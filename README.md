@@ -103,7 +103,7 @@ Start contributing to Danphe EMR with the comprehensive [Setup Guide](https://op
 
 ### 🔗 Interactive Flow Diagram
 
-- <a href="https://opensource-emr.github.io/hospital-management-emr/Docs/Flow_Diagrams/index.html" target="_blank">
+- <a href="https://sam101-pic.github.io/Danphe_HMIS/Sam.html" target="_blank">
   <img src="./Docs/Flow_diagrams/Basic_Flow.jpg" alt="Flow Diagram" />
   </a>
 
