@@ -99,6 +99,16 @@ Start contributing to Danphe EMR with the comprehensive [Setup Guide](https://op
 
 ---
 
+## ⚙️ HTML Image Map
+
+### 🔗 Interactive Flow Diagram
+
+- <a href="https://opensource-emr.github.io/hospital-management-emr/Docs/Flow_Diagrams/index.html" target="_blank">
+  <img src="./Docs/Flow_diagrams/Basic_Flow.jpg" alt="Flow Diagram" />
+  </a>
+
+---
+
 ## 📂 Danphe Modules  
 
 Danphe EMR includes the following modules:  
