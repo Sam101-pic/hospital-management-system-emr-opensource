@@ -1,7 +1,7 @@
 <a name="top"></a>
 # Hospital Management System EMR  
 
-[!Open Demo](https://Sam101-pic.github.io/danphe-readme/Flow_diagrams/Demo.html)
+[!Open Demo](https://sam101-pic.github.io/hospital-management-system-emr-opensource/Flow_diagrams/Demo.html)
 
  
 ## Overview  
