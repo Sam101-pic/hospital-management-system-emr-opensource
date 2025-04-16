@@ -1,7 +1,10 @@
 <a name="top"></a>
-# Hospital Management System EMR  
+# Hospital Management System EMR
 
-[![Project Walkthrough](https://img.youtube.com/vi/_PfG1i67uC4/maxresdefault.jpg)](https://Sam101-pic/hospital-management-system-emr-opensource/Flow_diagrams/Demo.html)
+Watch the demo video on YouTube:  
+[![Hospital Management System EMR](https://img.youtube.com/vi/_PfG1i67uC4/0.jpg)](https://www.youtube.com/watch?v=_PfG1i67uC4)
+
+
 > Click on the image above to have a clear walkthrough of our Hospital Management & EMR System. 
 
  
