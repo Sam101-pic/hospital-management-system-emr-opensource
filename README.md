@@ -1,8 +1,19 @@
 <a name="top"></a>
-# Hospital Management System EMR  
+# Hospital Management System EMR
 
-![Hospital Management System EMR](https://user-images.githubusercontent.com/48054642/159859670-05cbe026-f0eb-43cf-811a-0404a36a76f7.jpg)
+### Watch the demo video on YouTube:  
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=_PfG1i67uC4" target="_blank">
+    <img src="https://img.youtube.com/vi/_PfG1i67uC4/0.jpg" alt="Hospital Management System EMR" />
+  </a>
+</p>
 
+<p align="center">
+  ▶️ Click on the image above to have a clear walkthrough of our Hospital Management & EMR System.
+  </p>
+
+
+ 
 ## Overview  
 
 Danphe EMR is an enterprise web-based application that simplifies hospital management. Over 50 hospitals trust it in Asia (India, Nepal, Bangladesh) and provide comprehensive solutions for daily operations.  
@@ -33,6 +44,7 @@ Danphe HMIS has been consistent throughout these years and with that there are s
 - [ Having Issues](#️-having-issues)
 - [ Demo Link](#-demo-link)
 - [ Installation and Setup (For Developers)](#-installation-and-setup-for-developers)
+- [ HTML Image Map](#️-html-image-map)
 - [ Danphe Modules](#-danphe-modules)
 - [ DB Understanding Tutorial](#-db-understanding-tutorial)
 - [ Cleanup Scripts](#️-cleanup-scripts)
@@ -103,11 +115,11 @@ Start contributing to Danphe EMR with the comprehensive [Setup Guide](https://op
 
 ### 🔗 Interactive Flow Diagram
 
-- <a href="https://sam101-pic.github.io/Danphe_HMIS/Sam.html" target="_blank">
+
+<a href="https://sam101-pic.github.io/Danphe_HMIS/Sam.html" target="_blank">
   <img src="./Docs/Flow_diagrams/Basic_Flow.jpg" alt="Flow Diagram" />
   </a>
 
----
 
 ## 📂 Danphe Modules  
 
