@@ -1,7 +1,7 @@
 <a name="top"></a>
 # Hospital Management System EMR
 
-### Watch the demo video on YouTube:  
+### Watch the below video to see how Danphe EMR functions.  
 <p align="center">
   <a href="https://www.youtube.com/watch?v=_PfG1i67uC4" target="_blank">
     <img src="https://img.youtube.com/vi/_PfG1i67uC4/0.jpg" alt="Hospital Management System EMR" />
