@@ -2,8 +2,11 @@
 # Hospital Management System EMR
 
 Watch the demo video on YouTube:  
-[![Hospital Management System EMR](https://img.youtube.com/vi/_PfG1i67uC4/0.jpg)](https://www.youtube.com/watch?v=_PfG1i67uC4)
-
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=_PfG1i67uC4" target="_blank">
+    <img src="https://img.youtube.com/vi/_PfG1i67uC4/0.jpg" alt="Hospital Management System EMR" />
+  </a>
+</p>
 
 > Click on the image above to have a clear walkthrough of our Hospital Management & EMR System. 
 
