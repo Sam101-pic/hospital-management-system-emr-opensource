@@ -1,18 +1,9 @@
 <a name="top"></a>
 # Hospital Management System EMR  
 
-<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; margin: 20px auto;">
-  <iframe 
-    src="https://www.youtube.com/embed/_PfG1i67uC4?start=0" 
-    title="Hospital Management System EMR"
-    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" 
-    frameborder="0" 
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-    allowfullscreen>
-  </iframe>
-</div>
+[!Open Demo](https://Sam101-pic.github.io/danphe-readme/Flow_diagrams/Demo.html)
 
-
+ 
 ## Overview  
 
 Danphe EMR is an enterprise web-based application that simplifies hospital management. Over 50 hospitals trust it in Asia (India, Nepal, Bangladesh) and provide comprehensive solutions for daily operations.  
