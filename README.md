@@ -1,7 +1,17 @@
 <a name="top"></a>
 # Hospital Management System EMR  
 
-![Hospital Management System EMR](https://user-images.githubusercontent.com/48054642/159859670-05cbe026-f0eb-43cf-811a-0404a36a76f7.jpg)
+<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; margin: 20px auto;">
+  <iframe 
+    src="https://www.youtube.com/embed/_PfG1i67uC4?start=0" 
+    title="Hospital Management System EMR"
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" 
+    frameborder="0" 
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+    allowfullscreen>
+  </iframe>
+</div>
+
 
 ## Overview  
 
@@ -33,6 +43,7 @@ Danphe HMIS has been consistent throughout these years and with that there are s
 - [ Having Issues](#️-having-issues)
 - [ Demo Link](#-demo-link)
 - [ Installation and Setup (For Developers)](#-installation-and-setup-for-developers)
+- [ HTML Image Map](#️-html-image-map)
 - [ Danphe Modules](#-danphe-modules)
 - [ DB Understanding Tutorial](#-db-understanding-tutorial)
 - [ Cleanup Scripts](#️-cleanup-scripts)
