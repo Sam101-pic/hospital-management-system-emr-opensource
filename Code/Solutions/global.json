@@ -1,0 +1,11 @@
+{
+  "projects": [
+    "src",
+    "test"
+    //".\\src\\Web\\Plugins"
+
+  ],
+  "sdk": {
+    "version": "8.0.302"
+  }
+}
