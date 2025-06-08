@@ -23,6 +23,7 @@ export class ProfileItemMapModel {
   public DocObj = {};
   public OpdSelected: boolean = true;
   public IpdSelected: boolean = true;
+  PriceCategoryName: string;
 
   IsPercentageValid: boolean = true;//pratik:30Jan'20 -- for individual validation of AssignedTo and Referral Percent. Only to be used in Client side.
 

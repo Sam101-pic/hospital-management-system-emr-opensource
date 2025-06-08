@@ -2,6 +2,7 @@
   <input type="button" class="btn btn-sm primary-btn m1" (click)="AddItem()" value="Add Item" />
   <item-add [showAddPage]="showAddPage"
             [selectedItem]="selectedItem"
+            [itemList]="itemList"
             (callback-add)="CallBackAdd($event)"></item-add>
 </div>
 <div class="row">
@@ -14,5 +15,3 @@
     </danphe-grid>
   </div>
 </div>
-
-

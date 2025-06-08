@@ -139,7 +139,7 @@
           </div>
 
           <div class="clear"></div>
-          <p class="text-center btm-pad border-up-down"><b>&nbsp;Goods&nbsp;Receipt&nbsp;DETAILS&nbsp;PRINT</b></p>
+          <p class="text-center btm-pad border-up-down"><b>&nbsp;Goods&nbsp;Receipt&nbsp;Details&nbsp;Print</b></p>
           <div class="clear"></div>
           <div class="clear footer"></div>
           <div *ngIf="GoodsReceiptVM != null">
@@ -436,7 +436,7 @@
                     <table width="100%" style="border-left: 2px solid #ccc; padding-left: 5px;">
                       <tr>
                         <td><b style="font-size:18px;">P.O. No. : </b></td>
-                        <td style="font-size: 18px;">{{GoodsReceiptVM.OrderDetails.PurchaseOrderId || "N/A"}} </td>
+                        <td style="font-size: 18px;">{{GoodsReceiptVM.OrderDetails.PONumber || "N/A"}} </td>
                       </tr>
                       <tr>
                         <td><b>P.O. Date :</b></td>

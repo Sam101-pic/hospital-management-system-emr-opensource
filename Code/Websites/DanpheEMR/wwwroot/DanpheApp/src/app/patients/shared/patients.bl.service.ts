@@ -8,6 +8,8 @@ import { ClinicalDLService } from '../../clinical/shared/clinical.dl.service';
 import { LabsDLService } from '../../labs/shared/labs.dl.service';
 import { ImagingDLService } from '../../radiology/shared/imaging.dl.service';
 import { PatientFilesModel } from './patient-files.model';
+import { MedicareDependentModel } from './patient-medicare-dependent.model';
+import { MedicareMemberModel } from './patient-medicare-member.model';
 import { Patient } from './patient.model';
 import { PatientsDLService } from './patients.dl.service';
 
@@ -27,14 +29,82 @@ export class PatientsBLService {
     public admissionDLService: ADT_DLService) {
 
   }
+
+  public GetSalutationList() {
+    return this.patientDLService.GetSalutationList()
+      .map(res => { return res; });
+  }
+  public GetMedicarePatientList() {
+    return this.patientDLService.GetMedicarePatients()
+      .map(res => res);
+  }
+  public GetAllDepartment() {
+    return this.patientDLService.GetAllDepartments()
+      .map(res => res);
+  }
+
+  public GetAllDesignations() {
+    return this.patientDLService.GetAllDesignations()
+      .map(res => res);
+  }
+  public GetAllMedicareTypes() {
+    return this.patientDLService.GetAllMedicareTypes()
+      .map(res => res);
+  }
+  public GetAllMedicareInstitutes() {
+    return this.patientDLService.GetAllMedicareInstitutes()
+      .map(res => res);
+  }
+  public GetAllInsuranceProviderList() {
+    return this.patientDLService.GetAllInsuranceProviderList()
+      .map(res => res);
+  }
+  public GetPatientsWithVisitsInfo(searchTxt) {
+    return this.patientDLService.GetPatientsWithVisitsInfo(searchTxt)
+      .map(res => res);
+  }
+
+  public GetMedicareMemberDetailByPatientId(patientId) {
+    return this.patientDLService.GetMedicareMemberDetailByPatientId(patientId)
+      .map(res => res);
+  }
+  public GetMedicareDependentMemberDetailByPatientId(patientId) {
+    return this.patientDLService.GetMedicareDependentMemberDetailByPatientId(patientId)
+      .map(res => res);
+  }
+  public GetMedicareMemberDetailByMedicareNumber(memberNo) {
+    return this.patientDLService.GetMedicareMemberDetailByMedicareNumber(memberNo)
+      .map(res => res);
+  }
+  public PostMedicareDependentDetails(medicareDepDetails: MedicareDependentModel) {
+    let dependentDetails = _.omit(medicareDepDetails, ['MedicareDependentValidator']);
+    return this.patientDLService.PostMedicareDependentDetails(dependentDetails)
+      .map(res => res);
+  }
+  public PutMedicareDependentDetails(medicareDepDetails: MedicareDependentModel) {
+    let dependentDetails = _.omit(medicareDepDetails, ['MedicareDependentValidator']);
+    return this.patientDLService.PutMedicareDetails(dependentDetails)
+      .map(res => res);
+  }
+  public PostMedicareMemberDetails(medicareMemDetails: MedicareMemberModel) {
+    let memberDetails = _.omit(medicareMemDetails, ['MedicareMemberValidator']);
+    return this.patientDLService.PostMedicareMemberDetails(memberDetails)
+      .map(res => res);
+  }
+  public PutMedicareMemberDetails(medicareMemDetails: MedicareMemberModel) {
+    let memberDetails = _.omit(medicareMemDetails, ['MedicareMemberValidator']);
+    return this.patientDLService.PutMedicareDetails(memberDetails)
+      .map(res => res);
+  }
+
   // for getting the Patient
   public GetPatients(searcgTxt) {
     return this.patientDLService.GetPatients(searcgTxt)
       .map(res => { return res })
   }
   //  get registered patients
-  public GetPatientsList(searcgTxt) {
-    return this.patientDLService.GetPatientsList(searcgTxt)
+  public GetPatientsList(searcgTxt, searchUsingHospitalNo) {
+    return this.patientDLService.GetPatientsList(searcgTxt, searchUsingHospitalNo)
       .map(res => { return res })
   }
 
@@ -283,6 +353,10 @@ export class PatientsBLService {
     return this.patientDLService.GetCastEthnicGroupList().map((res) => {
       return res;
     });
+  }
+
+  GetPatientHealthCardTemplates(templateCode: string, patientid: number) {
+    return this.patientDLService.GetPatientHealthCardTemplates(templateCode, patientid).map(res => { return res; });
   }
 }
 

@@ -28,6 +28,9 @@ export class ServiceItemDetails_DTO {
   public IntegrationName: string = null;
   public DisplaySequence: number = null;
   public IsPackageBilling: boolean = false;
+  public AllowMultipleQty: boolean = true;
   public PerformerId: number = null;
   public DefaultDoctorList: string = null;
+  public IsDiscountEditableInSales: boolean = false;
+  public IsItemLevelDiscount: boolean = false;
 }

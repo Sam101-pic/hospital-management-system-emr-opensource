@@ -4,11 +4,11 @@ import {
 } from '@angular/core';
 import { CoreService } from '../../../core/shared/core.service';
 import { SecurityService } from '../../../security/shared/security.service';
+import { GridEmitModel } from '../../../shared/danphe-grid/grid-emit.model';
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import LabLISGridColumnSettings from '../shared/lis-grid-col.settings';
 import { LabLISBLService } from '../shared/lis.bl.service';
-import { GridEmitModel } from '../../../shared/danphe-grid/grid-emit.model';
-import { LabToLisComponentMapTemp } from '../shared/lis-comp-mapping.model';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 
 @Component({
     templateUrl: "./lis-mapping.html"
@@ -31,13 +31,13 @@ export class LISMappingComponent {
     public GetAllMappedDataData() {
         this.coreService.loading = true;
         this.labLISBlService.GetAllLISMappedData().subscribe(res => {
-            if (res.Status == "OK") {
+            if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
                 this.allMappedData = res.Results;
                 this.coreService.loading = false;
             }
-        }, (err) => { 
-            this.messageService.showMessage("notice",["Unable to get LIS Mappted data."]); 
-            this.coreService.loading = false; 
+        }, (err) => {
+            this.messageService.showMessage(ENUM_MessageBox_Status.Notice, ["Unable to get LIS Mappted data."]);
+            this.coreService.loading = false;
         });
     }
 
@@ -57,6 +57,10 @@ export class LISMappingComponent {
                 this.showMappingDeleteAlert = true;
                 break;
             }
+            case "activate": {
+                this.ActivateMapping(event.Data.LISComponentMapId)
+                break;
+            }
             default:
                 break;
         }
@@ -69,14 +73,14 @@ export class LISMappingComponent {
     Remove(decision: boolean) {
         if (decision) {
             this.labLISBlService.RemoveLisMapping(this.selectedLisCompMapId).subscribe(res => {
-                if (res.Status == "OK") {
+                if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
                     this.showMappingDeleteAlert = false;
                     this.selectedLisCompMapId = null;
                     this.GetAllMappedDataData();
                 }
             }, (err) => {
                 console.log(err.error.ErrorMessage); this.coreService.loading = false; this.selectedLisCompMapId = null;
-                this.messageService.showMessage('error', ['Sorry this mapping cannot be deleted now. Please try again Later.'])
+                this.messageService.showMessage(ENUM_MessageBox_Status.Error, ['Sorry this mapping cannot be deleted now. Please try again Later.'])
             });
         } else {
             this.selectedLisCompMapId = null;
@@ -90,5 +94,19 @@ export class LISMappingComponent {
             this.GetAllMappedDataData();
         }
         this.selectedLisCompMapId = null;
+    }
+
+    ActivateMapping(id: number) {
+        this.coreService.loading = true;
+        this.labLISBlService.ActivateMapping(id)
+            .finally(() => { this.coreService.loading = false; })
+            .subscribe(res => {
+                if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+                    this.GetAllMappedDataData();
+                }
+            }, (err) => {
+                console.log(err.error.ErrorMessage);
+                this.messageService.showMessage(ENUM_MessageBox_Status.Error, ['Sorry this mapping cannot be activated now. Please try again Later.'])
+            });
     }
 }

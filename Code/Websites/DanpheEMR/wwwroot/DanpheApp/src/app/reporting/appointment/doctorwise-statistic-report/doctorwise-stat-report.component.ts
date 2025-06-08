@@ -137,12 +137,12 @@ export class RPT_APPT_DoctortwiseStatisticsReportComponent {
     SummaryCalculation() {
         if (this.DoctorWiseStatisticsReportData != null) {
             this.DoctorWiseStatisticsReportData.forEach(appt => {
-                this.summary.tot_AdultNew += appt.NewMaleAdult + appt.NewFemaleAdult;
-                this.summary.tot_ChildNew += appt.NewFemaleChild + appt.NewMaleChild;
-                this.summary.tot_NewVisitPatients += appt.NewMaleAdult + appt.NewFemaleAdult + appt.NewFemaleChild + appt.NewMaleChild;
-                this.summary.tot_Old_Adult += appt.OldFemaleAdult + appt.OldMaleAdult;
-                this.summary.tot_Old_Child += appt.OldFemaleChild + appt.OldMaleChild;
-                this.summary.tot_Old_Patients += appt.OldFemaleAdult + appt.OldMaleAdult + appt.OldFemaleChild + appt.OldMaleChild;
+                this.summary.tot_AdultNew += appt.NewMaleAdult + appt.NewFemaleAdult + appt.NewOtherAdult;
+                this.summary.tot_ChildNew += appt.NewFemaleChild + appt.NewMaleChild + appt.NewOtherChild;
+                this.summary.tot_NewVisitPatients += appt.NewMaleAdult + appt.NewFemaleAdult + appt.NewOtherAdult + appt.NewFemaleChild + appt.NewMaleChild + appt.NewOtherChild;
+                this.summary.tot_Old_Adult += appt.OldFemaleAdult + appt.OldMaleAdult + appt.OldOtherAdult;
+                this.summary.tot_Old_Child += appt.OldFemaleChild + appt.OldMaleChild + appt.OldOtherChild;
+                this.summary.tot_Old_Patients += appt.OldFemaleAdult + appt.OldMaleAdult + appt.OldOtherAdult + appt.OldFemaleChild + appt.OldMaleChild + appt.OldOtherChild;
                 this.summary.tot_RegisteredVisitPatients += appt.Total;
             });
         }

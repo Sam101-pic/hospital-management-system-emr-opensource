@@ -1,35 +1,32 @@
-import { NgModule } from "@angular/core";
-import { RouterModule } from "@angular/router";
+import { FamilyHistoryListComponent } from "../clinical/history/family-history-list.component";
+import { SocialHistoryListComponent } from "../clinical/history/social-history-list.component";
+import { SurgicalHistoryListComponent } from "../clinical/history/surgical-history-list.component";
+import { MedicalProblemListComponent } from "../clinical/problems/medical-problem-list.component";
+import { PastMedicalComponent } from "../clinical/problems/past-medical.component";
+import { ProblemsMainComponent } from "../clinical/problems/problems-main.component";
 import { DoctorsMainComponent } from "../doctors/doctors-main.component";
 import { PatientOverviewMainComponent } from "../doctors/patient/patient-overview-main.component";
 import { PatientOverviewComponent } from "../doctors/patient/patient-overview.component";
-import { SelectVisitCanActivateGuard } from "../shared/select-visit-canactivate-guard";
 import { PatientVisitHistoryComponent } from "../doctors/patient/patient-visit-history.component";
-import { ResetPatientcontextGuard } from "../shared/reset-patientcontext-guard";
 import { ResetDoctorcontextGuard } from "../shared/reset-doctorcontext-guard";
-import { ProblemsMainComponent } from "../clinical/problems/problems-main.component";
-import { MedicalProblemListComponent } from "../clinical/problems/medical-problem-list.component";
-import { PastMedicalComponent } from "../clinical/problems/past-medical.component";
-import { FamilyHistoryListComponent } from "../clinical/history/family-history-list.component";
-import { SurgicalHistoryListComponent } from "../clinical/history/surgical-history-list.component";
-import { SocialHistoryListComponent } from "../clinical/history/social-history-list.component";
+import { ResetPatientcontextGuard } from "../shared/reset-patientcontext-guard";
+import { SelectVisitCanActivateGuard } from "../shared/select-visit-canactivate-guard";
 import { VisitSummaryCreateComponent } from "./visit/visit-summary-create.component";
-import { VisitSummaryMainComponent } from "./visit/visit-summary-main.component";
 import { VisitSummaryHistoryComponent } from "./visit/visit-summary-history.component";
-import { DoctorsNotesComponent } from "./notes/doctors-notes.component";
+import { VisitSummaryMainComponent } from "./visit/visit-summary-main.component";
 //import { NotesComponent } from '../clinical/notes/notes.component';
+import { PageNotFound } from "../404-error/404-not-found.component";
+import { ClinicalOverviewWrapperComponent } from "../clinical-new/clinical-overview-wrapper/clinical-overview-wrapper.component";
 import { PatientCurrentMedicationsComponent } from "../clinical/medications/patient-current-medications.component";
 import { PatientClinicalDocumentsComponent } from "../clinical/others/patient-clinical-documents.component";
-import { AuthGuardService } from "../security/shared/auth-guard.service";
 import { PatientScannedImages } from "../clinical/scanned-images/patient-scanned-images.component";
+import { AuthGuardService } from "../security/shared/auth-guard.service";
 import { IPDMainComponent } from "./ipd/ipd-main.component";
-import { ReferralSourceListComponent } from "./referral-source/referral-source-list.component";
-import { PageNotFound } from "../404-error/404-not-found.component";
-import { QuestionComponent } from "../core/dyn-templates/controls/question.component";
-import { InPatientDischargeSummaryComponent } from "./patient/in-patient-discharge-summary.component";
-import { OpdRecordComponent } from "./opd/opd-record/opd-record.component";
 import { OPNewPatientComponent } from "./opd/op-new-patient/op-new-patient.component";
+import { OpdRecordComponent } from "./opd/opd-record/opd-record.component";
 import { OutpatientMainComponent } from "./opd/outpatient-main.component";
+import { InPatientDischargeSummaryComponent } from "./patient/in-patient-discharge-summary.component";
+import { ReferralSourceListComponent } from "./referral-source/referral-source-list.component";
 export const DoctorsRoutingConstant = [
   {
     path: "",
@@ -65,6 +62,10 @@ export const DoctorsRoutingConstant = [
         path: "PatientRecord",
         component: IPDMainComponent,
         data: { patientAdmissionstatus: 'discharged' }
+      },
+      {
+        path: 'Clinical-Overview',
+        component: ClinicalOverviewWrapperComponent,
       },
       {
         path: "PatientOverviewMain",

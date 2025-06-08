@@ -1,13 +1,11 @@
-import * as moment from 'moment/moment';
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
-import { NepaliCalendarService } from './calendar/np/nepali-calendar.service';
-import { CoreService } from "../core/shared/core.service";
-import { PrinterSettingsModel } from '../settings-new/printers/printer-settings.model';
 import { Router } from '@angular/router';
-import { SecurityService } from '../security/shared/security.service';
-import { ENUM_ACC_ReportStaticName } from './shared-enums';
-import { AccountingService } from '../accounting/shared/accounting.service';
 import { Base64 } from 'js-base64';
+import * as moment from 'moment/moment';
+import { AccountingService } from '../accounting/shared/accounting.service';
+import { CoreService } from "../core/shared/core.service";
+import { SecurityService } from '../security/shared/security.service';
+import { PrinterSettingsModel } from '../settings-new/printers/printer-settings.model';
+import { NepaliCalendarService } from './calendar/np/nepali-calendar.service';
 
 
 //common functions are groupped in this class. 
@@ -184,10 +182,10 @@ export class CommonFunctions {
     }
     else {
       checkoutDate = moment(checkoutDate).subtract(1, 'days').set({ hour: chkOutHour, minute: chkOutMinute, second: 0, millisecond: 0 }).format('YYYY-MM-DD HH:mm');
-    }
-    //start calculation from start of the day i.e end of the previous day.
-    var checkinDate = moment(inDate).subtract(1, 'days').set({ hour: chkOutHour, minute: chkOutMinute, second: 0, millisecond: 0 }).format('YYYY-MM-DD HH:mm');
 
+    }
+    //'checkinDate' is directly aligned with the 'inDate' and adjusted according to 'checkouttimeparameter' which ensures that the totalDays calculation reflects the actual stay period...
+    let checkinDate = moment(inDate).set({ hour: chkOutHour, minute: chkOutMinute, second: 0, millisecond: 0 }).format('YYYY-MM-DD HH:mm');
     //var duration = moment.duration(moment(checkoutDate).diff(moment(checkinDate)));
     //var totalDays = duration.days() + (duration.months() * moment(inDate, 'YYYY-MM').daysInMonth());
 
@@ -351,10 +349,46 @@ export class CommonFunctions {
 
         let uri = 'data:application/vnd.ms-excel;base64,'
           , template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><meta http-equiv="content-type" content="text/plain; charset=UTF-8"/></head><body><table>{PrintDate}{DateRange}{Heading}{table}</table></body></html>'
-          , base64 = function (s) { return window.btoa(decodeURIComponent(encodeURIComponent(s))) }
+          , base64 = function (s) { return Base64.toBase64(decodeURIComponent(encodeURIComponent(s))) }
           , format = function (s, c) { return s.replace(/{(\w+)}/g, function (m, p) { return c[p]; }) }
         if (!table.nodeType) table = document.getElementById(table)
-        var ctx = { worksheet: name || workSheetName, table: table.innerHTML, PrintDate: PrintDate, DateRange: dateRange, Heading: Heading }
+        var ctx = { worksheet: workSheetName, table: table.innerHTML, PrintDate: PrintDate, DateRange: dateRange, Heading: Heading }
+        //return window.location.href = uri + base64(format(template, ctx))             
+        var link = document.createElement('a');
+        link.href = uri + base64(format(template, ctx));
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (ex) {
+      console.log(ex);
+    }
+  }
+  static ConvertHTMLTableToExcelForPharmacy(table: any, fromDate: string, toDate: string, SheetName: string, TableHeading: string, FileName: string) {
+    try {
+      if (table) {
+        let workSheetName = (SheetName.length > 0) ? SheetName : 'Sheet';
+        let PrintDate = '<b>Created Date:' + moment().format('YYYY-MM-DD') + '</b><br />'
+        let fromDateNp: any;
+        let toDateNp = '';
+        if (fromDate.length > 0 && toDate.length > 0) {
+          fromDateNp = '<span style:"text-align: center; float: right;">' + NepaliCalendarService.ConvertEngToNepaliFormatted_static(fromDate, '') + '</span>';
+          toDateNp = '<span style:"text-align: center; float: right;">' + NepaliCalendarService.ConvertEngToNepaliFormatted_static(toDate, '') + '</span>';
+        }
+        let dateRange = (fromDate.length > 0 && toDate.length > 0) ? '<b>Date Range:(AD)' + fromDate + ' To ' + toDate + '</b><br /><b>Date Range: (BS)' + fromDateNp + ' To ' + toDateNp + '</b><br/>' : '';
+
+        let Heading = '<table><tr><td style="text-align: center; font-size:25px" colspan="9">' + TableHeading + '</td></tr></table>'
+        // let Heading = '<h3 style="background-color: red; text-align: center;">' + TableHeading + '</h3>';
+        let filename = (FileName.length > 0) ? FileName : 'Exported_Excel_File';
+        filename = filename + '_' + moment().format('YYYYMMMDDhhss') + '.xls';
+
+        let uri = 'data:application/vnd.ms-excel;base64,'
+          , template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><meta http-equiv="content-type" content="text/plain; charset=UTF-8"/></head><body><table>{PrintDate}{DateRange}{Heading}{table}</table></body></html>'
+          , base64 = function (s) { return Base64.toBase64(decodeURIComponent(encodeURIComponent(s))) }
+          , format = function (s, c) { return s.replace(/{(\w+)}/g, function (m, p) { return c[p]; }) }
+        if (!table.nodeType) table = document.getElementById(table)
+        var ctx = { worksheet: workSheetName, table: table.innerHTML, PrintDate: PrintDate, DateRange: dateRange, Heading: Heading }
         //return window.location.href = uri + base64(format(template, ctx))             
         var link = document.createElement('a');
         link.href = uri + base64(format(template, ctx));
@@ -1137,7 +1171,24 @@ export class CommonFunctions {
           , base64 = function (s) { return window.btoa(decodeURIComponent(encodeURIComponent(s))) }
           , format = function (s, c) { return s.replace(/{(\w+)}/g, function (m, p) { return c[p]; }) }
         if (!table.nodeType) table = document.getElementById(table)
-        var ctx = { worksheet: name || workSheetName, table: table.innerHTML, Header: Header, footer: Footer }
+
+        // Collect only visible rows from the table
+        let visibleRowsHTML = '';
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+          if (this.HasContent(row)) { // Check if the row is actually visible
+            visibleRowsHTML += row.outerHTML;
+          }
+        });
+
+        let ctx = {
+          worksheet: name || workSheetName,
+          table: visibleRowsHTML, // Use the visible rows HTML
+          Header: Header,
+          footer: Footer
+        };
+
+        //var ctx = { worksheet: name || workSheetName, table: table.innerHTML, Header: Header, footer: Footer }
         //return window.location.href = uri + base64(format(template, ctx))             
         var link = document.createElement('a');
         link.href = uri + base64(format(template, ctx));
@@ -1159,4 +1210,7 @@ export class CommonFunctions {
     return text;
   }
 
+  public static HasContent(row: HTMLTableRowElement) {
+    return Array.from(row.cells).some(cell => cell.textContent.trim().length > 0);
+  }
 }

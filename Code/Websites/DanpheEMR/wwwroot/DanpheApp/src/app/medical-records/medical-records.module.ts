@@ -28,6 +28,7 @@ import { InpatientMorbidityReportComponent } from './mr-reports/government/inpat
 import { GovInpatientOutcomeReportComponent } from './mr-reports/government/inpatient-outcome/gov-inpatient-outcome-report.component';
 import { GovLaboratoryServicesReportComponent } from './mr-reports/government/lab-services/gov-laboratory-services.component';
 import { LabKeysPipe } from './mr-reports/government/lab-services/laboratory.pipe';
+import { NonCommunicableDiseaseReportComponent } from './mr-reports/government/non-communicable-disease/non-communicable-disease-report';
 import { OutpatientMorbidityReportComponent } from './mr-reports/government/outpatient-morbidity/mr-outpatient-morbidity-report';
 import { GovSummaryReportComponent } from './mr-reports/government/summary/govt-summary-report.component';
 import { OutpatientServicesReportComponent } from './mr-reports/mr-outpatient-services-report';
@@ -87,7 +88,8 @@ import { MR_DLService } from './shared/mr.dl.service';
     EmergencyPatientListComponent,
     EmergencyAddFinalDiagnosisComponent,
     EmergencyPatientMorbidityReportComponent,
-    EthnicGroupStatisticsReportComponent
+    EthnicGroupStatisticsReportComponent,
+    NonCommunicableDiseaseReportComponent
   ],
   bootstrap: []
 

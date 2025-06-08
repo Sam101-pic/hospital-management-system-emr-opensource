@@ -96,7 +96,12 @@ export class IncentiveBLService {
 
   //                        *** POST ***
   public AddProfile(profileObj) {
-    const data = _.omit(profileObj, ['ProfileValidator']);
+    const data = {
+      ..._.omit(profileObj, ['ProfileValidator']),
+      ProfileBillItemMap: profileObj.ProfileBillItemMap.map(item =>
+        _.omit(item, ['ProfileItemMapValidator'])
+      )
+    };
     return this.incentiveDL.AddProfile(data).map(res => res);
   }
 
@@ -203,5 +208,22 @@ export class IncentiveBLService {
   public UpdateProfile(profileObj) {
     const data = _.omit(profileObj, ['ProfileValidator']);
     return this.incentiveDL.UpdateProfile(data).map(res => res);
+  }
+
+  GetFilteredServiceItems(requestPayload) {
+    const requestFilterPayload = {
+      PriceCategoryId: requestPayload.PriceCategoryId,
+      ServiceDepartmentIds: requestPayload.ServiceDepartmentIds.join(','),
+    };
+    return this.incentiveDL.GetFilteredServiceItems(requestFilterPayload).map(res => res);
+  }
+  GetMasterServiceItems() {
+    return this.incentiveDL.GetMasterServiceItems().map(res => {
+      return res;
+    });
+  }
+  public GetPatientsWithVisitsInfo(searchTxt) {
+    return this.incentiveDL.GetPatientsWithVisitsInfo(searchTxt)
+      .map(res => res);
   }
 }

@@ -71,11 +71,11 @@ export class RPT_BIL_DepartmentWiseDiscountSchemeReportComponent {
   }
 
   Load() {
-    var membershipTypeId = !!this.DiscountScheme ? this.DiscountScheme.MembershipTypeId : null;
-    var serviceDepartmentId = !!this.ServiceDepartment ? this.ServiceDepartment.ServiceDepartmentId : null;
+    const schemeId = this.DiscountScheme != null ? this.DiscountScheme.SchemeId : null
+    const serviceDepartmentId = this.ServiceDepartment != null ? this.ServiceDepartment.ServiceDepartmentId : null;
     let payment = (this.PaymentMode != null && this.PaymentMode != 'All') ? this.PaymentMode : "";
     this.dlService.Read("/BillingReports/Billing_DepartmentWiseDiscountSchemeReport?FromDate="
-      + this.fromDate + "&ToDate=" + this.toDate + "&MembershipTypeId=" + membershipTypeId + "&ServiceDepartmentId=" + serviceDepartmentId + "&PaymentMode=" + payment)
+      + this.fromDate + "&ToDate=" + this.toDate + "&MembershipTypeId=" + schemeId + "&ServiceDepartmentId=" + serviceDepartmentId + "&PaymentMode=" + payment)
       .map(res => res)
       .subscribe(res => this.Success(res),
         res => this.Error(res));
@@ -84,7 +84,7 @@ export class RPT_BIL_DepartmentWiseDiscountSchemeReportComponent {
   Success(res) {
     if (res.Status == "OK") {
       let data = res.Results;
-      if (data.length > 0) {
+      if (data && data.length > 0) {
         this.DepartmentWiseDiscountSchemeGridData = null;
         this.DepartmentWiseDiscountSchemeGridData = data;
         this.cdr.detectChanges();
@@ -95,6 +95,14 @@ export class RPT_BIL_DepartmentWiseDiscountSchemeReportComponent {
         this.footerContent = document.getElementById("summaryFooter").innerHTML;
       }
       else {
+        this.DepartmentWiseDiscountSchemeGridData = []; // Clear the grid data
+        this.summaryFormatted = {
+          TotalAmount: 0,
+          TotalDiscount: 0,
+          NetRefundAmount: 0,
+          HospitalCollection: 0
+        }
+        this.cdr.detectChanges();
         this.msgBoxServ.showMessage("notice-message", ['No Data is Available Between Selected Parameters...']);
       }
     }
@@ -117,9 +125,9 @@ export class RPT_BIL_DepartmentWiseDiscountSchemeReportComponent {
     switch ($event.Action) {
       case "viewDetails": {
         let billingTransactionId = $event.Data.BillingTransactionId;
-        let membershipTypeId = $event.Data.MembershipTypeId;
+        const schemeId = $event.Data.SchemeId;
         let serviceDepartmentId = $event.Data.ServiceDepartmentId;
-        this.LoadItemLevel(billingTransactionId, membershipTypeId, serviceDepartmentId);
+        this.LoadItemLevel(billingTransactionId, schemeId, serviceDepartmentId);
       }
       default:
         break;
@@ -187,7 +195,7 @@ export class RPT_BIL_DepartmentWiseDiscountSchemeReportComponent {
       .subscribe(res => {
         if (res.Status == "OK") {
           this.DiscountSchemeList = res.Results;
-          CommonFunctions.SortArrayOfObjects(this.DiscountSchemeList, "MembershipTypeName");
+          CommonFunctions.SortArrayOfObjects(this.DiscountSchemeList, "SchemeName");
           //this.CurrentUser = this.securityService.loggedInUser.Employee.FullName;
 
         }
@@ -199,8 +207,10 @@ export class RPT_BIL_DepartmentWiseDiscountSchemeReportComponent {
   }
 
   DiscountSchemeListFormatter(data: any): string {
-    var discountScheme = data["MembershipTypeName"] + ' ( ' + data["DiscountPercent"] + '% )';
-    return discountScheme;
+    // var discountScheme = data["MembershipTypeName"] + ' ( ' + data["DiscountPercent"] + '% )';
+    // return discountScheme;
+    return data["SchemeName"];
+
   }
 
   getSummary(data: any) {
@@ -216,8 +226,10 @@ export class RPT_BIL_DepartmentWiseDiscountSchemeReportComponent {
     });
     this.summaryFormatted.TotalAmount = CommonFunctions.parseAmount(this.summaryFormatted.TotalAmount);
     this.summaryFormatted.TotalDiscount = CommonFunctions.parseAmount(this.summaryFormatted.TotalDiscount);
-    this.summaryFormatted.NetRefundAmount = CommonFunctions.parseAmount(this.summaryFormatted.NetRefundAmount);
-    this.summaryFormatted.HospitalCollection = this.summaryFormatted.TotalAmount - (this.summaryFormatted.TotalDiscount + this.summaryFormatted.NetRefundAmount);
+
+    //! Bikesh: Adjusted the 'NetRefundAmount' calculation because 'NetRefundAmount' is negative and we need calculate only positive integer.
+    this.summaryFormatted.NetRefundAmount = - (CommonFunctions.parseAmount(this.summaryFormatted.NetRefundAmount));
+    this.summaryFormatted.HospitalCollection = this.summaryFormatted.TotalAmount - this.summaryFormatted.TotalDiscount - this.summaryFormatted.NetRefundAmount;
     this.summaryFormatted.HospitalCollection = CommonFunctions.parseAmount(this.summaryFormatted.HospitalCollection);
 
   }
@@ -235,8 +247,10 @@ export class RPT_BIL_DepartmentWiseDiscountSchemeReportComponent {
     });
     this.summaryFormattedForItemsReport.TotalAmount = CommonFunctions.parseAmount(this.summaryFormattedForItemsReport.TotalAmount);
     this.summaryFormattedForItemsReport.TotalDiscount = CommonFunctions.parseAmount(this.summaryFormattedForItemsReport.TotalDiscount);
-    this.summaryFormattedForItemsReport.NetRefundAmount = CommonFunctions.parseAmount(this.summaryFormattedForItemsReport.NetRefundAmount);
-    this.summaryFormattedForItemsReport.HospitalCollection = this.summaryFormattedForItemsReport.TotalAmount - (this.summaryFormattedForItemsReport.TotalDiscount + this.summaryFormattedForItemsReport.NetRefundAmount);
+
+    //! Bikesh: Adjusted the 'NetRefundAmount' calculation because 'NetRefundAmount' is negative and we need calculate only positive integer.
+    this.summaryFormattedForItemsReport.NetRefundAmount = -(CommonFunctions.parseAmount(this.summaryFormattedForItemsReport.NetRefundAmount));
+    this.summaryFormattedForItemsReport.HospitalCollection = this.summaryFormattedForItemsReport.TotalAmount - this.summaryFormattedForItemsReport.TotalDiscount - this.summaryFormattedForItemsReport.NetRefundAmount;
     this.summaryFormattedForItemsReport.HospitalCollection = CommonFunctions.parseAmount(this.summaryFormattedForItemsReport.HospitalCollection);
   }
 

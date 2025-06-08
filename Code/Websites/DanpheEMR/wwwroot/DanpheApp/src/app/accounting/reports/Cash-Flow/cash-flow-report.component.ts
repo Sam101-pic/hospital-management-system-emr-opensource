@@ -1,9 +1,11 @@
 import { ChangeDetectorRef, Component } from '@angular/core';
 import * as moment from 'moment/moment';
 import { CoreService } from '../../../core/shared/core.service';
+import { SecurityService } from '../../../security/shared/security.service';
 import { CommonFunctions } from '../../../shared/common.functions';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponseText, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { Hospital_DTO } from '../../settings/shared/dto/hospitals.dto';
 import { FiscalYearModel } from '../../settings/shared/fiscalyear.model';
 import { AccountingService } from '../../shared/accounting.service';
 import { AccountingReportsBLService } from "../shared/accounting-reports.bl.service";
@@ -28,9 +30,15 @@ export class CashFlowReportComponent {
     public printDetaiils: any;
     public dateRange: string = null;
     public OpeningData: number = 0;
+    public SelectedHospital: number = 0;
+    public HospitalList: Array<Hospital_DTO> = new Array<Hospital_DTO>();
+    public HospitalId: number = 1;
+    public ActiveHospital: number = 0;
+
     constructor(
         public coreservice: CoreService,
         public accountingService: AccountingService,
+        public securityService: SecurityService,
         public messageBoxService: MessageboxService,
         public accReportBLService: AccountingReportsBLService,
         private changeDetector: ChangeDetectorRef) {
@@ -41,6 +49,17 @@ export class CashFlowReportComponent {
         //this.LoadCalendarTypes();         
         this.calType = this.coreservice.DatePreference;
         this.accountingService.getCoreparameterValue();
+        this.CheckAndAssignHospital();
+
+    }
+    CheckAndAssignHospital() {
+        this.ActiveHospital = this.securityService.AccHospitalInfo.ActiveHospitalId;
+        this.HospitalList = this.accountingService.accCacheData.Hospitals ? this.accountingService.accCacheData.Hospitals : [];
+        if (this.HospitalList.length === 1) {
+            this.SelectedHospital = this.HospitalList[0].HospitalId;
+        } else {
+            this.SelectedHospital = this.ActiveHospital;
+        }
     }
     public fiscalYearId: number = null;
     public validDate: boolean = true;
@@ -67,9 +86,10 @@ export class CashFlowReportComponent {
     //Load cash flow data
     LoadData() {
         this.btndisabled = true;
+        this.HospitalId = this.SelectedHospital;
         if (this.ValidDateCheck()) {
             try {
-                this.accReportBLService.GetCashFlowReportData(this.fromDate, this.toDate, this.fiscalYearId)
+                this.accReportBLService.GetCashFlowReportData(this.fromDate, this.toDate, this.fiscalYearId, this.HospitalId)
                     .subscribe(res => {
                         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
                             this.btndisabled = false;
@@ -79,7 +99,9 @@ export class CashFlowReportComponent {
                             for (let value of Object.values(this.cashflowData)) {
                                 str += Object.values(value);
                             }
-                            this.cashflowData = JSON.parse(str);
+                            if (str !== "" && str !== null) {
+                                this.cashflowData = JSON.parse(str);
+                            }
                             this.CalculateTotalAmounts();
                             this.formatDataforDisplay();
                             this.showResult = true;
@@ -97,7 +119,6 @@ export class CashFlowReportComponent {
         }
         else {
             this.btndisabled = false;
-            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Please select valid data range."]);
         }
 
     }
@@ -109,11 +130,15 @@ export class CashFlowReportComponent {
     //need to check proper
     ValidDateCheck(): boolean {
         if (this.fromDate.toString().length <= 0) {
-            this.messageBoxService.showMessage("failed", ['From Date required']);
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['From Date required']);
             return false;
         }
         if (this.toDate.toString().length <= 0) {
-            this.messageBoxService.showMessage("failed", ['To Date required']);
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['To Date required']);
+            return false;
+        }
+        if (!this.HospitalId) {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ['Please select Account Section']);
             return false;
         }
         return true;

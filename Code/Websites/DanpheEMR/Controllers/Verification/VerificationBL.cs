@@ -2,6 +2,7 @@
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
+using DanpheEMR.ServerModel.InventoryModels;
 using DanpheEMR.ServerModel.LabModels;
 using DanpheEMR.ServerModel.VerificationModels.Pharmacy;
 using DanpheEMR.Services.Pharmacy.DTOs.PurchaseOrder;
@@ -11,6 +12,7 @@ using DanpheEMR.Services.Verification.DTOs.Pharmacy;
 using DanpheEMR.Utilities;
 using DanpheEMR.ViewModel.Pharmacy;
 using Google.Apis.Drive.v3.Data;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
@@ -178,8 +180,15 @@ namespace DanpheEMR.Controllers
                         }
                     }
                 }
+                int minimumDispatchLevel = 0;
+                var param = inventoryDbContext.CfgParameters.FirstOrDefault(p => p.ParameterGroupName == "Inventory" && p.ParameterName == "SigningPanelConfiguration");
+                if (param != null)
+                {
+                    var jsonObject = JObject.Parse(param.ParameterValue);
+                    minimumDispatchLevel = (int)jsonObject["MinimumDispatchLevel"];
+                }
 
-                if (CurrentVerificationLevelCount > 0 && requisition.MaxVerificationLevel == CurrentVerificationLevelCount)
+                if (CurrentVerificationLevelCount > 0 && (minimumDispatchLevel == CurrentVerificationLevelCount || requisition.MaxVerificationLevel == CurrentVerificationLevelCount))
                 {
                     requisition.RequisitionStatus = ENUM_InventoryRequisitionStatus.Active;
                 }
@@ -237,6 +246,10 @@ namespace DanpheEMR.Controllers
             {
                 var requisitionVM = new InventoryRequisitionViewModel();
                 requisitionVM.RequisitionItemList = inventoryDb.RequisitionItems.Where(RI => RI.RequisitionId == RequisitionId && RI.RequisitionItemStatus != "withdrawn").ToList();
+
+
+                var requisition = inventoryDb.Requisitions.Where(req => req.RequisitionId == RequisitionId).FirstOrDefault();
+
                 foreach (var item in requisitionVM.RequisitionItemList)
                 {
                     var itemDetails = inventoryDb.Items.Where(itm => itm.ItemId == item.ItemId)
@@ -247,10 +260,12 @@ namespace DanpheEMR.Controllers
                     item.Code = itemDetails.Code;
                     item.UOMName = itemUOMName;
                     item.IsEdited = false;
+                    item.AvailableQuantity = inventoryDb.StoreStocks
+                                                .Where(s => s.ItemId == item.ItemId && s.StoreId == requisition.RequestToStoreId)
+                                                .Sum(s => (double?)s.AvailableQuantity) ?? 0;
                 }
 
 
-                var requisition = inventoryDb.Requisitions.Where(req => req.RequisitionId == RequisitionId).FirstOrDefault();
                 if (requisition != null)
                 {
                     requisitionVM.RequestingUser.Name = GetNameByEmployeeId(requisition.CreatedBy, inventoryDb);
@@ -288,7 +303,7 @@ namespace DanpheEMR.Controllers
                 dispatchers = dispatchDetails.Select(D => new DispatchVerificationActor
                 {
                     DispatchId = D.DispatchId,
-                    Date = D.CreatedOn ?? default(DateTime),
+                    Date = D.DispatchedDate ?? default(DateTime),
                     Remarks = D.Remarks,
                     Name = D.DispatchedByName,
                     isReceived = D.isReceived
@@ -297,6 +312,26 @@ namespace DanpheEMR.Controllers
 
             return dispatchers;
         }
+
+
+        public static object GetReceiversFromRequisitionId(int RequisitionId, InventoryDbContext inventoryDbContext)
+        {
+
+            var receiveDetails = (from
+                                    dis in inventoryDbContext.Dispatch
+                                  join emp in inventoryDbContext.Employees on dis.ReceivedBy equals emp.EmployeeId
+                                  where dis.RequisitionId == RequisitionId
+                                  select new
+                                  {
+                                      Date = dis.ReceivedOn,
+                                      Remarks = dis.ReceivedRemarks,
+                                      Name = emp.FullName
+                                  }).ToList();
+
+
+            return receiveDetails;
+        }
+
         public static List<PurchaseRequestModel> GetInventoryPurchaseRequestsBasedOnUser(DateTime FromDate, DateTime ToDate, InventoryDbContext inventoryDb, RbacDbContext rbacDb, RbacUser user)
         {
             try
@@ -763,9 +798,11 @@ namespace DanpheEMR.Controllers
                 {
                     GoodsReceiptVM.Verifiers = GetVerifiersList(goodsReceipt.VerificationId ?? 0, db);
                 }
+                var purchaseOrderDetails = db.PurchaseOrders.Where(p => p.PurchaseOrderId == goodsReceipt.PurchaseOrderId).FirstOrDefault();
                 GoodsReceiptVM.OrderDetails = new VER_PODetailModel
                 {
                     PurchaseOrderId = goodsReceipt.PurchaseOrderId,
+                    PONumber = purchaseOrderDetails != null ? purchaseOrderDetails.PONumber : null,
                     PoDate = goodsReceipt.PoDate,
                     VendorName = goodsReceipt.VendorName,
                     ContactNo = goodsReceipt.ContactNo,
@@ -988,8 +1025,8 @@ namespace DanpheEMR.Controllers
                                          ItemId = oi.ItemId,
                                          ItemName = item.ItemName,
                                          UOMName = uom.UOMName,
-                                         Quantity = oi.Quantity,
-                                         StandardRate = oi.StandardRate,
+                                         Quantity = oi.IsPacking ? (double)oi.PackingQty : oi.Quantity,
+                                         StandardRate = oi.IsPacking ? oi.StripRate : oi.StandardRate,
                                          ReceivedQuantity = oi.ReceivedQuantity,
                                          PendingQuantity = oi.PendingQuantity,
                                          SubTotal = oi.SubTotal,
@@ -1010,7 +1047,7 @@ namespace DanpheEMR.Controllers
                                          GenericId = oi.GenericId,
                                          GenericName = g.GenericName,
                                          FreeQuantity = oi.FreeQuantity,
-                                         TotalQuantity = (float)(oi.Quantity + (float)oi.FreeQuantity),
+                                         TotalQuantity = (float)((oi.IsPacking ? (double)oi.PackingQty : oi.Quantity) + (float)oi.FreeQuantity),
                                          CreatedBy = oi.CreatedBy,
                                          IsEdited = false,
                                          IsActive = oi.POItemStatus == "active" ? true : false,
@@ -1251,41 +1288,41 @@ namespace DanpheEMR.Controllers
         public static object GetRequisitionInfo(int RequisitionId, PharmacyDbContext pharmacyDbContext)
         {
             var requisition = (from r in pharmacyDbContext.StoreRequisition.Where(r => r.RequisitionId == RequisitionId)
-                                join s in pharmacyDbContext.PHRMStore on r.StoreId equals s.StoreId
-                                join fy in pharmacyDbContext.PharmacyFiscalYears on r.FiscalYearId equals fy.FiscalYearId
-                                join emp in pharmacyDbContext.Employees on r.CreatedBy equals emp.EmployeeId
-                                select new
-                                {
-                                    RequisitionId = r.RequisitionId,
-                                    RequisitionNo = r.RequisitionNo,
-                                    RequisitionDate = r.RequisitionDate,
-                                    RequisitionStatus =r.RequisitionStatus,
-                                    RequestedStoreName=s.Name,
-                                    RequsetedBy=emp.FullName,
-                                    CancelledBy = r.CancelledBy,
-                                    CancelledOn = r.CancelledOn,
-                                    CancelRemarks=r.CancelRemarks,
-                                    VerificationId =r.VerificationId,
-                                    IsVerificationEnabled = r.IsVerificationEnabled,
-                                }).FirstOrDefault();
+                               join s in pharmacyDbContext.PHRMStore on r.StoreId equals s.StoreId
+                               join fy in pharmacyDbContext.PharmacyFiscalYears on r.FiscalYearId equals fy.FiscalYearId
+                               join emp in pharmacyDbContext.Employees on r.CreatedBy equals emp.EmployeeId
+                               select new
+                               {
+                                   RequisitionId = r.RequisitionId,
+                                   RequisitionNo = r.RequisitionNo,
+                                   RequisitionDate = r.RequisitionDate,
+                                   RequisitionStatus = r.RequisitionStatus,
+                                   RequestedStoreName = s.Name,
+                                   RequsetedBy = emp.FullName,
+                                   CancelledBy = r.CancelledBy,
+                                   CancelledOn = r.CancelledOn,
+                                   CancelRemarks = r.CancelRemarks,
+                                   VerificationId = r.VerificationId,
+                                   IsVerificationEnabled = r.IsVerificationEnabled,
+                               }).FirstOrDefault();
 
             var requisitionItems = (from ri in pharmacyDbContext.StoreRequisitionItems.Where(a => a.RequisitionId == RequisitionId)
-                                     join item in pharmacyDbContext.PHRMItemMaster on ri.ItemId equals item.ItemId
-                                     join uom in pharmacyDbContext.PHRMUnitOfMeasurement on item.UOMId equals uom.UOMId
-                                     select new
-                                     {
-                                         RequisitionId=ri.RequisitionId,
-                                         RequisitionItemId=ri.RequisitionItemId,
-                                         ItemId =ri.ItemId,
-                                         ItemName=item.ItemName,
-                                         Quantity =ri.Quantity,
-                                         PendingQuantity=ri.PendingQuantity,
-                                         Unit=uom.UOMName,
-                                         RequisitionItemStatus=ri.RequisitionItemStatus,
-                                         Remark =ri.Remark,
-                                         IsEdited = false,
-                                         IsActive = ri.RequisitionItemStatus == "active" ? true : false,
-                                     }).ToList();
+                                    join item in pharmacyDbContext.PHRMItemMaster on ri.ItemId equals item.ItemId
+                                    join uom in pharmacyDbContext.PHRMUnitOfMeasurement on item.UOMId equals uom.UOMId
+                                    select new
+                                    {
+                                        RequisitionId = ri.RequisitionId,
+                                        RequisitionItemId = ri.RequisitionItemId,
+                                        ItemId = ri.ItemId,
+                                        ItemName = item.ItemName,
+                                        Quantity = ri.Quantity,
+                                        PendingQuantity = ri.PendingQuantity,
+                                        Unit = uom.UOMName,
+                                        RequisitionItemStatus = ri.RequisitionItemStatus,
+                                        Remark = ri.Remark,
+                                        IsEdited = false,
+                                        IsActive = ri.RequisitionItemStatus == "active" ? true : false,
+                                    }).ToList();
             return new
             {
                 Requisition = requisition,
@@ -1314,7 +1351,7 @@ namespace DanpheEMR.Controllers
         {
             try
             {
-                var requisition = pharmacyDbContext.StoreRequisition.Include(a=>a.RequisitionItems).Where(po => po.RequisitionId == requisitionDTO.RequisitionId).FirstOrDefault();
+                var requisition = pharmacyDbContext.StoreRequisition.Include(a => a.RequisitionItems).Where(po => po.RequisitionId == requisitionDTO.RequisitionId).FirstOrDefault();
                 requisition.RequisitionStatus = requisitionDTO.RequisitionStatus;
                 requisition.VerificationId = VerificationId;
 
@@ -1375,7 +1412,7 @@ namespace DanpheEMR.Controllers
             {
                 try
                 {
-                    var requisition = pharmacyDbContext.StoreRequisition.Include(a=>a.RequisitionItems).Where(po => po.RequisitionId == RequisitionId).FirstOrDefault();
+                    var requisition = pharmacyDbContext.StoreRequisition.Include(a => a.RequisitionItems).Where(po => po.RequisitionId == RequisitionId).FirstOrDefault();
                     requisition.CancelledBy = currentUser.EmployeeId;
                     requisition.CancelledOn = DateTime.Now;
                     requisition.RequisitionStatus = ENUM_PharmacyRequisitionStatus.Withdrawn;

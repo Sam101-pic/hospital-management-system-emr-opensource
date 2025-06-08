@@ -5,6 +5,7 @@ import { SettingsBLService } from '../../shared/settings.bl.service';
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { SettingsService } from '../../shared/settings-service';
 
+import * as moment from "moment";
 import { Employee } from "../../../employee/shared/employee.model";
 
 
@@ -21,12 +22,16 @@ export class EmployeeListComponent {
   public selectedEmployee: Employee;
   // public index: number;
   public selectedID: null;
+  gridExportOptions: any;
 
   constructor(public settingsBLService: SettingsBLService,
     public settingsService: SettingsService,
     public changeDetector: ChangeDetectorRef) {
     this.employeeGridColumns = this.settingsService.settingsGridCols.EmployeeList;
     this.getEmpList();
+  }
+  ngOnInit() {
+    this.LoadExportOptions();
   }
   public getEmpList() {
     // this.employeeList = DanpheCache.GetData(MasterType.Employee,null);
@@ -77,4 +82,11 @@ export class EmployeeListComponent {
     // this.index = null;
     this.selectedID = null;
   }
+
+  LoadExportOptions() {
+    this.gridExportOptions = {
+      fileName: 'Employee-List-' + moment().format('YYYY-MM-DD') + '.xls',
+    };
+  }
 }
+

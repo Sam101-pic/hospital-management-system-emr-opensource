@@ -20,24 +20,20 @@
                     <label class="control-label col-md-4">Salutation<b>:</b></label>
                     <div class="col-md-8">
                       <div class="input-group">
-                        <select id="Salutation" class="form-control" [(ngModel)]="CurrentEmployee.Salutation"
-                                [ngModelOptions]="{standalone: true}" (change)="FocusElementById('FirstName')"
-                                *ngIf="!update">
+                        <select id="id_employee_add_salutation" class="form-control" [(ngModel)]="CurrentEmployee.Salutation"
+                                [ngModelOptions]="{standalone: true}" (change)="FocusElementById('FirstName')" *ngIf="!update">
                           <option [ngValue]="null">--select--</option>
-                          <option value="Mr">Mr</option>
-                          <option value="Ms">Ms</option>
-                          <option value="Mrs">Mrs</option>
-                          <option value="Dr">Dr</option>
-                          <option value="Prof. Dr">Prof. Dr</option>
+                          <option *ngFor="let salutation of SalutationList" [ngValue]="salutation.SalutationName">
+                            {{ salutation.SalutationName }}
+                          </option>
                         </select>
+
                         <select id="Salutation" class="form-control" [(ngModel)]="CurrentEmployee.Salutation"
                                 [ngModelOptions]="{standalone: true}" (change)="FocusElementById('FirstName')" *ngIf="update">
                           <option [ngValue]="null">--select--</option>
-                          <option value="Mr">Mr</option>
-                          <option value="Ms">Ms</option>
-                          <option value="Mrs">Mrs</option>
-                          <option value="Dr">Dr</option>
-                          <option value="Prof. Dr">Prof. Dr</option>
+                          <option *ngFor="let salutation of SalutationList" [ngValue]="salutation.SalutationName">
+                            {{ salutation.SalutationName }}
+                          </option>
                         </select>
                       </div>
                     </div>

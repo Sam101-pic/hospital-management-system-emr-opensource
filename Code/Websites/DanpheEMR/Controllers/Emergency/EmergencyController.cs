@@ -10,18 +10,21 @@ using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.EmergencyModels;
 using DanpheEMR.ServerModel.PatientModels;
+using DanpheEMR.Services.Emergency;
+using DanpheEMR.Services.Emergency.DTOs;
 using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using OfficeOpenXml.FormulaParsing.Excel.Functions.Text;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
+using System.Data.Entity.Migrations;
 using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
@@ -35,13 +38,86 @@ namespace DanpheEMR.Controllers.Emergency
         private readonly CoreDbContext _coreDbContext;
         private readonly MasterDbContext _masterDbContext;
         private readonly VisitDbContext _visitDbContext;
-        public EmergencyController(IOptions<MyConfiguration> _config) : base(_config)
+        private readonly AdmissionDbContext _admissionDbContext;
+        private readonly IEmergencyService _emergencyService;
+        public EmergencyController(IEmergencyService emergencyService ,IOptions<MyConfiguration> _config) : base(_config)
         {
             _emergencyDbContext = new EmergencyDbContext(connString);
             _coreDbContext = new CoreDbContext(connString);
             _masterDbContext = new MasterDbContext(connString);
             _visitDbContext = new VisitDbContext(connString);
+            _admissionDbContext = new AdmissionDbContext(connString);
+            _emergencyService = emergencyService;
         }
+
+
+        [HttpPut]
+        [Route("ERUndoFinalizePatient")]
+        public IActionResult UndoFinalizePatient(int ERPatientId)
+        {
+
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => UndoFinalizePatientRetain(ERPatientId, currentUser,_emergencyDbContext);
+            return InvokeHttpPutFunction(func);
+
+        }
+        private object UndoFinalizePatientRetain(int ERPatientId,RbacUser currentUser,EmergencyDbContext _emergencyDbContext)
+        {
+            if (ERPatientId == 0)
+            {
+                Log.Error($"{nameof(ERPatientId)} is not provided");
+                throw new InvalidOperationException($"{nameof(ERPatientId)} is not provided");
+            }
+            try
+            {
+                var patient = _emergencyDbContext.EmergencyPatient.FirstOrDefault(p => p.ERPatientId == ERPatientId);
+
+                if (patient == null)
+                {
+                    Log.Error($"Patient with {nameof(ERPatientId)} {ERPatientId} not found");
+                    return NotFound($"Patient with {nameof(ERPatientId)} {ERPatientId} not found");
+                }
+                var bedReserv = _admissionDbContext.BedReservation
+                        .FirstOrDefault(res => res.IsActive == true && res.PatientId==patient.PatientId && res.PatientVisitId == patient.PatientVisitId);
+                if(bedReserv != null)
+                {
+                    bedReserv.IsActive = false;
+                    bedReserv.CancelledBy = currentUser.EmployeeId;
+                    bedReserv.CancelledOn = DateTime.Now;
+                    bedReserv.ModifiedBy = currentUser.EmployeeId;
+                    bedReserv.ModifiedOn = DateTime.Now;
+
+                    var bed = _admissionDbContext.Beds
+                      .FirstOrDefault(a => a.BedId == bedReserv.BedId);
+
+                    if (bed != null)
+                    {
+                        bed.IsReserved = false;
+                    }
+
+
+                    _admissionDbContext.SaveChanges();
+                }
+
+
+                // Update the fields
+                patient.ERStatus = "triaged";
+                patient.FinalizedStatus = null;
+                patient.FinalizedRemarks = null;
+                patient.FinalizedBy = null;
+                patient.FinalizedOn = null;
+
+                _emergencyDbContext.SaveChanges();
+                return Ok(patient);
+
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"An error occurred while Undo Finalized patient: {ex.Message}");
+                throw new InvalidOperationException($"An error occurred while Undo Finalized patient.{ex.Message}");
+            }
+        }
+
 
         [HttpGet]
         [Route("LatestEmergencyNumberAndModeOfArrival")]
@@ -55,11 +131,19 @@ namespace DanpheEMR.Controllers.Emergency
         [HttpGet]
         [Route("EmergencyPatients")]
         public IActionResult EmergencyPatients(int selectedCase)
-        {
-            // else if (reqType == "allERPatientList")       
-            Func<object> func = () => GetEmergencyPatients(selectedCase);
+        {     
+            Func<object> func = () => _emergencyService.EmergencyPatients(selectedCase, _emergencyDbContext);
             return InvokeHttpGetFunction(func);
+        }
 
+        [HttpGet]
+        [Route("EmergencyPatientsCases")]
+        public IActionResult EmergencyPatientCases(int ERPatientId)
+        {
+            Func<object> func = () => (from patCase in _emergencyDbContext.PatientCases
+                                       where patCase.ERPatientId == ERPatientId && patCase.IsActive == true
+                                       select patCase).FirstOrDefault();
+            return InvokeHttpGetFunction(func);
         }
         [HttpGet]
         [Route("TriagedPatients")]
@@ -201,6 +285,62 @@ namespace DanpheEMR.Controllers.Emergency
             return InvokeHttpGetFunction(func);
 
         }
+        /// <summary>
+        /// Retrieves a list of finalized emergency patients based on specified criteria.
+        /// </summary>
+        /// <param name="fromDate">The start date for date range filtering.</param>
+        /// <param name="toDate">The end date for date range filtering.</param>
+        /// <param name="finalizedStatus">The finalized status of the patients to filter by. Optional.</param>
+        /// <param name="selectedCase">The selected case number. Default is 0.</param>
+        /// <param name="dateType">The type of date to filter by. Optional.</param>
+        /// <param name="isPoliceCase">Indicates whether to filter for police cases. Optional. Can be used for future feature enhancements.</param>
+        /// <returns>An IActionResult containing the list of finalized emergency patients.</returns>
+        [HttpGet]
+        [Route("EmergencyFinalizedPatientList")]
+        public IActionResult FinalizedPatientListByStatus(
+            DateTime fromDate,
+            DateTime toDate,
+            string finalizedStatus = null,
+            int selectedCase = 0,
+            string dateType = null,
+            bool isPoliceCase = false)
+        {
+            return InvokeHttpGetFunction(() => GetFinalizedPatientList(
+                fromDate, toDate, finalizedStatus, selectedCase, dateType, isPoliceCase));
+        }
+
+        /// <summary>
+        /// Retrieves a list of finalized emergency patients from the database based on specified criteria.
+        /// </summary>
+        /// <param name="fromDate">The start date for date range filtering.</param>
+        /// <param name="toDate">The end date for date range filtering.</param>
+        /// <param name="finalizedStatus">The finalized status of the patients to filter by.</param>
+        /// <param name="selectedCase">The selected case number.</param>
+        /// <param name="dateType">The type of date to filter by.</param>
+        /// <param name="isPoliceCase">Indicates whether to filter for police cases.</param>
+        /// <returns>An object containing the list of finalized emergency patients retrieved from the database.</returns>
+        private object GetFinalizedPatientList(
+            DateTime fromDate,
+            DateTime toDate,
+            string finalizedStatus,
+            int selectedCase,
+            string dateType,
+            bool isPoliceCase)
+        {
+            var erStatus = ENUM_ERStatus.finalized;
+            return DALFunctions.GetDataTableFromStoredProc("SP_Get_Emergency_Finalized_PatientListByStatus",
+                new List<SqlParameter>()
+                {
+            new SqlParameter("@ERStatus", erStatus),
+            new SqlParameter("@FinalizedStatus", finalizedStatus ?? (object)DBNull.Value),
+            new SqlParameter("@SelectedCase", selectedCase),
+            new SqlParameter("@DateType", dateType ?? (object)DBNull.Value),
+            new SqlParameter("@FromDate", fromDate),
+            new SqlParameter("@ToDate", toDate),
+            new SqlParameter("@IsPoliceCase", isPoliceCase)
+                },
+                _emergencyDbContext);
+        }
         private object GetConsentForm(int patientId)
         {
 
@@ -208,7 +348,7 @@ namespace DanpheEMR.Controllers.Emergency
                                join pat in _emergencyDbContext.Patient on consentFile.PatientId equals pat.PatientId
                                join ER in _emergencyDbContext.EmergencyPatient on consentFile.ERPatientId equals ER.ERPatientId
                                where consentFile.ERPatientId == patientId && consentFile.IsActive == true
-                               select new
+                               select new ERGetConsentFormDTO
                                {
                                    ERPatientId = ER.ERPatientId,
                                    FileId = consentFile.FileId,
@@ -217,9 +357,49 @@ namespace DanpheEMR.Controllers.Emergency
                                    FileType = consentFile.FileType,
                                    FileName = consentFile.FileName,
                                    DisplayName = consentFile.DisplayName,
-                                   consentFile.ModifiedOn,
+                                   BinaryData = "",
                                }).ToList();
-            return allFileList;
+            int filesNotFoundCount = 0;
+            try
+            {
+                var location = (from dbc in _emergencyDbContext.AdminParameters
+                                where dbc.ParameterGroupName == "Emergency"
+                                && dbc.ParameterName == "UploadFileLocationPath"
+                                select dbc.ParameterValue).FirstOrDefault();
+
+                if (location == null)
+                {
+                    Log.Error($"UploadFileLocationPath not found.");
+                    throw new Exception("UploadFileLocationPath not found.");
+                }
+
+                for (int i = allFileList.Count - 1; i >= 0; i--)
+                {
+                    var f = allFileList[i];
+                    string imgPath = Path.Combine(location, f.FileName);
+                    try
+                    {
+                        var imageBytes = System.IO.File.ReadAllBytes(imgPath);
+                        string base64Image = Convert.ToBase64String(imageBytes);
+                        string binaryData = "data:" + f.FileType + ";base64," + base64Image;
+                        f.BinaryData = binaryData;
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        filesNotFoundCount++;
+                        // Remove the item from the list if the file is not found
+                        allFileList.RemoveAt(i);
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Can't read image. Error : {ex.Message}");
+                throw new Exception("Error: " + ex.Message);
+            }
+
+            return new { allFileList, filesNotFoundCount};
         }
         private object GetMatchingPatient(string firstName, string lastName, DateTime dateOfBirth, string phoneNumber)
         {
@@ -327,100 +507,115 @@ namespace DanpheEMR.Controllers.Emergency
         }
         private object GetEmergencyPatients(int selectedCase)
         {
-            var ervitalB4triage = (from parValue in _coreDbContext.Parameters
-                                   where parValue.ParameterGroupName.ToLower() == "emergency" && parValue.ParameterName == "ERAddVitalBeforeTriage"
-                                   select parValue.ParameterValue).FirstOrDefault();
-
-            var allERPatients = (from erpat in _emergencyDbContext.EmergencyPatient
-                                 join pat in _emergencyDbContext.Patient on erpat.PatientId equals pat.PatientId
-                                 join eth in _emergencyDbContext.Ethnicity on pat.EthnicGroup equals eth.EthnicGroup into EthnicityGroup
-                                 from ethGroup in EthnicityGroup.DefaultIfEmpty()
-                                 join moa in _emergencyDbContext.ModeOfArrival on erpat.ModeOfArrival equals moa.ModeOfArrivalId into ModeOfArr
-                                 where erpat.IsActive == true && erpat.ERStatus.ToLower() == "new"
-                                 from m in ModeOfArr.DefaultIfEmpty()
-                                 join visit in _emergencyDbContext.Visits on erpat.PatientVisitId equals visit.PatientVisitId
-                                 join patientSchemeMap in _emergencyDbContext.PatientSchemeMaps on new { visit.PatientId, visit.SchemeId } equals new { patientSchemeMap.PatientId, patientSchemeMap.SchemeId } into PatientSchemeMap
-                                 from psm in PatientSchemeMap.DefaultIfEmpty()
-                                 join scheme in _emergencyDbContext.Schemes on visit.SchemeId equals scheme.SchemeId
-                                 join priceCat in _emergencyDbContext.priceCategories on visit.PriceCategoryId equals priceCat.PriceCategoryId
-                                 select new
-                                 {
-                                     ERPatientId = erpat.ERPatientId,
-                                     ERPatientNumber = erpat.ERPatientNumber,
-                                     EthnicGroup = ethGroup != null ? ethGroup.EthnicGroup : null,
-                                     PatientCode = pat.PatientCode,
-                                     PatientId = erpat.PatientId,
-                                     PatientVisitId = erpat.PatientVisitId,
-                                     VisitDateTime = erpat.VisitDateTime,
-                                     FirstName = pat.FirstName,
-                                     MiddleName = pat.MiddleName,
-                                     LastName = pat.LastName,
-                                     Gender = pat.Gender,
-                                     Age = pat.Age,
-                                     DateOfBirth = pat.DateOfBirth,
-                                     ContactNo = pat.PhoneNumber,
-                                     Address = pat.Address,
-                                     MunicipalityId = pat.MunicipalityId,
-                                     MunicipalityName = (from pat in _emergencyDbContext.Patient
-                                                         join mun in _emergencyDbContext.Municipalities on pat.MunicipalityId equals mun.MunicipalityId
-                                                         where pat.PatientId == erpat.PatientId
-                                                         select mun.MunicipalityName).FirstOrDefault(),
-                                     ReferredBy = erpat.ReferredBy,
-                                     ReferredTo = erpat.ReferredTo,
-                                     Case = erpat.Case,
-                                     ConditionOnArrival = erpat.ConditionOnArrival,
-                                     ModeOfArrival = (int?)m.ModeOfArrivalId,
-                                     ModeOfArrivalName = m.ModeOfArrivalName,
-                                     CareOfPerson = erpat.CareOfPerson,
-                                     ERStatus = erpat.ERStatus,
-                                     TriageCode = erpat.TriageCode,
-                                     TriagedBy = erpat.TriagedBy,
-                                     TriagedOn = erpat.TriagedOn,
-                                     CreatedBy = erpat.CreatedBy,
-                                     CreatedOn = erpat.CreatedOn,
-                                     ModifiedBy = erpat.ModifiedBy,
-                                     ModifiedOn = erpat.ModifiedOn,
-                                     IsActive = erpat.IsActive,
-                                     IsPoliceCase = erpat.IsPoliceCase,
-                                     IsAddVitalBeforeTriage = ervitalB4triage,
-                                     OldPatientId = erpat.OldPatientId,
-                                     IsExistingPatient = erpat.IsExistingPatient,
-                                     vitals = (from vit in _emergencyDbContext.Vitals
-                                               where vit.PatientVisitId == erpat.PatientVisitId
-                                               select vit
-                                               ).OrderByDescending(d => d.VitalsTakenOn).FirstOrDefault(),
-                                     FullName = (pat.FirstName.ToLower().Contains("unknown") ? pat.FirstName : pat.FirstName + " " + (string.IsNullOrEmpty(pat.MiddleName) ? "" : pat.MiddleName + " ") + pat.LastName),
-                                     CountryId = pat.CountryId,
-                                     CountrySubDivisionId = pat.CountrySubDivisionId,
-                                     PatientCases = (from patCase in _emergencyDbContext.PatientCases
-                                                     where patCase.ERPatientId == erpat.ERPatientId && patCase.IsActive == true
-                                                     select patCase).OrderByDescending(d => d.PatientCaseId).FirstOrDefault(),
-                                     uploadedfiles = (from consent in _emergencyDbContext.Consentform
-                                                      where consent.ERPatientId == erpat.ERPatientId
-                                                      select consent
-                                                     //{
-                                                     //    ERPatientId=consent.ERPatientId,
-                                                     //    PatientId = consent.PatientId,
-                                                     //    fileId = consent.FileId,
-                                                     //    fileName=consent.FileName,
-                                                     //    fileType = consent.FileType,
-                                                     ).OrderByDescending(d => d.ERPatientId).FirstOrDefault(),
-                                     SchemeId = visit.SchemeId,
-                                     PriceCategoryId = visit.PriceCategoryId,
-                                     SchemeName = scheme.SchemeName,
-                                     PriceCategoryName = priceCat.PriceCategoryName,
-                                     WardNo = erpat.WardNo
-                                 }).OrderByDescending(p => p.ERPatientId).ToList();
-
-            if (selectedCase == 0)
+            try
             {
-                allERPatients.ToList();
+                var ervitalB4triage = (from parValue in _coreDbContext.Parameters
+                                       where parValue.ParameterGroupName.ToLower() == "emergency" && parValue.ParameterName == "ERAddVitalBeforeTriage"
+                                       select parValue.ParameterValue).FirstOrDefault();
+
+                var allERPatients = (from erpat in _emergencyDbContext.EmergencyPatient
+                                     join pat in _emergencyDbContext.Patient on erpat.PatientId equals pat.PatientId
+                                     join eth in _emergencyDbContext.Ethnicity on pat.EthnicGroup equals eth.EthnicGroup into EthnicityGroup
+                                     from ethGroup in EthnicityGroup.DefaultIfEmpty()
+                                     join moa in _emergencyDbContext.ModeOfArrival on erpat.ModeOfArrival equals moa.ModeOfArrivalId into ModeOfArr
+                                     where erpat.IsActive == true && erpat.ERStatus.ToLower() == "new"
+                                     from m in ModeOfArr.DefaultIfEmpty()
+                                     join visit in _emergencyDbContext.Visits on erpat.PatientVisitId equals visit.PatientVisitId
+                                     join patientSchemeMap in _emergencyDbContext.PatientSchemeMaps on new { visit.PatientId, visit.SchemeId } equals new { patientSchemeMap.PatientId, patientSchemeMap.SchemeId } into PatientSchemeMap
+                                     from psm in PatientSchemeMap.DefaultIfEmpty()
+                                     join scheme in _emergencyDbContext.Schemes on visit.SchemeId equals scheme.SchemeId
+                                     join priceCat in _emergencyDbContext.priceCategories on visit.PriceCategoryId equals priceCat.PriceCategoryId
+                                     select new
+                                     {
+                                         ERPatientId = erpat.ERPatientId,
+                                         ERPatientNumber = erpat.ERPatientNumber,
+                                         EthnicGroup = ethGroup != null ? ethGroup.EthnicGroup : null,
+                                         PatientCode = pat.PatientCode,
+                                         PatientId = erpat.PatientId,
+                                         PatientVisitId = erpat.PatientVisitId,
+                                         VisitDateTime = erpat.VisitDateTime,
+                                         FirstName = pat.FirstName,
+                                         MiddleName = pat.MiddleName,
+                                         LastName = pat.LastName,
+                                         Gender = pat.Gender,
+                                         Age = pat.Age,
+                                         DateOfBirth = pat.DateOfBirth,
+                                         ContactNo = pat.PhoneNumber,
+                                         Address = pat.Address,
+                                         MunicipalityId = pat.MunicipalityId,
+                                         MunicipalityName = (from pat in _emergencyDbContext.Patient
+                                                             join mun in _emergencyDbContext.Municipalities on pat.MunicipalityId equals mun.MunicipalityId
+                                                             where pat.PatientId == erpat.PatientId
+                                                             select mun.MunicipalityName).FirstOrDefault(),
+                                         ReferredBy = erpat.ReferredBy,
+                                         ReferredTo = erpat.ReferredTo,
+                                         Case = erpat.Case,
+                                         ConditionOnArrival = erpat.ConditionOnArrival,
+                                         ModeOfArrival = (int?)m.ModeOfArrivalId,
+                                         ModeOfArrivalName = m.ModeOfArrivalName,
+                                         CareOfPerson = erpat.CareOfPerson,
+                                         BroughtBy = erpat.BroughtBy,
+                                         RelationWithPatient = erpat.RelationWithPatient,
+                                         CareOfPersonContactNumber = erpat.CareOfPersonContactNumber,
+                                         ERStatus = erpat.ERStatus,
+                                         TriageCode = erpat.TriageCode,
+                                         TriagedBy = erpat.TriagedBy,
+                                         TriagedOn = erpat.TriagedOn,
+                                         CreatedBy = erpat.CreatedBy,
+                                         CreatedOn = erpat.CreatedOn,
+                                         ModifiedBy = erpat.ModifiedBy,
+                                         ModifiedOn = erpat.ModifiedOn,
+                                         IsActive = erpat.IsActive,
+                                         IsPoliceCase = erpat.IsPoliceCase,
+                                         IsAddVitalBeforeTriage = ervitalB4triage,
+                                         OldPatientId = erpat.OldPatientId,
+                                         IsExistingPatient = erpat.IsExistingPatient,
+                                         vitals = (from vit in _emergencyDbContext.Vitals
+                                                   where vit.PatientVisitId == erpat.PatientVisitId
+                                                   select vit
+                                                  ).OrderByDescending(d => d.VitalsTakenOn).FirstOrDefault(),
+                                         FullName = (pat.FirstName.ToLower().Contains("unknown") ? pat.FirstName : pat.FirstName + " " + (string.IsNullOrEmpty(pat.MiddleName) ? "" : pat.MiddleName + " ") + pat.LastName),
+                                         CountryId = pat.CountryId,
+                                         CountrySubDivisionId = pat.CountrySubDivisionId,
+                                         PatientCases = (from patCase in _emergencyDbContext.PatientCases
+                                                         where patCase.ERPatientId == erpat.ERPatientId && patCase.IsActive == true
+                                                         select patCase).OrderByDescending(d => d.PatientCaseId).FirstOrDefault(),
+                                         uploadedfiles = (from consent in _emergencyDbContext.Consentform
+                                                          where consent.ERPatientId == erpat.ERPatientId && consent.IsActive == true
+                                                          select consent
+                                                         //{
+                                                         //    ERPatientId=consent.ERPatientId,
+                                                         //    PatientId = consent.PatientId,
+                                                         //    fileId = consent.FileId,
+                                                         //    fileName=consent.FileName,
+                                                         //    fileType = consent.FileType,
+                                                         //    }
+                                                         ).OrderByDescending(d => d.ERPatientId).FirstOrDefault(),
+                                         SchemeId = visit.SchemeId,
+                                         PriceCategoryId = visit.PriceCategoryId,
+                                         SchemeName = scheme.SchemeName,
+                                         PriceCategoryName = priceCat.PriceCategoryName,
+                                         WardNo = erpat.WardNo,
+                                         Email = erpat.Email
+                                     }).OrderByDescending(p => p.ERPatientId).ToList();
+
+                if (selectedCase == 0)
+                {
+                    allERPatients.ToList();
+                }
+                else
+                {
+                    allERPatients = allERPatients.Where(p => (p.PatientCases == null) ? false : (p.PatientCases.MainCase == selectedCase)).ToList();
+                }
+
+                return allERPatients;
             }
-            else
+            catch (Exception ex)
             {
-                allERPatients = allERPatients.Where(p => (p.PatientCases == null) ? false : (p.PatientCases.MainCase == selectedCase)).ToList();
+                
+                throw new Exception("An error occurred: " + ex.Message);
             }
-            return allERPatients;
+
 
         }
         private object GetLatestEmergencyNumberAndModeOfArrival()
@@ -956,55 +1151,52 @@ namespace DanpheEMR.Controllers.Emergency
 
                     //Get Default ER doctor Name
                     ERParamClass erParam = new ERParamClass();
-                    erParam.DepartmentName = "EMERGENCY/CASUALTY";
-                    erParam.ERDutyDoctorFirstName = "Duty";
+                    erParam.DepartmentName = "EMERGENCY";
+                    erParam.ERDefaultDoctorId = 0;
 
                     var ERParams = (from cfg in _emergencyDbContext.AdminParameters
                                     where cfg.ParameterGroupName.ToLower() == "emergency"
-                                    && (cfg.ParameterName == "ERDepartmentAndDutyDoctor" || cfg.ParameterName == "AddProvisionalToBillingOnRegistration")
+                                    && (cfg.ParameterName == "DefaultErDoctorId" || cfg.ParameterName == "AddProvisionalToBillingOnRegistration")
                                     select cfg).ToList();
 
-                    string ERParamStr = ERParams.Where(p => p.ParameterName == "ERDepartmentAndDutyDoctor").Select(ep => ep.ParameterValue).FirstOrDefault();
+                    int erParamDefaultDoctorId = ERParams 
+                        .Where(p => p.ParameterName == "DefaultErDoctorId")
+                        .Select(ep => int.TryParse(ep.ParameterValue, out var value) ? value : 0)
+                        .FirstOrDefault();
+
                     string EnableProvRegistration = ERParams.Where(p => p.ParameterName == "AddProvisionalToBillingOnRegistration").Select(ep => ep.ParameterValue).FirstOrDefault();
 
-                    if (ERParamStr != null)
+                    if (erParamDefaultDoctorId != null)
                     {
-                        erParam = DanpheJSONConvert.DeserializeObject<ERParamClass>(ERParamStr);
+                        erParam.ERDefaultDoctorId = erParamDefaultDoctorId;
                     }
 
-
-                    string departmentName = erParam.DepartmentName;
-                    DepartmentModel department = (from dpt in _emergencyDbContext.Departments
-                                                  where dpt.DepartmentName == departmentName
-                                                  select dpt).FirstOrDefault();
-
-                    if (department != null)
+                    if (erParam.ERDefaultDoctorId!= null)
                     {
                         EmployeeModel employee = (from emp in _emergencyDbContext.Employee
-                                                  where emp.DepartmentId == department.DepartmentId
-                                                  && emp.FirstName == erParam.ERDutyDoctorFirstName
+                                                  where emp.EmployeeId == erParam.ERDefaultDoctorId
                                                   && emp.IsActive == true
                                                   select emp).FirstOrDefault();
                         if (employee != null)
                         {
                             emergencyPatient.PerformerId = employee.EmployeeId;
-                            emergencyPatient.PerformerName = employee.LongSignature;
+                            emergencyPatient.PerformerName = employee.FullName;
                         }
                     }
 
 
                     if (notExistingInPatTable)
                     {
-                        if (emergencyPatient.Gender == "Male")
-                        {
-                            patient.Salutation = "Mr.";
-                        }
-                        else
-                        {
-                            patient.Salutation = "Ms.";
-                        }
+                        //if (emergencyPatient.Gender == "Male")
+                        //{
+                        //    patient.Salutation = "Mr.";
+                        //}
+                        //else
+                        //{
+                        //    patient.Salutation = "Ms";
+                        //}
                         //NewPatientUniqueNumbersVM newPatientNumber = DanpheEMR.Controllers.PatientBL.GetPatNumberNCodeForNewPatient(connString);
-
+                        patient.Salutation =emergencyPatient.Salutation;
                         patient.FirstName = emergencyPatient.FirstName;
                         patient.Age = emergencyPatient.Age;
                         patient.MiddleName = emergencyPatient.MiddleName;
@@ -1013,6 +1205,7 @@ namespace DanpheEMR.Controllers.Emergency
                         patient.ShortName = emergencyPatient.FirstName + " " + (String.IsNullOrEmpty(emergencyPatient.MiddleName) ? " " : emergencyPatient.MiddleName + " ") + emergencyPatient.LastName;
                         patient.DateOfBirth = emergencyPatient.DateOfBirth == null ? DateTime.Now.Date : emergencyPatient.DateOfBirth;
                         patient.PhoneNumber = emergencyPatient.ContactNo;
+                        patient.Email = emergencyPatient.Email;
                         patient.Address = emergencyPatient.Address;
                         //patient.PatientNo = newPatientNumber.PatientNo;
                         //patient.PatientCode = GetPatientCode(patient.PatientNo.Value);
@@ -1023,6 +1216,7 @@ namespace DanpheEMR.Controllers.Emergency
                         patient.CountrySubDivisionId = emergencyPatient.CountrySubDivisionId;
                         patient.CreatedBy = currentUser.EmployeeId;
                         patient.MunicipalityId = emergencyPatient.MunicipalityId;
+                        patient.WardNumber = (Int16?)emergencyPatient.WardNo;
                         patient.CreatedOn = DateTime.Now;
                         patient.IsActive = true;
                         patient.EMPI = PatientBL.CreateEmpi(patient, connString);//need to replace this also with a common logic.
@@ -1054,8 +1248,36 @@ namespace DanpheEMR.Controllers.Emergency
                         //_emergencyDbContext.SaveChanges();
                     }
 
+                    if (!notExistingInPatTable)
+                    {
+                        patient = _emergencyDbContext.Patient
+                       .FirstOrDefault(p => p.PatientId == emergencyPatient.PatientId);
+
+                        if (patient != null)
+                        {
+                            patient.PhoneNumber = emergencyPatient.ContactNo;
+                            patient.Address = emergencyPatient.Address;
+                            patient.CountryId = emergencyPatient.CountryId;
+                            patient.CountrySubDivisionId = emergencyPatient.CountrySubDivisionId;
+                            patient.MunicipalityId = emergencyPatient.MunicipalityId;
+                            patient.WardNumber = (Int16?)emergencyPatient.WardNo;
+                            patient.EthnicGroup = emergencyPatient.EthnicGroup;
+                            if (patient.Age != emergencyPatient.Age)
+                            {
+                                patient.Age = emergencyPatient.Age;
+                                patient.DateOfBirth = emergencyPatient.DateOfBirth;
+                            }
+                            patient.ModifiedBy = currentUser.EmployeeId;
+                            patient.ModifiedOn = DateTime.Now;
+                            _emergencyDbContext.Patient.AddOrUpdate(patient);
+                        }
+                    }
+
+
+                    var patientId = notExistingInPatTable ? patient.PatientId : (int)emergencyPatient.PatientId;
+                    var hasPreviousVisits = _emergencyDbContext.Visits.Any(er => er.PatientId == patientId);
                     VisitModel patVisit = new VisitModel();
-                    patVisit.PatientId = notExistingInPatTable ? patient.PatientId : (int)emergencyPatient.PatientId;
+                    patVisit.PatientId = patientId;
                     patVisit.PerformerName = emergencyPatient.PerformerName;
                     patVisit.PerformerId = emergencyPatient.PerformerId;
                     patVisit.SchemeId = emergencyPatient.SchemeId;
@@ -1067,7 +1289,7 @@ namespace DanpheEMR.Controllers.Emergency
                     patVisit.IsVisitContinued = false;
                     patVisit.IsSignedVisitSummary = false;
                     patVisit.VisitStatus = ENUM_VisitStatus.initiated;// "initiated";
-                    patVisit.AppointmentType = ENUM_AppointmentType.New;// "New";
+                    patVisit.AppointmentType = hasPreviousVisits ? ENUM_AppointmentType.revisit : ENUM_AppointmentType.New;// "New";
                     patVisit.BillingStatus = ENUM_BillingStatus.provisional;// "provisional";
                     patVisit.CreatedBy = currentUser.EmployeeId;
                     patVisit.CreatedOn = DateTime.Now;
@@ -1249,6 +1471,7 @@ namespace DanpheEMR.Controllers.Emergency
                                           ).FirstOrDefault();
                     billItem.IsAutoBillingItem = false;
                     billItem.IsAutoCalculationStop = false;
+                    billItem.IsBedChargeQuantityEdited = false;
                     BillingSchemeModel scheme = _emergencyDbContext.Schemes.FirstOrDefault(a => a.SchemeId == emergencyPatient.SchemeId);
                     if (scheme == null)
                     {
@@ -1284,10 +1507,20 @@ namespace DanpheEMR.Controllers.Emergency
             /* var systemDefaultScheme = _emergencyDbContext.Schemes.FirstOrDefault(a => a.IsSystemDefault == true);*/
 
             /*if (emergencyPatient.PatientVisitId > 0 && emergencyPatient.SchemeId != systemDefaultScheme.SchemeId)*/
+
             if (emergencyPatient.PatientVisitId > 0)
             {
                 PatientSchemeMapModel patientScheme = new PatientSchemeMapModel();
-                var patientSchemeFromClient = emergencyPatient.PatientScheme;
+                var patientSchemeFromClient = new PatientSchemeMapModel();
+                if(emergencyPatient.PatientScheme != null)
+                {
+                    patientSchemeFromClient = emergencyPatient.PatientScheme;
+                    //Check if PolicyNo already exists in Server
+                    if (IsPolicyNoAlreadyExistsForOtherPatient(patientSchemeFromClient, (int)emergencyPatient.PatientId, _emergencyDbContext))
+                    {
+                        throw new InvalidOperationException($"The PolicyNo Provided already exists for Other Patient ");
+                    }
+                }
                 BillingSchemeModel scheme = _emergencyDbContext.Schemes.FirstOrDefault(a => a.SchemeId == emergencyPatient.SchemeId);
                 if (scheme != null)
                 {
@@ -1351,7 +1584,19 @@ namespace DanpheEMR.Controllers.Emergency
                     _emergencyDbContext.SaveChanges();
                 }
             }
+        } 
+
+        private static bool IsPolicyNoAlreadyExistsForOtherPatient(PatientSchemeMapModel patientScheme, int patientId, EmergencyDbContext emergencyDbContext)
+        {
+            if (patientScheme.PolicyNo is null)
+            {
+                return false;
+            }
+            var alreadyExistsInServer = emergencyDbContext.PatientSchemeMaps.Any(p => p.PolicyNo == patientScheme.PolicyNo && p.PatientId != patientId && p.SchemeId == patientScheme.SchemeId);
+            return alreadyExistsInServer;
+
         }
+
         private object AddDischargeSummary(string ipStr, RbacUser currentUser)
         {
             using (var emergencyDbContextTransaction = _emergencyDbContext.Database.BeginTransaction())
@@ -2049,7 +2294,7 @@ namespace DanpheEMR.Controllers.Emergency
                                             where pat.PatientId == emergencyPatient.PatientId
                                             select pat).FirstOrDefault();
 
-                    if (!emergencyPatient.IsExistingPatient)
+                    if (emergencyPatient.IsExistingPatient)
                     {
                         patient.FirstName = emergencyPatient.FirstName;
                         patient.MiddleName = emergencyPatient.MiddleName;
@@ -2058,12 +2303,15 @@ namespace DanpheEMR.Controllers.Emergency
                         patient.PhoneNumber = emergencyPatient.ContactNo;
                         patient.Gender = emergencyPatient.Gender;
                         patient.Age = emergencyPatient.Age;
+                        patient.EthnicGroup = emergencyPatient.EthnicGroup;
                         patient.DateOfBirth = emergencyPatient.DateOfBirth == null ? DateTime.Now.Date : emergencyPatient.DateOfBirth;
                     }
 
 
                     patient.CountryId = emergencyPatient.CountryId;
                     patient.CountrySubDivisionId = emergencyPatient.CountrySubDivisionId;
+                    patient.MunicipalityId = emergencyPatient.MunicipalityId;
+                    patient.WardNumber = (Int16?)emergencyPatient.WardNo;
                     patient.Address = emergencyPatient.Address;
                     patient.ModifiedBy = currentUser.EmployeeId;
                     patient.ModifiedOn = System.DateTime.Now;
@@ -2110,10 +2358,13 @@ namespace DanpheEMR.Controllers.Emergency
                     erPatient.MiddleName = emergencyPatient.MiddleName;
                     erPatient.LastName = emergencyPatient.LastName;
                     erPatient.Gender = emergencyPatient.Gender;
+                    erPatient.EthnicGroup = emergencyPatient.EthnicGroup;
                     erPatient.DateOfBirth = emergencyPatient.DateOfBirth == null ? DateTime.Now.Date : emergencyPatient.DateOfBirth;
                     erPatient.ContactNo = emergencyPatient.ContactNo;
                     erPatient.CareOfPersonContactNumber = emergencyPatient.CareOfPersonContactNumber;
                     erPatient.CareOfPerson = emergencyPatient.CareOfPerson;
+                    erPatient.BroughtBy = emergencyPatient.BroughtBy;
+                    erPatient.RelationWithPatient = emergencyPatient.RelationWithPatient;
                     erPatient.ConditionOnArrival = emergencyPatient.ConditionOnArrival;
                     erPatient.Case = emergencyPatient.Case;
                     erPatient.ModeOfArrival = emergencyPatient.ModeOfArrival;
@@ -2122,7 +2373,9 @@ namespace DanpheEMR.Controllers.Emergency
                     erPatient.ReferredTo = emergencyPatient.ReferredTo;
                     erPatient.ModifiedBy = currentUser.EmployeeId;
                     erPatient.IsPoliceCase = emergencyPatient.IsPoliceCase;
+                    erPatient.WardNo = emergencyPatient.WardNo;
                     erPatient.ModifiedOn = System.DateTime.Now;
+                    erPatient.Email = emergencyPatient.Email;
                     //if(emergencyPatient.ERPatientId == emergencyPatient.PatientCases.ERPatientId)
                     //{
 
@@ -2131,13 +2384,13 @@ namespace DanpheEMR.Controllers.Emergency
                                         where patCases.ERPatientId == emergencyPatient.ERPatientId
                                         select patCases).FirstOrDefault();
 
-                    if (emergencyPatient.MainCase != 1)
+                    if (emergencyPatient.PatientCases.MainCase != null)
                     {
                         if (prevPatCases != null)
                         {
                             prevPatCases.ERPatientId = emergencyPatient.ERPatientId;
-                            prevPatCases.MainCase = emergencyPatient.MainCase;
-                            prevPatCases.SubCase = emergencyPatient.SubCase;
+                            prevPatCases.MainCase = emergencyPatient.PatientCases.MainCase;
+                            prevPatCases.SubCase = emergencyPatient.PatientCases.SubCase;
                             prevPatCases.BitingAddress = emergencyPatient.PatientCases.BitingAddress;
                             prevPatCases.OtherCaseDetails = emergencyPatient.PatientCases.OtherCaseDetails;
                             prevPatCases.BitingSite = emergencyPatient.PatientCases.BitingSite;
@@ -2176,8 +2429,8 @@ namespace DanpheEMR.Controllers.Emergency
                         {
                             EmergencyPatientCases patCases = new EmergencyPatientCases();
                             patCases.ERPatientId = emergencyPatient.ERPatientId;
-                            patCases.MainCase = emergencyPatient.MainCase;
-                            patCases.SubCase = emergencyPatient.SubCase;
+                            patCases.MainCase = emergencyPatient.PatientCases.MainCase;
+                            patCases.SubCase = emergencyPatient.PatientCases.SubCase;
                             patCases.BitingAddress = emergencyPatient.PatientCases.BitingAddress;
                             patCases.OtherCaseDetails = emergencyPatient.PatientCases.OtherCaseDetails;
                             patCases.BitingSite = emergencyPatient.PatientCases.BitingSite;
@@ -2666,7 +2919,11 @@ namespace DanpheEMR.Controllers.Emergency
             var res = (from erpat in erDbContext.EmergencyPatient
                        join pat in erDbContext.Patient on erpat.PatientId equals pat.PatientId
                        join visit in erDbContext.Visits on erpat.PatientVisitId equals visit.PatientVisitId
-                       //join dischargeSum in erDbContext.DischargeSummary on erpat.PatientVisitId equals dischargeSum.PatientVisitId 
+                       join scheme in erDbContext.Schemes on visit.SchemeId equals scheme.SchemeId
+                       join priceCat in erDbContext.priceCategories on visit.PriceCategoryId equals priceCat.PriceCategoryId
+                       join mode in erDbContext.ModeOfArrival on erpat.ModeOfArrival equals mode.ModeOfArrivalId into modeGroup
+                       from moa in modeGroup.DefaultIfEmpty()
+                                                                   //join dischargeSum in erDbContext.DischargeSummary on erpat.PatientVisitId equals dischargeSum.PatientVisitId 
                        where erpat.IsActive == true && erpat.ERStatus.ToLower() == "finalized"
                        && (!string.IsNullOrEmpty(erpat.FinalizedStatus) && erpat.FinalizedStatus == status)
                        select new
@@ -2722,7 +2979,19 @@ namespace DanpheEMR.Controllers.Emergency
                                               select employee.FirstName + " " + (string.IsNullOrEmpty(employee.MiddleName) ? "" : employee.MiddleName + " ") + employee.LastName).FirstOrDefault(),
                            PatientCases = (from patCase in erDbContext.PatientCases
                                            where patCase.ERPatientId == erpat.ERPatientId && patCase.IsActive == true
-                                           select patCase).OrderByDescending(d => d.PatientCaseId).FirstOrDefault()
+                                           select patCase).OrderByDescending(d => d.PatientCaseId).FirstOrDefault(),
+                           SchemeId = visit.SchemeId,
+                           PriceCategoryId = visit.PriceCategoryId,
+                           SchemeName = scheme.SchemeName,
+                           PriceCategoryName = priceCat.PriceCategoryName,
+                           MunicipalityId = pat.MunicipalityId,
+                           CareOfPersonContactNumber = erpat.CareOfPersonContactNumber,
+                           BroughtBy = erpat.BroughtBy,
+                           RelationWithPatient = erpat.RelationWithPatient,
+                           IsPoliceCase = erpat.IsPoliceCase,
+                           ModeOfArrivalName = moa.ModeOfArrivalName,
+                           WardNo = pat.WardNumber,
+                           EthnicGroup = pat.EthnicGroup
                        }).OrderByDescending(p => p.ERPatientId).ToList();
 
             if (selectedCase == 0)

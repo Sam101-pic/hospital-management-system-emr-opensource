@@ -1,12 +1,11 @@
-﻿using DanpheEMR.ServerModel.RadiologyModels;
-using SendGrid;
+﻿using SendGrid;
 using SendGrid.Helpers.Mail;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DanpheEMR.ServerModel.LabModels;
+using MimeKit;
+using Serilog;
 
 namespace DanpheEMR.Services
 {
@@ -39,113 +38,54 @@ namespace DanpheEMR.Services
             }
         }
 
-
-        public async Task<string> SendEmail(string senderAddress, List<string> emailList, string nameOfSender, 
-            string subject, string plainText, string htmlContent, string pdfBase64string, string fileName, 
-            List<ImageAttachmentModel> imageAttachments, string apiKey)
-        {
-            List<EmailAddress> toSenderList = new List<EmailAddress>();
-
-            var client = new SendGridClient(apiKey);
-            var from = new EmailAddress(senderAddress, nameOfSender);
-
-            foreach (var email in emailList)
-            {
-                var to = new EmailAddress(email);
-                toSenderList.Add(to);
-            }
-
-            var msg = MailHelper.CreateSingleEmailToMultipleRecipients(from, toSenderList, subject, plainText, htmlContent);
-
-            var attachmentList = new List<Attachment>();
-            //Check for Image Attachments
-            if (imageAttachments != null && imageAttachments.Count > 0)
-            {
-                
-                foreach (var imgAttach in imageAttachments)
-                {
-                    Attachment singleAttachment = new Attachment();
-                    singleAttachment.Content = imgAttach.ImageBase64;
-                    singleAttachment.ContentId = imgAttach.ImageName;
-                    singleAttachment.Filename = imgAttach.ImageName + ".jpeg";
-                    singleAttachment.Type = "image/jpeg";
-                    singleAttachment.Disposition = "attachment";
-                    attachmentList.Add(singleAttachment);
-                }
-               
-            }
-
-            if (fileName != null && pdfBase64string != null)
-            {
-                Attachment singleAttachment = new Attachment();
-                singleAttachment.Content = pdfBase64string;
-                singleAttachment.ContentId = fileName;
-                singleAttachment.Filename = fileName + ".pdf";
-                singleAttachment.Type = "application/pdf";
-                singleAttachment.Disposition = "attachment";
-                attachmentList.Add(singleAttachment);
-            }
-
-
-            if (attachmentList != null && attachmentList.Count > 0)
-            {
-                msg.AddAttachments(attachmentList.AsEnumerable());
-            }    
-
-            var response = await client.SendEmailAsync(msg);
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Accepted)            {
-                return "OK";
-            } else
-            {
-              return "Error";
-            }
-        }
         public async Task<string> SendEmail(string senderAddress, List<string> emailList, string nameOfSender,
         string subject, string plainText,  string htmlContent, string pdfBase64string, string fileName, 
-        List<AttachmentModel> ImageAttachments, string apiKey)
+        List<AttachmentModel> ImageAttachments, string apiKey, string smtpServer, string password, int portNo)
         {
-            List<EmailAddress> toSenderList = new List<EmailAddress>();
-
-            var client = new SendGridClient(apiKey);
-            var from = new EmailAddress(senderAddress, nameOfSender);
-
-            foreach (var email in emailList)
+            try
             {
-                var to = new EmailAddress(email);
-                toSenderList.Add(to);
-            }
+                var email = new MimeMessage();
+                email.Sender = MailboxAddress.Parse(senderAddress);
 
-            var msg = MailHelper.CreateSingleEmailToMultipleRecipients(from, toSenderList, subject, plainText, htmlContent);
+                email.From.Add(MailboxAddress.Parse(senderAddress));//We need From as well for some Email Server, hence adding From here.
 
-            var attachmentList = new List<Attachment>();
-            //Check for Image Attachments
-            if (fileName != null && pdfBase64string != null)
-            {
-                Attachment singleAttachment = new Attachment();
-                singleAttachment.Content = pdfBase64string;
-                singleAttachment.ContentId = fileName;
-                singleAttachment.Filename = fileName + ".pdf";
-                singleAttachment.Type = "application/pdf";
-                singleAttachment.Disposition = "attachment";
-                attachmentList.Add(singleAttachment);
-            }
+                foreach (var emailAddress in emailList)
+                {
+                    email.To.Add(MailboxAddress.Parse(emailAddress));
+                }
+                email.Subject = subject;
+                var builder = new BodyBuilder();
+                if (pdfBase64string != null)
+                {
+                    byte[] fileBytes = Convert.FromBase64String(pdfBase64string);
+                    builder.Attachments.Add(fileName, fileBytes, ContentType.Parse("application/pdf"));
+                }
 
+                if (ImageAttachments != null && ImageAttachments.Count > 0)
+                {
+                    foreach (var imgAttach in ImageAttachments)
+                    {
+                        byte[] imageByte = Convert.FromBase64String(imgAttach.ImageBase64);
+                        builder.Attachments.Add(imgAttach.ImageName, imageByte, ContentType.Parse("image/jpeg"));
+                    }
+                }
+                
+                builder.HtmlBody = string.Concat(string.Concat(plainText, "<br/>"), (htmlContent));
+                builder.TextBody = plainText;
 
-            if (attachmentList != null && attachmentList.Count > 0)
-            {
-                msg.AddAttachments(attachmentList.AsEnumerable());
-            }
+                email.Body = builder.ToMessageBody();
 
-            var response = await client.SendEmailAsync(msg);
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Accepted)
-            {
+                var smtp = new MailKit.Net.Smtp.SmtpClient();
+                smtp.Connect(smtpServer, portNo);
+                smtp.Authenticate(senderAddress, password);
+                var response = await smtp.SendAsync(email);
+                smtp.Disconnect(true);
                 return "OK";
             }
-            else
+            catch (Exception ex)
             {
-                return "Error";
+                Log.Error(ex.Message);
+                throw;
             }
         }
     }

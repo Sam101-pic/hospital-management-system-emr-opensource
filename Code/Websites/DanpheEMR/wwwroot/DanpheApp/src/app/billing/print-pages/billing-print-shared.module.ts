@@ -11,7 +11,6 @@ import { SharedModule } from '../../shared/shared.module';
 import { DepositReceiptComponent } from './deposit-slip/bil-print-deposit-slip.component';
 import { BIL_Print_Invoice_Discharge_Component } from './ip-discharge-invoice/bil-print-invoice-discharge.component';
 import { BIL_Print_IP_Estimation } from './ip-estimation/bil-print-ip-estimation.component';
-import { BIL_Print_ProvisionalSlip_Component } from './provisional-slip/bil-print-provisional-slip.component';
 import { BIL_Print_SettlementSlip_Component } from './settlement-slip/bil-print-settlement-slip.component';
 // import { DischargeBillBreakupComponent } from './ip-discharge-invoice/breakup/discharge-bill-breakup.component';
 import { ADTSharedModule } from '../../adt/adt-shared.module';
@@ -43,7 +42,6 @@ import { Bil_Print_Invoice_DefaultComponent } from './op-normal-invoice/bil-prin
   ],
 
   declarations: [
-    BIL_Print_ProvisionalSlip_Component,
     BIL_Print_Invoice_Discharge_Component,
     BIL_Print_SettlementSlip_Component,
     DepositReceiptComponent,
@@ -63,7 +61,6 @@ import { Bil_Print_Invoice_DefaultComponent } from './op-normal-invoice/bil-prin
     CommonModule,
     FormsModule,
     RouterModule,
-    BIL_Print_ProvisionalSlip_Component,
     BIL_Print_Invoice_Discharge_Component,
     BIL_Print_SettlementSlip_Component,
     DepositReceiptComponent,

@@ -17,6 +17,7 @@ export class DischargeBillVM {
   public DepositBalance: number = 0;
   public TaxableAmount: number = 0;
   public TaxTotal: number = 0;
+  public ToBePaid: number = 0;
 }
 
 //export class DischargeBillSummaryVM {
@@ -96,23 +97,23 @@ export class BillingTransactionDetailVM {
 
 
 export class PatientDetailVM {
-  public PatientId: number;
-  public PatientName: string;
-  public HospitalNo: string;
-  public InpatientNo: string;
-  public Address: string;
-  public DateOfBirth: string;
-  public ContactNo: string;
-  public Gender: string;
-  public CountrySubDivision: string;
-  public CountryName: string;
-  public MunicipalityName: string;
-  public WardNumber: number;
-  public PANNumber: string;
-  public MembershipTypeName: string = null;
-  public SSFPolicyNo: string = null;
-  public PolicyNo: string = null;
-  public SchemeName: string = null;
+  public PatientId: number = 0;
+  public PatientName: string = "";
+  public HospitalNo: string = "";
+  public InpatientNo: string = "";
+  public Address: string = "";
+  public DateOfBirth: string = "";
+  public ContactNo: string = "";
+  public Gender: string = "";
+  public CountrySubDivisionName: string = "";
+  public CountryName: string = "";
+  public MunicipalityName: string = "";
+  public WardNumber: number = 0;
+  public PANNumber: string = "";
+  public MembershipTypeName: string = "";
+  public SSFPolicyNo: string = "";
+  public PolicyNo: string = "";
+  public SchemeName: string = "";
 }
 
 export class AdmissionDetailVM {

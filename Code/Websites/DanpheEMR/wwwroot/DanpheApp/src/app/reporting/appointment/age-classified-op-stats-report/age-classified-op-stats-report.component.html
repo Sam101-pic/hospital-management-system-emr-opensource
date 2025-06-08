@@ -6,7 +6,7 @@
 </style>
 <div class="wrapper">
     <div class="row">
-        <form [formGroup]="selectedAgeClassifiedOPStatsParameter.DyanamicValidator" class="form-horizontal">
+        <form [formGroup]="selectedAgeClassifiedOPStatsParameter.DynamicValidator" class="form-horizontal">
             <div class="form-body">
                 <div class="col-md-12">
                     <div class="caption custom-caption" style="float: left;"> <i class="glyphicon glyphicon-asterisk"></i> <span
@@ -31,7 +31,13 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-3" style="display: flex; justify-content: flex-end;">
+                        <div class="col-md-1" style="padding: 0px; margin: 5px 0px 0px 0px;">
+                            <label for="id_checkbox_freeVisit" class="is-ref mt-checkbox mt-checkbox-outline">
+                                <input type="checkbox" id="id_checkbox_freeVisit" (click)="IsFreeVisitChecked()" style="cursor: pointer;" />
+                                <span></span>Free Visit
+                            </label>
+                        </div>
                         <div class="form-group">
                             <button class="btn green btn-success" type="button" style="margin-left:100px;" (click)="Load()"> <i
                                    class="fa fa-search"></i> Show
@@ -56,7 +62,7 @@
                     &nbsp;&nbsp;&nbsp;
 
                 </div>
-                <table border="1" style="width: 100%;">
+                <!-- <table border="1" style="width: 100%;">
                     <tr>
                         <th *ngFor="let header of dynamicHeaders; let i = index">{{header}}</th>
                     </tr>
@@ -65,7 +71,27 @@
                             {{ calculateColumnSum(header) }}
                         </td>
                     </tr>
+                </table> -->
+                <table border="1" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Age Group</th>
+                            <th>Male</th>
+                            <th>Female</th>
+                            <th>Other</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let item of SummaryData">
+                            <td>{{ item.AgeGroup }}</td>
+                            <td>{{ item.MaleCount }}</td>
+                            <td>{{ item.FemaleCount }}</td>
+                            <td>{{ item.otherCount }}</td>
+                        </tr>
+                    </tbody>
                 </table>
+
+
             </div>
         </div>
     </div>

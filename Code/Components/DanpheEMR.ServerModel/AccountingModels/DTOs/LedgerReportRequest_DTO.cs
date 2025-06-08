@@ -14,5 +14,6 @@ namespace DanpheEMR.ServerModel.AccountingModels.DTOs
         public DateTime ToDate;
         public int FiscalYearId;
         public int CostCenterId;
+        public int HospitalId;
     }
 }

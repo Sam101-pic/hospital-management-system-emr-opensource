@@ -73,7 +73,6 @@ export class DischargeSummaryListComponent {
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("AdmittedDate", true));
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("DischargedDate", true));
     this.NepaliDateForAdmittedPatientsInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("AdmittedDate", true));
-
   }
   Load() {
     if (this.checkDateValidation()) {
@@ -121,6 +120,12 @@ export class DischargeSummaryListComponent {
       .subscribe(res => {
         if (res.Status == 'OK') {
           this.dischargedList = res.Results;
+          if (this.dischargedList && this.dischargedList.length > 0) {
+            this.dischargedList.map(a => {
+              a.Age = this.coreService.CalculateAge(a.DateOfBirth);
+            });
+            console.log(this.dischargedList);
+          }
         }
         else {
           this.msgBoxServ.showMessage("error", [res.ErrorMessage]);
@@ -133,16 +138,23 @@ export class DischargeSummaryListComponent {
   DischargedListGridActions($event: GridEmitModel) {
 
     switch ($event.Action) {
-      case "dischargeSummary": {
+      case "discharge-summary-view": {
         this.selectedDischarge = null;
         this.changeDetector.detectChanges();
         this.selectedDischarge = $event.Data;
         this.showDischargedList = false;
         this.wentFrom = 'dischargedList';
-        if (this.selectedDischarge.IsSubmitted)
-          this.showSummaryView = true;
-        else
-          this.showDischargeSummaryAdd = true;
+        this.showSummaryView = true;
+        break;
+      }
+      case "discharge-summary-add":
+      case "discharge-summary-edit": {
+        this.selectedDischarge = null;
+        this.changeDetector.detectChanges();
+        this.selectedDischarge = $event.Data;
+        this.showDischargedList = false;
+        this.wentFrom = 'dischargedList';
+        this.showDischargeSummaryAdd = true;
         break;
       }
       case "clear-due": {
@@ -303,18 +315,26 @@ export class DischargeSummaryListComponent {
 
   DischargeSummaryAdmittedListGridActions($event: GridEmitModel) {
     switch ($event.Action) {
-      case "dischargeSummary": {
+      case "discharge-summary-view": {
         this.selectedDischarge = null;
         this.changeDetector.detectChanges();
         this.selectedDischarge = $event.Data;
-        this.wentFrom = 'admittedList';
         this.showAdmittedList = false;
-        if (this.selectedDischarge.IsSubmitted)
-          this.showSummaryView = true;
-        else
-          this.showDischargeSummaryAdd = true;
+        this.wentFrom = 'admittedList';
+        this.showSummaryView = true;
         break;
       }
+      case "discharge-summary-add":
+      case "discharge-summary-edit": {
+        this.selectedDischarge = null;
+        this.changeDetector.detectChanges();
+        this.selectedDischarge = $event.Data;
+        this.showAdmittedList = false;
+        this.wentFrom = 'admittedList';
+        this.showDischargeSummaryAdd = true;
+        break;
+      }
+
 
       default: break;
     }

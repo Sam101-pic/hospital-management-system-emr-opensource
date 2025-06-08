@@ -218,8 +218,8 @@ export class PharmacySupplierLedgerMappingComponent {
                 ledger.LedgerGroupName = this.CurrentLedger.LedgerGroupName;
                 this.getLedgerList();
                 this.sourceLedgerList.push(ledger);
-                this.accountingService.accCacheData.LedgersALL.push(ledger);//mumbai-team-june2021-danphe-accounting-cache-change
             });
+            this.accountingService.SetCacheLedgerList(res.Results);
         }
         else if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results == null) {
             this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["Ledger under LedgerGroup already exist.Please deactivate the previous ledger to add a new one with same name"]);

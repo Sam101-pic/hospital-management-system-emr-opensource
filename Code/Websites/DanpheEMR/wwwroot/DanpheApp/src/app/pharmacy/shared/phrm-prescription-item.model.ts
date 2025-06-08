@@ -1,14 +1,12 @@
 
 import {
-  NgForm,
-  FormGroup,
+  FormBuilder,
   FormControl,
-  Validators,
-  FormBuilder
-} from '@angular/forms'
+  FormGroup,
+  Validators
+} from '@angular/forms';
 import * as moment from 'moment/moment';
 import { PHRMItemMasterModel } from "./phrm-item-master.model";
-import { ICD10 } from '../../clinical/shared/icd10.model';
 export class PHRMPrescriptionItem {
   public PrescriptionItemId: number = 0;
   public PatientId: number = null;
@@ -25,8 +23,10 @@ export class PHRMPrescriptionItem {
   public ItemName: string = null;
   //public UOMId: number = null;
   // public ItemTypeName: string = null;
+  public VisitType: string = null;
   public Quantity: number = 0;
   public Frequency: number = 0;
+  public FrequencyAbbreviation: string = "";
   public StartingDate: string = "";
   public HowManyDays: number = 0;
   public Notes: string = null;
@@ -50,7 +50,7 @@ export class PHRMPrescriptionItem {
   public IsPreference: boolean = false;
   public IsAvailable: boolean = false;
   public Route: string = null;
-
+  public Strength: string;
   public Dosage: string = null;// sud-6Jul'18
   public GenericId: number = null;// sud-6Jul'18
   public GenericName: string = null;//only for client side.: sud-6Jul'18
@@ -59,7 +59,7 @@ export class PHRMPrescriptionItem {
   //Added by Anish While making Diagnosis
   public DiagnosisId: number = 0;
   PerformerFullName: any;
-
+  TimingOfMedicineTake: string = '';
 
   constructor() {
     this.ItemListByItemType = [];

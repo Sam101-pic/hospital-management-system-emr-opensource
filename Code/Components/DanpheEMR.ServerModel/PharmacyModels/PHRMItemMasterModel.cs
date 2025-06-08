@@ -49,6 +49,8 @@ namespace DanpheEMR.ServerModel
         public decimal PurchaseRate { get; set; }
         public decimal SalesRate { get; set; }
         public decimal PurchaseDiscount { get; set; }
+        public decimal MRP { get; set; }
         public virtual List<PHRM_MAP_MstItemsPriceCategory> PHRM_MAP_MstItemsPriceCategories { get; set; } = new List<PHRM_MAP_MstItemsPriceCategory>();
+        public string HSCode { get; set; }
     }
 }

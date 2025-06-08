@@ -110,4 +110,10 @@ class GetRequisitionItemViewDto {
   DispatchedQuantity: number;
   RequestedItemStatus: string;
   Remarks: string;
+  ItemCode: string;
+  Unit: string;
+  CancelledBy: string;
+  CancelledOn: string;
+  CancelRemarks: string;
+
 }

@@ -28,24 +28,47 @@ export default class AccSettingsGridColumnSettings {
     ];
 
 
+    // static BillingLedgerMapingActions_CellRenderer(params) {
+    //     let template = `
+    //         <a danphe-grid-action="map" class="grid-action">Map</a>
+    //     `;
+
+    //     if (params.data.LedgerCode) {
+    //         if (params.data.IsActive == true) {
+    //             template += `
+    //                 <a danphe-grid-action="activateDeactivateBillingLedgerMapping" class="grid-action">Disable</a>
+    //             `;
+    //         } else {
+    //             template += `
+    //                 <a danphe-grid-action="activateDeactivateBillingLedgerMapping" class="grid-action">Enable</a>
+    //             `;
+    //         }
+    //     }
+
+    //     return template;
+    // }
+
+
     static BillingLedgerMapingActions_CellRenderer(params) {
-        let template = `
-            <a danphe-grid-action="map" class="grid-action">Map</a>
-        `;
-
-        if (params.data.LedgerCode) {
-            if (params.data.IsActive == true) {
-                template += `
-                    <a danphe-grid-action="activateDeactivateBillingLedgerMapping" class="grid-action">Disable</a>
-                `;
-            } else {
-                template += `
-                    <a danphe-grid-action="activateDeactivateBillingLedgerMapping" class="grid-action">Enable</a>
-                `;
-            }
+        if (params.data.IsActive == true) {
+            let template =
+                `<a danphe-grid-action="map" class="grid-action" >
+          Map
+          </a>
+          <a danphe-grid-action="activateDeactivateBillingLedgerMapping" class="grid-action">
+                  Disable
+          </a>`
+            return template;
         }
-
-        return template;
+        else {
+            let template = `<a danphe-grid-action="map" class="grid-action" >
+            Map
+            </a>
+                <a danphe-grid-action="activateDeactivateBillingLedgerMapping" class="grid-action" >
+                  Enable
+          </a>`
+            return template;
+        }
     }
 
 

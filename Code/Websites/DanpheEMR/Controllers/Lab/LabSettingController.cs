@@ -21,6 +21,7 @@ using DanpheEMR.Security;
 using DanpheEMR.ServerModel.LabModels;
 using System.Transactions;
 using DanpheEMR.Enums;
+using Serilog;
 
 namespace DanpheEMR.Controllers
 {
@@ -54,6 +55,20 @@ namespace DanpheEMR.Controllers
             //{
             Func<object> func = () => GetLabTestList();
             return InvokeHttpGetFunction<object>(func);
+        }
+
+        [HttpGet]
+        [Route("LabTestsOnly")]
+        public IActionResult LabTestsOnly()
+        {
+            Func<object> func = () => GetLabTestOnly();
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        private object GetLabTestOnly()
+        {
+            var labTests = _labDbContext.LabTests.Where(l => l.IsActive == true).ToList();
+            return labTests;
         }
 
         [HttpGet]
@@ -157,6 +172,7 @@ namespace DanpheEMR.Controllers
                                    Description = test.Description,
                                    LabTestSynonym = test.LabTestSynonym,
                                    LabTestName = test.LabTestName,
+                                   LabTestShortName = test.LabTestShortName,
                                    LabTestCategory = category.TestCategoryName,
                                    LabTestCategoryId = test.LabTestCategoryId,
                                    LabTestSpecimen = test.LabTestSpecimen,
@@ -213,6 +229,7 @@ namespace DanpheEMR.Controllers
 
             signatoriesData.AllDoctors = (from doc in _labDbContext.Employee
                                           where departmentId.Contains((int)doc.DepartmentId)
+                                          && doc.IsActive == true
                                           select doc
                             ).ToList();
 
@@ -417,6 +434,14 @@ namespace DanpheEMR.Controllers
                 try
                 {
                     LabTestModel labTest = DanpheJSONConvert.DeserializeObject<LabTestModel>(ipDataString);
+                    string trimmedLabTestCode = labTest.LabTestCode?.Trim();
+
+                    if (!string.IsNullOrEmpty(trimmedLabTestCode) &&
+                        _labDbContext.LabTests.Any(t => t.LabTestCode == trimmedLabTestCode))
+                    {
+                        Log.Error($"Lab Test Code '{trimmedLabTestCode}' already exists.");
+                        throw new InvalidOperationException($"Lab Test Code '{trimmedLabTestCode}' already exists. Please use a unique LabTestcode.");
+                    }
                     BillServiceItemModel billItemPrice = new BillServiceItemModel();
                     billItemPrice.AllowMultipleQty = true;
                     labTest.CreatedBy = currentUser.EmployeeId;
@@ -880,11 +905,13 @@ namespace DanpheEMR.Controllers
                         }
                         else
                         {
+                            componentToAdd.CreatedBy = currentUser.EmployeeId;
                             _labDbContext.LabTestComponents.Add(componentToAdd);
                             _labDbContext.SaveChanges();
                             var compId = componentToAdd.ComponentId;
                             var componentMapToAdd = labTest.LabTestComponentMap[0];
                             componentMapToAdd.ComponentId = compId;
+                            componentMapToAdd.CreatedBy = currentUser.EmployeeId;
                             _labDbContext.LabTestComponentMap.Add(componentMapToAdd);
                             _labDbContext.SaveChanges();
                         }
@@ -1016,6 +1043,8 @@ namespace DanpheEMR.Controllers
                             componentToUpdate.ValueType = comp.ValueType;
                             componentToUpdate.Method = comp.Method;
                             componentToUpdate.ControlType = comp.ControlType;
+                            componentToUpdate.ValuePrecision = comp.ValuePrecision;
+                            componentToUpdate.ShowRangeDescriptionInLabReport = comp.ShowRangeDescriptionInLabReport;
 
                             _labDbContext.Entry(componentToUpdate).State = EntityState.Modified;
                             _labDbContext.Entry(componentToUpdate).Property(x => x.CreatedOn).IsModified = false;

@@ -7,7 +7,9 @@ using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
+using DanpheEMR.Utilities;
 using Microsoft.Extensions.Options;
+using OfficeOpenXml.FormulaParsing.Excel.Functions.Text;
 
 namespace DanpheEMR.Services.QueueManagement
 {
@@ -27,17 +29,23 @@ namespace DanpheEMR.Services.QueueManagement
             return departmentdetails;
         }
 
-        public dynamic GetAppointmentData(int deptId, int doctorId, bool pendingOnly)
+        public dynamic GetAppointmentData(int deptId, List<int?> doctorId, bool pendingOnly)
         {
+            //List<int?> doctorIdList = DanpheJSONConvert.DeserializeObject<List<int?>>(doctorId);
 
             var visitVMList = (from visit in queueManagementDbContext.Visits
                                join department in queueManagementDbContext.Department on visit.DepartmentId equals department.DepartmentId
                                join patient in queueManagementDbContext.Patients on visit.PatientId equals patient.PatientId
                                where ((visit.VisitStatus == "initiated")
-                                  && visit.VisitDate == DbFunctions.TruncateTime(System.DateTime.Now) && visit.VisitType != ENUM_VisitType.inpatient) && visit.BillingStatus != ENUM_BillingStatus.returned
-                              && (department.DepartmentId == deptId || deptId == 0)
-                              && (visit.PerformerId == doctorId || doctorId == 0)
-                               where visit.Ins_HasInsurance == null
+                                     && visit.VisitDate == DbFunctions.TruncateTime(System.DateTime.Now) && visit.VisitType != ENUM_VisitType.inpatient) && visit.BillingStatus != ENUM_BillingStatus.returned
+                                     && (department.DepartmentId == deptId || deptId == 0)
+                                     && (doctorId.Contains(visit.PerformerId) || doctorId.Count == 0)
+
+                               //&& (doctorIdList.Contains(visit.PerformerId) || doctorIdList.Count == 0)
+
+                               //&& (visit.PerformerId == doctorId || doctorId == 0)
+                               //&& (visit.PerformerId.HasValue && doctorIdList.Contains(visit.PerformerId.Value) || doctorIdList.Count == 0) 
+                               where visit.Ins_HasInsurance == false
                                select new
                                {
                                    PatientVisitId = visit.PatientVisitId,
@@ -67,9 +75,9 @@ namespace DanpheEMR.Services.QueueManagement
             }
         }
 
-         public dynamic updateQueueStatus(string data, int visitId, RbacUser currentUser)
+        public dynamic updateQueueStatus(string data, int visitId, RbacUser currentUser)
         {
-            VisitModel visitModel =queueManagementDbContext.Visits.Where(a => a.PatientVisitId == visitId).FirstOrDefault();
+            VisitModel visitModel = queueManagementDbContext.Visits.Where(a => a.PatientVisitId == visitId).FirstOrDefault();
             visitModel.QueueStatus = data;
             visitModel.ModifiedBy = currentUser.UserId;
             visitModel.ModifiedOn = DateTime.Now;
@@ -79,11 +87,11 @@ namespace DanpheEMR.Services.QueueManagement
             queueManagementDbContext.SaveChanges();
             return visitModel;
         }
-   
 
-         public dynamic GetAllAppointmentApplicableDoctor()
+
+        public dynamic GetAllAppointmentApplicableDoctor()
         {
-            var doctorList = queueManagementDbContext.Employees.Where(x => x.IsAppointmentApplicable == true).ToList();
+            var doctorList = queueManagementDbContext.Employees.Where(x => x.IsAppointmentApplicable == true && x.IsActive == true).ToList();
             return doctorList;
         }
     }

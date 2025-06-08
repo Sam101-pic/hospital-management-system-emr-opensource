@@ -53,18 +53,19 @@
     <div class="form-group row col-md-12">
         <div class="col-md-12 autocomplete-item">
             <div class="row col-md-12">
-                <div class="col-md-6">
-                    <from-to-date-select (on-change)="OnDateRangeChange($event)">
+                <div class="col-md-6" style="padding-left:0px;">
+                    <from-to-date-select (on-change)="OnDateRangeChange($event)"
+                                         [date-settings-name]="'billing-reports'">
                     </from-to-date-select>
                 </div>
                 <div class="col-md-4">
                     <div class="form-group row">
                         <div class="col-md-12 autocomplete-item" style=" display: flex; align-items: center; flex-direction: row;">
                             <label class="control-label col-md-3"><b>Substore :</b></label>
-                            <input  danphe-auto-complete class="form-control col-md-8" placeholder="Select Substore" 
-                            [(ngModel)]="selectedStore" [source]="substores" [list-formatter]="ReturnListFormatter" 
-                            display-property-name="StoreName" value-property-name="StoreId" [match-formatted]="true" 
-                            (valueChanged)="AssignSelectedSubstore($event)" onclick="this.select()" />
+                            <input danphe-auto-complete class="form-control col-md-8" placeholder="Select Substore"
+                                   [(ngModel)]="selectedStore" [source]="substores" [list-formatter]="ReturnListFormatter"
+                                   display-property-name="StoreName" value-property-name="StoreId" [match-formatted]="true"
+                                   (ngModelChange)="AssignSelectedSubstore($event)" onclick="this.select()" />
 
                         </div>
                     </div>
@@ -76,8 +77,11 @@
             </div>
         </div>
         <div class="col-lg-12 col-sm-12">
-            <danphe-grid [grid-colDefaults]="ReturnFromSubstoreColumn" [grid-data]="returnedItemList" [rangeType]="dateRange" [NepaliDateInGridParams]="NepaliDateInGridSettings" [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" (grid-actions)="SubstoreReturnActions($event)">
+            <danphe-grid [grid-colDefaults]="ReturnFromSubstoreColumn" [grid-data]="returnedItemList" [rangeType]="dateRange"
+                         [NepaliDateInGridParams]="NepaliDateInGridSettings" [grid-exportOptions]="gridExportOptions" [grid-showExport]="true"
+                         (grid-actions)="SubstoreReturnActions($event)">
             </danphe-grid>
         </div>
     </div>
-    <return-from-substore-detail (callback-close)="Close()" [showReceiveStockPopUp]="showReceiveStockPopUp" [showViewPopUp]="showViewPopUp" [ReturnedItem]="selecteditems" (callback)="GetReturnId($event)"></return-from-substore-detail>
+    <return-from-substore-detail (callback-close)="Close()" [showReceiveStockPopUp]="showReceiveStockPopUp" [showViewPopUp]="showViewPopUp"
+                                 [ReturnId]="ReturnId" (callback)="GetReturnId($event)"></return-from-substore-detail>

@@ -13,11 +13,13 @@ import { CoreService } from "../../../core/shared/core.service";
 import { Patient } from "../../../patients/shared/patient.model";
 import { SecurityService } from "../../../security/shared/security.service";
 import { PriceCategory } from "../../../settings-new/shared/price.category.model";
+import { InsuranceMasterItems_DTO } from "../../../shared/DTOs/insurance-master-items.dto";
 import { ServiceDepartmentVM } from "../../../shared/common-masters.model";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { CommonFunctions } from '../../../shared/common.functions';
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_BillingStatus, ENUM_DanpheHTTPResponses, ENUM_LabTypes, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_PriceCategory } from "../../../shared/shared-enums";
+import { ENUM_BillingStatus, ENUM_BillingType, ENUM_DanpheHTTPResponses, ENUM_IntegrationNames, ENUM_LabTypes, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_PriceCategory, ENUM_Scheme_ApiIntegrationNames } from "../../../shared/shared-enums";
+import { BillInsuranceService } from "../../shared/bill-insurance.service";
 import { BillingInvoiceBlService } from "../../shared/billing-invoice.bl.service";
 import { BillingMasterBlService } from "../../shared/billing-master.bl.service";
 import { BillingAdditionalServiceItem_DTO } from "../../shared/dto/bill-additional-service-item.dto";
@@ -52,12 +54,17 @@ export class IpBillItemRequest implements OnInit {
   @Input("scheme-price-category")
   public SchemePriceCategoryObj: SchemePriceCategoryCustomType = { SchemeId: 0, PriceCategoryId: 0 };
   //master data
+
+  @Input("admitting-doctor")
+  public AdmittingDoctor: string = ""
   public BillItems: Array<any>;
   public BillItemsComplete: Array<any>;
   public ServiceDepartmentList: Array<ServiceDepartmentVM>;
   public DoctorsList: Array<any> = [];
   public ShowIpBillRequestSlip: Boolean = false;
-  public BillingTransaction: BillingTransaction = new BillingTransaction();;
+
+  public BillingTransaction: BillingTransaction = new BillingTransaction();
+  public EnableInsuranceCapping: boolean = false;
   //seleted items
   public SelectedItems = [];
   public SelectedServiceDepartments: Array<any> = [];
@@ -101,8 +108,11 @@ export class IpBillItemRequest implements OnInit {
   public PriceCategory: string = ENUM_PriceCategory.Normal;
   public BillRequestDoubleEntryWarningTimeHrs: number = 0;
   public PastTestList: any = [];
+  public PastOneYearTestList: BillingTransactionItem[] = [];
   public PastTestList_ForDuplicate: any = [];
   public TotalAdditionalServiceItems: number = 0;
+  public InsuranceMasterItems = new Array<InsuranceMasterItems_DTO>();
+  public IsItemValidForCapping: boolean = false;
   constructor(
     private _messageBoxService: MessageboxService,
     private _securityService: SecurityService,
@@ -111,12 +121,14 @@ export class IpBillItemRequest implements OnInit {
     public billingService: BillingService,
     public coreService: CoreService,
     private _billingInvoiceBlService: BillingInvoiceBlService,
-    private _billingMasterBlService: BillingMasterBlService
+    private _billingMasterBlService: BillingMasterBlService,
+    public billInsuranceService: BillInsuranceService
   ) {
     this.SearchByItemCode = this.coreService.UseItemCodeItemSearch();
     this.SetBillingItemsNPrices();
     this.BillRequestDoubleEntryWarningTimeHrs = this.coreService.LoadIPBillRequestDoubleEntryWarningTimeHrs();
     this.GetBillingRequestDisplaySettings();
+    this.GetInsuranceCappingParam();
     if (this.coreService.labTypes.length > 1) {
       this.HasMultipleLabType = true;
     } else {
@@ -124,6 +136,7 @@ export class IpBillItemRequest implements OnInit {
       this.LabTypeName = this.coreService.labTypes[0].LabTypeName;
     }
     this.GetPriceCategory();
+    this.InsuranceMasterItems = this.coreService.InsuranceMasterItems;
   }
 
   ngOnChanges() {
@@ -147,6 +160,8 @@ export class IpBillItemRequest implements OnInit {
     this.PastTest(this.PastTests);
     this.SetLabTypeNameInLocalStorage();
     this.SelectedPriceCategoryObj = this.DefaultPriceCategory;
+    this.GetPatientPastOneYearBillITxntems();
+    // this.billInsuranceService.GetInsuranceCappingInformation(this.currPatVisitContext.MemberNo);
   }
 
   hotkeys(event): void {
@@ -187,14 +202,30 @@ export class IpBillItemRequest implements OnInit {
       this.BillingTransaction.BillingTransactionItems.push(billItem);
     }
     if (this.SelectedPackage.BillingPackageId) {
-      const filteredItems = this.BillItems.filter(billingItem =>
-        this.SelectedPackage.BillingPackageServiceItemList.find(selectedItem =>
+      const filteredItems = this.BillItems.filter(billingItem => {
+        const matchedItem = this.SelectedPackage.BillingPackageServiceItemList.find(selectedItem =>
           selectedItem.ServiceItemId === billingItem.ServiceItemId
-        )
-      );
+        );
+
+        if (matchedItem) {
+          billingItem.PerformerId = matchedItem.PerformerId;
+          return true;
+        }
+
+        return false;
+      });
       filteredItems.forEach((element, index) => {
         this.SelectedItems[index] = element;
         this.AssignSelectedItem(index);
+        this.SelectedRequestedByDoctor[index] = this.AdmittingDoctor;//This is kept here in order to assign Prescriber automatically in Package Billing
+        this.AssignRequestedByDoctor(index);
+        const doctor = this.DoctorsList.find(a => a.EmployeeId === element.PerformerId);
+        if (doctor && doctor.EmployeeId) {
+          this._changeDetectorRef.detectChanges();
+          this.SelectedAssignedToDoctor[index] = doctor.FullName;
+          this.AssignSelectedDoctor(index);
+          this._changeDetectorRef.detectChanges();
+        }
         if (index < filteredItems.length - 1) {
           this.AddTxnItemRowOnClick(index);
         }
@@ -210,7 +241,8 @@ export class IpBillItemRequest implements OnInit {
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           if (res.Results.length > 0) {
-            this.ServicePackages = res.Results;
+            const servicePackagesList = res.Results;
+            this.ServicePackages = servicePackagesList.filter(s => s.IsItemLoadPackage);//IP Billing needs Item load package only.
             this.setFocusById('search_packages');
           }
         }
@@ -435,6 +467,13 @@ export class IpBillItemRequest implements OnInit {
       if (this.CheckSelectionFromAutoComplete() && this.BillingTransaction.BillingTransactionItems.length) {
         for (var i = 0; i < this.BillingTransaction.BillingTransactionItems.length; i++) {
           let currTxnItm = this.BillingTransaction.BillingTransactionItems[i];
+          let currTxnItmforCapping: any = this.BillingTransaction.BillingTransactionItems[i];
+          let itm = currTxnItmforCapping.ItemList.find(a => a.ServiceItemId === currTxnItmforCapping.ServiceItemId && a.ServiceDepartmentId === currTxnItmforCapping.ServiceDepartmentId);
+          const IsValidCapping = this.billInsuranceService.ValidateCapping(this.SchemePriceCategory.UseCappingAPI, itm.IsCappingEnabled, itm, true, false);
+          if (!IsValidCapping) {
+            isFormValid = false;
+            break;
+          }
           //for IsZeroPriceAlowed case...
           var item = currTxnItm.ItemList.find(a => a.ServiceItemId === currTxnItm.ServiceItemId && a.ServiceDepartmentId === currTxnItm.ServiceDepartmentId);
           if (item && item.IsZeroPriceAllowed) {
@@ -465,6 +504,15 @@ export class IpBillItemRequest implements OnInit {
     else {
       this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Invalid Patient/Visit Id."]);
       isFormValid = false;
+    }
+    if (this.SchemePriceCategory.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.SSF || this.SchemePriceCategory.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS) {
+      if (this.BillingTransaction && this.BillingTransaction.BillingTransactionItems && this.BillingTransaction.BillingTransactionItems.length) {
+        if (this.InsuranceMasterItems && this.InsuranceMasterItems.length) {
+          if (!this.CheckItemCodeAndItemPriceInsuranceBilling(this.BillingTransaction.BillingTransactionItems, this.SchemePriceCategory.SchemeApiIntegrationName)) {
+            isFormValid = false;
+          }
+        }
+      }
     }
     return isFormValid;
   }
@@ -545,7 +593,7 @@ export class IpBillItemRequest implements OnInit {
     // this.billItems = this.billItemsComplete.filter(item => item.ServiceDepartmentName != "OPD");
     this.BillItemsComplete = this._billingMasterBlService.ServiceItemsForIp;
     this.AdditionalServiceItems = this._billingMasterBlService.AdditionalServiceItems;
-    this.BillItems = this.BillItemsComplete.filter(item => item.ServiceDepartmentName !== "OPD");
+    this.BillItems = this.BillItemsComplete.filter(item => item.IntegrationName !== ENUM_IntegrationNames.OPD);
     if (this.BillingTransaction.BillingTransactionItems && this.BillingTransaction.BillingTransactionItems.length > 0
       && (!this.BillingTransaction.BillingTransactionItems[0].ItemList)) {
       this.BillingTransaction.BillingTransactionItems[0].ItemList = this.BillItems;
@@ -578,12 +626,15 @@ export class IpBillItemRequest implements OnInit {
         this.SelectedRequestedByDoctor[0] = doc.FullName;
         this.AssignRequestedByDoctor(0);
       }
+    } else {
+      this.SelectedRequestedByDoctor[0] = this.AdmittingDoctor;
+      this.AssignRequestedByDoctor(0);
     }
   }
 
   GetVisitContext(patientId: number, visitId: number): void {
     if (patientId && visitId) {
-      this._billingBLService.GetDataOfInPatient(patientId, visitId)
+      this._billingBLService.GetPatientCurrentVisitContext(patientId, visitId)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results.Current_WardBed) {
             this.CurrentPatientVisitContext = res.Results;
@@ -635,9 +686,17 @@ export class IpBillItemRequest implements OnInit {
       else if (typeof (this.SelectedItems[index]) === 'object')
         item = this.SelectedItems[index];
       if (item) {
+
+        if (item.IsDoctorMandatory) {
+          this.AssignPerformer(index, item);
+        }
+        const IsQuantityChanged = false;
+        const IsItemSelected = true;
+        this.billInsuranceService.ValidateCapping(this.SchemePriceCategory.UseCappingAPI, item.IsCappingEnabled, item, IsItemSelected, IsQuantityChanged);
+        this.IsItemValidForCapping = this.billInsuranceService.IsValidCapping;
         this.SelectedInvoiceItemForAdditionalItemCalculation = item;
         let discountApplicable = item.IsDiscountApplicable;
-        if (this.BillingType.toLowerCase() !== "inpatient") {
+        if (this.BillingType.toLowerCase() !== ENUM_BillingType.inpatient) {
           let extItem = this.BillingTransaction.BillingTransactionItems.find(a => a.ServiceItemId === item.ServiceItemId && a.ServiceDepartmentId === item.ServiceDepartmentId);
           let extItemIndex = this.BillingTransaction.BillingTransactionItems.findIndex(a => a.ServiceItemId === item.ServiceItemId && a.ServiceDepartmentId === item.ServiceDepartmentId);
           if (extItem && index != extItemIndex) {
@@ -658,13 +717,14 @@ export class IpBillItemRequest implements OnInit {
         //this.billingTransaction.BillingTransactionItems[index].TaxableAmount = item.TaxApplicable ? item.Price : 0;
         this.BillingTransaction.BillingTransactionItems[index].DiscountSchemeId = this.SchemePriceCategory.SchemeId;
         this.BillingTransaction.BillingTransactionItems[index].Price = item.Price;
-        this.BillingTransaction.BillingTransactionItems[index].PriceCategory = null;
+        this.BillingTransaction.BillingTransactionItems[index].PriceCategory = this.SchemePriceCategory.PriceCategoryName;
         this.BillingTransaction.BillingTransactionItems[index].PriceCategoryId = this.SchemePriceCategory.PriceCategoryId;
         this.BillingTransaction.BillingTransactionItems[index].ServiceItemId = item.ServiceItemId;
         this.BillingTransaction.BillingTransactionItems[index].IsCoPayment = item.IsCoPayment;
         this.BillingTransaction.BillingTransactionItems[index].CoPaymentCashPercent = item.CoPayCashPercent;
         this.BillingTransaction.BillingTransactionItems[index].CoPaymentCreditPercent = item.CoPayCreditPercent;
         this.BillingTransaction.BillingTransactionItems[index].IsDoctorMandatory = item.IsDoctorMandatory;
+        this.BillingTransaction.BillingTransactionItems[index].IntegrationName = item.IntegrationName;
         if (!discountApplicable) {
           //Yubraj 29th July -- Disable discount TextBox in case of DiscountApplicable is false
           //If item is not DiscountApplicable, Discunt percentshould be '0' (zero) and textBox is disable
@@ -691,9 +751,6 @@ export class IpBillItemRequest implements OnInit {
         this.HasAdditionalServiceItem = this.HasAdditionalServiceItemSelected = item.HasAdditionalBillingItems;
         this.NextIndex = index + 1;
 
-        if (item.IsDoctorMandatory) {
-          this.AssignPerformer(index, item);
-        }
       }
       else
         this.BillingTransaction.BillingTransactionItems[index].IsValidSelItemName = false;
@@ -727,16 +784,21 @@ export class IpBillItemRequest implements OnInit {
       this.BillingTransaction.BillingTransactionItems[index].IsDoubleEntry_Now = false;
     }
   }
-
+  isPackageItem(item): boolean {
+    // Adjust this logic based on how you identify package items
+    if (this.SelectedPackage && this.SelectedPackage.BillingPackageServiceItemList && this.SelectedPackage.BillingPackageServiceItemList.length) {
+      return this.SelectedPackage.BillingPackageServiceItemList.some(packageItem => packageItem.ServiceItemId === item.ServiceItemId);
+    }
+  }
   private AssignPerformer(index: number, item: any): void {
     /*
               !Step 1: First update validation for Performer to required it Doctor is Mandatory for the selected item.
               !Step 2: Check if the DoctorList of that item is null. If Doctor List is not empty, Parse the string DoctorList to local variable in the form of array of numbers.
               !Step 3: If the DoctorList contains single doctor, Find that doctor from all AppointmentApplicable DoctorList & assign that doctor as performer of that service item.
-              !Step 4: Else if the DoctorList contains multiple doctors, 
+              !Step 4: Else if the DoctorList contains multiple doctors,
                         !- Assign selected default to one variable, say defaultDoctors by filtering from the main DoctorList.
                         !- Assign other remaining doctors to one variable, say otherDoctors by filtering from the main DoctorList and excluding defaultDoctors.
-                        !- Then combine defaultDoctors and otherDoctors to AssignedDoctorList in order that defaultDoctors comes first and then otherDoctors on the dropDown Menu.     
+                        !- Then combine defaultDoctors and otherDoctors to AssignedDoctorList in order that defaultDoctors comes first and then otherDoctors on the dropDown Menu.
       */
     //! Step 1:
     this.BillingTransaction.BillingTransactionItems[index].BillingTransactionItemValidator.get('PerformerId').setValidators(item.IsDoctorMandatory ? Validators.required : null);
@@ -900,7 +962,10 @@ export class IpBillItemRequest implements OnInit {
     if (this.BillingTransaction.BillingTransactionItems && this.BillingTransaction.BillingTransactionItems.length > 0) {
       isPerformerValid = this.BillingTransaction.BillingTransactionItems[this.BillingTransaction.BillingTransactionItems.length - 1].IsValidCheck('PerformerId', 'required')
     }
-    if (isPerformerValid === false) {
+    if (!this.billInsuranceService.IsValidCapping && this.SchemePriceCategory.IsBillingCappingApplicable) {
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`Insurance capping is applied and the remaining Quantity usage is exceeded.`]);
+      return;
+    } if (!this.IsPackageBilling && isPerformerValid === false) {
       this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Performer is mandatory."]);
       return;
     }
@@ -922,6 +987,8 @@ export class IpBillItemRequest implements OnInit {
       }
       if (this.SelectedRequestedByDoctor[index]) {
         this.SelectedRequestedByDoctor[new_index] = this.SelectedRequestedByDoctor[index];
+      } else {
+        this.SelectedRequestedByDoctor[0] = this.AdmittingDoctor;
       }
       this.AssignRequestedByDoctor(new_index);
       window.setTimeout(function () {
@@ -954,6 +1021,7 @@ export class IpBillItemRequest implements OnInit {
     }
     this.CalculationForAll();
     this.CheckForDoubleEntry();
+    this.IsItemValidForCapping = true;
   }
   //----end: add/delete rows-----
 
@@ -1031,92 +1099,6 @@ export class IpBillItemRequest implements OnInit {
     //this.LoadItemsPriceByPriceCategoryAndFilter($event.PriceCategoryId);
   }
 
-  //! Krishna, 18thJune, Below code is deprecated, hence commenting for now, Will remove it in later versions.
-  // public BilcfgItemsVsPriceCategoryMap: Array<any> = new Array<any>();
-  // LoadItemsPriceByPriceCategoryAndFilter(selectedPriceCategoryId: number) {
-  //   if (selectedPriceCategoryId) {
-  //     let selectedPriceCategoryObj = this.allPriceCategories.find(a => a.PriceCategoryId == selectedPriceCategoryId);
-  //     //if (selectedPriceCategoryObj.IsRateDifferent) {
-  //     //! Need initial data
-  //     this.SetBillingItemsNPrices();
-  //     //! Reset the BillTxnItms rows
-  //     for (let index = 0; index < this.billingTransaction.BillingTransactionItems.length; index++) {
-  //       if (this.billingTransaction.BillingTransactionItems) {
-  //         this.billingTransaction.BillingTransactionItems = [];
-  //         this.selectedItems = [];
-  //         this.selectedAssignedToDr = [];
-  //         this.selectedServDepts = [];
-  //         if (this.billingTransaction.BillingTransactionItems.length == 0) {
-  //           this.AddNewBillTxnItemRow();
-  //           this.changeDetectorRef.detectChanges();
-  //         }
-  //         this.Calculationforall();
-  //       }
-  //     }
-  //     //* fetch from mapping table
-  //     if (this.SchemePriceCategory.SchemeId && this.SchemePriceCategory.PriceCategoryId) {
-  //       this.billingMasterBlService.GetServiceItems(ENUM_ServiceBillingContext.IpBilling, this.SchemePriceCategory.SchemeId, this.SchemePriceCategory.PriceCategoryId)
-  //         .subscribe((res: DanpheHTTPResponse) => {
-  //           if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
-  //             this.BilcfgItemsVsPriceCategoryMap = res.Results;
-  //             this.FilterItemsByPriceCategoryAndAssignPrice(this.priceCategory);
-  //           }
-  //         },
-  //           err => {
-  //             console.log(err);
-  //           });
-  //     }
-  //   }
-  // }
-
-  // FilterItemsByPriceCategoryAndAssignPrice(selectedPriceCategory) {
-  //   if (this.BilcfgItemsVsPriceCategoryMap && this.BilcfgItemsVsPriceCategoryMap.length) {
-
-  //     //! Krishna, 29thMarch'23 below logic needs to changed as soon as possible, it is just a temporary solution, Here Item may come duplicate and in large number, hence we are filtering it with priceCategoryId
-  //     //this.billItems = this.billItems.filter(ele => this.BilcfgItemsVsPriceCategoryMap.some(elem => ele.ServiceDepartmentId === elem.ServiceDepartmentId && ele.ItemId === elem.ItemId && ele.PriceCategoryId === this.SchemePriceCategory.PriceCategoryId));
-  //     this.billItems = this.billItems.filter(ele => this.BilcfgItemsVsPriceCategoryMap.some(elem => ele.ServiceItemId === elem.ServiceItemId && ele.PriceCategoryId === this.SchemePriceCategory.PriceCategoryId));
-  //     this.billItems.map(a => {
-  //       let matchedData = this.BilcfgItemsVsPriceCategoryMap.find(b => b.ServiceDepartmentId === a.ServiceDepartmentId && b.IntegrationItemId === a.IntegrationItemId);
-  //       if (matchedData) {
-  //         a.ItemCode = matchedData.ItemCode;
-  //         a.Price = matchedData.Price;
-  //         a.DiscountApplicable = matchedData.IsDiscountApplicable;
-  //         a.DiscountPercent = matchedData.DiscountPercent;
-  //         a.IsCoPayment = matchedData.IsCoPayment;
-  //         a.CoPaymentCashPercent = matchedData.CoPayCashPercent;
-  //         a.CoPaymentCreditPercent = matchedData.CoPayCreditPercent;
-  //       }
-  //     });
-  //     if (this.billingTransaction.BillingTransactionItems) {
-
-  //       this.billingTransaction.BillingTransactionItems = [];
-  //       this.selectedItems = [];
-  //       this.selectedAssignedToDr = [];
-  //       this.selectedServDepts = [];
-  //       if (this.billingTransaction.BillingTransactionItems.length == 0) {
-  //         this.AddNewBillTxnItemRow();
-  //         this.changeDetectorRef.detectChanges();
-  //       }
-  //       this.Calculationforall();
-  //     }
-
-  //   }
-  //   else {
-  //     this.billItems = new Array<BillingTransactionItem>();
-  //     if (this.billingTransaction.BillingTransactionItems) {
-
-  //       this.billingTransaction.BillingTransactionItems = [];
-  //       this.selectedItems = [];
-  //       this.selectedAssignedToDr = [];
-  //       this.selectedServDepts = [];
-  //       if (this.billingTransaction.BillingTransactionItems.length == 0) {
-  //         this.AddNewBillTxnItemRow();
-  //         this.changeDetectorRef.detectChanges();
-  //       }
-  //       this.Calculationforall();
-  //     }
-  //   }
-  // }
   ResetDoctorListOnItemChange(item, index): void {
     if (item) {
       let docArray = null;
@@ -1229,7 +1211,13 @@ export class IpBillItemRequest implements OnInit {
       this.BillingRequestDisplaySettings = currParam;
     }
   }
-
+  GetInsuranceCappingParam(): void {
+    var param = this.coreService.Parameters.find(a => a.ParameterGroupName === "Billing" && a.ParameterName === "AllowInsuranceCapping");
+    if (param && param.ParameterValue) {
+      let currParam = JSON.parse(param.ParameterValue);
+      this.EnableInsuranceCapping = currParam;
+    }
+  }
   OnLabTypeChange(): void {
     this.BillingTransaction.LabTypeName = this.LabTypeName;
     this.FilterBillItems(0);
@@ -1251,6 +1239,8 @@ export class IpBillItemRequest implements OnInit {
       this.BillingTransaction.BillingTransactionItems.forEach(item => {
         item.DiscountSchemeId = this.SchemePriceCategory.SchemeId;
         item.PriceCategoryId = this.SchemePriceCategory.PriceCategoryId;
+        item.IsBillingCappingApplicable = this.SchemePriceCategory.IsBillingCappingApplicable;
+        item.UseCappingAPI = this.SchemePriceCategory.UseCappingAPI;
       });
     }
   }
@@ -1390,6 +1380,50 @@ export class IpBillItemRequest implements OnInit {
       this.CalculationForAll();
       this.ResetDoctorListOnItemChange(this.AdditionalInvoiceItem, index);
       this.AddTxnItemRowOnClick(index);
+    }
+  }
+
+  //! Krishna, 15thMay, 2024, This method is responsible to validate the ItemCode and Price for SSF and HIB Billing.
+  CheckItemCodeAndItemPriceInsuranceBilling(billingTransactionItems: BillingTransactionItem[], schemeApiIntegrationName: string): boolean {
+    if (billingTransactionItems && this.InsuranceMasterItems && this.InsuranceMasterItems.length) {
+      let isValid = true;
+      for (let index = 0; index < billingTransactionItems.length; index++) {
+        const element = billingTransactionItems[index];
+        const insuranceItemWithMatchingItem = this.InsuranceMasterItems.some(a => a.InsuranceType === schemeApiIntegrationName && a.InsCode === element.ItemCode);
+        if (!insuranceItemWithMatchingItem) {
+          isValid = false;
+          this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`${element.ItemCode} ItemCode for ${element.ItemName} is not matching with Insurance Provided ItemCode, \n Please Contact your Administrator!`]);
+          break;
+        } else {
+          const matchingItem = this.InsuranceMasterItems.find(a => a.InsuranceType === schemeApiIntegrationName && a.InsCode === element.ItemCode);
+          if (element.Price !== matchingItem.Price) {
+            isValid = false;
+            this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`${element.Price} Price for ${element.ItemName} is not matching with Insurance Provided Price, It Should be ${matchingItem.Price}, \n Please contact your Administrator!`]);
+            break;
+          }
+        }
+      }
+      return isValid;
+    }
+  }
+  GetPatientPastOneYearBillITxntems() {
+    this._billingBLService.GetPatientPastOneYearBillITxntems(this.PatientId).subscribe(res => {
+      if (res.Status == "OK") {
+        this.PastOneYearTestList = res.Results;
+        this.billInsuranceService.PatientsPastOneYearTestList(this.PastOneYearTestList);
+      }
+    });
+  }
+  ValidateForCappingItems($event: any, index) {
+    if ($event) {
+      const qty = Number($event.target.value);
+      const itemName = this.SelectedItems[index]
+      const IsItemSelected = false;
+      const IsQuantityChanged = true;
+      //type any is used because of the selectedInvoiceItem is not object but string
+      const selectedInvoiceItem: any = this.BillItems.find(item => item.ItemName === itemName);
+      this.billInsuranceService.ValidateCapping(this.SchemePriceCategory.UseCappingAPI, selectedInvoiceItem.IsCappingEnabled, selectedInvoiceItem, IsItemSelected, IsQuantityChanged, qty);
+      this.IsItemValidForCapping = this.billInsuranceService.IsValidCapping;
     }
   }
 }

@@ -6,6 +6,7 @@ import { UnitOfMeasurementModel } from '../shared/unit-of-measurement.model';
 //Parse, validate, manipulate, and display dates and times in JS.
 import * as moment from "moment";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 
 @Component({
     selector: 'unitofmeasurement-add',
@@ -17,6 +18,9 @@ export class UnitOfMeasurementAddComponent {
     public showAddPage: boolean = false;
     @Input("selectedUnitOfMeasurement")
     public selectedUnitOfMeasurement: UnitOfMeasurementModel;
+
+    @Input("unitofmeasurementList")
+    public UnitOfMeasurementList = new Array<UnitOfMeasurementModel>();
     @Output("callback-add")
     callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
     public update: boolean = false;
@@ -54,6 +58,14 @@ export class UnitOfMeasurementAddComponent {
             this.CurrentUnitOfMeasurement.UnitOfMeasurementValidator.controls[i].markAsDirty();
             this.CurrentUnitOfMeasurement.UnitOfMeasurementValidator.controls[i].updateValueAndValidity();
         }
+        if (this.UnitOfMeasurementList && this.UnitOfMeasurementList.length) {
+            const isUnitOfMeasurementNameAlreadyExists = this.UnitOfMeasurementList.some(a => a.UOMName.toLowerCase() === this.CurrentUnitOfMeasurement.UOMName.toLowerCase());
+            if (isUnitOfMeasurementNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add Unit of Measurement as UnitOfMeasurement Name "${this.CurrentUnitOfMeasurement.UOMName}" already exists.`]);
+                return;
+            }
+        }
+
         if (this.CurrentUnitOfMeasurement.IsValidCheck(undefined, undefined)) {
             this.loading = true;
             this.CurrentUnitOfMeasurement.CreatedOn = moment().format('YYYY-MM-DD');
@@ -79,6 +91,14 @@ export class UnitOfMeasurementAddComponent {
         for (var i in this.CurrentUnitOfMeasurement.UnitOfMeasurementValidator.controls) {
             this.CurrentUnitOfMeasurement.UnitOfMeasurementValidator.controls[i].markAsDirty();
             this.CurrentUnitOfMeasurement.UnitOfMeasurementValidator.controls[i].updateValueAndValidity();
+        }
+
+        if (this.UnitOfMeasurementList && this.UnitOfMeasurementList.length) {
+            const isUnitOfMeasurementNameAlreadyExists = this.UnitOfMeasurementList.some(a => a.UOMName.toLowerCase() === this.CurrentUnitOfMeasurement.UOMName.toLowerCase() && a.UOMId !== this.CurrentUnitOfMeasurement.UOMId);
+            if (isUnitOfMeasurementNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update Unit of Measurement as UnitOfMeasurement Name "${this.CurrentUnitOfMeasurement.UOMName}" already exists.`]);
+                return;
+            }
         }
 
         if (this.CurrentUnitOfMeasurement.IsValidCheck(undefined, undefined)) {

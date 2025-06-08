@@ -1,5 +1,13 @@
-﻿using DanpheEMR.CommonTypes;
+﻿using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Entity;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Xml;
+using DanpheEMR.CommonTypes;
 using DanpheEMR.Controllers.Settings.DTO;
+using DanpheEMR.Core.Caching;
 using DanpheEMR.Core.Configuration;
 using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
@@ -7,21 +15,16 @@ using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.ClinicalModels;
 using DanpheEMR.ServerModel.MasterModels;
+using DanpheEMR.ServerModel.SalutationModel;
 using DanpheEMR.ServerModel.WardSupplyModels;
 using DanpheEMR.Services.DepartmentSettings.DTOs;
 using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Data.Entity;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using System.Xml;
+using Serilog;
 
 // For more information on enabling Web API for empty projects, visit http://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -42,6 +45,20 @@ namespace DanpheEMR.Controllers
             _labDbContext = new LabDbContext(connString);
             _clinicalDbContext = new ClinicalDbContext(connString);
         }
+        [HttpGet]
+        [Route("Salutation")]
+        public IActionResult GetSalutation()
+        {
+            Func<object> func = () => HandleGetSalutations();
+            return InvokeHttpGetFunction(func);
+        }
+
+        private object HandleGetSalutations()
+        {
+            var salutations = _masterDbContext.Salutations.ToList();
+            return salutations;
+        }
+
 
         [HttpGet]
         [Route("Departments")]
@@ -192,6 +209,115 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
         }
         [HttpPost]
+        [Route("Salutation")]
+        public IActionResult PostSalutation([FromBody] SalutationsModel salutationsData)
+        {
+            Func<object> func = () => AddSalutation(salutationsData);
+            return InvokeHttpPostFunction(func);
+        }
+
+        [HttpPut]
+        [Route("Salutation")]
+        public IActionResult PutSalutation([FromBody] SalutationsModel salutationsData)
+        {
+            Func<object> func = () => UpdateSalutation(salutationsData);
+            return InvokeHttpPutFunction(func);
+        }
+
+        private object AddSalutation(SalutationsModel salutationsData)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+
+            ValidateSalutation(salutationsData);
+
+            SalutationsModel salutationsModel = new SalutationsModel
+            {
+                SalutationName = salutationsData.SalutationName,
+                IsActive = true,
+                IsApplicableForPatients=salutationsData.IsApplicableForPatients,
+                CreatedBy = currentUser.EmployeeId,
+                CreatedOn = DateTime.Now
+            };
+
+            _masterDbContext.Salutations.Add(salutationsModel);
+            _masterDbContext.SaveChanges();
+
+            return salutationsModel;
+        }
+
+        private object UpdateSalutation(SalutationsModel salutationsData)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+
+            ValidateSalutation(salutationsData, true);
+
+            SalutationsModel existingData = _masterDbContext.Salutations
+                .FirstOrDefault(x => x.SalutationId == salutationsData.SalutationId);
+
+            if (existingData == null)
+            {
+                Log.Error($"Salutations with ID {salutationsData.SalutationId} not found.");
+                throw new InvalidOperationException("Record not found.");
+            }
+
+            existingData.SalutationName = salutationsData.SalutationName;
+            existingData.IsApplicableForPatients = salutationsData.IsApplicableForPatients;
+            existingData.ModifiedBy = currentUser.EmployeeId;
+            existingData.ModifiedOn = DateTime.Now;
+
+            _masterDbContext.SaveChanges();
+
+            return  existingData;
+        }
+
+        private void ValidateSalutation(SalutationsModel salutationsData, bool isUpdate = false)
+        {
+            if (salutationsData == null)
+            {
+                Log.Error("Salutations value is not provided.");
+                throw new InvalidOperationException("No salutation data provided.");
+            }
+
+            salutationsData.SalutationName = salutationsData.SalutationName?.Trim();
+
+            bool isSalutationExists = _masterDbContext.Salutations
+                .Any(m => m.SalutationName == salutationsData.SalutationName &&
+                         (!isUpdate || m.SalutationId != salutationsData.SalutationId));
+
+            if (isSalutationExists)
+            {
+                Log.Error($"SalutationName '{salutationsData.SalutationName}' already exists.");
+                throw new InvalidOperationException("Salutation Name already exists.");
+            }
+        }
+
+
+        [HttpPut]
+        [Route("activate-deactivate-salutation")]
+        public IActionResult ActivateDeactivateSalutationStatus([FromBody] int selectedId)
+        {
+            Func<object> func = () => ChangeActiveDeactivateStatus(selectedId);
+            return InvokeHttpPostFunction(func);
+        }
+
+        private object ChangeActiveDeactivateStatus(int selectedId)
+        {
+            SalutationsModel existingData = _masterDbContext.Salutations.FirstOrDefault(x => x.SalutationId == selectedId);
+            if (existingData != null)
+            {
+                existingData.IsActive = !existingData.IsActive;
+                _masterDbContext.SaveChanges();
+              
+                return existingData;
+            }
+            else
+            {
+                throw new Exception("Null Value is not Allowed");
+            }
+
+        }
+
+        [HttpPost]
         [Route("PostIntakeOutputVariable")]
         public IActionResult postIntakeOutputVariable([FromBody] ClinicalIntakeOutputParameterModel clinicalIntakeOutput)
         {
@@ -280,133 +406,6 @@ namespace DanpheEMR.Controllers
             return opdServiceItems;
         }
 
-        //[HttpGet]
-        //public string Get(string department,
-        //    string servDeptName,
-        //    string reqType,
-        //    int providerId,
-        //    int patientId,
-        //    DateTime requestDate,
-        //    int roleId,
-        //    int userId,
-        //    int bedId,
-        //    int itemId,
-        //    int serviceDeptId,
-        //    string status,
-        //    int templateId,
-        //    bool ShowIsActive,
-        //    bool showInactiveItems = false)
-        //{
-        //    MasterDbContext masterDbContext = new MasterDbContext(connString);
-        //    BillingDbContext billingDbContext = new BillingDbContext(connString);
-        //    DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
-
-        //    try
-        //    {
-        //        //if (reqType == "departments")
-        //        //{
-        //        //    List<DepartmentModel> deptList = (from d in masterDbContext.Departments
-        //        //                                      select d).OrderBy(d => d.DepartmentName).ToList();
-        //        //    responseData.Status = "OK";
-        //        //    responseData.Results = deptList;
-        //        //}
-        //        //if (reqType == "phrm-store")
-        //        //{
-        //        //    var substoreType = Enums.ENUM_StoreCategory.Substore;
-        //        //    List<PHRMStoreModel> storeList = (from s in masterDbContext.Store
-        //        //                                      where s.Category == substoreType
-        //        //                                      select s).OrderBy(s => s.Name).ToList();
-        //        //    responseData.Status = "OK";
-        //        //    responseData.Results = storeList;
-        //        //}
-
-        //        //else
-
-        //        //if (reqType == "integrationName")
-        //        //{
-        //        //    List<IntegrationModel> integrationNameList = (from i in masterDbContext.IntegrationName
-        //        //                                                  select i).ToList();
-        //        //    responseData.Status = "OK";
-        //        //    responseData.Results = integrationNameList;
-        //        //}
-
-
-
-        //        //else
-        //        //if (reqType == "countries")
-        //        //{
-        //        //    List<CountryModel> countryList = (from d in masterDbContext.Country
-        //        //                                      select d).OrderBy(c => c.CountryName).ToList();
-        //        //    responseData.Status = "OK";
-        //        //    responseData.Results = countryList;
-        //        //}
-        //        //else
-
-        //        //if (reqType == "subdivisions")
-        //        //{
-        //        //    List<CountrySubDivisionModel> subDivisionList = (from subd in masterDbContext.CountrySubDivision
-        //        //                                                     select subd).ToList();
-        //        //    responseData.Status = "OK";
-        //        //    responseData.Results = subDivisionList;
-        //        //}
-        //        //else
-
-        //        //if (reqType == "municipalities")
-        //        //{
-        //        //    var data = (from c in masterDbContext.Country
-        //        //                join d in masterDbContext.CountrySubDivision on c.CountryId equals d.CountryId
-        //        //                join m in masterDbContext.Municipalities on d.CountrySubDivisionId equals m.CountrySubDivisionId
-        //        //                select new
-        //        //                {
-        //        //                    MunicipalityName = m.MunicipalityName,
-        //        //                    MunicipalityId = m.MunicipalityId,
-        //        //                    CountryId = m.CountryId,
-        //        //                    CountryName = c.CountryName,
-        //        //                    CountrySubDivisionName = d.CountrySubDivisionName,
-        //        //                    CountrySubDivisionId = d.CountrySubDivisionId,
-        //        //                    Type = m.Type,
-        //        //                    IsActive = m.IsActive
-        //        //                }).ToList();
-
-        //        //    responseData.Status = "OK";
-        //        //    responseData.Results = data;
-        //        //}
-        //        //else 
-
-        //        //if (reqType == "reactions")
-        //        //{
-        //        //    List<ReactionModel> reactioinList = (from rxn in masterDbContext.Reactions
-        //        //                                         select rxn).ToList();
-        //        //    responseData.Status = "OK";
-        //        //    responseData.Results = reactioinList;
-        //        //}
-        //        //else
-
-        //        //if (reqType == "cfgparameters")
-        //        //{
-        //        //    List<CfgParameterModel> parameterList = (from param in masterDbContext.CFGParameters
-        //        //                                             select param).OrderBy(p => p.ParameterId).ToList();
-        //        //    responseData.Status = "OK";
-        //        //    responseData.Results = parameterList;
-        //        //}
-        //        //else 
-
-        //        //if (reqType == "get-print-export-configuration")
-        //        //{
-        //        //    List<PrintExportConfigModel> data = (from config in masterDbContext.PrintExportConfig
-        //        //                                         select config).OrderBy(b => b.PrintExportSettingsId).ToList();
-        //        //    responseData.Status = "OK";
-        //        //    responseData.Results = data;
-        //        //}
-
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        responseData.Status = "Failed";
-        //        responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
-        //    }
-        //    return DanpheJSONConvert.SerializeObject(responseData, true);
-        //}
         [HttpGet("GetICD10Groups")]
         public IActionResult GetICD10Groups()
         {
@@ -564,34 +563,12 @@ namespace DanpheEMR.Controllers
         }
         private object PriceCategoriesList()
         {
-            var priceCategoryList = (from price in _masterDbContext.PriceCategorys
-                                         //join phrmCredit in _masterDbContext.PharmacyCreditOrganizations on price.PharmacyDefaultCreditOrganizationId equals phrmCredit.OrganizationId
-                                         //into credit
-                                         //from creditorg in credit.DefaultIfEmpty()
-                                         //join billingCredit in _masterDbContext.BillingCreditOrganization on price.DefaultCreditOrganizationId equals billingCredit.OrganizationId
-                                         //into bill
-                                         //from billorg in bill.DefaultIfEmpty()
-                                         //join payment in _masterDbContext.PaymentModes on price.DefaultPaymentModeId equals payment.PaymentSubCategoryId into pay
-                                         //from paymode in pay.DefaultIfEmpty()
-                                     select new PriceCategoryDTO
-                                     {
-                                         PriceCategoryId = price.PriceCategoryId,
-                                         PriceCategoryCode = price.PriceCategoryCode,
-                                         PriceCategoryName = price.PriceCategoryName,
-                                         Description = price.Description,
-                                         IsDefault = price.IsDefault,
-                                         IsActive = price.IsActive,
-                                         ShowInRegistration = price.ShowInRegistration,
-                                         ShowInAdmission = price.ShowInAdmission,
-
-                                     }).Where(r => r.PriceCategoryName != null && r.PriceCategoryName != "").OrderByDescending(price => price.PriceCategoryId).ToList();
-
-
-            if (priceCategoryList == null || priceCategoryList.Count() == 0)
+            var priceCategoryList = DanpheCache.Get("master-pricecategory");
+            if (priceCategoryList == null)
             {
-                throw new Exception("No price history found.");
+                priceCategoryList = _masterDbContext.PriceCategorys.ToList<PriceCategoryModel>();
+                DanpheCache.Add("master-pricecategory", priceCategoryList, DateTime.Now.AddMinutes(20));
             }
-
             return priceCategoryList;
         }
 
@@ -886,268 +863,18 @@ namespace DanpheEMR.Controllers
                 _masterDbContext.PriceCategorys.Add(priceCategory);
                 _masterDbContext.SaveChanges();
 
+          
+                var priceCategories = _masterDbContext.PriceCategorys.ToList<PriceCategoryModel>();
+                
+                string key = "master-pricecategory";
+                
+                DanpheCache.RemoveCache(key);
+
+                DanpheCache.Add(key, priceCategories, DateTime.Now.AddMinutes(20));
+               
                 return priceCategory;
             }
         }
-
-
-
-        // POST api/values
-        //[HttpPost]
-        //public string Post()
-        //{
-
-        //    DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();//type 'object' since we have variable return types
-        //    responseData.Status = "OK";//by default status would be OK, hence assigning at the top
-        //    MasterDbContext masterDbContext = new MasterDbContext(connString);
-        //    BillingDbContext billingDbContext = new BillingDbContext(connString);
-        //    LabDbContext labDbContext = new LabDbContext(connString);
-        //    CoreDbContext coreDbContext = new CoreDbContext(connString);
-        //    RbacDbContext rbacDbContext = new RbacDbContext(connString);
-
-        //    try
-        //    {
-        //        int itemId = ToInt(this.ReadQueryStringData("itemId"));
-        //        string reqType = this.ReadQueryStringData("reqType");
-        //        string ipDataStr = this.ReadPostData();
-        //        RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-
-        //        //if (reqType == "department")
-        //        //{
-        //        //    DepartmentModel deptModel = DanpheJSONConvert.DeserializeObject<DepartmentModel>(str);
-        //        //    bool departmentExist = masterDbContext.Departments.Any(x => x.DepartmentName == deptModel.DepartmentName);
-        //        //    if (!departmentExist)
-        //        //    {
-        //        //        deptModel.CreatedOn = System.DateTime.Now;
-        //        //        masterDbContext.Departments.Add(deptModel);
-        //        //        masterDbContext.SaveChanges();
-
-        //        //        if (deptModel.ServiceItemsList != null && deptModel.ServiceItemsList.Count > 0)
-        //        //        {
-        //        //            UpdateBillItemsOfDepartment(deptModel, masterDbContext);
-        //        //        }
-
-        //        //        responseData.Results = deptModel;
-        //        //        responseData.Status = "OK";
-        //        //    }
-
-        //        //    else
-        //        //    {
-        //        //        responseData.Results = "Duplcate Department Name";
-        //        //        responseData.Status = "Error";
-        //        //    }
-        //        //}
-        //        //else
-
-        //        //if (reqType == "store")
-        //        //{
-        //        //    using (var dbContextTransaction = rbacDbContext.Database.BeginTransaction())
-        //        //    {
-        //        //        try
-        //        //        {
-        //        //            PHRMStoreModel storeModel = DanpheJSONConvert.DeserializeObject<PHRMStoreModel>(str);
-        //        //            //create permission so that admin can create substore access right to the user
-
-        //        //            //add permission in store table
-        //        //            storeModel.PermissionId = SubstoreBL.CreatePermissionForStore(storeModel.Name, currentUser, rbacDbContext);
-        //        //            //create store after creating permission
-        //        //            storeModel = SubstoreBL.CreateStore(storeModel, rbacDbContext);
-
-        //        //            //create permission for each verifier
-        //        //            if (storeModel.StoreVerificationMapList != null)
-        //        //            {
-        //        //                int CurrentVerificationLevel = 1;
-        //        //                int MaxVerificationLevel = storeModel.MaxVerificationLevel;
-        //        //                foreach (var storeVerificationMap in storeModel.StoreVerificationMapList)
-        //        //                {
-        //        //                    SubstoreBL.CreateAndMapVerifiersWithStore(storeVerificationMap, storeModel, CurrentVerificationLevel, MaxVerificationLevel, currentUser, rbacDbContext);
-        //        //                    CurrentVerificationLevel++;
-        //        //                }
-        //        //            }
-
-        //        //            dbContextTransaction.Commit();
-        //        //            responseData.Results = storeModel;
-        //        //            responseData.Status = "OK";
-        //        //        }
-        //        //        catch (Exception ex)
-        //        //        {
-        //        //            dbContextTransaction.Rollback();
-        //        //            throw ex;
-        //        //        }
-        //        //    }
-        //        //}
-        //        //else
-
-        //        //if (reqType == "country")
-        //        //{
-        //        //    CountryModel countryModel = DanpheJSONConvert.DeserializeObject<CountryModel>(str);
-        //        //    countryModel.CreatedOn = System.DateTime.Now;
-        //        //    masterDbContext.Country.Add(countryModel);
-        //        //    masterDbContext.SaveChanges();
-        //        //    responseData.Results = countryModel;
-        //        //    responseData.Status = "OK";
-        //        //}
-        //        //else
-        //        //if (reqType == "subdivision")
-        //        //{
-        //        //    CountrySubDivisionModel subDivisionModel = DanpheJSONConvert.DeserializeObject<CountrySubDivisionModel>(str);
-        //        //    subDivisionModel.CreatedOn = System.DateTime.Now;
-        //        //    masterDbContext.CountrySubDivision.Add(subDivisionModel);
-        //        //    masterDbContext.SaveChanges();
-        //        //    responseData.Results = subDivisionModel;
-        //        //    responseData.Status = "OK";
-        //        //}
-        //        //else
-        //        //if (reqType == "municipality")
-        //        //{
-        //        //    MunicipalityModel model = DanpheJSONConvert.DeserializeObject<MunicipalityModel>(ipDataStr);
-        //        //    if (model.MunicipalityId > 0)
-        //        //    {
-        //        //        var selectedMun = masterDbContext.Municipalities.Where(m => m.MunicipalityId == model.MunicipalityId).FirstOrDefault();
-        //        //        selectedMun.CountryId = model.CountryId;
-        //        //        selectedMun.CountrySubDivisionId = model.CountrySubDivisionId;
-        //        //        selectedMun.MunicipalityName = model.MunicipalityName;
-        //        //        selectedMun.Type = model.Type;
-        //        //        selectedMun.ModifiedOn = System.DateTime.Now;
-        //        //        selectedMun.ModifiedBy = currentUser.EmployeeId;
-        //        //        masterDbContext.Entry(selectedMun).State = EntityState.Modified;
-        //        //        masterDbContext.Entry(selectedMun).Property(x => x.CountryId).IsModified = true;
-        //        //        masterDbContext.Entry(selectedMun).Property(x => x.CountrySubDivisionId).IsModified = true;
-        //        //        masterDbContext.Entry(selectedMun).Property(x => x.MunicipalityName).IsModified = true;
-        //        //        masterDbContext.Entry(selectedMun).Property(x => x.ModifiedBy).IsModified = true;
-        //        //        masterDbContext.Entry(selectedMun).Property(x => x.ModifiedOn).IsModified = true;
-        //        //        masterDbContext.Entry(selectedMun).Property(x => x.Type).IsModified = true;
-        //        //    }
-        //        //    else
-        //        //    {
-        //        //        model.CreatedOn = System.DateTime.Now;
-        //        //        model.CreatedBy = currentUser.EmployeeId;
-        //        //        masterDbContext.Municipalities.Add(model);
-        //        //    }
-        //        //    masterDbContext.SaveChanges();
-        //        //    responseData.Results = model;
-        //        //    responseData.Status = "OK";
-        //        //}
-        //        //else
-
-        //        //if (reqType == "reaction")
-        //        //{
-        //        //    ReactionModel rxnModel = DanpheJSONConvert.DeserializeObject<ReactionModel>(ipDataStr);
-        //        //    rxnModel.CreatedOn = System.DateTime.Now;
-
-        //        //    bool rxnExists = masterDbContext.Reactions.Any((rxn => rxn.ReactionName.Equals(rxnModel.ReactionName) || rxn.ReactionCode.Equals(rxnModel.ReactionCode)));
-
-        //        //    if (rxnExists)
-        //        //    {
-        //        //        responseData.Status = "Failed";
-        //        //        responseData.ErrorMessage = "Rxn with Duplicate Name or Code cannot be Added";
-        //        //    }
-        //        //    else
-        //        //    {
-        //        //        masterDbContext.Reactions.Add(rxnModel);
-        //        //        masterDbContext.SaveChanges();
-        //        //        responseData.Results = rxnModel;
-        //        //        responseData.Status = "OK";
-        //        //    }
-        //        //}
-        //        //else
-
-        //        //if (reqType == "lab-item")
-        //        //{
-        //        //    LabTestModel labItem = DanpheJSONConvert.DeserializeObject<LabTestModel>(ipDataStr);
-
-        //        //    using (var dbContextTransaction = labDbContext.Database.BeginTransaction())
-        //        //    {
-        //        //        try
-        //        //        {
-        //        //            labItem.CreatedOn = DateTime.Now;
-        //        //            labItem.CreatedBy = currentUser.EmployeeId;
-        //        //            //set default reporttemplateid if its not provided from client-side.
-        //        //            if (!labItem.ReportTemplateId.HasValue)
-        //        //            {
-        //        //                var defTemplate = labDbContext.LabReportTemplates
-        //        //                    .Where(rep => rep.IsDefault.HasValue && rep.IsDefault.Value).FirstOrDefault();
-        //        //                if (defTemplate != null)
-        //        //                {
-        //        //                    labItem.ReportTemplateId = defTemplate.ReportTemplateID;
-        //        //                }
-        //        //            }
-
-        //        //            //LabTestJSONComponentModel LabTestComponent = labItem.LabTestComponentsJSON[0];
-        //        //            //LabTestComponentMapModel ComponentMap = labItem.LabTestComponentMap[0];
-
-        //        //            //make Lab test code and procedure code here after savechanges()
-        //        //            labDbContext.LabTests.Add(labItem);
-        //        //            labDbContext.SaveChanges();
-        //        //            labItem.LabTestCode = "L-" + labItem.LabTestId.ToString("D6");//make LabTest code with 0 leading 
-        //        //            labItem.ProcedureCode = "LAB-" + labItem.LabTestId.ToString("D6");//making Procedure code with 0 leading vaues                                        
-        //        //            labDbContext.SaveChanges();
-
-        //        //            //labDbContext.LabTestComponents.Add(LabTestComponent);
-        //        //            //labDbContext.SaveChanges();
-
-        //        //            //ComponentMap.ComponentId = LabTestComponent.ComponentId;
-        //        //            //ComponentMap.LabTestId = labItem.LabTestId;
-
-
-        //        //            //labDbContext.LabTestComponentMap.Add(ComponentMap);
-        //        //            //labDbContext.SaveChanges();
-
-        //        //            dbContextTransaction.Commit();
-
-        //        //            responseData.Results = labItem;
-        //        //            responseData.Status = "OK";
-        //        //        }
-        //        //        catch (Exception ex)
-        //        //        {
-        //        //            dbContextTransaction.Rollback();
-        //        //            throw ex;
-        //        //        }
-        //        //    }
-        //        //}
-
-        //        //else
-
-        //        //if (reqType == "post-bank")
-        //        //{
-        //        //    BanksModel bankDetail = DanpheJSONConvert.DeserializeObject<BanksModel>(ipDataStr);
-
-        //        //    bankDetail.CreatedBy = currentUser.EmployeeId;
-        //        //    bankDetail.CreatedOn = DateTime.Now;
-
-        //        //    masterDbContext.Banks.Add(bankDetail);
-        //        //    masterDbContext.SaveChanges();
-
-
-        //        //    responseData.Results = bankDetail;
-        //        //    responseData.Status = "OK";
-        //        //}
-
-        //        //else
-
-        //        //if (reqType == "post-print-export-configuration")
-        //        //{
-        //        //    PrintExportConfigModel printExportConfigModel = DanpheJSONConvert.DeserializeObject<PrintExportConfigModel>(ipDataStr);
-        //        //    printExportConfigModel.CreatedBy = currentUser.EmployeeId;
-        //        //    printExportConfigModel.CreatedOn = DateTime.Now;
-        //        //    masterDbContext.PrintExportConfig.Add(printExportConfigModel);
-        //        //    masterDbContext.SaveChanges();
-        //        //    responseData.Results = printExportConfigModel;
-        //        //    responseData.Status = "OK";
-        //        //}
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        responseData.Status = "Failed";
-        //        responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
-
-        //    }
-
-
-        //    return DanpheJSONConvert.SerializeObject(responseData, true);
-        //}
-
-        // PUT api/values/5
 
         [HttpPut]
         [Route("Department")]
@@ -1270,298 +997,24 @@ namespace DanpheEMR.Controllers
             return InvokeHttpPutFunction(func);
         }
 
-        //[HttpPut]
-        //public string Put()
-        //{
-        //    string reqType = this.ReadQueryStringData("reqType");
-        //    DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
-        //    string str = this.ReadPostData();
-        //    MasterDbContext masterDBContext = new MasterDbContext(connString);
-        //    BillingDbContext billingDbContext = new BillingDbContext(connString);
-        //    CoreDbContext coreDbContext = new CoreDbContext(connString);
-        //    RbacDbContext rbacDbContext = new RbacDbContext(connString);
-        //    RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+        [HttpGet]
+        [Route("GetPriceCategories")]
+        public IActionResult GetPriceCategory()
+        {
+            Func<object> func = () => GetPriceCategoriesFromCache();
+            return InvokeHttpGetFunction(func);
+        }
 
-        //    try
-        //    {
-        //        if (!String.IsNullOrEmpty(str))
-        //        {
-        //            //if (reqType == "department")
-        //            //{
-        //            //    DepartmentModel clientDept = DanpheJSONConvert.DeserializeObject<DepartmentModel>(str);
-        //            //    masterDBContext.Departments.Attach(clientDept);
-        //            //    masterDBContext.Entry(clientDept).State = EntityState.Modified;
-        //            //    masterDBContext.Entry(clientDept).Property(x => x.CreatedOn).IsModified = false;
-        //            //    masterDBContext.Entry(clientDept).Property(x => x.CreatedBy).IsModified = false;
-        //            //    clientDept.ModifiedOn = System.DateTime.Now;
-
-
-        //            //    if (clientDept.ServiceItemsList != null && clientDept.ServiceItemsList.Count > 0)
-        //            //    {
-        //            //        UpdateBillItemsOfDepartment(clientDept, masterDBContext);
-        //            //    }
-
-        //            //    masterDBContext.SaveChanges();
-        //            //    responseData.Results = clientDept;
-        //            //    responseData.Status = "OK";
-        //            //}
-        //            //else
-        //            //if (reqType == "storeActivation")
-        //            //{
-        //            //    using (var dbContextTransaction = rbacDbContext.Database.BeginTransaction())
-        //            //    {
-        //            //        try
-        //            //        {
-        //            //            int storeId = DanpheJSONConvert.DeserializeObject<int>(ipDataStr);
-
-        //            //            Boolean NewActiveStatus = SubstoreBL.ActivateDeactivateStore(storeId, currentUser, rbacDbContext);
-        //            //            //take the NewActiveStatus and set it to all the permission
-        //            //            //change the permission as well.
-        //            //            SubstoreBL.ActivateDeactivateAllStorePermission(storeId, NewActiveStatus, currentUser, rbacDbContext);
-
-
-        //            //            dbContextTransaction.Commit();
-        //            //            responseData.Results = true;
-        //            //            responseData.Status = "OK";
-        //            //        }
-        //            //        catch (Exception ex)
-        //            //        {
-        //            //            dbContextTransaction.Rollback();
-        //            //            throw ex;
-        //            //        }
-        //            //    }
-
-        //            //}
-        //            //else
-
-        //            //if (reqType == "store")
-        //            //{
-        //            //    using (var dbContextTransaction = rbacDbContext.Database.BeginTransaction())
-        //            //    {
-        //            //        try
-        //            //        {
-        //            //            PHRMStoreModel store = DanpheJSONConvert.DeserializeObject<PHRMStoreModel>(ipDataStr);
-        //            //            if (SubstoreBL.CheckForStoreDuplication(store.Name, store.StoreId, rbacDbContext))
-        //            //            {
-        //            //                Exception ex = new Exception("Substore Already Exists.");
-        //            //                throw ex;
-        //            //            }
-        //            //            var OldStoreName = rbacDbContext.Store.AsNoTracking().FirstOrDefault(a => a.StoreId == store.StoreId).Name.ToString();
-        //            //            var NewStoreName = store.Name;
-
-        //            //            //change the permission first as well.
-        //            //            if (OldStoreName != NewStoreName)
-        //            //            {
-        //            //                SubstoreBL.UpdateStorePermissionName(NewStoreName, store.PermissionId, currentUser, rbacDbContext);
-
-        //            //                SubstoreBL.UpdateStoreVerifierPermission(store, currentUser, rbacDbContext);
-
-        //            //            }
-        //            //            //if new verification level is added.
-        //            //            var OldMaxVerificationLevel = rbacDbContext.Store.AsNoTracking().FirstOrDefault(a => a.StoreId == store.StoreId).MaxVerificationLevel;
-        //            //            var NewMaxVerificationLevel = store.MaxVerificationLevel;
-        //            //            if (NewMaxVerificationLevel > OldMaxVerificationLevel)
-        //            //            {
-        //            //                //create the new verification level and necessary permission level
-        //            //                foreach (StoreVerificationMapModel storeVerificationMapModel in store.StoreVerificationMapList)
-        //            //                {
-        //            //                    if (storeVerificationMapModel.VerificationLevel > OldMaxVerificationLevel)
-        //            //                    {
-        //            //                        SubstoreBL.CreateAndMapVerifiersWithStore(storeVerificationMapModel, store, ++OldMaxVerificationLevel, NewMaxVerificationLevel, currentUser, rbacDbContext);
-        //            //                    }
-        //            //                }
-        //            //            }
-
-        //            //            SubstoreBL.UpdateRoleForVerifiers(store, currentUser, rbacDbContext);
-
-        //            //            rbacDbContext.Store.Attach(store);
-        //            //            rbacDbContext.Entry(store).State = EntityState.Modified;
-        //            //            rbacDbContext.Entry(store).Property(x => x.CreatedOn).IsModified = false;
-        //            //            rbacDbContext.Entry(store).Property(x => x.CreatedBy).IsModified = false;
-        //            //            store.ModifiedOn = System.DateTime.Now;
-        //            //            store.ModifiedBy = currentUser.EmployeeId;
-
-        //            //            rbacDbContext.SaveChanges();
-        //            //            responseData.Results = store;
-        //            //        }
-        //            //        catch (Exception ex)
-        //            //        {
-        //            //            dbContextTransaction.Rollback();
-        //            //            throw ex;
-        //            //        }
-
-        //            //        dbContextTransaction.Commit();
-        //            //        responseData.Status = "OK";
-        //            //    }
-        //            //}
-        //            //else
-
-        //            //if (reqType == "country")
-        //            //{
-        //            //    CountryModel countryInfo = DanpheJSONConvert.DeserializeObject<CountryModel>(ipDataStr);
-        //            //    masterDBContext.Country.Attach(countryInfo);
-        //            //    masterDBContext.Entry(countryInfo).State = EntityState.Modified;
-        //            //    masterDBContext.Entry(countryInfo).Property(x => x.CreatedOn).IsModified = false;
-        //            //    masterDBContext.Entry(countryInfo).Property(x => x.CreatedBy).IsModified = false;
-        //            //    countryInfo.ModifiedOn = System.DateTime.Now;
-        //            //    masterDBContext.SaveChanges();
-        //            //    responseData.Results = countryInfo;
-        //            //    responseData.Status = "OK";
-        //            //}
-        //            //else
-
-        //            //if (reqType == "municipalityStatusUpdate")
-        //            //{
-        //            //    string munIdStr = this.ReadQueryStringData("municipalityId");
-        //            //    int municipalityId = Convert.ToInt32(munIdStr);
-        //            //    var selMunicipality = masterDBContext.Municipalities.Where(m => m.MunicipalityId == municipalityId).FirstOrDefault();
-        //            //    selMunicipality.IsActive = !selMunicipality.IsActive;
-        //            //    selMunicipality.ModifiedBy = currentUser.EmployeeId;
-        //            //    selMunicipality.ModifiedOn = System.DateTime.Now;
-        //            //    masterDBContext.Entry(selMunicipality).State = EntityState.Modified;
-        //            //    masterDBContext.Entry(selMunicipality).Property(x => x.ModifiedOn).IsModified = true;
-        //            //    masterDBContext.Entry(selMunicipality).Property(x => x.ModifiedBy).IsModified = true;
-        //            //    masterDBContext.Entry(selMunicipality).Property(x => x.IsActive).IsModified = true;
-        //            //    masterDBContext.SaveChanges();
-
-        //            //    responseData.Results = selMunicipality;
-        //            //    responseData.Status = "OK";
-        //            //}
-        //            //else
-
-        //            //if (reqType == "subdivision")
-        //            //{
-        //            //    CountrySubDivisionModel subdivInfo = DanpheJSONConvert.DeserializeObject<CountrySubDivisionModel>(ipDataStr);
-        //            //    masterDBContext.CountrySubDivision.Attach(subdivInfo);
-        //            //    masterDBContext.Entry(subdivInfo).State = EntityState.Modified;
-        //            //    masterDBContext.Entry(subdivInfo).Property(x => x.CreatedOn).IsModified = false;
-        //            //    masterDBContext.Entry(subdivInfo).Property(x => x.CreatedBy).IsModified = false;
-        //            //    subdivInfo.ModifiedOn = System.DateTime.Now;
-        //            //    masterDBContext.SaveChanges();
-        //            //    responseData.Results = subdivInfo;
-        //            //    responseData.Status = "OK";
-        //            //}
-        //            //else
-        //            //if (reqType == "reaction")
-        //            //{
-        //            //    ReactionModel rxnInfo = DanpheJSONConvert.DeserializeObject<ReactionModel>(ipDataStr);
-        //            //    bool rxnExists = masterDBContext.Reactions.Any(rxn =>
-        //            //                                    (rxn.ReactionName.Equals(rxnInfo.ReactionName) || rxn.ReactionCode.Equals(rxnInfo.ReactionCode))
-        //            //                                    && !rxn.ReactionId.Equals(rxnInfo.ReactionId));
-
-        //            //    if (!rxnExists)
-        //            //    {
-        //            //        masterDBContext.Reactions.Attach(rxnInfo);
-        //            //        masterDBContext.Entry(rxnInfo).State = EntityState.Modified;
-        //            //        masterDBContext.Entry(rxnInfo).Property(x => x.CreatedOn).IsModified = false;
-        //            //        masterDBContext.Entry(rxnInfo).Property(x => x.CreatedBy).IsModified = false;
-        //            //        rxnInfo.ModifiedOn = System.DateTime.Now;
-        //            //        masterDBContext.SaveChanges();
-        //            //        responseData.Results = rxnInfo;
-        //            //        responseData.Status = "OK";
-        //            //    }
-        //            //    else
-        //            //    {
-        //            //        responseData.Status = "Failed";
-        //            //        responseData.ErrorMessage = "Rxn with Duplicate Name or Code cannot be Added";
-        //            //    }
-        //            //}
-
-
-        //            //else
-        //            //if (reqType == "update-parameter")
-        //            //{
-        //            //    CfgParameterModel parameter = DanpheJSONConvert.DeserializeObject<CfgParameterModel>(str);
-        //            //    var parmToUpdate = (from paramData in masterDBContext.CFGParameters
-        //            //                        where paramData.ParameterId == parameter.ParameterId
-        //            //                        //no need of below comparision since parameter id is Primary Key and we can compare only to it.
-        //            //                        //&& paramData.ParameterName == parameter.ParameterName
-        //            //                        //&& paramData.ParameterGroupName == parameter.ParameterGroupName
-        //            //                        select paramData
-        //            //                        ).FirstOrDefault();
-
-        //            //    parmToUpdate.ParameterValue = parameter.ParameterValue;
-
-        //            //    masterDBContext.Entry(parmToUpdate).Property(p => p.ParameterValue).IsModified = true;
-
-        //            //    masterDBContext.SaveChanges();
-        //            //    responseData.Status = "OK";
-        //            //    responseData.Results = parmToUpdate;
-        //            //}
-
-        //            //else
-
-        //            //if (reqType == "put-bank")
-        //            //{
-        //            //    BanksModel bankDetail = DanpheJSONConvert.DeserializeObject<BanksModel>(str);
-
-        //            //    bankDetail.ModifiedBy = currentUser.EmployeeId;
-        //            //    bankDetail.ModifiedOn = DateTime.Now;
-
-        //            //    masterDBContext.Banks.Attach(bankDetail);
-
-        //            //    masterDBContext.Entry(bankDetail).Property(x => x.BankName).IsModified = true;
-        //            //    masterDBContext.Entry(bankDetail).Property(x => x.BankShortName).IsModified = true;
-        //            //    masterDBContext.Entry(bankDetail).Property(x => x.Description).IsModified = true;
-        //            //    masterDBContext.Entry(bankDetail).Property(x => x.IsActive).IsModified = true;
-        //            //    masterDBContext.Entry(bankDetail).Property(x => x.ModifiedBy).IsModified = true;
-        //            //    masterDBContext.Entry(bankDetail).Property(x => x.ModifiedOn).IsModified = true;
-
-        //            //    masterDBContext.SaveChanges();
-
-        //            //    responseData.Results = bankDetail;
-        //            //    responseData.Status = "OK";
-
-        //            //}
-
-        //            //else 
-        //            //if (reqType == "put-print-export-configuration")
-        //            //{
-        //            //    PrintExportConfigModel printExportConfigModel = DanpheJSONConvert.DeserializeObject<PrintExportConfigModel>(str);
-        //            //    printExportConfigModel.ModifiedBy = currentUser.EmployeeId;
-        //            //    printExportConfigModel.ModifiedOn = DateTime.Now;
-        //            //    masterDBContext.PrintExportConfig.Attach(printExportConfigModel);
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.SettingName).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.PageHeaderText).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ReportDescription).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ModuleName).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ShowHeader).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ShowFooter).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ShowEnDate).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ShowFilterDateRange).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ShowNpDate).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ShowOtherFilterVariables).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ShowPrintExportDateTime).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ShowUserName).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.IsActive).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ModifiedBy).IsModified = true;
-        //            //    masterDBContext.Entry(printExportConfigModel).Property(x => x.ModifiedOn).IsModified = true;
-        //            //    masterDBContext.SaveChanges();
-        //            //    responseData.Results = printExportConfigModel;
-        //            //    responseData.Status = "OK";
-        //            //}
-
-        //            //else
-        //            //{
-        //            //    responseData.Status = "Failed";
-        //            //    responseData.ErrorMessage = "Invalid Request Type";
-        //            //}
-        //        }
-        //        else
-        //        {
-        //            responseData.Status = "Failed";
-        //            responseData.ErrorMessage = "Client Object is empty";
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        responseData.Status = "Failed";
-        //        responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
-        //    }
-        //    return DanpheJSONConvert.SerializeObject(responseData, true);
-        //}
-
-
+        private object GetPriceCategoriesFromCache()
+        {
+            var priceCategoryList = DanpheCache.Get("master-pricecategory");
+            if (priceCategoryList == null)
+            {
+                priceCategoryList = _masterDbContext.PriceCategorys.ToList<PriceCategoryModel>();
+                DanpheCache.Add("master-pricecategory", priceCategoryList, DateTime.Now.AddMinutes(20));
+            }
+            return priceCategoryList;
+        }
 
         #region This handles Update of Price Category.
         [HttpPut]
@@ -1593,10 +1046,15 @@ namespace DanpheEMR.Controllers
                 rowToUpdate.ShowInRegistration = priceCategoryDTO.ShowInRegistration;
                 rowToUpdate.ShowInAdmission = priceCategoryDTO.ShowInAdmission;
                 rowToUpdate.IsDefault = priceCategoryDTO.IsDefault;
+                rowToUpdate.IsPharmacyRateDifferent = priceCategoryDTO.IsPharmacyRateDifferent;
                 rowToUpdate.ModifiedBy = currentUser.EmployeeId;
                 rowToUpdate.ModifiedOn = DateTime.Now;
 
                 _masterDbContext.SaveChanges();
+                var updatedPriceCategories = _masterDbContext.PriceCategorys.ToList<PriceCategoryModel>();
+                string key = "master-pricecategory";
+                DanpheCache.RemoveCache(key);
+                DanpheCache.Add(key, updatedPriceCategories, DateTime.Now.AddMinutes(20)); // cache expiry time
 
                 return priceCategoryDTO;
             }
@@ -1614,8 +1072,18 @@ namespace DanpheEMR.Controllers
             try
             {
                 var rowToUpdate = await masterDbContext.PriceCategorys.Where(a => a.PriceCategoryId == PriceCategoryId).FirstOrDefaultAsync();
+                if (rowToUpdate == null)
+                {
+                    responseData.Status = ENUM_DanpheHttpResponseText.Failed;
+                    responseData.ErrorMessage = "Price category not found.";
+                    return NotFound(responseData);
+                }
                 rowToUpdate.IsActive = IsActive;
                 await masterDbContext.SaveChangesAsync();
+                string Key = "master-pricecategory";
+                DanpheCache.RemoveCache(Key);
+                var updatedPriceCategories = await masterDbContext.PriceCategorys.ToListAsync();
+                DanpheCache.Add(Key, updatedPriceCategories, DateTime.Now.AddMinutes(20));
                 responseData.Status = ENUM_DanpheHttpResponseText.OK;
                 responseData.Results = rowToUpdate;
             }

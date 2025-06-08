@@ -6,6 +6,7 @@ import {
 } from '@angular/forms';
 export class PHRMPatient {
     public PatientId: number = 0;
+    public Salutation: string = '';
     public FirstName: string = "";
     public MiddleName: string = null;
     public LastName: string = "";
@@ -28,6 +29,9 @@ export class PHRMPatient {
     public ProviderId: number = 0;
     public IsAdmitted: boolean = true;
     public CountrySubDivisionName: string = "";
+    CountryName: string = "";
+    MunicipalityName: string = "";
+    WardNumber: number = 0;
     //only for read purpose
     public ShortName: string = "";
     public PHRMPatientValidator: FormGroup = null;
@@ -48,13 +52,17 @@ export class PHRMPatient {
     PatientVisitId: number = null;
     MembershipTypeId: number = null;
     ClaimCode: number = null;
-    VisitType: string = "";
+    VisitType: string = "outpatient";
     SchemeId: number = null;
     SchemeName: string = '';
+    EthnicGroup: string = "";
+    PolicyNo: string = "";
+
     //Constructor of class
     constructor() {
         var _formBuilder = new FormBuilder();
         this.PHRMPatientValidator = _formBuilder.group({
+            'Salutation': [''],
             'FirstName': ['', Validators.compose([Validators.required, Validators.maxLength(30)])],
             'LastName': ['', Validators.compose([Validators.required, Validators.maxLength(30)])],
             'MiddleName': ['', Validators.compose([Validators.maxLength(30)])],
@@ -77,6 +85,17 @@ export class PHRMPatient {
     //Check Is valid or not control
     public IsValid(): boolean { if (this.PHRMPatientValidator.valid) { return true; } else { return false; } }
     public IsValidCheck(fieldname, validator): boolean {
+        // if (this.PHRMPatientValidator.valid) {
+        //     return true;
+        // }
+
+        // if (fieldname == undefined) {
+        //     return this.PHRMPatientValidator.valid;
+        // }
+        // else {
+
+        //     return !(this.PHRMPatientValidator.hasError(validator, fieldname));
+        // }
         if (this.PHRMPatientValidator.valid) {
             return true;
         }
@@ -85,8 +104,20 @@ export class PHRMPatient {
             return this.PHRMPatientValidator.valid;
         }
         else {
-
             return !(this.PHRMPatientValidator.hasError(validator, fieldname));
+        }
+    }
+
+    public EnableControl(formControlName: string, enabled: boolean) {
+
+        let currCtrol = this.PHRMPatientValidator.controls[formControlName];
+        if (currCtrol) {
+            if (enabled) {
+                currCtrol.enable();
+            }
+            else {
+                currCtrol.disable();
+            }
         }
     }
 }

@@ -137,10 +137,11 @@ export class LabTestComponent {
             }
 
             //Filter for ReportTemplateId
-            if (this.selCategoryId === 0) {
+            if (Number(this.selCategoryId) === 0) {
                 this.filteredLabTestList = isActiveFilteredList;
             }
             else {
+                this.selCategoryId = Number(this.selCategoryId);
                 this.filteredLabTestList = isActiveFilteredList.filter(itm => itm.LabTestCategoryId === this.selCategoryId);
             }
 

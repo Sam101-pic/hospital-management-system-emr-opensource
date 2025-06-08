@@ -5,7 +5,7 @@ import { CoreService } from "../../../../core/shared/core.service";
 import { PHRMStoreModel } from "../../../../pharmacy/shared/phrm-store.model";
 import { SecurityService } from "../../../../security/shared/security.service";
 import { GridEmitModel } from "../../../../shared/danphe-grid/grid-emit.model";
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from "../../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { MessageboxService } from "../../../../shared/messagebox/messagebox.service";
 import WARDGridColumns from "../../../shared/ward-grid-cloumns";
 import { WardSupplyAssetReturnModel } from "../../../shared/wardsupply-asset-return.model";
@@ -54,7 +54,7 @@ export class WardSupplyInventoryReturnList {
     this.GetInventoryList()
   }
   GetInventoryList() {
-    this.inventoryList = this.wardsupplyService.inventoryList;
+    this.inventoryList = this.wardsupplyService.inventoryList.filter(inv => inv.IsActive);
     if (this.wardsupplyService.inventoryList.length > 0) {
       this.selectedInventory = this.inventoryList[0].StoreId;
       this.WardInventoryReturnGridColumns = WARDGridColumns.WardInventoryReturnList;
@@ -140,7 +140,7 @@ export class WardSupplyInventoryReturnList {
   }
   LoadRereturnDetails(ReturnId: number) {
     if (ReturnId != null) {
-      this.returnId = ReturnId;    
+      this.returnId = ReturnId;
       this.wardsupplyBLService.GetWardInventoryReturnItemsByReturnId(this.returnId)
         .subscribe(res => this.ShowRequisitionDetails(res));
     }

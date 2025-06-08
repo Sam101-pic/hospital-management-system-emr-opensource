@@ -13,21 +13,16 @@
               <label class="control-label col-md-4">Salutation<b>:</b></label>
               <div class="col-md-8">
                 <div class="input-group">
-                  <div class="icheck-inline">
-                    <label class="mt-checkbox mt-checkbox-outline">
-                      <input name="salutation" type="radio" value="Mr." [(ngModel)]="model.Salutation"
-                             (ngModelChange)="OnSelectSalutation()" [ngModelOptions]="{standalone: true}">
-                      <span></span>Mr </label>
-                    <label class="mt-checkbox mt-checkbox-outline">
-                      <input name="salutation" type="radio" value="Ms." [(ngModel)]="model.Salutation"
-                             (ngModelChange)="OnSelectSalutation()" [ngModelOptions]="{standalone: true}">
-                      <span></span>Ms </label>
-                    <label class="mt-checkbox mt-checkbox-outline">
-                      <input name="salutation" type="radio" value="Mrs." [(ngModel)]="model.Salutation"
-                             (ngModelChange)="OnSelectSalutation()" [ngModelOptions]="{standalone: true}">
-                      <span></span>Mrs </label>
-                  </div>
+                  <select id="id_patient_basic_info_salutation" class="form-control" [(ngModel)]="model.Salutation"
+                          [ngModelOptions]="{standalone: true}" (change)="OnSelectSalutation()">
+                    <option [ngValue]="null">--select--</option>
+                    <option *ngFor="let salutation of SalutationList" [ngValue]="salutation.SalutationName">
+                      {{ salutation.SalutationName }}
+                    </option>
+                  </select>
                 </div>
+
+
               </div>
             </div>
             <div *ngIf="showLocalName" class="form-group">
@@ -69,6 +64,7 @@
               <div class="col-md-8">
                 <input class="form-control" id="LastName" (keyup.enter)="GoToNextInput('Gender')" type="text"
                        formControlName="LastName" [(ngModel)]="model.LastName" required value=""
+                       (focusout)="OnLastNameChanged($event)" (input)="ClearEthnicGroup()"
                        (focusout)="capitalizeFirstLetter('LastName')" placeholder="Last Name" />
                 <span class="error-msg" *ngIf="model.IsDirty('LastName')"
                       [hidden]="model.IsValidCheck('LastName','required')"> Last Name is required</span> <span
@@ -253,7 +249,8 @@
                   </div> -->
 
                   <select class="form-control" [(ngModel)]="model.Gender"
-                          (change)="GoToNextInput('Age')" id="Gender" formControlName="Gender">
+                          (change)="model.EthnicGroup ? GoToNextInput('Age') : GoToNextInput('id_select_ethnic_group')" id="Gender"
+                          formControlName="Gender">
                     <option value="null" selected disabled>--select--</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -271,16 +268,12 @@
               </scheme-select> -->
             </div>
             <div class="form-group">
-              <label class="control-label col-md-4">{{GeneralFieldLabel.Caste}}<b>:</b></label>
+              <label class="control-label col-md-4">{{GeneralFieldLabel.Caste}}<sup>*</sup><b>:</b></label>
               <div class="col-md-8">
-                <select class="form-control" [(ngModel)]="model.EthnicGroup" [ngModelOptions]="{standalone: true}">
-                  <option value="Dalit">Dalit</option>
-                  <option value="JanaJaati">JanaJaati</option>
-                  <option value="Madhesi">Madhesi</option>
-                  <option value="Muslim">Muslim</option>
-                  <option value="Brahmin/Chhetri">Brahmin/Chhetri</option>
-                  <option value="Other">Other</option>
-                </select>
+                <select-ethnic-group [lastName]="model.LastName" [patient-ethnic-group]="model.EthnicGroup"
+                                     (on-ethnic-group-change)="OnEthnicGroupChangeCallBack($event)"
+                                     (change)="GoToNextInput('Age')">
+                </select-ethnic-group>
               </div>
             </div>
             <div class="form-group">

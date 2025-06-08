@@ -16,6 +16,8 @@ using Newtonsoft.Json.Converters;
 using Newtonsoft.Json;
 using DanpheEMR.ServerModel.MedicareModels;
 using DanpheEMR.ServerModel.AccountingModels.Transactions;
+using DanpheEMR.ServerModel.AccountingModels.Config;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DanpheEMR.DalLayer
 {
@@ -41,6 +43,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<TransactionItemDetailModel>().ToTable("ACC_TransactionItemDetail");
             modelBuilder.Entity<TransactionInventoryItemModel>().ToTable("ACC_TransactionInventoryItems");
             modelBuilder.Entity<FiscalYearModel>().ToTable("ACC_MST_FiscalYears");
+            modelBuilder.Entity<MapFiscalYearModel>().ToTable("ACC_MAP_FiscalYearHospital");
             modelBuilder.Entity<TransactionCostCenterItemModel>().ToTable("ACC_TransactionCostCenterItems");
             modelBuilder.Entity<CostCenterItemModel>().ToTable("ACC_MST_CostCenterItems");
             modelBuilder.Entity<CostCenterModel>().ToTable("ACC_MST_CostCenter");
@@ -80,6 +83,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<BankReconciliationModel>().ToTable("ACC_TXN_Bank_Reconciliation");
             modelBuilder.Entity<BankReconciliationCategoryModel>().ToTable("ACC_MST_Bank_ReconciliationCategory");
             modelBuilder.Entity<GoodsReceiptModel>().ToTable("INV_TXN_GoodsReceipt");
+            modelBuilder.Entity<GoodsReceiptItemsModel>().ToTable("INV_TXN_GoodsReceiptItems");
             modelBuilder.Entity<AccountingPaymentModel>().ToTable("ACC_TXN_Payment");
             modelBuilder.Entity<PHRMGoodsReceiptModel>().ToTable("PHRM_GoodsReceipt");
             modelBuilder.Entity<PaymentModes>().ToTable("MST_PaymentModes");
@@ -91,6 +95,10 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<MedicareTypes>().ToTable("INS_MST_MedicareType");
             modelBuilder.Entity<BankAndSuspenseAccountReconciliationMapModel>().ToTable("ACC_MAP_BankAndSuspenseAccountReconciliation");
             modelBuilder.Entity<PHRMStoreModel>().ToTable("PHRM_MST_Store");
+
+            modelBuilder.Entity<FiscalYearModel>()
+               .Property(e => e.FiscalYearId)
+               .HasDatabaseGeneratedOption(DatabaseGeneratedOption.None);
 
         }
         public DbSet<ChartOfAccountModel> ChartOfAccounts { get; set; }
@@ -106,6 +114,7 @@ namespace DanpheEMR.DalLayer
         public DbSet<TransactionItemDetailModel> TransactionItemDetails { get; set; }
         public DbSet<TransactionInventoryItemModel> TransactionInventoryItems { get; set; }
         public DbSet<FiscalYearModel> FiscalYears { get; set; }
+        public DbSet<MapFiscalYearModel> MapFiscalYears { get; set; }
         public DbSet<TransactionCostCenterItemModel> TransactionCostCenters { get; set; }
         public DbSet<CostCenterItemModel> CostCenterItems { get; set; }
         public DbSet<CostCenterModel> CostCenters { get; set; }
@@ -147,6 +156,7 @@ namespace DanpheEMR.DalLayer
         public DbSet<BankReconciliationCategoryModel> BankReconciliationCategory { get; set; }
 
         public DbSet<GoodsReceiptModel> GoodsReceiptModels { get; set; }
+        public DbSet<GoodsReceiptItemsModel> InvGoodsReceiptModels { get; set; }
         public DbSet<AccountingPaymentModel> AccountingPaymentModels { get; set; }
         public DbSet<PHRMGoodsReceiptModel> PHRMGoodsReceipt { get; set; }
         public DbSet<PaymentModes> PaymentMode { get; set; }

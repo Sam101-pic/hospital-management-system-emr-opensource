@@ -21,6 +21,8 @@ namespace DanpheEMR.ServerModel.WardSupplyModels
         public bool IsFixedAsset { get; set; }
         public WARDInventoryReturnModel WardReturn { get; set; }
         public List<MAP_ReturnItems_FixedAssetStock> ReturnAssets { get; set; } = new List<MAP_ReturnItems_FixedAssetStock>();
+        [NotMapped]
+        public  decimal CostPrice { get; set; }
 
     }
 

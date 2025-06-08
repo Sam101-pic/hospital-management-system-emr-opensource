@@ -1,6 +1,6 @@
 //file: FromToDateSettings
 //created: 6June'20-Sud
-//Description: 
+//Description:
 /*
  This file contains settings for each module, page, report etc.
  we can later move these to parameters if it's required differently for different hospitals.
@@ -64,6 +64,14 @@ export class FromToDateSettings {
           retValue.defaultRangeName = "last1week";
           retValue.allowFutureDate = false;
           retValue.validDateRangesCSV = "1D,1W,1M,3M";
+          break;
+        }
+      case "ot-booking-list":
+        {
+          retValue.defaultRangeName = "today";
+          retValue.allowFutureDate = true;
+          retValue.validDateRangesCSV = "1D,1W,1M,3M";
+          retValue.maxDaysInRange = 0;
           break;
         }
       default: //Don't remove/Change this..

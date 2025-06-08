@@ -35,6 +35,7 @@ export class PharmacyProvisionalInvoicePrintComponent {
     public browserPrintContentObj: any = { innerHTML: '' };
     public GeneralFieldLabel = new GeneralFieldLabels();
     @Output("call-back-print") callBackPrint: EventEmitter<object> = new EventEmitter();
+    showRackNoInPrint: boolean = false;
 
 
     constructor(public coreService: CoreService,
@@ -44,6 +45,8 @@ export class PharmacyProvisionalInvoicePrintComponent {
         private changeDetector: ChangeDetectorRef
     ) {
         this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
+        this.GetRackNoParameterSettings();
+
     }
 
     ngOnInit() {
@@ -160,6 +163,13 @@ export class PharmacyProvisionalInvoicePrintComponent {
 
     CallBackBillPrint($event) {
         this.callBackPrint.emit();
+    }
+    GetRackNoParameterSettings(): void {
+        let RackNoPrintSetting = this.coreService.Parameters.find(p => p.ParameterName == "ShowRackNoInPharmacyReceipt" && p.ParameterGroupName == "Pharmacy");
+        if (RackNoPrintSetting) {
+            let showRackNoInPrint = JSON.parse(RackNoPrintSetting.ParameterValue);
+            this.showRackNoInPrint = showRackNoInPrint.ShowRackNoInNormalPharmacyReceipt;
+        }
     }
 
 }

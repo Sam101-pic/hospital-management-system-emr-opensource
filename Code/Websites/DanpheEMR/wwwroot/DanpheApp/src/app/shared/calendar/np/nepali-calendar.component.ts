@@ -1,14 +1,18 @@
-import { Component, ChangeDetectorRef, OnChanges } from '@angular/core';
-import { Input, Output, EventEmitter, OnInit } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from '@angular/core';
 import { NepaliCalendarService } from './nepali-calendar.service';
 import {
-  NepaliDate, NepaliMonth, NepaliDay, NepaliYear, NepaliHours, NepaliMinutes, NepaliAMPM
+  NepaliAMPM,
+  NepaliDate,
+  NepaliDay,
+  NepaliHours, NepaliMinutes,
+  NepaliMonth,
+  NepaliYear
 } from './nepali-dates';
 
 import * as moment from 'moment/moment';
+import { FiscalYearModel } from '../../../accounting/settings/shared/fiscalyear.model';
 import { CoreService } from '../../../core/shared/core.service';
 import { SecurityService } from '../../../security/shared/security.service';
-import { FiscalYearModel } from '../../../accounting/settings/shared/fiscalyear.model';
 
 @Component({
   selector: "np-calendar",
@@ -31,14 +35,14 @@ export class NepaliCalendarComponent {
   public nepDays: Array<NepaliDay> = [];
   public hoursList: Array<NepaliHours> = [];
   public minutesList: Array<NepaliMinutes> = [];
-  public amPMList: Array<NepaliAMPM> = [];  
+  public amPMList: Array<NepaliAMPM> = [];
 
   @Input("input-focus") //coming from parent form
-  public inputFocus:boolean=null;
+  public inputFocus: boolean = null;
 
-  public outputToDatePicker:boolean = null;
+  public outputToDatePicker: boolean = null;
 
-  @Output('output-focus') outputFocus:EventEmitter<boolean> = new EventEmitter<boolean>();
+  @Output('output-focus') outputFocus: EventEmitter<boolean> = new EventEmitter<boolean>();
 
   @Input("showTime")
   public showTime: boolean = false;
@@ -113,19 +117,19 @@ export class NepaliCalendarComponent {
   public FilteredFiscalYearList: Array<FiscalYearModel> = [];
   public FiscalYearList: Array<FiscalYearModel> = [];
   public monthDisplayNumber: any;
-  public fiscalYearId:number=0;
+  public fiscalYearId: number = 0;
 
-  public monthNumber: any;  
+  public monthNumber: any;
   public showmonthCalendar: boolean = false;
   @Input("showmonthCalendar")
   set setmonthCalendar(value: boolean) {
-    this.showmonthCalendar = value;   
-    if(this.showmonthCalendar ==true){
-      this.getFiscalYear(); 
-    }     
+    this.showmonthCalendar = value;
+    if (this.showmonthCalendar == true) {
+      this.getFiscalYear();
+    }
   }
   @Input("showFiscalYear")
-  public showFiscalYear:boolean =false;
+  public showFiscalYear: boolean = false;
 
   // END:Vikas: 06th Aug 20: Added for month calendar chnages.
 
@@ -144,18 +148,18 @@ export class NepaliCalendarComponent {
     this.min_calYear_Np = this.npCalendarService.minNepYear;
     this.max_calYear_Np = this.npCalendarService.maxNepYear;
     this.showCalendar = true;
-      
+
   }
 
-  ngOnChanges(){
-     if(this.inputFocus){
-       if(!this.showmonthCalendar && this.showCalendar){
+  ngOnChanges() {
+    if (this.inputFocus) {
+      if (!this.showmonthCalendar && this.showCalendar) {
         this.setFocusById('inputYear');
-       }
-       else if(this.showmonthCalendar){
+      }
+      else if (this.showmonthCalendar) {
         this.setFocusById('FiscalYearName');
-       }
-     }
+      }
+    }
   }
 
   ngOnInitialization() {
@@ -195,7 +199,7 @@ export class NepaliCalendarComponent {
   }
 
   ngOnInit() {
-    this.InitializeMinMaxNpDate();    
+    this.InitializeMinMaxNpDate();
   }
 
   InitializeMinMaxNpDate() {
@@ -547,16 +551,16 @@ export class NepaliCalendarComponent {
     this.showBoard = false;
   }
 
- // START:Vikas: 06th Aug 20: Added for month calendar chnages. 
+  // START:Vikas: 06th Aug 20: Added for month calendar chnages. 
   getFiscalYear() {
     this.FiscalYearList = Array<FiscalYearModel>();
     this.FiscalYearList = this.securityService.AccHospitalInfo.FiscalYearList;
     this.FiscalYearList.map(f => {
       f.StartDate = moment(f.StartDate).format("YYYY-MM-DD");
       f.EndDate = moment(f.EndDate).format("YYYY-MM-DD");
-      let npStartYear =  moment(this.npCalendarService.ConvertEngToNepDateString(f.StartDate)).format('YYYY')
-      let npEndYear =  moment(this.npCalendarService.ConvertEngToNepDateString(f.EndDate)).format('YYYY')
-      f.FiscalYearName = npStartYear +'/'+npEndYear
+      let npStartYear = moment(this.npCalendarService.ConvertEngToNepDateString(f.StartDate)).format('YYYY')
+      let npEndYear = moment(this.npCalendarService.ConvertEngToNepDateString(f.EndDate)).format('YYYY')
+      f.FiscalYearName = npStartYear + '/' + npEndYear
     });
     this.FilteredFiscalYearList = this.FiscalYearList.filter(f => f.IsClosed != true);
     var selFYear = this.FilteredFiscalYearList.filter(f => f.FiscalYearId == this.securityService.AccHospitalInfo.CurrFiscalYear.FiscalYearId);
@@ -593,16 +597,16 @@ export class NepaliCalendarComponent {
     for (let i = 0; i < months.length; i++) {
       if (moment(months[i].Date).isBetween(this.selectedFiscalYear.StartDate, YrEndDate, undefined, '[]')) {
 
-        let monthNo = + moment(months[i].Date).format('MM');       
-        let month = this.nepMonths.filter(n=> n.EngmonthSeq == monthNo)[0].monthName + '-' + npStartYear; 
+        let monthNo = + moment(months[i].Date).format('MM');
+        let month = this.nepMonths.filter(n => n.EngmonthSeq == monthNo)[0].monthName + '-' + npStartYear;
         let disabled = this.disbaledValue(months[i].Date);
-        this.showMonthsList.push({ monthNumber: monthNo, monthDisplayNumber: i + 1, monthName: month,year: moment(this.selectedFiscalYear.StartDate).format('YYYY'), disabled: disabled });
+        this.showMonthsList.push({ monthNumber: monthNo, monthDisplayNumber: i + 1, monthName: month, year: moment(this.selectedFiscalYear.StartDate).format('YYYY'), disabled: disabled });
       }
       else {
-        let monthNo = + moment(months[i].Date).format('MM');       
-        let month = this.nepMonths.filter(n=> n.EngmonthSeq == monthNo)[0].monthName + '-' + npEndYear; 
+        let monthNo = + moment(months[i].Date).format('MM');
+        let month = this.nepMonths.filter(n => n.EngmonthSeq == monthNo)[0].monthName + '-' + npEndYear;
         let disabled = this.disbaledValue(months[i].Date);
-        this.showMonthsList.push({ monthNumber: monthNo, monthDisplayNumber: i + 1, monthName: month,year: moment(this.selectedFiscalYear.EndDate).format('YYYY'), disabled: disabled });
+        this.showMonthsList.push({ monthNumber: monthNo, monthDisplayNumber: i + 1, monthName: month, year: moment(this.selectedFiscalYear.EndDate).format('YYYY'), disabled: disabled });
       }
     }
     this.monthNumber = + moment().format('MM');
@@ -658,35 +662,34 @@ export class NepaliCalendarComponent {
     }
     return dates;
   }
-  disbaledValue(month)
-  {
+  disbaledValue(month) {
     let todaydate = moment(this.securityService.AccHospitalInfo.TodaysDate).format('YYYY-MM-DD');
-    let year =+ moment(todaydate).format('YYYY');
+    let year = + moment(todaydate).format('YYYY');
     let mn = + moment(todaydate).format('MM')
     let m = moment(new Date(year, mn, 0)).format('YYYY-MM-DD');
     let currentmonth = moment(m).format('YYYY-MM-DD');
     //
-    if (moment(month).isAfter(currentmonth)) {    
+    if (moment(month).isAfter(currentmonth)) {
       return true;
-    } 
-    else{
+    }
+    else {
       return false;
     }
   }
- // END:Vikas: 06th Aug 20: Added for month calendar chnages.
+  // END:Vikas: 06th Aug 20: Added for month calendar chnages.
 
- FocusOut(){
-  if(this.inputFocus){
-    this.inputFocus = false;
-    this.outputFocus.emit(this.outputToDatePicker=true); 
+  FocusOut() {
+    if (this.inputFocus) {
+      this.inputFocus = false;
+      this.outputFocus.emit(this.outputToDatePicker = true);
+    }
+    else {
+      return;
+    }
   }
-  else{
-    return;
-  }
- }
 
-   //common function to set focus on  given Element. 
-   setFocusById(targetId: string, waitingTimeinMS: number = 10) {
+  //common function to set focus on  given Element. 
+  setFocusById(targetId: string, waitingTimeinMS: number = 10) {
     var timer = window.setTimeout(function () {
       let htmlObject = document.getElementById(targetId);
       if (htmlObject) {

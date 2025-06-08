@@ -1,20 +1,20 @@
-import { Component, ChangeDetectorRef } from "@angular/core";
-import PHRMGridColumns from '../../shared/phrm-grid-columns';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import { PharmacyBLService } from "../../shared/pharmacy.bl.service"
-import { PharmacyService } from "../../shared/pharmacy.service"
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service"
+import { ChangeDetectorRef, Component } from "@angular/core";
 import { Router } from '@angular/router';
-import { PHRMStoreStockModel } from "../../shared/phrm-storestock.model";
-import { IMRPUpdatedStock } from "../../setting/mrp/phrm-update-mrp.component";
-import { ENUM_StockLocations } from "../../../shared/shared-enums";
-import { SecurityService } from "../../../security/shared/security.service";
-import { PHRMUpdatedStockVM } from "../../setting/expiry-batch/phrm-update-exp-batch.component ";
-import { DispensaryService } from "../../../dispensary/shared/dispensary.service";
-import { PHRMStoreModel } from "../../shared/phrm-store.model";
-import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import * as moment from "moment";
 import { CoreService } from "../../../core/shared/core.service";
+import { DispensaryService } from "../../../dispensary/shared/dispensary.service";
+import { SecurityService } from "../../../security/shared/security.service";
+import { NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_StockLocations } from "../../../shared/shared-enums";
+import { PHRMUpdatedStockVM } from "../../setting/expiry-batch/phrm-update-exp-batch.component ";
+import { IMRPUpdatedStock } from "../../setting/mrp/phrm-update-mrp.component";
+import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
+import { PharmacyService } from "../../shared/pharmacy.service";
+import PHRMGridColumns from '../../shared/phrm-grid-columns';
+import { PHRMStoreModel } from "../../shared/phrm-store.model";
+import { PHRMStoreStockModel } from "../../shared/phrm-storestock.model";
 @Component({
   selector: 'store-details-list',
   templateUrl: "./phrm-store-details-list.html",
@@ -174,6 +174,7 @@ export class PHRMStoreDetailsListComponent {
         this.selectedItem.ModifiedOn = null;
         //this.selectedItem.Price = data.Price;
         this.selectedItem.InOut = null;
+        this.selectedItem.Price = data.CostPrice;
         //this.selectedItem.GoodReceiptPrintId = data.GoodReceiptPrintId;
         this.showStockList = false;
 
@@ -305,9 +306,14 @@ export class PHRMStoreDetailsListComponent {
     this.showUpdateMRPPopUpBox = false;
     if ($event.event == 'update') {
       let updatedStock = $event.stock;
-      var stockInClient = this.stockList.filter(s => s.ItemId == updatedStock.ItemId && s.ExpiryDate == updatedStock.ExpiryDate && s.BatchNo == updatedStock.BatchNo);
-      stockInClient.forEach(stock => stock.SalePrice = updatedStock.SalePrice);
-      this.stockList = this.stockList.slice();
+      if (updatedStock) {
+        this.stockList.forEach(itm => {
+          if (itm.ItemId == updatedStock.ItemId && itm.ExpiryDate == updatedStock.ExpiryDate && itm.BatchNo == updatedStock.BatchNo) {
+            itm.SalePrice = updatedStock.SalePrice;
+          }
+        });
+        this.stockList = this.stockList.slice();
+      }
     }
 
   }
@@ -315,9 +321,15 @@ export class PHRMStoreDetailsListComponent {
     this.showUpdateExpBatchPopUpBox = false;
     if ($event.event == 'update') {
       let updatedStock = $event.stock;
-      var stockInClient = this.stockList.filter(s => s.ItemId == updatedStock.ItemId && s.ExpiryDate == updatedStock.OldExpiryDate && s.BatchNo == updatedStock.OldBatchNo);
-      stockInClient.forEach(stock => { stock.ExpiryDate = updatedStock.ExpiryDate; stock.BatchNo = updatedStock.BatchNo });
-      this.stockList = this.stockList.slice();
+      if (updatedStock) {
+        this.stockList.forEach(itm => {
+          if (itm.ItemId == updatedStock.ItemId && itm.ExpiryDate == updatedStock.OldExpiryDate && itm.BatchNo == updatedStock.OldBatchNo) {
+            itm.ExpiryDate = updatedStock.ExpiryDate;
+            itm.BatchNo = updatedStock.BatchNo;
+          }
+        });
+        this.stockList = this.stockList.slice();
+      }
     }
   }
   OnNewStockReceive() {

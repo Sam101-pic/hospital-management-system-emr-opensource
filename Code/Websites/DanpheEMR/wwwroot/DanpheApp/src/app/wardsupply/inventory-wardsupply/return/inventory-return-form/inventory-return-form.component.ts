@@ -4,8 +4,9 @@ import * as moment from "moment";
 import { InventoryService } from "../../../../inventory/shared/inventory.service";
 import { PHRMStoreModel } from "../../../../pharmacy/shared/phrm-store.model";
 import { SecurityService } from "../../../../security/shared/security.service";
+import { DanpheHTTPResponse } from "../../../../shared/common-models";
 import { MessageboxService } from "../../../../shared/messagebox/messagebox.service";
-import { ENUM_GRItemCategory } from "../../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_GRItemCategory, ENUM_MessageBox_Status } from "../../../../shared/shared-enums";
 import { WardSupplyBLService } from "../../../shared/wardsupply.bl.service";
 import { wardsupplyService } from "../../../shared/wardsupply.service";
 import { WardInventoryReturnItemsModel } from "../ward-inventory-return-items.model";
@@ -50,6 +51,9 @@ export class WardSupplyInventoryReturnForm {
     }
     GetInventoryList() {
         this.inventoryList = this.wardsupplyService.inventoryList;
+        if (this.inventoryList && this.inventoryList.length) {
+            this.inventoryList = this.inventoryList.filter(i => i.IsActive === true);
+        }
     }
 
     public ItemCategory() {
@@ -63,13 +67,12 @@ export class WardSupplyInventoryReturnForm {
     }
 
     GetItemListByItemCategory(itmCategory: string) {
-        let retItemList = this.filteredItemListBySelectedInventory.filter(item => item.ItemCategory === itmCategory);
+        let retItemList = this.filteredItemListBySelectedInventory.filter(item => item.ItemCategoryName === itmCategory);
         return retItemList;
     }
 
     myListFormatter(data: any): string {
-        let html = data["ItemName"];
-        html += (data["Description"] == null || data["Description"] == "" ? "" : "|" + data["Description"]);
+        let html = data["ItemName"] + '|ItemCode:' + data["Code"] + '|CostPrice:' + data["CostPrice"];
         return html;
     }
     ListFormatter(data: any): string {
@@ -84,66 +87,25 @@ export class WardSupplyInventoryReturnForm {
                 this.router.navigate(['/WardSupply']);
             }
             else {
-                this.LoadItemList();
+                this.CommonList = this.wardsupplyService.inventoryStockList;
             }
         } catch (exception) {
             this.messageBoxService.showMessage("Error", [exception]);
         }
     }
 
-
-    LoadItemList(): void {
-        this.wardsupplyBLService.GetInventorySubStoreItemsByStoreIdForReturn(this.activeSubstoreId)
-            .subscribe(res => this.CallBackGetItemList(res));
-    }
-    CallBackGetItemList(res) {
-        if (res.Status == 'OK') {
-            this.ItemList = [];
-            this.AllItemList = [];
-            if (res && res.Results) {
-                res.Results.forEach(a => {
-                    this.ItemList.push({
-                        "StockId": a.StockId,
-                        "ItemId": a.ItemId,
-                        "ItemName": a.ItemName,
-                        "Description": a.Description,
-                        "ItemCategory": a.ItemCategory,
-                        "VendorName": a.VendorName,
-                        "IsFixedAsset": a.IsFixedAsset,
-                        "Code": a.ItemCode,
-                        "BatchNo": a.BatchNo,
-                        "ExpiryDate": a.ExpiryDate,
-                        "BarCodeNumberList": a.BarCodeList.length == 0 ? null : a.BarCodeList,
-                        "IsActive": a.IsActive,
-                        "Remark": "",
-                        "StoreId": a.StoreId,
-                        "AvailableQuantity": a.AvailableQuantity
-                    });
-                });
-
-            }
-            this.ItemList = this.ItemList.filter(item => item.IsActive == true);
-            this.CommonList = this.ItemList;
-        }
-        else {
-            err => {
-                this.messageBoxService.showMessage("failed", ['failed to get Item.. please check log for details.']);
-                this.logError(err.ErrorMessage);
-            }
-        }
-    }
     private InitializeReturnItems() {
         this.currentRequItem = new WardInventoryReturnItemsModel();
         this.currentRequItem.ItemCategory = ENUM_GRItemCategory.Consumables;
-        this.filteredItemList = this.filteredItemListBySelectedInventory.filter(a => a.ItemCategory == this.currentRequItem.ItemCategory)
+        this.filteredItemList = this.filteredItemListBySelectedInventory.filter(a => a.ItemCategoryName == this.currentRequItem.ItemCategory)
         this.return.ReturnItemsList.push(this.currentRequItem);
         this.SetFocusOnItemName(0);
         this.return.TargetStoreId = this.selectedInventory;
         this.return.SourceStoreId = this.activeSubstoreId;
     }
     AddRowRequest() {
-        for (var i = 0; i < this.return.ReturnItemsList.length; i++) {
-            for (var a in this.return.ReturnItemsList[i].ReturnItemValidator.controls) {
+        for (let i = 0; i < this.return.ReturnItemsList.length; i++) {
+            for (let a in this.return.ReturnItemsList[i].ReturnItemValidator.controls) {
                 this.return.ReturnItemsList[i].ReturnItemValidator.controls[a].markAsDirty();
                 this.return.ReturnItemsList[i].ReturnItemValidator.controls[a].updateValueAndValidity();
             }
@@ -152,7 +114,7 @@ export class WardSupplyInventoryReturnForm {
         this.currentRequItem = new WardInventoryReturnItemsModel();
         this.currentRequItem.ItemCategory = ENUM_GRItemCategory.Consumables;
         this.filteredItemList = [];
-        this.filteredItemList = this.filteredItemListBySelectedInventory.filter(a => a.ItemCategory == this.currentRequItem.ItemCategory)
+        this.filteredItemList = this.filteredItemListBySelectedInventory.filter(a => a.ItemCategoryName == this.currentRequItem.ItemCategory)
         this.return.ReturnItemsList.push(this.currentRequItem);
         let nextInputIndex = this.return.ReturnItemsList.length - 1
         this.SetFocusOnItemName(nextInputIndex);
@@ -188,19 +150,26 @@ export class WardSupplyInventoryReturnForm {
     }
     SelectItemFromSearchBox(Item: any, index) {
         if (typeof Item === "object" && !Array.isArray(Item) && Item !== null) {
+            if (this.return.ReturnItemsList.some(item => item.ItemId === Item.ItemId && item.Code === Item.Code && item.CostPrice == Item.CostPrice)) {
+                this.return.ReturnItemsList[index].SelectedItem = null;
+                this.messageBoxService.showMessage("Warning", ["Item already exists in the list. Please select different item."])
+                return;
+            }
             this.return.ReturnItemsList[index].BarCodeNumberList = [];
-            this.return.ReturnItemsList[index].BarCodeNumberList = this.AllItemList.filter(i => i.ItemId == Item.ItemId);
+            if (Item.IsFixedAsset) {
+                this.return.ReturnItemsList[index].BarCodeNumberList = this.GetBarCodesByItemIdAndStoreId(this.activeSubstoreId, Item.ItemId);
+            }
             if (Item.ItemId > 0) {
                 this.return.ReturnItemsList[index].Id = Item.Id;
                 this.return.ReturnItemsList[index].ItemId = Item.ItemId;
                 this.return.ReturnItemsList[index].ItemName = Item.ItemName;
                 this.return.ReturnItemsList[index].VendorName = Item.VendorName;
                 this.return.ReturnItemsList[index].Code = Item.Code;
-                this.return.ReturnItemsList[index].BarCodeNumberList = Item.BarCodeNumberList;
                 this.return.ReturnItemsList[index].IsFixedAsset = Item.IsFixedAsset
                 this.return.ReturnItemsList[index].AvailableQuantity = Item.AvailableQuantity
                 this.return.ReturnItemsList[index].BatchNo = Item.BatchNo
                 this.return.ReturnItemsList[index].ExpiryDate = Item.ExpiryDate;
+                this.return.ReturnItemsList[index].CostPrice = Item.CostPrice;
             }
 
         }
@@ -212,16 +181,20 @@ export class WardSupplyInventoryReturnForm {
     }
     AddReturn() {
         var CheckIsValid = true;
+        if (!this.return.Remarks || this.return.Remarks.trim() === '') {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['Please provide remarks']);
+            return;
+        }
         if (!this.selectedInventory || this.selectedInventory == 0) {
             this.messageBoxService.showMessage("error", ['Please select inventory for return']);
             return;
         }
         if (this.return.ReturnItemsList.length > 0) {
             this.return.ReturnStatus = "active";
-            for (var i = 0; i < this.return.ReturnItemsList.length; i++) {
+            for (let i = 0; i < this.return.ReturnItemsList.length; i++) {
                 this.return.ReturnItemsList[i].CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
             }
-            for (var i = 0; i < this.return.ReturnItemsList.length; i++) {
+            for (let i = 0; i < this.return.ReturnItemsList.length; i++) {
                 if (!this.return.ReturnItemsList[i].ItemName) {
                     this.messageBoxService.showMessage("error", ['Please select Item name for return']);
                     return;
@@ -234,13 +207,13 @@ export class WardSupplyInventoryReturnForm {
 
             }
             if (this.return.IsValidCheck(undefined, undefined) == false) {
-                for (var a in this.return.ReturnValidator.controls) {
+                for (let a in this.return.ReturnValidator.controls) {
                     this.return.ReturnValidator.controls[a].markAsDirty();
                     this.return.ReturnValidator.controls[a].updateValueAndValidity();
                 }
                 CheckIsValid = false;
             }
-            for (var i = 0; i < this.return.ReturnItemsList.length; i++) {
+            for (let i = 0; i < this.return.ReturnItemsList.length; i++) {
                 if (this.return.ReturnItemsList[i].IsValidCheck(undefined, undefined) == false) {
 
                     for (var a in this.return.ReturnItemsList[i].ReturnItemValidator.controls) {
@@ -259,6 +232,7 @@ export class WardSupplyInventoryReturnForm {
                 .subscribe(
                     res => {
                         if (res.Status == 'OK') {
+                            this.ReloadStock();
                             this.messageBoxService.showMessage("success", ["Return is Generated and Saved"]);
                             this.changeDetectorRef.detectChanges();
                             this.return.ReturnItemsList = new Array<WardInventoryReturnItemsModel>();
@@ -268,15 +242,14 @@ export class WardSupplyInventoryReturnForm {
                             this.RouteToViewDetail(res.Results);
                         }
                         else {
-                            err => {
-                                this.messageBoxService.showMessage("failed", ['failed to add Return.. please check log for details.']);
-                                this.logError(err.ErrorMessage);
-                                //  this.returnList();
-                            }
+
+                            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to add Return. <br>' + res.ErrorMessage]);
+                            this.logError(res.ErrorMessage);
+                            //  this.returnList();
                         }
                     },
                     err => {
-                        this.messageBoxService.showMessage("failed", ['failed to add Return.. please check log for details.']);
+                        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to add Return. <br>' + err.ErrorMessage]);
                         this.logError(err.ErrorMessage);
                         // this.returnList();
                     });
@@ -358,7 +331,7 @@ export class WardSupplyInventoryReturnForm {
             //No need to filter by Storeid coz we have single inventory to return.
             //this.AllItemList = this.CommonList.filter(i => i.StoreId == this.selectedInventory);
             //this.filteredItemListBySelectedInventory=this.AllItemList.filter(i => i.StoreId == this.selectedInventory);
-            this.filteredItemListBySelectedInventory = this.CommonList;
+            this.filteredItemListBySelectedInventory = this.CommonList.filter(a => a.StoreId == this.selectedInventory);
             if (this.return.ReturnItemsList.length > 0) {
                 this.return.ReturnItemsList = [];
             }
@@ -380,6 +353,33 @@ export class WardSupplyInventoryReturnForm {
 
 
         }
+    }
+
+
+    ReloadStock() {
+        this.wardsupplyBLService.GetInventoryStockByStoreId(this.activeSubstoreId)
+            .subscribe(res => {
+                if (res.Status == "OK") {
+                    this.wardsupplyService.inventoryStockList = res.Results;
+                }
+                else {
+                    console.log(res.ErrorMessage);
+                }
+            })
+    }
+
+    GetBarCodesByItemIdAndStoreId(subStoreId: number, itemId: number): any {
+        this.wardsupplyBLService.GetBarCodesOfCapitalItemByItemIdAndSubStoreId(subStoreId, itemId)
+            .subscribe((res: DanpheHTTPResponse) => {
+                if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                    return res.Results;
+                }
+                else {
+                    console.log(res.ErrorMessage);
+                }
+            }, err => {
+                console.log(err);
+            })
     }
 
 

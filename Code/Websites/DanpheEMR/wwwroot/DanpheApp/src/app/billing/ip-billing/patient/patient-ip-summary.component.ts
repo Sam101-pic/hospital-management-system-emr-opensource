@@ -1,10 +1,10 @@
-import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from '@angular/core';
+import { ChangeDetectorRef, Component, EventEmitter, HostListener, Input, Output } from '@angular/core';
 import { Router } from '@angular/router';
 import * as _ from 'lodash';
 import * as moment from 'moment/moment';
 import { Subject, Subscription } from "rxjs";
+import { CurrentVisitContextVM } from '../../../appointments/shared/current-visit-context.model';
 import { MedicareMemberVsMedicareBalanceVM } from '../../../appointments/shared/medicare-model';
-import { VisitService } from '../../../appointments/shared/visit.service';
 import { CoreService } from "../../../core/shared/core.service";
 import { Patient } from '../../../patients/shared/patient.model';
 import { PatientService } from '../../../patients/shared/patient.service';
@@ -13,15 +13,16 @@ import { SecurityService } from '../../../security/shared/security.service';
 import { BillingScheme_DTO } from '../../../settings-new/billing/shared/dto/billing-scheme.dto';
 import { CreditOrganization } from '../../../settings-new/shared/creditOrganization.model';
 import { PriceCategory } from '../../../settings-new/shared/price.category.model';
-import { NepaliCalendarService } from "../../../shared/calendar/np/nepali-calendar.service";
 import { CancelStatusHoldingModel, DanpheHTTPResponse } from '../../../shared/common-models';
 import { CommonFunctions } from '../../../shared/common.functions';
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
 import { DLService } from '../../../shared/dl.service';
+import { FewaPayService } from '../../../shared/fewa-pay/helpers/fewa-pay.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
-import { ENUM_AdditionalServiceItemGroups, ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_CancellationService, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_InvoiceType, ENUM_MembershipTypeName, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_Scheme_ApiIntegrationNames, ENUM_ServiceBillingContext } from '../../../shared/shared-enums';
+import { ENUM_AdditionalServiceItemGroups, ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_CancellationService, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_FewaPayMessageTypes, ENUM_FewaPayTransactionFrom, ENUM_InvoiceType, ENUM_MembershipTypeName, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_POS_ResponseStatus, ENUM_PaymentModeSubCategory, ENUM_Scheme_ApiIntegrationNames, ENUM_ServiceBillingContext } from '../../../shared/shared-enums';
+import { BillInsuranceService } from '../../shared/bill-insurance.service';
 import { BillingDeposit } from '../../shared/billing-deposit.model';
 import { BillingInvoiceBlService } from '../../shared/billing-invoice.bl.service';
 import { BillingMasterBlService } from '../../shared/billing-master.bl.service';
@@ -29,10 +30,13 @@ import { BillingTransactionItem } from '../../shared/billing-transaction-item.mo
 import { BillingTransaction, EmployeeCashTransaction, IPBillTxnVM } from '../../shared/billing-transaction.model';
 import { BillingBLService } from '../../shared/billing.bl.service';
 import { BillingService } from '../../shared/billing.service';
+import { InvoiceDetail } from '../../shared/dto/invoice-detail.dto';
 import { SchemePriceCategory_DTO } from '../../shared/dto/scheme-pricecategory.dto';
 import { IpBillingDiscountModel } from '../../shared/ip-bill-discount.model';
 import { PatientScheme } from '../../shared/patient-map-scheme';
 import { BedDetailVM, BedDurationTxnDetailsVM, DischargeDetailBillingVM } from '../shared/discharge-bill.view.models';
+import { AdditionalBedReservationObject_DTO } from '../shared/dto/additional-bed-reservation-object.dto';
+import { AdditionalBedReservation_DTO } from '../shared/dto/additional-bed-reservation.dto';
 import { ProvisionalDischarge_DTO } from '../shared/dto/provisional-discharge.dto';
 import { PharmacyPendingBillItemsViewModel } from '../shared/pharmacy-pending-bill-item-view.model';
 
@@ -42,6 +46,7 @@ import { PharmacyPendingBillItemsViewModel } from '../shared/pharmacy-pending-bi
   styleUrls: ['./patient-ip-summary.component.css'],
   host: { '(window:keydown)': 'hotkeys($event)' }
 })
+
 export class PatientIpSummaryComponent {
 
   @Output("on-summary-closed")
@@ -78,9 +83,11 @@ export class PatientIpSummaryComponent {
   public checkouttimeparameter: string;
   public exchangeRate: number = 0;
   public selectedCreditOrganization: CreditOrganization;
-
   public IsCheckoutParameter: boolean = false;
   //create a new model to assign global variables and bind to html
+
+  public ShowDynamicQr: boolean = false;
+  public DynamicQrMessage: string = "";
   public model = {
     PharmacyProvisionalAmount: 0,
     SubTotal: 0,
@@ -126,6 +133,7 @@ export class PatientIpSummaryComponent {
   public estimatedDischargeDate: string;
 
   public estimatedDiscountPercent: number = 0;
+  public estimatedDiscountAmount: number = 0;
 
   // public CreditOrganizationMandatory: boolean = false;
 
@@ -236,29 +244,46 @@ export class PatientIpSummaryComponent {
   public AllowProvisionalDischarge: boolean = false;
   public ShowProvisionalDischargeConfirmation: boolean = false;
   public IsProvisionalDischarge: boolean = false;
+  public loadingScreen: boolean = false;
+  public SettlePharmacyCredits: boolean = false;
+  public ConsultantDoctors: string = "";
 
+  public CreditLimitToDisplay: number = 0
+  ShowCaretakerContact: boolean = false;
+  AdditionalBedReservations = new Array<AdditionalBedReservation_DTO>();
+  AdditionalBedReservationsObjectList = new Array<AdditionalBedReservationObject_DTO>();
+  ShowAdditionalBedReservationsPopUp: boolean = false;
+  public ipBillingTxnVM: IPBillTxnVM = new IPBillTxnVM();
+  public currPatVisitContext: CurrentVisitContextVM = new CurrentVisitContextVM();
+  public PolicyNo: string;
+  public BillingPreviousProvisional = {
+    PatientId: 0,
+    BillingProvisionalAmount: 0
+  };
 
-  constructor(public dlService: DLService,
-    public patService: PatientService,
-    public changeDetector: ChangeDetectorRef,
-    public billingService: BillingService,
-    public billingBLService: BillingBLService,
-    public msgBoxServ: MessageboxService,
-    public npCalendarService: NepaliCalendarService,
-    public CoreService: CoreService,
-    public patientBLServie: PatientsBLService,
-    public router: Router,
-    public securityService: SecurityService,
-    public routeFromService: RouteFromService,
-    public visitService: VisitService,
-    public billingInvoiceBlService: BillingInvoiceBlService,
-    public billingMasterBlService: BillingMasterBlService) {
+  constructor(
+    private _dlService: DLService,
+    public patientService: PatientService,
+    private _changeDetector: ChangeDetectorRef,
+    private _billingService: BillingService,
+    private _billingBLService: BillingBLService,
+    private _messageBoxService: MessageboxService,
+    public coreService: CoreService,
+    private _patientBLService: PatientsBLService,
+    private _router: Router,
+    private _securityService: SecurityService,
+    private _routeFromService: RouteFromService,
+    private _billingInvoiceBlService: BillingInvoiceBlService,
+    private _billingMasterBlService: BillingMasterBlService,
+    private _fewaPayService: FewaPayService,
+    private billInsuranceService: BillInsuranceService
 
+  ) {
     this.SetAutoBedAndAutoBillItemParameters();//sud:07Oct'20--to make common place for this param.
-
+    this.GetParameterToShowHideCaretakerContact();
     // this.allItemslist = this.billingService.allBillItemsPriceList;//sud:30Apr'20--code optimization
-    this.allEmployeeList = this.billingService.AllEmpListForBilling; //sud:30Apr'20--code optimization
-    this.creditOrganizationsList = this.billingService.AllCreditOrganizationsList;//sud:30Apr'20--code optimization
+    this.allEmployeeList = this._billingService.AllEmpListForBilling; //sud:30Apr'20--code optimization
+    this.creditOrganizationsList = this._billingService.AllCreditOrganizationsList;//sud:30Apr'20--code optimization
 
 
 
@@ -275,7 +300,7 @@ export class PatientIpSummaryComponent {
 
     this.IPPharmacyBillItemGridCol = GridColumnSettings.IPPharmacyBillItemGridCol;
 
-    this.overallCancellationRule = this.CoreService.GetIpBillCancellationRule();
+    this.overallCancellationRule = this.coreService.GetIpBillCancellationRule();
     if (this.overallCancellationRule && this.overallCancellationRule.Enable) {
       this.isCancelRuleEnabled = this.overallCancellationRule.Enable;
       this.billingCancellationRule.labStatus = this.overallCancellationRule.LabItemsInBilling;
@@ -287,7 +312,25 @@ export class PatientIpSummaryComponent {
     this.InitializeSubscription();
     this.GetParameterToShowHideOtherCurrencyOption();
     this.GetParameterToEnableDisableProvisionalDischarge();
+    this.ReadParameterToSettlePharmacyCredits();
 
+  }
+
+  GetParameterToShowHideCaretakerContact(): void {
+    const params = this.coreService.Parameters.find(a => a.ParameterGroupName === "Billing" && a.ParameterName === "IPBillingCaretakerContactDisplay");
+    if (params) {
+      this.ShowCaretakerContact = params.ParameterValue === "true" ? true : false;;
+    } else {
+      this.ShowCaretakerContact = false;
+    }
+  }
+  ReadParameterToSettlePharmacyCredits() {
+    const params = this.coreService.Parameters.find(a => a.ParameterGroupName === "Billing" && a.ParameterName === "SettlePharamcyCreditFromBilling");
+    if (params) {
+      this.SettlePharmacyCredits = JSON.parse(params.ParameterValue);
+    } else {
+      this.SettlePharmacyCredits = false;
+    }
   }
 
   InitializeSubscription() {
@@ -299,7 +342,7 @@ export class PatientIpSummaryComponent {
   }
 
   GetParameterToShowHideOtherCurrencyOption(): void {
-    const params = this.CoreService.Parameters.find(a => a.ParameterGroupName === "Billing" && a.ParameterName === "ShowOtherCurrency");
+    const params = this.coreService.Parameters.find(a => a.ParameterGroupName === "Billing" && a.ParameterName === "ShowOtherCurrency");
     if (params) {
       this.EnableShowOtherCurrency = params.ParameterValue === "true" ? true : false;
     } else {
@@ -307,7 +350,7 @@ export class PatientIpSummaryComponent {
     }
   }
   GetParameterToEnableDisableProvisionalDischarge(): void {
-    const params = this.CoreService.Parameters.find(p => p.ParameterGroupName === "Billing" && p.ParameterName === "EnableProvisionalDischarge");
+    const params = this.coreService.Parameters.find(p => p.ParameterGroupName === "Billing" && p.ParameterName === "EnableProvisionalDischarge");
     if (params) {
       this.ShowAllowProvisionalDischargeCheckbox = JSON.parse(params.ParameterValue);
     }
@@ -317,14 +360,14 @@ export class PatientIpSummaryComponent {
   public autoBedBillParam = { DoAutoAddBillingItems: false, DoAutoAddBedItem: false, ItemList: [] };
 
   SetAutoBedAndAutoBillItemParameters() {
-    var param = this.CoreService.Parameters.find(p => p.ParameterGroupName == "ADT" && p.ParameterName == "AutoAddBillingItems");
+    var param = this.coreService.Parameters.find(p => p.ParameterGroupName == "ADT" && p.ParameterName == "AutoAddBillingItems");
     if (param && param.ParameterValue) {
       this.autoBedBillParam = JSON.parse(param.ParameterValue);
     }
   }
 
   public LoadMembershipSettings() {
-    var currParam = this.CoreService.Parameters.find(a => a.ParameterGroupName == "Billing" && a.ParameterName == "MembershipSchemeSettings");
+    var currParam = this.coreService.Parameters.find(a => a.ParameterGroupName == "Billing" && a.ParameterName == "MembershipSchemeSettings");
     if (currParam && currParam.ParameterValue) {
       this.membershipSchemeParam = JSON.parse(currParam.ParameterValue);
     }
@@ -332,7 +375,7 @@ export class PatientIpSummaryComponent {
 
   //This is to get the ItemLevelDiscount settings //Krishna,20JAN'22..
   public LoadItemLevelSettngs() {
-    let currParam = this.CoreService.Parameters.find(a => a.ParameterGroupName == "Billing" && a.ParameterName == "IPBillingDiscountSettings");
+    let currParam = this.coreService.Parameters.find(a => a.ParameterGroupName == "Billing" && a.ParameterName == "IPBillingDiscountSettings");
     if (currParam && currParam.ParameterValue) {
       this.ItemLevelDiscountSettings = JSON.parse(currParam.ParameterValue);
     }
@@ -380,7 +423,7 @@ export class PatientIpSummaryComponent {
   public SaveDiscountState() {
     this.ipBillingDiscountModel.PatientVisitId = this.ipVisitId;
     this.ipBillingDiscountModel.ProvisionalDiscPercent = this.model.DiscountPercent;
-    this.billingBLService.UpdateDiscount(this.ipBillingDiscountModel).subscribe(
+    this._billingBLService.UpdateDiscount(this.ipBillingDiscountModel).subscribe(
       res => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
           //this.getPatientDetails(); //!Krishna, 2ndApril'23, Commented for now, Need to check its impact and why it called here.
@@ -465,7 +508,7 @@ export class PatientIpSummaryComponent {
       const IpBalance = medicareMemberDetail.IpBalance;
       if (IpBalance > 0) {
         this.IsMedicareMemberEligibleForBilling = IpBalance > 0 ? true : false;
-        !this.IsMedicareMemberEligibleForBilling && this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Patient is not eligible for Billing in this Price Category"]);
+        !this.IsMedicareMemberEligibleForBilling && this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Patient is not eligible for Billing in this Price Category"]);
       } else {
         this.IsMedicareMemberEligibleForBilling = true;
       }
@@ -487,12 +530,12 @@ export class PatientIpSummaryComponent {
 
   LoadPriceCategoryServiceItems() {
     if (this.SchemePriceCategory.SchemeId && this.SchemePriceCategory.PriceCategoryId) {
-      this.billingMasterBlService.GetServiceItems(ENUM_ServiceBillingContext.IpBilling, this.SchemePriceCategory.SchemeId, this.SchemePriceCategory.PriceCategoryId)
+      this._billingMasterBlService.GetServiceItems(ENUM_ServiceBillingContext.IpBilling, this.SchemePriceCategory.SchemeId, this.SchemePriceCategory.PriceCategoryId)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
             this.PriceCategoryServiceItems = res.Results;
             this.allItemslist = this.PriceCategoryServiceItems;
-            this.billingMasterBlService.ServiceItemsForIp = res.Results;
+            this._billingMasterBlService.ServiceItemsForIp = res.Results;
             this.FilterItemsAndAssignCoPayAndDiscountInfo();
             // this.CalculationForAll();
             // this.CoreService.loading = false;
@@ -520,7 +563,7 @@ export class PatientIpSummaryComponent {
       });
     }
     this.CalculationForAll();
-    this.CoreService.loading = false;
+    this.coreService.loading = false;
   }
 
   ngOnInit() {
@@ -528,9 +571,11 @@ export class PatientIpSummaryComponent {
       this.bedDurationDetails = [];
       this.getPatientDetails();
       this.GetPatientCurrentPatientSchemeMap(this.patientId, this.ipVisitId);
+      this.GetVisitContext(this.patientId, this.ipVisitId);
       this.GetDetailForInpatientsCancelledItems(this.patientId, this.ipVisitId);
+      this.GetPatientVisitConsultants(this.ipVisitId);
 
-      this.CoreService.loading = true;
+      this.coreService.loading = true;
       // if (this.autoBedBillParam.DoAutoAddBedItem) {
       //   this.UpdateBedDuration();
       // }
@@ -540,17 +585,39 @@ export class PatientIpSummaryComponent {
       this.UpdateBedDuration();
 
       this.CheckCreditBill(this.patientId);
+      this.GetAdditionalBedReservations(this.patientId, this.ipVisitId)
       // this.GetPharmacyProvisionalBalance();
-      // this.GetPharmacyPendingAmount();
+      this.GetPharmacyPendingAmount();
+      this.LoadBillingPreviousProvisionalAmount(this.patientId, this.ipVisitId);
       this.dischargeDetail.DischargeDate = moment().format('YYYY-MM-DDTHH:mm:ss');
 
-      this.OrderStatusSettingB4Discharge = this.CoreService.GetIpBillOrderStatusSettingB4Discharge();
+      this.OrderStatusSettingB4Discharge = this.coreService.GetIpBillOrderStatusSettingB4Discharge();
       if (this.OrderStatusSettingB4Discharge) {
         this.billingDischargeRule.labStatus = this.OrderStatusSettingB4Discharge.RestrictOnLabStatusArr;
         this.billingDischargeRule.radiologyStatus = this.OrderStatusSettingB4Discharge.RestrictOnRadiologyStatusArr;
       }
-      this.MstPaymentModes = this.CoreService.masterPaymentModes;
-      this.PaymentPages = this.CoreService.paymentPages;
+      this.MstPaymentModes = this.coreService.masterPaymentModes;
+      this.PaymentPages = this.coreService.paymentPages;
+    }
+  }
+  GetPatientVisitConsultants(ipVisitId: number) {
+    if (ipVisitId) {
+      this._billingBLService.GetPatientVisitConsultants(ipVisitId)
+        .subscribe((res: DanpheHTTPResponse) => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            const consultants = res.Results;
+            if (consultants) {
+              const nonPrimaryConsultants = consultants.filter(c => c.IsPrimaryConsultant === false);
+              this.ConsultantDoctors = (nonPrimaryConsultants && nonPrimaryConsultants.length > 0) ? nonPrimaryConsultants.map(nc => nc.ConsultantName).join(", ") : undefined;
+            }
+          } else {
+            this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [`Cannot load the consultants ${res.ErrorMessage}`]);
+          }
+        },
+          err => {
+            console.log(err.ErrorMessage);
+            this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Failed to load consultants."]);
+          });
     }
   }
 
@@ -562,10 +629,11 @@ export class PatientIpSummaryComponent {
   }
 
   GetPatientCurrentPatientSchemeMap(patientId: number, patientVisitId: number) {
-    this.patientBLServie.GetPatientCurrentSchemeMap(patientId, patientVisitId).subscribe(
+    this._patientBLService.GetPatientCurrentSchemeMap(patientId, patientVisitId).subscribe(
       (res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
           this.PatientSchemeMap = res.Results;
+          this.PolicyNo = res.Results.PolicyNo;
         }
       },
       err => {
@@ -574,24 +642,21 @@ export class PatientIpSummaryComponent {
   }
 
   getPatientDetails() {
-    this.patientBLServie.GetPatientById(this.patientId)
+    this._patientBLService.GetPatientById(this.patientId)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
           this.patientInfo = res.Results;
-          this.patService.globalPatient = res.Results;
-          const schemePriceCategoryObj = res.Results.Visits.map(a => {
-            return { "SchemeId": a.SchemeId, "PriceCategoryId": a.PriceCategoryId }
-          });
-          if (schemePriceCategoryObj) {
-            this.SchemePriceCategoryFromVisit.SchemeId = schemePriceCategoryObj[0].SchemeId;
-            this.SchemePriceCategoryFromVisit.PriceCategoryId = schemePriceCategoryObj[0].PriceCategoryId;
+          this.patientService.globalPatient = res.Results;
+
+          if (this.patientInfo.SchemeId && this.patientInfo.PriceCategoryId) {
+            this.SchemePriceCategoryFromVisit.SchemeId = this.patientInfo.SchemeId;
+            this.SchemePriceCategoryFromVisit.PriceCategoryId = this.patientInfo.PriceCategoryId;
             this.LoadAdditionalServiceItems(this.SchemePriceCategoryFromVisit.PriceCategoryId);
           }
-          let admissionObj = res.Results.Admissions.find(a => a.AdmissionStatus.toLowerCase() === "admitted");
-          if (admissionObj) {
-            this.DiscountSchemeId = admissionObj.DiscountSchemeId;
+          if (res.Results.DiscountSchemeId) {
+            this.DiscountSchemeId = res.Results.DiscountSchemeId;
 
-            if (admissionObj.IsItemDiscountEnabled && this.SchemePriceCategory.IsDiscountEditable) {
+            if (res.Results.IsItemDiscountEnabled && this.SchemePriceCategory.IsDiscountEditable) {
               this.enableItemLevelDiscount = true;
               this.ipBillingDiscountModel.IsItemDiscountEnabled = true;
             } else {
@@ -605,7 +670,7 @@ export class PatientIpSummaryComponent {
 
 
   LoadPatientBillingSummary(patientId: number, patientVisitId: number) {
-    this.dlService.Read("/api/IpBilling/InpatientPendingBillItems?patientId=" + this.patientId + "&ipVisitId=" + this.ipVisitId)
+    this._dlService.Read("/api/IpBilling/InpatientPendingBillItems?patientId=" + this.patientId + "&ipVisitId=" + this.ipVisitId)
       .map(res => res)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
@@ -614,15 +679,22 @@ export class PatientIpSummaryComponent {
           this.admissionInfo.AdmittedOn = this.admissionInfo.AdmittedOn;
           this.admissionInfo.DischargedOn = moment(this.admissionInfo.DischargedOn).format('YYYY-MM-DDTHH:mm:ss');
           this.patAllPendingItems = res.Results.PendingBillItems;
+          const patientsPendingItems = _.cloneDeep(res.Results.PendingBillItems);
+          this.billInsuranceService.SetPatientAllPendingItems(patientsPendingItems);
           this.patAllPendingItems.map(a => a.ProvisionalReceiptNoFormatted = ENUM_CancellationService.PR + "/" + a.ProvisionalReceiptNo)
 
-          this.pharmacyPendingBillItems = res.Results.PharmacyPendingBillsItems;
-          this.PharmacyTotal = res.Results.PharmacyTotalAmount;
+          //! Krishna, Allow Pharmacy Credit Settlement from Billing Only when it is allowed from Settings
+          this.ReadParameterToSettlePharmacyCredits();
+          if (this.SettlePharmacyCredits) {
+            this.pharmacyPendingBillItems = res.Results.PharmacyPendingBillsItems;
+            this.PharmacyTotal = res.Results.PharmacyTotalAmount;
+          }
+
           //this.LoadPriceCategoryServiceItems();
           this.PatientPendingBillItemSubject.next(this.patAllPendingItems);
 
           this.UpdateEmployeeObjects_OfBilTxnItems_ForGrid(this.patAllPendingItems);
-
+          this.GetVisitContext(this.PatientId, this.PatientVisitId)
 
           this.bedDetails = res.Results.AdmissionInfo.BedDetails;
 
@@ -655,9 +727,10 @@ export class PatientIpSummaryComponent {
           // this.CoreService.loading = false;
         }
         else {
-          this.msgBoxServ.showMessage("failed", [" Unable to get bill summary."]);
+
+          this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [" Unable to get bill summary."]);
           console.log(res.ErrorMessage);
-          this.CoreService.loading = false;
+          this.coreService.loading = false;
         }
       });
   }
@@ -683,7 +756,7 @@ export class PatientIpSummaryComponent {
         messArr.push("Assigned Doctor is mandatory in some of items. Please update.");
       }
 
-      this.msgBoxServ.showMessage("Warning!", messArr);
+      this._messageBoxService.showMessage("Warning!", messArr);
       return true;
     }
   }
@@ -691,7 +764,7 @@ export class PatientIpSummaryComponent {
   CheckCreditBill(patientId: number) {
     this.hasPreviousCredit = false;
     this.showCreditBillAlert = false;
-    this.dlService.Read("/api/Billing/CheckCreditBill?patientId=" + this.patientId)
+    this._dlService.Read("/api/Billing/CheckCreditBill?patientId=" + this.patientId)
       .map(res => res)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
@@ -704,7 +777,7 @@ export class PatientIpSummaryComponent {
   }
 
   LoadCreditInformationOfPatient(patientId: number) {
-    this.dlService.Read("/api/Billing/PatientCreditInfo?patientId=" + this.patientId)
+    this._dlService.Read("/api/Billing/PatientCreditInfo?patientId=" + this.patientId)
       .map(res => res)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
@@ -714,7 +787,7 @@ export class PatientIpSummaryComponent {
   }
 
   GetPharmacyProvisionalBalance() {
-    this.dlService.Read("/api/GetPatCrDetail/" + this.patientId + "/null/null/null")
+    this._dlService.Read("/api/GetPatCrDetail/" + this.patientId + "/null/null/null")
       .map(res => res)
       .subscribe(res => {
         if (res) {
@@ -725,7 +798,7 @@ export class PatientIpSummaryComponent {
 
 
   GetPharmacyPendingAmount() {
-    this.billingBLService.GetPharmacyPendingAmount(this.patientId, this.ipVisitId).subscribe(
+    this._billingBLService.GetPharmacyPendingAmount(this.patientId, this.ipVisitId).subscribe(
       (res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
           let PharmacyPendingAmounts = res.Results;
@@ -743,7 +816,7 @@ export class PatientIpSummaryComponent {
 
   BackToPatientListGrid() {
     this.onClose.emit();
-    this.patService.CreateNewGlobal();
+    this.patientService.CreateNewGlobal();
   }
 
   ClosePatientSummary(showConfirmAlert = true) {
@@ -777,7 +850,7 @@ export class PatientIpSummaryComponent {
 
   ConfirmDischarge() {
     if (this.model.Tender < this.model.ToBePaid && this.model.PayType.toLowerCase() !== ENUM_BillPaymentMode.credit.toLowerCase() && this.UseDeposit && this.model.DepositBalance > 0) {
-      this.msgBoxServ.showMessage("failed", ["Tender must be greater or equal to Cash amount"]);
+      this._messageBoxService.showMessage("failed", ["Tender must be greater or equal to Cash amount"]);
       return;
     }
 
@@ -786,12 +859,12 @@ export class PatientIpSummaryComponent {
     var AdmissionDate = moment(this.admissionInfo.AdmittedOn).format('YYYY-MM-DD HH:mm');
     if ((moment(currDate).isBefore(disDate))) {
       this.validDischargeDate = false;
-      this.msgBoxServ.showMessage("notice", ["Invalid can't enter future date"]);
+      this._messageBoxService.showMessage("notice", ["Invalid can't enter future date"]);
       return;
     }
     if ((moment(disDate).isBefore(AdmissionDate))) {
       this.validDischargeDate = false;
-      this.msgBoxServ.showMessage("Notice", ["Invalid can't discharge patient before admission date."]);
+      this._messageBoxService.showMessage("Notice", ["Invalid can't discharge patient before admission date."]);
       return;
     }
 
@@ -799,7 +872,7 @@ export class PatientIpSummaryComponent {
 
     if (this.PatientSchemeMap && (this.SchemePriceCategory.IsCreditLimited || this.SchemePriceCategory.IsGeneralCreditLimited) && (this.SchemePriceCategory.IsCreditLimited && !this.CheckCreditLimits())) {
       this.validDischargeDate = false;
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Credit Amount cannot exceed Credit limit."]);
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Credit Amount cannot exceed Credit limit."]);
       return;
     }
 
@@ -807,6 +880,8 @@ export class PatientIpSummaryComponent {
       let sure = window.confirm("You're going to discharge a patient without billing, Are your Sure you want to proceed ?");
       if (sure) {
         this.PostBillAndDischargePatient();
+        return;
+      } else {
         return;
       }
     }
@@ -825,11 +900,11 @@ export class PatientIpSummaryComponent {
       }
 
       if (this.model.PayType.toLowerCase() === ENUM_BillPaymentMode.credit.toLowerCase() && !this.model.OrganizationId || this.model.OrganizationId === 0) {
-        this.msgBoxServ.showMessage(ENUM_DanpheHTTPResponses.Failed.toLowerCase(), ["Credit Organization is mandatory for credit bill"]);
+        this._messageBoxService.showMessage(ENUM_DanpheHTTPResponses.Failed.toLowerCase(), ["Credit Organization is mandatory for credit bill"]);
         return;
       }
       else if ((this.model.PayType.toLowerCase() === ENUM_BillPaymentMode.credit.toLowerCase() || this.model.DiscountPercent > 0) && !this.model.Remarks) {
-        this.msgBoxServ.showMessage(ENUM_DanpheHTTPResponses.Failed.toLowerCase(), [" Remarks is mandatory."]);
+        this._messageBoxService.showMessage(ENUM_DanpheHTTPResponses.Failed.toLowerCase(), [" Remarks is mandatory."]);
         return;
       }
       else {
@@ -860,7 +935,8 @@ export class PatientIpSummaryComponent {
   }
   //to check whether pharmacy charge is cleared or not : 2019/1/25
   PostBillAndDischargePatientPharmacyCharge() {
-    this.PostBillAndDischargePatient();
+    // this.PostBillAndDischargePatient();
+    this.HandleInvoiceRequest();
   }
 
   PostBillAndDischargePatient() {
@@ -872,30 +948,53 @@ export class PatientIpSummaryComponent {
     let AdmissionDate = moment(this.admissionInfo.AdmittedOn).format('YYYY-MM-DD HH:mm');
     if ((moment(currDate).isBefore(disDate))) {
       this.validDischargeDate = false;
-      this.msgBoxServ.showMessage("notice", ["Invalid can't enter future date"]);
+      this._messageBoxService.showMessage("notice", ["Invalid can't enter future date"]);
       return;
     }
     if ((moment(disDate).isBefore(AdmissionDate))) {
       this.validDischargeDate = false;
-      this.msgBoxServ.showMessage("notice", ["Invalid can't discharge patient before admission date."]);
+      this._messageBoxService.showMessage("notice", ["Invalid can't discharge patient before admission date."]);
       return;
     }
 
     this.loading = true;
     this.dischargeDetail.PatientVisitId = this.ipVisitId;
     this.showDischargePopUpBox = false;
+    this.loadingScreen = false;
     this.billType = "invoice";
     this.billStatus = "";
-    this.PostBillingTransaction();
+
+    this.HandlePaymentTransaction();
 
   }
 
+  /**This method is responsible to check whether FewaPay is applicable or not if not proceed with normal workflow else wait for the message sent by FewaPay Browser extension and decide after message is received*/
+  private HandlePaymentTransaction() {
+    if (this._fewaPayService.IsFewaPayApplicable(this.model.PaymentDetails)) {
+      this.loadingScreen = true;
+      const transactionReqString = this._fewaPayService.CreateFewaPayTransactionRequest(this.model.PaymentDetails, this.totalAmountToPassToPaymentModeInfo, this.model.Remarks);
+      if (transactionReqString) {
+        window.postMessage({
+          type: ENUM_FewaPayMessageTypes.PaymentInfoRequest,
+          data: transactionReqString,
+        }, "*");
+        console.log('Transaction Request is posted from Danphe.');
+      } else {
+        this.loadingScreen = false;
+        this.loading = false;
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [`Transaction Request cannot be created due to missing mandatory data like paymentDetails, totalAmount and remarks`]);
+      }
+
+    } else {
+      this.PostBillingTransaction();
+    }
+  }
 
   ProceedDischargeWithZeroItems() {
     let currDate = moment().format('YYYY-MM-DD');
     let disDate = moment(this.dischargeDetail.DischargeDate).format('YYYY-MM-DD');
     if ((moment(currDate) < moment(disDate))) {
-      this.msgBoxServ.showMessage("notice", ["Invalid can't enter future date"]);
+      this._messageBoxService.showMessage("notice", ["Invalid can't enter future date"]);
       return;
     }
 
@@ -905,37 +1004,37 @@ export class PatientIpSummaryComponent {
         "PatientVisitId": this.ipVisitId,
         "PatientId": this.patientId,
         "DischargeDate": this.dischargeDetail.DischargeDate,
-        "CounterId": this.securityService.getLoggedInCounter().CounterId,
+        "CounterId": this._securityService.getLoggedInCounter().CounterId,
         "DepositBalance": this.model.DepositBalance,
         "DischargeRemarks": this.dischargeDetail.Remarks,
         "DiscountSchemeId": this.DiscountSchemeId,
         "DischargeFrom": "billing"
       };
-      this.billingBLService.DischargePatientWithZeroItem(data)
+      this._billingBLService.DischargePatientWithZeroItem(data)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
             this.showCancelAdmissionAlert = false;
             if ((res.Results.DepositId > 0)) {
               this.deposit = res.Results;
-              this.deposit.PatientName = this.patService.getGlobal().ShortName;
-              this.deposit.PatientCode = this.patService.getGlobal().PatientCode;
-              this.deposit.Address = this.patService.getGlobal().Address;
-              this.deposit.PhoneNumber = this.patService.getGlobal().PhoneNumber;
+              this.deposit.PatientName = this.patientService.getGlobal().ShortName;
+              this.deposit.PatientCode = this.patientService.getGlobal().PatientCode;
+              this.deposit.Address = this.patientService.getGlobal().Address;
+              this.deposit.PhoneNumber = this.patientService.getGlobal().PhoneNumber;
               this.showDepositReceipt = true;
             } else {
               this.BackToPatientListGrid();
             }
             this.loading = false;
-            this.msgBoxServ.showMessage("success", ["Patient discharge successfully."]);
+            this._messageBoxService.showMessage("success", ["Patient discharge successfully."]);
           }
           else {
-            this.msgBoxServ.showMessage("failed", ["Patient discharge failed."]);
+            this._messageBoxService.showMessage("failed", ["Patient discharge failed."]);
             console.log(res.ErrorMessage);
             this.loading = false;
           }
         });
     } else {
-      this.msgBoxServ.showMessage("failed", ["Discharge Remarks is mandatory."]);
+      this._messageBoxService.showMessage("failed", ["Discharge Remarks is mandatory."]);
       this.loading = false;
     }
   }
@@ -954,7 +1053,7 @@ export class PatientIpSummaryComponent {
     this.showDischargeBill = false;
     this.showEstimationBill = false;
     if (this.IsProvisionalDischarge) {
-      this.router.navigate(['/Billing/SearchPatient']);
+      this._router.navigate(['/Billing/SearchPatient']);
     }
     if (this.billType === "invoice") {
       this.ClosePatientSummary(false);
@@ -963,7 +1062,7 @@ export class PatientIpSummaryComponent {
 
   NewItemBtn_Click() {
     this.showIpBillRequest = false;
-    this.changeDetector.detectChanges();
+    this._changeDetector.detectChanges();
     this.showIpBillRequest = true;
   }
 
@@ -983,13 +1082,13 @@ export class PatientIpSummaryComponent {
     this.patAllPendingItems.forEach(itm => {
       itm.ProvisionalReceiptNoFormatted = `PR/${itm.ProvisionalReceiptNo}`;
       if (itm.DiscountPercent === 0 && !this.enableItemLevelDiscount) {
-        if (itm.DiscountApplicable) {
-          if ((itm.DiscountPercent === 0 || this.InvoiceLevelDiscountChanged)) {
-            itm.DiscountPercent = (this.SchemePriceCategory.IsDiscountApplicable && this.model.DiscountPercent) ? this.model.DiscountPercent : 0;
-          } else {
-            this.InvoiceLevelDiscountChanged = false;
-          }
+        // if (itm.DiscountApplicable) {
+        if ((itm.DiscountPercent === 0 || this.InvoiceLevelDiscountChanged)) {
+          itm.DiscountPercent = (this.SchemePriceCategory.IsDiscountApplicable && this.model.DiscountPercent) ? this.model.DiscountPercent : 0;
+        } else {
+          this.InvoiceLevelDiscountChanged = false;
         }
+        // }
         //itm.DiscountPercent = this.currMembershipDiscountPercent;
         //itm.DiscountPercentAgg = this.model.DiscountPercent ? this.model.DiscountPercent : 0;
         itm.DiscountAmount = (itm.SubTotal * itm.DiscountPercent) / 100;
@@ -998,14 +1097,15 @@ export class PatientIpSummaryComponent {
     });
     // this.FilterItemsAndAssignCoPayAndDiscountInfo();
     this.CalculationForAll();
-    this.CoreService.loading = false;
+    this.coreService.loading = false;
     //this.CalculationForAll();
     this.showIpBillRequest = false;
     this.patAllPendingItems = this.patAllPendingItems.slice();
+    this.LoadPatientBillingSummary(this.patientId, this.ipVisitId);
   }
 
   AddDepositBtn_Click() {
-    this.patService.globalPatient.PatientId = this.patientId;
+    this.patientService.globalPatient.PatientId = this.patientId;
     this.showDepositPopUp = true;
   }
   //Hom 17 Jan'19
@@ -1024,8 +1124,10 @@ export class PatientIpSummaryComponent {
     this.updatedItems.forEach(item => {
       item.IsSelected = false
       const itm = this.PriceCategoryServiceItems.find(a => a.ServiceItemId === item.ServiceItemId);
-      item.IsPriceChangeAllowed = itm.IsPriceChangeAllowed;
-      item.IsZeroPriceAllowed = itm.IsZeroPriceAllowed;
+      if (itm) {
+        item.IsPriceChangeAllowed = itm.IsPriceChangeAllowed;
+        item.IsZeroPriceAllowed = itm.IsZeroPriceAllowed;
+      }
     });
     this.showUpdatePricePopup = true;
   }
@@ -1049,7 +1151,7 @@ export class PatientIpSummaryComponent {
     let discAmt: number = 0;
     if (itemsInfo && itemsInfo.length > 0 || (pharmacyItemsInfo && pharmacyItemsInfo.length > 0)) {
       itemsInfo.forEach(itm => {
-        itm.DiscountAmount = this.billingInvoiceBlService.CalculateAmountFromPercentage(itm.DiscountPercent, itm.SubTotal);
+        itm.DiscountAmount = this._billingInvoiceBlService.CalculateAmountFromPercentage(itm.DiscountPercent, itm.SubTotal);
         itm.TotalAmount = itm.SubTotal - itm.DiscountAmount;
 
 
@@ -1063,7 +1165,7 @@ export class PatientIpSummaryComponent {
       });
       let overallSubTot = itemsInfo.reduce(function (acc, itm) { return acc + itm.SubTotal; }, 0);
       let overallDiscAmt = itemsInfo.reduce(function (acc, itm) { return acc + itm.DiscountAmount; }, 0);
-      discountPercent = CommonFunctions.parseAmount(this.billingInvoiceBlService.CalculatePercentage(overallDiscAmt, overallSubTot), 3); //CommonFunctions.parseAmount(overallDiscAmt * 100 / overallSubTot, 3);
+      discountPercent = CommonFunctions.parseAmount(this._billingInvoiceBlService.CalculatePercentage(overallDiscAmt, overallSubTot), 3); //CommonFunctions.parseAmount(overallDiscAmt * 100 / overallSubTot, 3);
       //let pharmacyTotal = this.PharmacyTotal;
       this.model.DiscountPercent = discountPercent;
       this.estimatedDiscountPercent = this.model.DiscountPercent;
@@ -1085,8 +1187,8 @@ export class PatientIpSummaryComponent {
         //!Krishna, 2ndApril'23, this is needed to be calculated here again, as Discount may Change which can change TotalAmount
         this.patAllPendingItems.forEach(ele => {
           if (ele.IsCoPayment) {
-            ele.CoPaymentCashAmount = this.billingInvoiceBlService.CalculateAmountFromPercentage(ele.CoPaymentCashPercent, ele.TotalAmount);
-            ele.CoPaymentCreditAmount = this.billingInvoiceBlService.CalculateAmountFromPercentage(ele.CoPaymentCreditPercent, ele.TotalAmount);
+            ele.CoPaymentCashAmount = this._billingInvoiceBlService.CalculateAmountFromPercentage(ele.CoPaymentCashPercent, ele.TotalAmount);
+            ele.CoPaymentCreditAmount = this._billingInvoiceBlService.CalculateAmountFromPercentage(ele.CoPaymentCreditPercent, ele.TotalAmount);
           } else {
             ele.CoPaymentCashAmount = 0;
             ele.CoPaymentCreditAmount = 0;
@@ -1181,9 +1283,9 @@ export class PatientIpSummaryComponent {
             this.model.Change = 0;
           }
         } else {
-          this.model.ToBePaid = this.model.TotalAmount;
+          this.model.ToBePaid = this.SettlePharmacyCredits == true ? this.model.GrandTotal : this.model.TotalAmount;
           this.model.ReceivedAmount = this.model.ToBePaid;
-          this.model.Tender = this.model.TotalAmount;
+          this.model.Tender = this.SettlePharmacyCredits == true ? this.model.GrandTotal : this.model.TotalAmount;
           this.amountToBeUsedInCalculationOfTenderAndChangeOnly = this.model.Tender;
           this.model.ToBeRefund = 0;
           this.model.Change = 0;
@@ -1197,6 +1299,8 @@ export class PatientIpSummaryComponent {
       this.model.GrandTotal = CommonFunctions.parseAmount(this.model.GrandTotal, 3);
       this.model.ToBePaid = CommonFunctions.parseAmount(this.model.ToBePaid, 3);
 
+      this.estimatedDiscountAmount = this.model.DiscountAmount;
+
     }
     else {
       this.model.DiscountPercent = 0;
@@ -1206,6 +1310,8 @@ export class PatientIpSummaryComponent {
       this.model.CoPaymentCreditAmount = 0;
       this.model.DiscountAmount = 0;
       this.model.GrandTotal = 0;
+      this.model.ToBePaid = 0;
+      this.model.ToBeRefund = this.model.DepositBalance;
     }
 
     //*Krishna, 9thFeb'23 Below Logic is to Pass Amount to PaymentModeInfo Component for further calculations
@@ -1221,7 +1327,7 @@ export class PatientIpSummaryComponent {
 
 
   CallBackDepositAdd($event = null) {
-    if ($event && $event.depositBalance) {
+    if ($event) {
       this.model.DepositBalance = $event.depositBalance;
       //this.admissionInfo.DepositAdded = $event.depositBalance;
       this.DisplayDeductDepositCheckbox = true;
@@ -1267,13 +1373,13 @@ export class PatientIpSummaryComponent {
       this.patAllPendingItems = this.patAllPendingItems.slice();
       //this.CalculationForAll();
       this.CalculationForAll();
-      this.CoreService.loading = false;
+      this.coreService.loading = false;
     }
   }
 
   SetDoctorsList() {
     //sud:2May'20: reuse global variables for doctors list..
-    this.doctorsList = this.billingService.GetDoctorsListForBilling();
+    this.doctorsList = this._billingService.GetDoctorsListForBilling();
     let Obj = new Object();
     Obj["EmployeeId"] = null;
     Obj["FullName"] = "SELF";
@@ -1289,21 +1395,21 @@ export class PatientIpSummaryComponent {
     var ProcedureType = this.admissionInfo.ProcedureType;
     if (ProcedureType) {
 
-      this.billingBLService.UpdateProcedure(admissionPatId, ProcedureType)
+      this._billingBLService.UpdateProcedure(admissionPatId, ProcedureType)
         .subscribe(
           res => {
             if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
-              this.msgBoxServ.showMessage("success", ["Procedure Type Updated Successfully."]);
+              this._messageBoxService.showMessage("success", ["Procedure Type Updated Successfully."]);
               this.loading = false;
             }
             else {
-              this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+              this._messageBoxService.showMessage("failed", [res.ErrorMessage]);
               this.loading = false;
             }
           });
     }
     else {
-      this.msgBoxServ.showMessage("failed", ["Please enter Procedure Description."]);
+      this._messageBoxService.showMessage("failed", ["Please enter Procedure Description."]);
       this.loading = false;
     }
   }
@@ -1328,7 +1434,7 @@ export class PatientIpSummaryComponent {
 
     //if (this.autoBedBillParam.DoAutoAddBedItem) {
     // this.billingBLService.UpdateBedDurationBillTxn(this.bedDurationDetails)
-    this.billingBLService.UpdateBedDurationBillTxn(this.ipVisitId)
+    this._billingBLService.UpdateBedDurationBillTxn(this.ipVisitId)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
           console.log("ADT Bill Items Quantity updated.");
@@ -1337,13 +1443,11 @@ export class PatientIpSummaryComponent {
         else {
           console.log("Failed to update bed transaction detail.");
           console.log(res.ErrorMessage);
-          this.CoreService.loading = false;
+          this.coreService.loading = false;
         }
       });
     //}
   }
-
-  public ipBillingTxnVM: IPBillTxnVM = new IPBillTxnVM();
 
   PostBillingTransaction() {
     this.MapBillingTransaction();
@@ -1361,38 +1465,37 @@ export class PatientIpSummaryComponent {
     }
 
     if (this.ipBillingTxnVM.billingTransactionModel.PaymentMode.toLowerCase() === ENUM_BillPaymentMode.credit.toLowerCase() && (!this.ipBillingTxnVM.billingTransactionModel.OrganizationId || this.ipBillingTxnVM.billingTransactionModel.OrganizationId === 0)) {
-      this.msgBoxServ.showMessage(ENUM_DanpheHTTPResponses.Failed.toLowerCase(), ["Credit Organization is mandatory for credit"]);
+      this._messageBoxService.showMessage(ENUM_DanpheHTTPResponses.Failed.toLowerCase(), ["Credit Organization is mandatory for credit"]);
       this.loading = false;
       return;
     }
 
-    this.billingBLService.PostIpBillTransactionAndDischarge(this.ipBillingTxnVM, this.pharmacyPendingBillItems, this.PharmacyTotal)
+    this._billingBLService.PostIpBillTransactionAndDischarge(this.ipBillingTxnVM, this.pharmacyPendingBillItems, this.PharmacyTotal)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
-          //sud:15Sept'21--using similar variable in all pages..
-          //this.bil_BilTxnId = this.billingTransaction.BillingTransactionId = res.Results.BillingTransactionId;
-          //this.DischargePatient(res.Results.InvoiceNo, res.Results.FiscalYearId);
-
-          // this.bil_InvoiceNo = res.Results.InvoiceNo;
-          // this.bil_FiscalYrId = res.Results.FiscalYearId;
-          // this.showDischargeBill = true;
-          // this.loading = false;
-
-
-          this.DischargeStatementId = res.Results.DischargeStatementId;
-          this.PatientId = res.Results.PatientId;
-          this.PatientVisitId = res.Results.PatientVisitId;
-          this.showDischargeBill = true;
-          this.loading = false;
+          if (this.model.PaymentDetails && this.model.PaymentDetails.toLowerCase().includes(ENUM_PaymentModeSubCategory.FonePay) && this.coreService.EnableFewaPay === false && this.coreService.EnableDirectFonePay) {
+            // if (res.Results !== null && res.Results.Result !== null && res.Results.Result.Result) {
+            if (res.Results !== null) {
+              this.DynamicQrMessage = res.Results.qrMessage;
+              this.ShowDynamicQr = true;
+            }
+          } else {
+            this.DischargeStatementId = res.Results.DischargeStatementId;
+            this.PatientId = res.Results.PatientId;
+            this.PatientVisitId = res.Results.PatientVisitId;
+            this.showDischargeBill = true;
+            this.loading = false;
+          }
         }
         else {
-          this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+          this._messageBoxService.showMessage("failed", [res.ErrorMessage]);
           //this.msgBoxServ.showMessage("failed", ["Unable to complete billing transaction."]);
           this.BackToPatientListGrid();//redirect to ipbilling list if failed.
           console.log(res.ErrorMessage);
           this.loading = false;
         }
       });
+    this.loadingScreen = false;
   }
 
   CancelDischarge() {
@@ -1413,7 +1516,7 @@ export class PatientIpSummaryComponent {
     this.dischargeDetail.DiscountSchemeId = this.DiscountSchemeId;
     this.dischargeDetail.PatientId = this.patientId;
     this.dischargeDetail.ProcedureType = this.admissionInfo.ProcedureType;
-    this.billingBLService.DischargePatient(this.dischargeDetail)
+    this._billingBLService.DischargePatient(this.dischargeDetail)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
           this.bil_InvoiceNo = invoiceNo;
@@ -1422,7 +1525,7 @@ export class PatientIpSummaryComponent {
           this.loading = false;
         }
         else {
-          this.msgBoxServ.showMessage("failed", ["BILLING TRANSACTION completed but DISCHARGE PATIENT failed."]);
+          this._messageBoxService.showMessage("failed", ["BILLING TRANSACTION completed but DISCHARGE PATIENT failed."]);
           console.log(res.ErrorMessage);
           this.loading = false;
         }
@@ -1476,7 +1579,7 @@ export class PatientIpSummaryComponent {
         this.billingTransaction.DiscountPercent = (this.billingTransaction.DiscountAmount * 100) / (this.model.SubTotal);// CommonFunctions.parseAmount();
       }
 
-    this.billingTransaction.TaxId = this.billingService.taxId;
+    this.billingTransaction.TaxId = this._billingService.taxId;
     // this.billingTransaction.PaidAmount = this.billingTransaction.BillStatus == "paid" ? this.model.ToBePaid : 0;
     this.billingTransaction.PaidAmount = this.billingTransaction.BillStatus === ENUM_BillingStatus.paid ? this.model.ReceivedAmount : 0; //Krishna, 31,Aug'22, to handle Co-Payment
     this.billingTransaction.Tender = this.model.Tender;
@@ -1527,8 +1630,8 @@ export class PatientIpSummaryComponent {
       this.billingTransaction.EmployeeCashTransaction = this.TempEmployeeCashTransaction;
     }
 
-    this.billingTransaction.PaidCounterId = this.billingTransaction.BillStatus == "paid" ? this.securityService.getLoggedInCounter().CounterId : null;
-    this.billingTransaction.CounterId = this.securityService.getLoggedInCounter().CounterId;
+    this.billingTransaction.PaidCounterId = this.billingTransaction.BillStatus == "paid" ? this._securityService.getLoggedInCounter().CounterId : null;
+    this.billingTransaction.CounterId = this._securityService.getLoggedInCounter().CounterId;
 
     this.patAllPendingItems.forEach(item => {
       if (item.IsTaxApplicable) {
@@ -1561,6 +1664,9 @@ export class PatientIpSummaryComponent {
 
   public CalculateTotalDays() {
     this.totalDays = moment(this.dischargeDetail.DischargeDate).diff(this.admissionInfo.AdmittedOn, "day");
+    if (this.totalDays === 0) {
+      this.totalDays = 1;
+    }
     //this.totalDays = moment(this.dischargeDetail.DischargeDate).date() -   moment(this.admissionInfo.AdmittedOn).date();
     var currDate = moment().format('YYYY-MM-DD HH:mm');
     var disDate = moment(this.dischargeDetail.DischargeDate).format('YYYY-MM-DD  HH:mm');
@@ -1611,7 +1717,7 @@ export class PatientIpSummaryComponent {
     this.showUpdatePricePopup = false;
     // this.FilterItemsAndAssignCoPayAndDiscountInfo();
     this.CalculationForAll();
-    this.CoreService.loading = false;
+    this.coreService.loading = false;
     // this.CalculationForAll();
   }
   //1st August:  Dinesh Adding tender and change field
@@ -1648,6 +1754,23 @@ export class PatientIpSummaryComponent {
           if ((this.selItemForEdit.ItemIntegrationName.toLowerCase() == 'lab' && !this.billingCancellationRule.labStatus.includes(this.selItemForEdit.OrderStatus))
             || (this.selItemForEdit.ItemIntegrationName.toLowerCase() == 'radiology' && !this.billingCancellationRule.radiologyStatus.includes(this.selItemForEdit.OrderStatus))) {
             this.selItemForEdit.AllowCancellation = false;
+          }
+        }
+
+
+        // Check if the item was requested under a different price category
+        const selItemPriceCategoryId = this.selItemForEdit.PriceCategoryId;
+        const visitPriceCategoryId = this.SchemePriceCategoryFromVisit.PriceCategoryId;
+        const selItemPriceCategory = this.selItemForEdit.PriceCategory;
+        const SchemePriceCategoryID = this.SchemePriceCategoryObj.PriceCategoryId
+
+        if (selItemPriceCategoryId && visitPriceCategoryId && SchemePriceCategoryID) {
+          if (selItemPriceCategoryId !== visitPriceCategoryId && selItemPriceCategoryId !== SchemePriceCategoryID) {
+            this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`This item was requested under the ${selItemPriceCategory} price category. Please change the price category to update.`]);
+            return;
+          } else if (selItemPriceCategoryId === visitPriceCategoryId && selItemPriceCategoryId !== SchemePriceCategoryID) {
+            this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`This item was requested under the ${selItemPriceCategory} price category. Please change the price category to update.`]);
+            return;
           }
         }
 
@@ -1724,7 +1847,7 @@ export class PatientIpSummaryComponent {
             this.OrderStatusRestrictedItems.push(a);
           }
           else if (a.OrderStatus != ENUM_OrderStatus.Final) {
-            this.msgBoxServ.showMessage("Warning", ["Final Report of " + a.ItemName + " is not added for this Patients"]);
+            this._messageBoxService.showMessage("Warning", ["Final Report of " + a.ItemName + " is not added for this Patients"]);
           }
       });
 
@@ -1747,7 +1870,7 @@ export class PatientIpSummaryComponent {
   CloseDischargePopUp($event) {
     if ($event) {
       if (this.IsProvisionalDischarge) {
-        this.router.navigate(['/Billing/SearchPatient']);
+        this._router.navigate(['/Billing/SearchPatient']);
       } else {
         this.CloseRecieptView();
       }
@@ -1770,7 +1893,7 @@ export class PatientIpSummaryComponent {
             this.InvoiceLevelDiscountChanged = false;
           }
           //}
-          itm.DiscountAmount = this.billingInvoiceBlService.CalculateAmountFromPercentage(itm.DiscountPercent, itm.SubTotal);
+          itm.DiscountAmount = this._billingInvoiceBlService.CalculateAmountFromPercentage(itm.DiscountPercent, itm.SubTotal);
           itm.DiscountSchemeId = this.SchemePriceCategory.SchemeId;
         });
         this.loading = false;
@@ -1788,8 +1911,25 @@ export class PatientIpSummaryComponent {
   //Anjana: 17 June, 2021: Close deposit button on click of escape key
   hotkeys(event) {
     // 27 is escape button.
-    if (event.keyCode == 27) {
-      this.CloseDepositPopUp();
+    if (event.keyCode === 27) {
+      if (this.showDepositPopUp) {
+        this.CloseDepositPopUp();
+      }
+      else if (this.ShowAdditionalBedReservationsPopUp) {
+        this.CloseAdditionalBedReservationsPopUp();
+      }
+      else if (this.showDischargePopUpBox) {
+        this.CloseDischargeConfirmPopUp();
+      }
+      else if (this.showCreditBillAlert) {
+        this.showCreditBillAlert = false;
+      }
+      else if (this.showDepositReceipt) {
+        this.CloseDepositReceipt();
+      }
+      else if (this.showEstimationBill || this.showDischargeBill) {
+        this.CloseRecieptView();
+      }
     }
     //78 is ALT + N
     if (event.altKey === true && event.keyCode == 78) {
@@ -1805,9 +1945,9 @@ export class PatientIpSummaryComponent {
 
   GoToSettlement() {
     if (this.CreditTotal > 0) {
-      this.routeFromService._routefrom = "/Billing/InpatBilling";
-      this.routeFromService.routeData = { Action: 'ShowSettlement', PatientId: this.patientId };
-      this.router.navigate(['/Billing/Settlements/BillSettlements']);
+      this._routeFromService._routefrom = "/Billing/InpatBilling";
+      this._routeFromService.routeData = { Action: 'ShowSettlement', PatientId: this.patientId };
+      this._router.navigate(['/Billing/Settlements/BillSettlements']);
     }
 
 
@@ -1902,6 +2042,7 @@ export class PatientIpSummaryComponent {
         }
       }
     } else {
+      let cashPaymentMode = this.MstPaymentModes.find(a => a.PaymentSubCategoryName.toLowerCase() === 'cash');
       this.TempEmployeeCashTransaction = new Array<EmployeeCashTransaction>();
       if (this.model.DepositBalance > 0 && this.UseDeposit) {
         if (this.model.DepositBalance <= this.model.ReceivedAmount) {
@@ -1915,7 +2056,7 @@ export class PatientIpSummaryComponent {
           let empCashTxnObj2 = new EmployeeCashTransaction();
           empCashTxnObj2.InAmount = this.model.ToBePaid;
           empCashTxnObj2.OutAmount = 0;
-          empCashTxnObj2.PaymentModeSubCategoryId = obj.PaymentSubCategoryId;
+          empCashTxnObj2.PaymentModeSubCategoryId = cashPaymentMode.PaymentSubCategoryId;
           empCashTxnObj2.ModuleName = "Billing";
           this.TempEmployeeCashTransaction.push(empCashTxnObj2);
         }
@@ -1936,7 +2077,7 @@ export class PatientIpSummaryComponent {
           let empCashTxnObj3 = new EmployeeCashTransaction();
           empCashTxnObj3.InAmount = this.model.ReceivedAmount;
           empCashTxnObj3.OutAmount = 0;
-          empCashTxnObj3.PaymentModeSubCategoryId = obj.PaymentSubCategoryId;
+          empCashTxnObj3.PaymentModeSubCategoryId = cashPaymentMode.PaymentSubCategoryId;
           empCashTxnObj3.ModuleName = "Billing";
           this.TempEmployeeCashTransaction.push(empCashTxnObj3);
         }
@@ -1953,7 +2094,7 @@ export class PatientIpSummaryComponent {
   ReCalculateDiscounts() {
     if (this.model.DiscountAmount <= this.model.SubTotal && this.model.DiscountAmount >= 0) {
       let discountAmount = this.model.DiscountAmount;
-      this.model.DiscountPercent = this.billingInvoiceBlService.CalculatePercentage(this.model.DiscountAmount, this.model.SubTotal);//(this.model.DiscountAmount * 100) / this.model.SubTotal;
+      this.model.DiscountPercent = this._billingInvoiceBlService.CalculatePercentage(this.model.DiscountAmount, this.model.SubTotal);//(this.model.DiscountAmount * 100) / this.model.SubTotal;
       this.estimatedDiscountPercent = this.model.DiscountPercent;
 
       //Need to re-calculate aggregatediscounts of each item and Invoice amounts when Invoice Discount is changed.
@@ -1989,11 +2130,11 @@ export class PatientIpSummaryComponent {
     let ReceivedAmount = this.model.ReceivedAmount;
     if (ReceivedAmount < 0) {
       isValidAmount = false;
-      this.msgBoxServ.showMessage("Error", ["Cash cannot be less than 0!"]);
+      this._messageBoxService.showMessage("Error", ["Cash cannot be less than 0!"]);
     }
     if (ReceivedAmount > this.model.ToBePaid) {
       isValidAmount = false;
-      this.msgBoxServ.showMessage("Error", ["Cash cannot be more than TotalAmount!"]);
+      this._messageBoxService.showMessage("Error", ["Cash cannot be more than TotalAmount!"]);
     }
     // if (this.SchemePriceCategory.IsCoPayment) {
     //   let CoPaymentCashAmount = (this.SchemePriceCategory.Copayment_CashPercent / 100) * this.model.ToBePaid;
@@ -2016,6 +2157,17 @@ export class PatientIpSummaryComponent {
           item.DiscountSchemeId = this.SchemePriceCategory.SchemeId;
           item.PriceCategoryId = this.SchemePriceCategory.PriceCategoryId;
         });
+      }
+
+      //! Manage Credit Limits to be displayed in the UI
+      if (this.SchemePriceCategory && (this.SchemePriceCategory.IsCreditLimited || this.SchemePriceCategory.IsGeneralCreditLimited)) {
+        if (this.SchemePriceCategory.IsGeneralCreditLimited) {
+          this.CreditLimitToDisplay = this.PatientSchemeMap.GeneralCreditLimit;
+        } else {
+          this.CreditLimitToDisplay = this.PatientSchemeMap.IpCreditLimit;
+        }
+      } else {
+        console.log('Scheme PriceCategory is not loaded Or Scheme is not Credit Limited');
       }
       if (this.SchemePriceCategory.IsCreditOnlyScheme && !this.SchemePriceCategory.IsCoPayment) {
         this.DisablePaymentModeDropDown = true;
@@ -2061,17 +2213,17 @@ export class PatientIpSummaryComponent {
   }
 
   LoadAdditionalServiceItems(priceCategoryId: number): void {
-    this.billingMasterBlService.GetAdditionalServiceItems(ENUM_AdditionalServiceItemGroups.Anaesthesia, priceCategoryId)
+    this._billingMasterBlService.GetAdditionalServiceItems(ENUM_AdditionalServiceItemGroups.Anaesthesia, priceCategoryId)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
-          this.billingMasterBlService.AdditionalServiceItems = res.Results;
+          this._billingMasterBlService.AdditionalServiceItems = res.Results;
         }
       }, err => {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Could not load Additional ServiceItems"]);
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Could not load Additional ServiceItems"]);
       })
   }
   GetDetailForInpatientsCancelledItems(patientId: number, patientVisitId: number): void {
-    this.billingBLService.GetDetailForIpCancellationItems(patientId, patientVisitId).subscribe(
+    this._billingBLService.GetDetailForIpCancellationItems(patientId, patientVisitId).subscribe(
       res => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
           this.CancelledItemDetails = res.Results;
@@ -2080,7 +2232,7 @@ export class PatientIpSummaryComponent {
           this.patAllCancelledItems = this.CancelledItemDetails;
         }
         else {
-          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Could not fetch Cancelled Items"]);
+          this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Could not fetch Cancelled Items"]);
           console.log(res.ErrorMessage);
         }
       }
@@ -2105,10 +2257,18 @@ export class PatientIpSummaryComponent {
   }
 
   ConfirmProvisionalDischarge(): void {
+    const disDate = moment(this.dischargeDetail.DischargeDate).format('YYYY-MM-DD HH:mm');
+    const AdmissionDate = moment(this.admissionInfo.AdmittedOn).format('YYYY-MM-DD HH:mm');
+
+    if (moment(disDate).isBefore(AdmissionDate)) {
+      this.validDischargeDate = false;
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Invalid! Can't discharge the patient before the admission date."]);
+      return;
+    }
     if (this.AllowProvisionalDischarge) {
       this.ShowProvisionalDischargeConfirmation = true;
     } else {
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Provisional Discharge is not Allowed!`])
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Provisional Discharge is not Allowed!`])
     }
   }
 
@@ -2116,27 +2276,27 @@ export class PatientIpSummaryComponent {
     const provisionalDischarge = this.PrepareProvisionalDischargeObject();
     if (provisionalDischarge) {
       if (!provisionalDischarge.PatientId) {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Patient is not set to Provisional Discharge Object`]);
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Patient is not set to Provisional Discharge Object`]);
         return;
       }
       if (!provisionalDischarge.PatientVisitId) {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Patient Visit is not set to Provisional Discharge Object`]);
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Patient Visit is not set to Provisional Discharge Object`]);
         return;
       }
       if (!provisionalDischarge.DiscountSchemeId) {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Discount Scheme is not set to Provisional Discharge Object`]);
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Discount Scheme is not set to Provisional Discharge Object`]);
         return;
       }
 
       this.loading = true;
-      this.billingBLService.PostProvisionalDischarge(provisionalDischarge).finally(() => this.loading = false).subscribe((res: DanpheHTTPResponse) => {
+      this._billingBLService.PostProvisionalDischarge(provisionalDischarge).finally(() => this.loading = false).subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
-          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, [res.Results]);
+          this._messageBoxService.showMessage(ENUM_MessageBox_Status.Success, [res.Results]);
           this.ShowProvisionalDischargeConfirmation = false;
           this.IsProvisionalDischarge = true;
           this.showEstimationBill = true;
         } else {
-          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+          this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
         }
       }, err => {
         console.log(err);
@@ -2148,7 +2308,7 @@ export class PatientIpSummaryComponent {
 
   PrepareProvisionalDischargeObject(): ProvisionalDischarge_DTO {
     let provisionalDischarge = new ProvisionalDischarge_DTO();
-    provisionalDischarge.DischargeDate = this.dischargeDetail.DischargeDate;;
+    provisionalDischarge.DischargeDate = this.dischargeDetail.DischargeDate;
     provisionalDischarge.PatientId = this.patientId;
     provisionalDischarge.PatientVisitId = this.ipVisitId;
     provisionalDischarge.ProcedureType = this.admissionInfo.ProcedureType;
@@ -2156,5 +2316,153 @@ export class PatientIpSummaryComponent {
     provisionalDischarge.DiscountSchemeId = this.DiscountSchemeId;
 
     return provisionalDischarge;
+  }
+
+  private HandleInvoiceRequest() {
+    this.loadingScreen = true;
+    this.PostBillAndDischargePatient();
+  }
+  OnDynamicQrCallback($event: InvoiceDetail): void {
+    this.ShowDynamicQr = false;
+    if ($event && $event.paymentStatus) {
+      this.DischargeStatementId = $event.dischargeStatementId;
+      this.PatientId = $event.patientId;
+      this.PatientVisitId = $event.patientVisitId;
+      this.showDischargeBill = true;
+    } else {
+      this.loading = false;
+    }
+  }
+
+  /**Below HostListener is responsible to catch the responses from FewaPay Browser Extension */
+  @HostListener('window:message', ['$event'])
+  onMessage(event: MessageEvent): void {
+    const result = this._fewaPayService.HandleEventsFromFewaPayBrowserExtension(event);
+    if (result) {
+      if (result.resultCode === ENUM_POS_ResponseStatus.Success) { //! Krishna, 10thDec'23 "000" is success status code sent from POS device.
+        const transactionId = 'verifyTransId' in result && result.verifyTransId;
+        if (transactionId) {
+          this.model.PaymentDetails = `${this.model.PaymentDetails}; TransactionId: ${transactionId}`;
+        }
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.patientId, ENUM_FewaPayTransactionFrom.IpBilling);
+        this.PostBillingTransaction();
+      } else {
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.patientId, ENUM_FewaPayTransactionFrom.IpBilling);
+        this.loading = false;
+        this.loadingScreen = false;
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [`${result.message}`]);
+      }
+      return;
+    }
+  }
+
+  CloseDischargeConfirmPopUp() {
+    this.showDischargePopUpBox = false;
+    this.loadingScreen = false;
+  }
+
+  OnAllowProvisionalDischargeCheckboxChanged() {
+    if (this.AllowProvisionalDischarge) {
+      this.DisableInvoiceDiscountPercent = true;
+      this.DisableInvoiceDiscountAmount = true;
+    } else {
+      this.DisableInvoiceDiscountPercent = false;
+      this.DisableInvoiceDiscountAmount = true;
+    }
+  }
+
+  OnAdditionalBedReservationClick(): void {
+    this.ShowAdditionalBedReservationsPopUp = true;
+  }
+
+  GetAdditionalBedReservations(patientId: number, patientVisitId: number): void {
+    this._billingBLService.GetAdditionalBedReservations(patientId, patientVisitId)
+      .subscribe((res: DanpheHTTPResponse): void => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          if (res.Results && res.Results.length) {
+            this.AdditionalBedReservations = res.Results;
+            this.AdditionalBedReservationsObjectList = new Array<AdditionalBedReservationObject_DTO>();
+            this.AdditionalBedReservations.forEach(element => {
+              let addBedRes = new AdditionalBedReservationObject_DTO();
+              addBedRes.CreatedOn = element.CreatedOn;
+              addBedRes.WardName = element.WardName;
+              addBedRes.BedFeatureName = element.BedFeatureName;
+              addBedRes.BedNumber = element.BedNumber;
+              addBedRes.Status = element.IsActive ? "active" : "cancelled";
+              if (element.CareTakerInformation) {
+                let careTakerInformation = JSON.parse(element.CareTakerInformation);
+                if (careTakerInformation) {
+                  addBedRes.PrimaryCareTakerId = careTakerInformation.PrimaryCareTakerId;
+                  addBedRes.PrimaryCareTakerName = careTakerInformation.PrimaryCareTakerName;
+                  addBedRes.PrimaryCareTakerContact = careTakerInformation.PrimaryCareTakerContact;
+                  addBedRes.SecondaryCareTakerName = careTakerInformation.SecondaryCareTakerName;
+                  addBedRes.SecondaryCareTakerContact = careTakerInformation.SecondaryCareTakerContact;
+                }
+              }
+              if (!element.IsActive) {
+                if (element.CompletedOn) {
+                  addBedRes.CompletedOn = element.CompletedOn;
+                }
+                else {
+                  addBedRes.CompletedOn = "";
+                }
+              }
+              else {
+                addBedRes.CompletedOn = "";
+              }
+              this.AdditionalBedReservationsObjectList.push(addBedRes)
+            });
+          }
+          else {
+            console.info(`Patient doesn't have additional bed reservations.`);
+          }
+        }
+        else {
+          this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+        }
+      },
+        (err): void => {
+          this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Error : ${err.ErrorMessage}`]);
+        });
+  }
+
+  CloseAdditionalBedReservationsPopUp(): void {
+    this.ShowAdditionalBedReservationsPopUp = false;
+    this.AdditionalBedReservations = new Array<AdditionalBedReservation_DTO>();
+  }
+
+  @HostListener('document:keydown.escape', ['$event']) onKeydownHandler(event: KeyboardEvent) {
+    this.showDischargePopUpBox = false;
+    this.CloseRecieptView();
+
+  }
+
+  GetVisitContext(patientId: number, visitId: number) {
+    if (patientId && visitId) {
+      this._billingBLService.GetPatientCurrentVisitContext(patientId, visitId)
+        .subscribe(res => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+            this.currPatVisitContext = res.Results;
+            if (this.SchemePriceCategory && this.SchemePriceCategory.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS && this.SchemePriceCategory.UseCappingAPI) {
+              this.billInsuranceService.GetInsuranceCappingInformation(this.currPatVisitContext.MemberNo);
+            }
+            this.billInsuranceService.SetPatientVisitContext(this.currPatVisitContext)
+          }
+          else {
+            console.log(ENUM_DanpheHTTPResponses.Failed, ["Problem! Cannot get the Current Visit Context ! "]);
+          }
+        },
+          err => { console.log(err.ErrorMessage); });
+    }
+  }
+  LoadBillingPreviousProvisionalAmount(patientId: number, ipVisitId: number): void {
+    this._billingBLService.GetBillingPreviousProvisionalAmount(patientId, ipVisitId)
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+          this.BillingPreviousProvisional = res.Results;
+        }
+      }, err => {
+        console.log(err.ErrorMessage);
+      });
   }
 }

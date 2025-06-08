@@ -22,5 +22,8 @@ namespace DanpheEMR.ServerModel
         public int? ModifiedBy { get; set; }
         public int CreatedBy { get; set; }
         public bool IsActive { get; set; }
+        public int HospitalId { get; set; }
+        public bool IsSystemDefault { get; set; }
+
     }
 }

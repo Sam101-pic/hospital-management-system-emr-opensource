@@ -23,5 +23,7 @@ namespace DanpheEMR.ServerModel
         public virtual List<PHRMPrescriptionItemModel> PHRMPrescriptionItems { get; set; }
         [NotMapped]
         public string PatientName { get; set; }
+        public int PatientVisitId { get; set; }
+        public int PrescriptionNo { get; set; }
     }
 }

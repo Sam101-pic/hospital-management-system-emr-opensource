@@ -17,6 +17,7 @@ namespace DanpheEMR.Services.Billing.DTO
         public decimal Price { get; set; }
         public bool IsTaxApplicable { get; set; }
         public bool IsDiscountApplicable { get; set; }
+        public bool AllowMultipleQty { get; set; }
         public decimal DiscountPercent { get; set; }
         public bool IsPriceChangeAllowed { get; set; }
         public bool IsZeroPriceAllowed { get; set; }
@@ -29,5 +30,8 @@ namespace DanpheEMR.Services.Billing.DTO
         public string IntegrationName { get; set; }
         public int? DisplaySequence { get; set; }
         public string DefaultDoctorList { get; set; }
+        public bool IsCappingEnabled { get; set; }
+        public int CappingLimitDays { get; set; }
+        public int CappingQuantity { get; set; }
     }
 }

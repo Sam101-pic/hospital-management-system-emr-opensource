@@ -25,4 +25,9 @@ export class MedicarePatient_DTO {
     public ParentMedicareMemberId: number = 0;
     public IsIpLimitExceeded: boolean = false;
     public IsOpLimitExceeded: boolean = false;
+    public MedicareEndDate: string = "";
+    public PriceCategoryId: number;
+    public SchemeId: number;
+    public PriceCategoryName: string;
+    public SchemeName: string;
 }

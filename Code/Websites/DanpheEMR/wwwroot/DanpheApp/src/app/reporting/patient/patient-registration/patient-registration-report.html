@@ -1,9 +1,10 @@
 <div class="wrapper">
   <div class="row">
-    <form  class="form-horizontal">
+    <form class="form-horizontal">
       <div class="form-body">
         <div class="col-md-12">
-          <div class="caption custom-caption"><i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject">Patient Registration Report</span> </div>
+          <div class="caption custom-caption"><i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject">Patient Registration
+              Report</span> </div>
           <!--<div class="col-md-5 col-xs-12">
       <div class="form-group">
         <label class="control-label col-md-3">From Date<b class="color-red"> *</b><b
@@ -32,7 +33,9 @@
     </div>-->
           <div class="row">
             <div class="col-md-6 col-xs-12">
-              <from-to-date-select (on-change)="OnFromToDateChange($event)"> </from-to-date-select>
+              <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                                   [date-settings-name]="'common-range-with-today'">
+              </from-to-date-select>
             </div>
           </div>
         </div>
@@ -44,16 +47,16 @@
                 <div class="input-group">
                   <div class="icheck-inline">
                     <label class="mt-checkbox mt-checkbox-outline">
-                      <input type="radio" checked="checked" (change)="LoadGender('Male')" name="Gender" value="Male"
-                           style="width:15px;height:15px" />
+                      <input type="radio" (change)="LoadGender('Male')" name="Gender" value="Male"
+                             style="width:15px;height:15px" />
                       <span></span>Male </label>
                     <label class="mt-checkbox mt-checkbox-outline">
                       <input type="radio" (change)="LoadGender('Female')" name="Gender" value="Female"
-                           style="width:15px;height:15px" />
+                             style="width:15px;height:15px" />
                       <span></span>Female </label>
                     <label class="mt-checkbox mt-checkbox-outline">
-                      <input type="radio" (change)="LoadGender('All')" name="Gender" value="All"
-                           style="width:15px;height:15px" />
+                      <input type="radio" checked="checked" (change)="LoadGender('All')" name="Gender" value="All"
+                             style="width:15px;height:15px" />
                       <span></span>All </label>
                   </div>
                 </div>
@@ -85,7 +88,8 @@
   <div class="row">
     <div class="col-lg-12 col-sm-12">
       <danphe-grid [grid-colDefaults]="PatientWiseRegReportColumns" [grid-data]="PatientWiseRegReportData"
-                   [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" [NepaliDateInGridParams]="NepaliDateInGridSettings"> </danphe-grid>
+                   [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" [NepaliDateInGridParams]="NepaliDateInGridSettings">
+      </danphe-grid>
     </div>
   </div>
 </div>

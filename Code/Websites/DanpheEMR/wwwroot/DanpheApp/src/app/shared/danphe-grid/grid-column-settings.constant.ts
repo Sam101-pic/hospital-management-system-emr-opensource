@@ -3,17 +3,197 @@ import * as moment from "moment/moment";
 import { SecurityService } from '../../security/shared/security.service';
 import VerificationGridColumns from "../../verification/shared/verification-grid-column";
 import { CommonFunctions } from "../common.functions";
-import { ENUM_ConsultationRequestStatus } from "../shared-enums";
+import { ENUM_AppointmentType, ENUM_ConsultationRequestStatus, ENUM_DateTimeFormat, ENUM_VisitType } from "../shared-enums";
 export default class GridColumnSettings {
   static securityService;
+  static currentUserId: number;
+  static isAdmin: boolean;
+  static ShowAddEditReportButton = false;
+  static ShowAddEditFileButton = false;
 
-
-  constructor(private _securityService: SecurityService
-  ) {
-    console.log("GridColumnSettings.insIpBillPatientSearch");
-
+  constructor(private _securityService: SecurityService) {
     GridColumnSettings.securityService = this._securityService;
+    let loggedInUser = this._securityService.GetLoggedInUser();
+    if (loggedInUser != null) {
+      GridColumnSettings.currentUserId = loggedInUser.EmployeeId;
+      GridColumnSettings.isAdmin = loggedInUser.IsSystemAdmin;
+    }
   }
+  static initialize(securityService: SecurityService): void {
+    GridColumnSettings.securityService = securityService;
+    let radiologyFlowParam = securityService.getRadiologyFlowParameter();
+    if (radiologyFlowParam) {
+      GridColumnSettings.ShowAddEditReportButton = radiologyFlowParam.ShowAddEditReportButton;
+      GridColumnSettings.ShowAddEditFileButton = radiologyFlowParam.ShowAddEditFileButton;
+    }
+  }
+  static ERPatientVisitsList = [
+    { headerName: "Hospital No.", width: 80, field: "PatientCode" },
+    { headerName: "Patient", field: "Name", width: 100 },
+    {
+      headerName: "Age/Gender",
+      field: "",
+      width: 60,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+    },
+    {
+      headerName: "Visit Date",
+      field: "VisitDate",
+      width: 100,
+    },
+    {
+      headerName: "Visit Time",
+      field: "VisitTime",
+      width: 100,
+    },
+    {
+      headerName: "Triage Status",
+      field: "TriageStatus",
+      width: 100,
+    },
+    {
+      headerName: "Triaged On",
+      width: 100,
+      field: "TriagedOn",
+    },
+    { headerName: "Assigned Doctor", field: "Doctor", width: 100 },
+    {
+      headerName: "Actions",
+      field: "",
+      width: 50,
+      cellRenderer: GridColumnSettings.PreviewPatientRenderer,
+    },
+  ];
+
+  MapAnaesthesiaListGridColumns = [
+    { headerName: "Anaesthesia Type", field: "AnaesthesiaType", width: 300 },
+    { headerName: "Billing Item", field: "ItemName", width: 300 },
+    { headerName: "IsActive", field: "IsActive", width: 120 },
+    {
+      headerName: "Actions", field: "", width: 150,
+      cellRenderer: GridColumnSettings.MapAnaesthesiaListActions
+    },
+  ];
+  private static MapAnaesthesiaListActions(params) {
+    let template;
+    if (params.data) {
+      template = `<a danphe-grid-action="edit" class="grid-action"> <i class="fa fa-edit"></i>Edit</a>`;
+    }
+    return template;
+  }
+
+  AnaesthesiaTypeListGridColumns = [
+    { headerName: "Anaesthesia Type", field: "AnaesthesiaType", width: 300 },
+    { headerName: "IsActive", field: "IsActive", width: 120 },
+    {
+      headerName: "Actions", field: "", width: 150,
+      cellRenderer: GridColumnSettings.AnaesthesiyaTypeListActions
+    },
+  ];
+  private static AnaesthesiyaTypeListActions(params) {
+    let template;
+    if (params.data) {
+      template = `<a danphe-grid-action="edit" class="grid-action"> <i class="fa fa-edit"></i>Edit</a>`;
+    }
+    return template;
+  }
+
+  static PatientVisitsList = [
+    { headerName: "Hospital No.", width: 80, field: "PatientCode" },
+    { headerName: "Patient", field: "Name", width: 100 },
+    {
+      headerName: "Age/Sex",
+      field: "",
+      width: 60,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+    },
+    {
+      headerName: "Appointment Date",
+      field: "",
+      width: 100,
+      cellRenderer: GridColumnSettings.ApptDateOnlyRenderer,
+    },
+    {
+      headerName: "Appointment Time",
+      field: "",
+      width: 100,
+      cellRenderer: GridColumnSettings.AppointmentTimeRenderer,
+
+    },
+    { headerName: "Department", field: "DepartmentName", width: 100 },
+    { headerName: "Doctor", field: "Doctor", width: 120 },
+    { headerName: "Appointment Type", field: "AppointmentType", width: 100 },
+    {
+      headerName: "Actions",
+      field: "",
+      width: 50,
+      cellRenderer: GridColumnSettings.PreviewPatientRenderer,
+    },
+  ];
+
+  static AdmittedPatientList = [
+    {
+      headerName: "Admission Date",
+      width: 100,
+      field: "AdmittedDate"
+    },
+    { headerName: "Hospital No.", width: 80, field: "PatientCode" },
+    { headerName: "IP Number.", width: 80, field: "VisitCode" },
+    { headerName: "Patient", field: "Name", width: 100 },
+    {
+      headerName: "Age/Sex",
+      field: "",
+      width: 100,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+    },
+    { headerName: "Admitting Doctor", field: "AdmittingDoctorName", width: 150 },
+    { headerName: "Department", field: "DepartmentName", width: 100 },
+    {
+      headerName: "Ward/Bed",
+      field: "WardBed",
+      width: 100,
+    },
+    {
+      headerName: "Actions",
+      field: "",
+      width: 100,
+      cellRenderer: GridColumnSettings.PreviewPatientRenderer,
+    },
+  ];
+
+  static DischargedPatientList = [
+    { headerName: "Hospital No.", width: 80, field: "PatientCode" },
+    { headerName: "IP Number.", width: 80, field: "VisitCode" },
+    { headerName: "Patient", field: "Name", width: 100 },
+    {
+      headerName: "Age/Sex",
+      field: "",
+      width: 100,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+    },
+    {
+      headerName: "Admission Date",
+      width: 160,
+      field: "AdmittedDate"
+    },
+    { headerName: "Admitting Doctor", field: "AdmittingDoctorName", width: 150 },
+    { headerName: "Department", field: "DepartmentName", width: 100 },
+    {
+      headerName: "Ward/Bed",
+      field: "WardBed",
+      width: 100,
+
+    },
+    {
+      headerName: "Discharged Date", field: "DischargeDate", width: 150
+    },
+    {
+      headerName: "Actions",
+      field: "",
+      width: 100,
+      cellRenderer: GridColumnSettings.PreviewPatientRenderer,
+    },
+  ];
   static LeaveRuleList = [
     { headerName: "Leave Category", field: "LeaveCategoryName", width: 110 },
     { headerName: "Days", field: "Days", width: 110 },
@@ -272,9 +452,11 @@ export default class GridColumnSettings {
       headerName: "Age/Sex",
       field: "",
       width: 110,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
-    { headerName: "Address", field: "Address", width: 110 },
+    {
+      headerName: "Address", field: "SortedAddress", width: 110,
+    },
     { headerName: "Phone", field: "PhoneNumber", width: 110 },
     {
       headerName: "Actions",
@@ -290,7 +472,7 @@ export default class GridColumnSettings {
 
 
 
-  static GetPatientActions() {
+  static GetPatientActions(params) {
     let template = "";
 
     if (GridColumnSettings.securityService.HasPermission("btn-patient-edit-view")) {
@@ -306,6 +488,9 @@ export default class GridColumnSettings {
        <li><a danphe-grid-action="showNeighbourCard" >Visitor Card</a></li>`;
     if (GridColumnSettings.securityService.HasPermission("patient-pat-sticker-button")) {
       template += `<li><a danphe-grid-action="showPatientSticker" >Patient Sticker</a></li>`;
+    }
+    if (GridColumnSettings.securityService.HasPermission("btn-patient-assign-member") && params.data.ISMedicareMember === 0) {
+      template += `<li><a danphe-grid-action="assignMember">Assign Member</a></li>`;
     }
     +`</ul>
     </div>`;
@@ -591,90 +776,134 @@ export default class GridColumnSettings {
     },
   ];
 
-  static BillCreditBillSearch = [
+  static BillingProvisionalOutPatientErClearanceGridColumns = [
     {
       headerName: "Scheme",
       field: "SchemeName",
       width: 100,
-      pinned: true,
     },
     {
       headerName: "Hospital Number",
       field: "PatientCode",
-      width: 170,
-      pinned: true,
+      width: 170
     },
     {
       headerName: "Patient Name",
       field: "ShortName",
-      width: 160,
-      pinned: true,
+      width: 160
     },
     {
       headerName: "Age/Sex",
       field: "",
       width: 110,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
-      pinned: true,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient
     },
     {
       headerName: "Contact No.",
       field: "PhoneNumber",
-      width: 100,
-      pinned: true,
+      width: 100
     },
 
     {
       headerName: "Last Bill Date",
       field: "LastCreditBillDate",
       width: 180,
-      pinned: true,
-      cellRenderer: GridColumnSettings.BilProvisionalDateTimeRenderer,
+      cellRenderer: GridColumnSettings.BilProvisionalDateTimeRenderer
     },
-    { headerName: "Total", field: "TotalCredit", width: 110, pinned: true },
+    { headerName: "Total", field: "TotalCredit", width: 110 },
     {
       headerName: "Action",
       field: "",
-      pinned: true,
       width: 200,
       template: `<a danphe-grid-action="showDetails" class="grid-action">
                 Show Details
-             </a>`
+             </a>
+             `
     },
-    //<a danphe-grid-action="view" class="grid-action">Print< /a>
+
   ];
-  static InsuranceBillCreditBillSearch = [
+
+  static BillCreditBillSearch = [
+    {
+      headerName: "Scheme",
+      field: "SchemeName",
+      width: 100
+    },
     {
       headerName: "Hospital Number",
       field: "PatientCode",
-      width: 170,
-      pinned: true,
+      width: 170
     },
     {
       headerName: "Patient Name",
       field: "ShortName",
-      width: 160,
-      pinned: true,
+      width: 160
+    },
+    {
+      headerName: "Visit Type",
+      field: "VisitType",
+      width: 130
     },
     {
       headerName: "Age/Sex",
       field: "",
       width: 110,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
-      pinned: true,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatient
+    },
+    {
+      headerName: "Contact No.",
+      field: "ContactNo",
+      width: 100
+    },
+
+    {
+      headerName: "Last Bill Date",
+      field: "VisitDate",
+      width: 180,
+      cellRenderer: GridColumnSettings.BilProvisionalDateTimeRenderer,
+    },
+    { headerName: "Total", field: "TotalCredit", width: 110 },
+    {
+      headerName: "Action",
+      field: "",
+      width: 200,
+      template: `<a danphe-grid-action="showDetails" class="grid-action">
+                Show Details
+             </a>
+             <a danphe-grid-action="view" class="grid-action">
+                Print
+             </a>
+             `
+    },
+
+  ];
+  static InsuranceBillCreditBillSearch = [
+    {
+      headerName: "Hospital Number",
+      field: "PatientCode",
+      width: 170
+    },
+    {
+      headerName: "Patient Name",
+      field: "ShortName",
+      width: 160
+    },
+    {
+      headerName: "Age/Sex",
+      field: "",
+      width: 110,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatient
     },
     {
       headerName: "LastCreditBillDate",
       field: "LastCreditBillDate",
       width: 180,
-      pinned: true,
       cellRenderer: GridColumnSettings.BilProvisionalDateTimeRenderer,
     },
-    { headerName: "Total", field: "TotalCredit", width: 110, pinned: true },
+    { headerName: "Total", field: "TotalCredit", width: 110 },
     {
       headerName: "Action",
       field: "",
-      pinned: true,
       width: 200,
       template: `<a danphe-grid-action="showDetails" class="grid-action">
                 Show Details
@@ -692,7 +921,7 @@ export default class GridColumnSettings {
       headerName: "Age/Sex",
       field: "",
       width: 110,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
     { headerName: "Credits", field: "CreditTotal", width: 110 },
     { headerName: "Provisional", field: "ProvisionalTotal", width: 110 },
@@ -1007,7 +1236,7 @@ export default class GridColumnSettings {
       headerName: "Age/Sex",
       field: "",
       width: 80,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
     { headerName: "Requested On", field: "RequisitionDate", width: 130 },
     { headerName: "Item", field: "ItemName", width: 110 },
@@ -1081,6 +1310,8 @@ export default class GridColumnSettings {
                 Add Report
              </a>
             `;
+      //  <a danphe-grid-action="upload-imging-files" class="grid-action">
+      //  Attach Files   </a>
       return template;
     } else if (params.data.IsScanned && params.data.IsReportSaved) {
       let template = `<a danphe-grid-action="show-edit-report" class="grid-action">
@@ -1156,12 +1387,12 @@ export default class GridColumnSettings {
       headerName: "Age/Sex",
       field: "",
       width: 70,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
     { headerName: "Phone", field: "PhoneNumber", width: 110 },
     {
       headerName: "Reporting Doctor",
-      field: "ReportingDoctorNamesFromSignatories",
+      field: "PerformerName",
       width: 140,
     },
     { headerName: "Imaging Type", field: "ImagingTypeName", width: 110 },
@@ -1175,7 +1406,7 @@ export default class GridColumnSettings {
     {
       headerName: "Report",
 
-      width: 150,
+      width: 200,
       cellRenderer: GridColumnSettings.ImagingReportViewActionRenderer,
     },
   ];
@@ -1244,7 +1475,7 @@ export default class GridColumnSettings {
       headerName: "Age/Sex",
       field: "",
       width: 70,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
     { headerName: "Contact", field: "PhoneNumber", width: 100 },
     {
@@ -1655,6 +1886,8 @@ export default class GridColumnSettings {
       width: 80,
       cellRenderer: GridColumnSettings.RequisitionDateOnlyRenderer,
     },
+    { headerName: "Requested By", field: "RequestedBy", width: 120 },
+    { headerName: "Received By", field: "ReceivedBy", width: 160 },
     { headerName: "Status", field: "RequisitionStatus", width: 80 },
     {
       headerName: "Verification Status",
@@ -1734,6 +1967,45 @@ export default class GridColumnSettings {
     },
   ];
 
+
+  static OutPatientVisitListGridCols = [
+    { headerName: "Visit Date", field: "VisitDate", width: 100, },
+    { headerName: "Visit Time", width: 100, cellRenderer: GridColumnSettings.VisitTimeOnlyRenderer },
+    { headerName: "Visit Code", field: "VisitCode", width: 100 },
+    { headerName: "Department", field: "Department", width: 100 },
+    { headerName: "Doctor", field: "PerformerName", width: 100 },
+    { headerName: "Visit Type", field: "VisitType", width: 100 },
+    { headerName: "Appointment Type", field: "AppointmentType", width: 100 },
+    { headerName: "Days Passed", field: "DaysPassed", width: 100 },
+    { headerName: "Scheme", field: "SchemeName", width: 100 },
+    { headerName: "Queue", field: "QueueNo", width: 100 },
+
+    {
+      headerName: "Actions",
+      field: "",
+      width: 180,
+      cellRenderer: GridColumnSettings.ManageVisitActionsRenderer,
+    },
+  ];
+
+  static InPatientVisitListGridCols = [
+    { headerName: "Admission Date", field: "AdmittingDate", width: 100 },
+    { headerName: "Discharge Date", field: "DischargeDate", width: 100 },
+    { headerName: "IpNumber", field: "VisitCode", width: 100 },
+    { headerName: "Department", field: "Department", width: 100 },
+    { headerName: "Admitting Doctor", field: "PerformerName", width: 100 },
+    { headerName: "Appointment Type", field: "AppointmentType", width: 100 },
+    { headerName: "Days Passed", field: "DaysPassed", width: 100 },
+    { headerName: "Scheme", field: "SchemeName", width: 100 },
+    { headerName: "Queue", field: "QueueNo", width: 100 },
+
+    {
+      headerName: "Actions",
+      field: "",
+      width: 180,
+      cellRenderer: GridColumnSettings.ManageVisitActionsRenderer,
+    },
+  ];
   static AppointmentAllPatientSearch = [
     { headerName: "Hospital Number", field: "PatientCode", width: 160 },
     { headerName: "Patient Name", field: "ShortName", width: 200 },
@@ -1750,11 +2022,12 @@ export default class GridColumnSettings {
       headerName: "Actions",
       field: "",
       width: 180,
-      template: `
+      template:
+        `
              <a danphe-grid-action="create" class="grid-action">
                 Create Appointment
-             </a>`,
-    },
+             </a>`
+    }
   ];
 
   static TxnItemList = [
@@ -1801,7 +2074,7 @@ export default class GridColumnSettings {
       headerName: "Age/ Sex",
       field: "PatientName",
       width: 70,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
     //{ headerName: "Phone Number", field: "PhoneNumber", width: 100 },
     {
@@ -1847,7 +2120,7 @@ export default class GridColumnSettings {
     {
       headerName: "Age/Sex",
       width: 60,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
     //{ headerName: "Phone Number", field: "PhoneNumber", width: 100 },
     {
@@ -2042,15 +2315,17 @@ export default class GridColumnSettings {
 
   static writeOffItemColumn = [
     { headerName: "Item Name", field: "ItemName", width: 150 },
-    { headerName: "Batch No.", field: "BatchNO", width: 150 },
     { headerName: "Write Off Qty", field: "WriteOffQuantity", width: 150 },
     { headerName: "Unit", field: "UOMName", width: 100 },
-    { headerName: "Write Off Date", field: "WriteOffDate", width: 150 },
+    { headerName: "Write Off Date", field: "WriteOffDate", width: 150, cellRenderer: GridColumnSettings.WriteOffDateRenderer },
     { headerName: "Rate", field: "ItemRate", width: 150 },
     { headerName: "Total Amount", field: "TotalAmount", width: 150 },
     { headerName: "Remark", field: "Remark" },
   ];
-
+  static WriteOffDateRenderer(params) {
+    let date: string = params.data.AdmittedDate;
+    return moment(date).format('YYYY-MM-DD');
+  }
   static vendorList = [
     { headerName: "Vendor Name", field: "VendorName", width: 150 },
     { headerName: "Vendor Code", field: "VendorCode", width: 150 },
@@ -2327,12 +2602,12 @@ export default class GridColumnSettings {
       width: 100,
       cellRenderer: GridColumnSettings.AccCrAmountRenderder,
     },
-    {
-      headerName: "Option",
-      field: "",
-      width: 100,
-      cellRenderer: GridColumnSettings.AccDailyTxnActionTemplate,
-    },
+    // {
+    //   headerName: "Option",
+    //   field: "",
+    //   width: 100,
+    //   cellRenderer: GridColumnSettings.AccDailyTxnActionTemplate,
+    // },
   ];
 
   static CostCenterItemsList = [
@@ -2385,6 +2660,50 @@ export default class GridColumnSettings {
 
     },
   ];
+
+  static medicarePatientModuleList = [
+    { headerName: "MemberNo", field: "MedicareNo", width: 120, },
+    { headerName: "Name", field: "Name", width: 200, },
+    {
+      headerName: "Age/Sex",
+      field: "",
+      width: 110,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+    },
+    { headerName: "HospitalNo", field: "HospitalNo", width: 130, },
+    { headerName: "Scheme", field: "SchemeName", width: 90, },
+    { headerName: "Price Category", field: "PriceCategoryName", width: 130, },
+    { headerName: "Ins. No", field: "InsurancePolicyNo", width: 130, },
+    {
+      headerName: "Member Start Date", field: "MedicareStartDate", width: 90,
+      cellRenderer: GridColumnSettings.MemberStartDateRenderder,
+    },
+    {
+      headerName: "Member End Date", field: "MedicareEndDate", width: 90,
+      cellRenderer: GridColumnSettings.MemberEndDateRenderder,
+    },
+    { headerName: "IsDependent", field: "IsDependent", width: 100, },
+    { headerName: "Category", field: "Category", width: 120, },
+    { headerName: "IsActive", field: "IsActive", width: 90, },
+    { headerName: "Remarks", field: "Remarks", width: 150, },
+    {
+      headerName: "Action",
+      field: "",
+      width: 150,
+      cellRenderer: GridColumnSettings.ViewMedicarePatientList,
+
+    },
+  ];
+  static MemberStartDateRenderder(params) {
+    if (params.data)
+      return moment(params.data.MedicareStartDate).format("YYYY-MM-DD");
+    else return "";
+  }
+  static MemberEndDateRenderder(params) {
+    if (params.data)
+      return moment(params.data.MedicareEndDate).format("YYYY-MM-DD");
+    else return "";
+  }
 
   static ledgerGroupList = [
     { headerName: "Primary Group", field: "PrimaryGroup", width: 100 },
@@ -2972,6 +3291,7 @@ export default class GridColumnSettings {
       field: "WardBedInfo",
       width: 180
     },
+    { headerName: "Scheme Name", field: "SchemeName", width: 120 },
     {
       headerName: "Actions",
       field: "",
@@ -3202,7 +3522,7 @@ export default class GridColumnSettings {
     {
       headerName: "Age/Sex",
       field: "",
-      width: 100,
+      width: 80,
       cellRenderer: GridColumnSettings.AgeSexRendererPatient,
     },
     { headerName: "Admission Status", field: "AdmissionStatus", width: 100 },
@@ -3212,13 +3532,13 @@ export default class GridColumnSettings {
       field: "",
       cellRenderer: GridColumnSettings.AdmittedAppointmentDateRenderer,
     },
-    { headerName: "Ward-Bed", field: "BedInformation.BedCode", width: 100 },
+    { headerName: "Ward-Bed", field: "BedInformation.BedCode", width: 80 },
     { headerName: "Dept", field: "Department", width: 100 },
     { headerName: "Provider Name", field: "AdmittingDoctorName", width: 150 },
     {
       headerName: "Actions",
       field: "",
-      width: 100,
+      width: 140,
       cellRenderer: GridColumnSettings.FavoritePatientRenderer,
     },
   ];
@@ -3355,14 +3675,18 @@ export default class GridColumnSettings {
 
   //start: billing duplicate prints
   static DuplicateInvoiceList = [
-    { headerName: "Date", field: "TransactionDate" },
+    {
+      headerName: "Date",
+      field: "TransactionDate",
+      cellRenderer: GridColumnSettings.BillingInvoiceDateTimeRenderer,
+    },
     { headerName: "Hospital No.", field: "PatientCode" },
     { headerName: "Patient Name", field: "ShortName" },
     {
       headerName: "Age/Sex",
       field: "",
       width: 120,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
     //{ headerName: "Phone", field: "PhoneNumber", width: 110 },
     { headerName: "Total", field: "TotalAmount" },
@@ -3388,7 +3712,7 @@ export default class GridColumnSettings {
       headerName: "Age/Sex",
       field: "",
       width: 120,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
 
     { headerName: "FiscalYear", field: "FiscalYear" },
@@ -3418,11 +3742,12 @@ export default class GridColumnSettings {
     {
       headerName: "Last Billing Date",
       field: "LastBillDate",
-      cellRenderer: GridColumnSettings.BilProvisionalDate,
+      cellRenderer: GridColumnSettings.BillingProvisionalReceiptsDateTimeRenderer,
     },
     { headerName: "Hospital No.", field: "PatientCode" },
     { headerName: "Patient Name", field: "PatientName" },
     { headerName: "Total Amount", field: "TotalAmount" },
+    { headerName: "ReceiptNo", field: "ProvisionalReceiptNo" },
     {
       headerName: "Action",
       field: "",
@@ -3446,12 +3771,12 @@ export default class GridColumnSettings {
       headerName: "Age/Sex",
       field: "",
       width: 120,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatient,
+      cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
     },
     {
       headerName: "DepositDate",
       field: "CreatedOn",
-      cellRenderer: GridColumnSettings.DepositDateTimeRenderer,
+      cellRenderer: GridColumnSettings.BillingDepositeReceiptsDateTimeRenderer,
     },
     { headerName: "Phone", field: "PhoneNumber", width: 110 },
     {
@@ -3686,14 +4011,34 @@ export default class GridColumnSettings {
   ];
 
   static DateRenderer_Settlmnt(params) {
-    return moment(params.data.SettlementDate).format("YYYY-MM-DD HH:mm");
+    return moment(params.data.SettlementDate).format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
   }
 
-  //added: sud--18may'18'
+  static BillingInvoiceDateTimeRenderer(params) {
+    return moment(params.data.Date).format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
+  }
+
+  static BillingDepositeReceiptsDateTimeRenderer(params) {
+    return moment(params.data.DepositDate).format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
+  }
+
+  static BillingProvisionalReceiptsDateTimeRenderer(params) {
+    return moment(params.data.LastBillDate).format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
+  }
+
+  static BillingDischargeStatementDateTimeRenderer(params) {
+    return moment(params.data.StatementDate).format(ENUM_DateTimeFormat.Year_Month_Day);
+  }
+  //Modified: 29thSep'24 Bikesh
   static AgeSexRenderer_Settlmnt(params) {
-    let dob = params.data.Patient.DateOfBirth;
-    let gender: string = params.data.Patient.Gender;
-    return CommonFunctions.GetFormattedAgeSex(dob, gender);
+    let age = params.data.Patient.Age;
+    let gender = params.data.Patient.Gender;
+    if (age && gender) {
+      let agesex = age + '/' + gender.charAt(0).toUpperCase();
+      return agesex;
+    }
+    else
+      return '';
   }
 
   //end : billing duplicate prints
@@ -3740,6 +4085,27 @@ export default class GridColumnSettings {
   static VisitDateOnlyRenderer(params) {
     let date: string = params.data.VisitDate;
     return moment(date).format("YYYY-MM-DD");
+  }
+
+  static AppointmentTimeRenderer(params) {
+    let time = params.data.AppointmentTime;
+    return moment(time, 'HH:mm:ss').format('hh:mm:ss A');
+  }
+  static AdmittingDateRenderer(params) {
+    let date: string = params.data.AdmittingDate;
+    return moment(date).format("YYYY-MM-DD");
+  }
+  static DischargeDateRenderer(params) {
+    let date: string = params.data.DischargeDate;
+    return moment(date).format("YYYY-MM-DD");
+  }
+
+  static AllDateFormatRenderer(params) {
+    const dateFieldName = params.colDef.cellRendererParams.dateFieldName;
+    const date = params.data[dateFieldName];
+    if (date != null) {
+      return moment(date).format("YYYY-MM-DD");
+    }
   }
   //displays date and time in hour:minute
   static DateTimeRenderer(params) {
@@ -3911,9 +4277,14 @@ export default class GridColumnSettings {
   }
 
   static AgeSexCombineRenderer(params) {
-    let Age = params.data.Patient.Age;
-    let gender: string = params.data.Patient.Gender;
-    return Age + " / " + gender[0].toUpperCase();
+    let age = params.data.Patient.Age;
+    let gender = params.data.Patient.Gender;
+    if (age && gender) {
+      let agesex = age + '/' + gender.charAt(0).toUpperCase();
+      return agesex;
+    }
+    else
+      return '';
   }
   static AgeSexAppointmentCombineRenderer(params) {
     let Age = params.data.Age;
@@ -3929,6 +4300,17 @@ export default class GridColumnSettings {
       return "";
     }
   }
+  static NewAgeSexRendererPatient(params) {
+    let age = params.data.Age;
+    let gender = params.data.Gender;
+    if (age && gender) {
+      let agesex = age + '/' + gender.charAt(0).toUpperCase();
+      return agesex;
+    }
+    else
+      return '';
+  }
+
   static AgeSexRendererPatientConsumption(params) {
     let age = params.data.Age;
     let gender: string = params.data.Sex;
@@ -4041,10 +4423,13 @@ export default class GridColumnSettings {
   }
 
   static ImagingReportViewActionRenderer(params): string {
-    // let retValue = '<a danphe-grid-action="view-report"  class="icon-' + params.data.ImagingTypeName + '"';//sud:31May'19--use this line later if required.
-    let retValue = '<a danphe-grid-action="view-report"  class="grid-action"';
-    retValue +=
-      ' title= "ViewReport" style= "cursor:pointer">&nbsp;&nbsp;View</a>';
+    let retValue = '';
+    if (GridColumnSettings.ShowAddEditFileButton && params.data.PatientFileId) {
+      retValue += '<a danphe-grid-action="view-file" class="grid-action" title="View File" style="cursor:pointer; background-color:#008000 !important; margin-left: 10px;">&nbsp;&nbsp;View File</a>';
+    }
+    if (GridColumnSettings.ShowAddEditReportButton) {
+      retValue += '<a danphe-grid-action="view-report" class="grid-action" title="View Report" style="cursor:pointer; margin-left: 10px;">&nbsp;&nbsp;View Report</a>';
+    }
     return retValue;
   }
   static PurchaseOrderNosrenderer(params) {
@@ -4197,15 +4582,18 @@ export default class GridColumnSettings {
                                 followup </a>`;
       }
     }
-    if (!currVisit.IsFreeVisit) {
-      templateHtml += `<a danphe-grid-action="printsticker" class="grid-action" title="Print OPD-Sticker">
+    templateHtml += `<a danphe-grid-action="printsticker" class="grid-action" title="Print OPD-Sticker">
                                  <i class="glyphicon glyphicon-print" ></i>&nbsp;sticker </a>`;
-    }
 
     //sud:1June'19-commented below for MNK. un-comment it if needed for some other hospital.
     //templateHtml += `<a danphe-grid-action="generic-sticker" title="Generic Sticker" class="grid-action">
     //                     <i class="glyphicon glyphicon-print"></i>&nbsp;Generic Sticker</a>`;
 
+    return templateHtml;
+  }
+
+  static PreviewPatientRenderer() {
+    let templateHtml = `<a danphe-grid-action="preview" class="d-icon icon-user" title="Preview" style="display: inherit;"></a>`;
     return templateHtml;
   }
   static FavoritePatientRenderer(params) {
@@ -4214,8 +4602,16 @@ export default class GridColumnSettings {
     let templateHtml = `<a danphe-grid-action="preview" class="d-icon icon-user" title="Preview" style="display: inherit; float:left;"></a>
              <a danphe-grid-action="notes" class="d-icon icon-note hidden" title="Notes""></a>
              <a danphe-grid-action="medication" class="d-icon icon-medication hidden" title="Medication""></a>
-             <a danphe-grid-action="labs" class="d-icon icon-lab" title="Labs""></a>
-             <a danphe-grid-action="imaging" class="d-icon icon-imaging" title="Imaging""></a>`;
+             <a danphe-grid-action="labs" class="d-icon icon-lab hidden" title="Labs""></a>
+             <a danphe-grid-action="imaging" class="d-icon icon-imaging hidden" title="Imaging"></a>`;
+    if (currPatient.VisitType === ENUM_VisitType.inpatient) {
+      if (currPatient.DischargeSummaryId > 0) {
+        templateHtml += '<a danphe-grid-action="viewDischargeSummary" class="grid-action" title="View DischargeSummary">View Summary</a>';
+      }
+      else {
+        templateHtml += '<a danphe-grid-action="addDischargeSummary"  class="grid-action" title="Add DischargeSummary">Add Summary</a>';
+      }
+    }
     if (currPatient.IsFollowUp) {
       templateHtml +=
         '<a danphe-grid-action="removefollowup" class=" d-icon fa fa-file-text" style="font-size:15px;position:relative;top:-5px; margin-left:10px; margin-right:10px;;" title="remove follow up""></a>';
@@ -4793,11 +5189,11 @@ Department:` +
   static ShowActionForGoodsReceiptList(params) {
     let template = `
         <a danphe-grid-action="view" title="View"
-        class="grid-action ${params.data.GRStatus == "verified"
+        class="grid-action ${params.data.GRStatus == "verified" && !params.data.IsReceived
         ? "animated-btn blinking-btn-warning grid-action"
         : ""
       }">
-        ${params.data.GRStatus == "verified" ? "(Receive)" : ""} View
+        ${params.data.GRStatus == "verified" && !params.data.IsReceived ? "(Receive)" : ""} View
         </a>`;
     if (params.data.canGRDispatch && params.data.ReceivedRemarks != null && params.data.IsQuantityAvailableToDispatchFromGR) {
       template += `<a danphe-grid-action="gr-dispatch" class="grid-action">GR Dispatch</a>`;
@@ -5010,7 +5406,7 @@ Department:` +
 
   static OnlineAppointmentList = [
     { headerName: "Status", field: "Status", width: 100 },
-    { headerName: "Date/Time", field: "VisitDate", width: 110 },
+    { headerName: "Appointment Date", field: "VisitDate", width: 110, cellRenderer: GridColumnSettings.VisitDateTimeRenderer },
     { headerName: "Patient Name", field: "PatientName", width: 110 },
     { headerName: "Age/Gender", width: 100, cellRenderer: GridColumnSettings.OnlineApptAgeGender },
     { headerName: "Phone Number", field: "ContactNumber", width: 80 },
@@ -5039,6 +5435,10 @@ Department:` +
       template += "<a danphe-grid-action='checkin' class='grid-action'> <i class='fa-solid fa-circle-check'></i>Check In</a>";
     }
     return template;
+  }
+
+  public static VisitDateTimeRenderer(param) {
+    return moment(param.data.VisitDate).format("YYYY-MM-DD HH:mm");
   }
 
   static DoctorOPNewPatientList = [
@@ -5284,33 +5684,28 @@ Department:` +
     {
       headerName: "Hospital Number",
       field: "HospitalNo",
-      width: 140,
-      pinned: true,
+      width: 140
     },
     {
       headerName: "Patient Name",
       field: "PatientName",
-      width: 140,
-      pinned: true,
+      width: 140
     },
     {
       headerName: "Age/Sex",
       field: "",
       width: 100,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatientConsumption,
-      pinned: true,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatientConsumption
     },
     {
       headerName: "Contact No.",
       field: "ContactNo",
-      width: 100,
-      pinned: true,
+      width: 100
     },
-    { headerName: "Total Amt.", field: "TotalAmount", width: 110, pinned: true },
+    { headerName: "Total Amt.", field: "TotalAmount", width: 110 },
     {
       headerName: "Action",
       field: "",
-      pinned: true,
       width: 200,
       template: `<a danphe-grid-action="showDetails" class="grid-action">
                 Show Details
@@ -5424,45 +5819,38 @@ Department:` +
     {
       headerName: "Last Return Date",
       field: "CreatedOn",
-      width: 140,
-      pinned: true,
+      width: 140
     },
     {
       headerName: "ReturnReceiptNo",
       field: "ConsumptionReturnReceiptNo",
-      width: 100,
-      pinned: true,
+      width: 100
     },
     {
       headerName: "Hospital Number",
       field: "HospitalNo",
-      width: 140,
-      pinned: true,
+      width: 140
     },
     {
       headerName: "Patient Name",
       field: "PatientName",
-      width: 140,
-      pinned: true,
+      width: 140
     },
     {
       headerName: "Age/Sex",
       field: "",
       width: 100,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatientConsumption,
-      pinned: true,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatientConsumption
     },
     {
       headerName: "Contact No.",
       field: "ContactNo",
-      width: 100,
-      pinned: true,
+      width: 100
     },
-    { headerName: "Total Amt.", field: "TotalAmount", width: 110, pinned: true },
+    { headerName: "Total Amt.", field: "TotalAmount", width: 110 },
     {
       headerName: "Action",
       field: "",
-      pinned: true,
       width: 200,
       template: `
               <a danphe-grid-action="view" class="grid-action">
@@ -5475,39 +5863,33 @@ Department:` +
     {
       headerName: "Invoice No",
       field: "InvoicePrintNo",
-      width: 140,
-      pinned: true,
+      width: 140
     },
     {
       headerName: "Hospital Number",
       field: "HospitalNo",
-      width: 140,
-      pinned: true,
+      width: 140
     },
     {
       headerName: "Patient Name",
       field: "PatientName",
-      width: 140,
-      pinned: true,
+      width: 140
     },
     {
       headerName: "Age/Sex",
       field: "",
       width: 100,
-      cellRenderer: GridColumnSettings.AgeSexRendererPatientConsumption,
-      pinned: true,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatientConsumption
     },
     {
       headerName: "Contact No.",
       field: "ContactNo",
-      width: 100,
-      pinned: true,
+      width: 100
     },
-    { headerName: "Total Amt.", field: "TotalAmount", width: 110, pinned: true },
+    { headerName: "Total Amt.", field: "TotalAmount", width: 110 },
     {
       headerName: "Action",
       field: "",
-      pinned: true,
       width: 200,
       template:
         ` <a danphe-grid-action="view" class="grid-action">
@@ -5553,11 +5935,20 @@ Department:` +
 
 
   static DischargeStatementColumnList = [
+    {
+      headerName: "StatementDate",
+      field: "StatementDate",
+      cellRenderer: GridColumnSettings.BillingDischargeStatementDateTimeRenderer,
+      width: 100,
+    },
+    { headerName: "StatementTime", field: "", width: 100, cellRenderer: GridColumnSettings.DischargeStatementTimeRenderer },
     { headerName: "Hospital No.", field: "PatientCode", width: 70 },
     { headerName: "Patient Name", field: "PatientName", width: 150 },
-    { headerName: "Age/Sex", field: "AgeSex", width: 150 },
+    {
+      headerName: "Age/Sex", field: "", width: 150, cellRenderer: GridColumnSettings.NewAgeSexRendererPatient,
+    },
     { headerName: "Phone", field: "PhoneNo", width: 150 },
-    { headerName: "Statement Date", field: "StatementDate", width: 100, cellRenderer: GridColumnSettings.DischargeStatementDateRenderer },
+    // { headerName: "StatementDate/Time", field: "", width: 100, cellRenderer: GridColumnSettings.DischargeStatementDateRenderer },
     { headerName: "ReceiptNo", field: "StatementNo", width: 50 },
 
     {
@@ -5573,10 +5964,16 @@ Department:` +
     },
   ];
 
-  static DischargeStatementDateRenderer(params) {
-    let date: string = params.data.StatementDate;
-    return moment(date).format("YYYY-MM-DD HH:mm");
+  static DischargeStatementTimeRenderer(params): string {
+    if (params && params.data.StatemntTime) {
+      let time: string = params.data.StatemntTime;
+
+      let formattedTime: string = moment(time, "HH:mm").format("HH:mm A");
+      return formattedTime;
+    }
   }
+
+
 
   public SchemeRefundGridCols = [
     { headerName: "Refund Date", field: "RefundDate", width: 110 },
@@ -5600,13 +5997,13 @@ Department:` +
   ];
 
   static IPPharmacyBillItemGridCol = [
-    { headerName: "Date", field: "CreatedOn", width: 90 },
+    { headerName: "Date", field: "BillDate", width: 90 },
     { headerName: "ItemName", field: "ItemName", width: 160 },
     { headerName: "Batch", field: "BatchNo", width: 100 },
     { headerName: "Expiry", field: "ExpiryDate", width: 100 },
     { headerName: "Qty.", field: "Quantity", width: 60 },
     { headerName: "SalePrice", field: "SalePrice", width: 60 },
-    { headerName: "DiscAmt", field: "TotalDisAmt", width: 85 },
+    { headerName: "DiscAmt", field: "DiscountAmount", width: 85 },
     { headerName: "Amount", field: "TotalAmount", width: 85 },
     { headerName: "User", field: "User", width: 150 },
   ];
@@ -5717,13 +6114,14 @@ Department:` +
     return template;
   }
 
-  public marketingReferralreportListGridCols = [
+  public MarketingReferralDetailedReportGridCols = [
     { headerName: "Invoice Date", field: "InvoiceDate", width: 140 },
     { headerName: "Invoice No", field: "InvoiceNoFormatted", width: 140 },
     { headerName: "HospitalNo", field: "HospitalNo", width: 140 },
     { headerName: "PatientName", field: "PatientName", width: 140 },
     { headerName: "Referring Party", field: "ReferringPartyName", width: 140 },
     { headerName: "Party Group", field: "GroupName", width: 120 },
+    { headerName: "Area Code", field: "AreaCode", width: 90 },
     { headerName: "Referring Organization", field: "ReferringOrganizationName", width: 120 },
     { headerName: "Vehicle No.", field: "VehicleNumber", width: 120 },
     { headerName: "Referral Scheme", field: "ReferralSchemeName", width: 120 },
@@ -5733,6 +6131,17 @@ Department:` +
     { headerName: "Remarks", field: "Remarks", width: 120 },
     { headerName: "EnteredBy", field: "EnteredBy", width: 120 },
     { headerName: "EnteredOn", field: "EnteredOn", width: 120 },
+
+  ];
+
+
+  public MarketingReferralSummaryReportGridCols = [
+    { headerName: "Referring Party", field: "ReferringPartyName", width: 140 },
+    { headerName: "Party Group", field: "GroupName", width: 120 },
+    { headerName: "Area Code", field: "AreaCode", width: 90 },
+    { headerName: "Referring Organization", field: "ReferringOrganizationName", width: 120 },
+    { headerName: "Invoice Net Amount", field: "InvoiceNetAmount", width: 120 },
+    { headerName: "Referral Amount", field: "ReferralAmount", width: 120 }
 
   ];
   static ProvisionalDischargeListGridColumns = [
@@ -5767,57 +6176,521 @@ Department:` +
     { headerName: "Insulin", field: "Insulin", width: 100 },
     { headerName: "Entered By", field: "EnteredBy", width: 100 },
     { headerName: "Remarks", field: "Remarks", width: 100 },
+    {
+      headerName: "Action",
+      field: "",
+      width: 120,
+      cellRenderer: (params) => {
+        const CurrentUserId = GridColumnSettings.currentUserId;
+        const isEditable = params.data.CreatedBy === CurrentUserId;
+        return isEditable
+          ? `
+            <div>
+              <a danphe-grid-action="edit" class="grid-action">Edit</a>
+              <i class="fa fa-trash" style="margin-left: 10px; color: black; zoom: 1.5;" danphe-grid-action="delete"></i>
+            </div>
+          `
+          : `
+            <div>
+              <a class="grid-action disabled" style="pointer-events: none; opacity: 0.5;">Edit</a>
+              <i class="fa fa-trash" style="margin-left: 10px; color: grey; zoom: 1.5; pointer-events: none; opacity: 0.5;"></i>
+            </div>
+          `;
+      },
+
+    }
   ];
   static CreatedOnDate(params) {
     return moment(params.data.CreatedOn).format("YYYY-MM-DD");
   }
   static CreatedOnTime(params) {
     return moment(params.data.CreatedOn).format("h:mm A");
-    }
+  }
 
-    ConsultationRequest = [
-        { headerName: "Requested On", field: "RequestedOn", width: 100, cellRenderer: GridColumnSettings.FormatRequestedOnDateTime, },
-        { headerName: "Requesting Dept", field: "RequestingDepartmentName", width: 100, },
-        { headerName: "Requesting Dr.", field: "RequestingConsultantName", width: 100 },
-        { headerName: "Consulted On", field: "ConsultedOn", width: 100, cellRenderer: GridColumnSettings.FormatConsultedOnDateTime },
-        { headerName: "Consulting Dept", field: "ConsultingDepartmentName", width: 100 },
-        { headerName: "Consulting Dr.", field: "ConsultingDoctorName", width: 100 },
-        { headerName: "Status", field: "Status", width: 100 },
-        { headerName: "Action", field: "Status", width: 100, cellRenderer: GridColumnSettings.ConsultationRequestActionTemplate },
-    ];
-
-    static FormatRequestedOnDateTime(params) {
-        return moment(params.data.RequestedOn).format("YYYY-MM-DD HH:mm A");
-    }
-    static FormatConsultedOnDateTime(params) {
-        return moment(params.data.ConsultedOn).format("YYYY-MM-DD HH:mm A");
-    }
-
-    static ConsultationRequestActionTemplate(params) {
-        let template = ``;
-        if (params.data.Status.toLowerCase() === ENUM_ConsultationRequestStatus.Requested.toLowerCase()
-            && GridColumnSettings.securityService.HasPermission("btn-nursing-consultation-request-respond")
-        ) {
-            template += `<a danphe-grid-action="respond" class="grid-action">
-      Respond
-      </a>`;
-        }
-        if (GridColumnSettings.securityService.HasPermission("btn-nursing-consultation-request-view")) {
-            template += `<a danphe-grid-action="view" class="grid-action">
-                 View
-                </a>`;
-        }
-        return template;
-    }
-  IntakeOutput = [
-    { headerName: "Recorded On", field: "CreatedOn", width: 100, cellRenderer: GridColumnSettings.CreatedOn, },
-    { headerName: "Intake Output Type", field: "IntakeOutputType", width: 100 },
-    { headerName: "Total Intake/Output(ml)", field: "IntakeOutputValue", width: 100 },
-    { headerName: "Balance", field: "Balance", width: 100 },
+  ConsultationRequest = [
+    { headerName: "Requested On", field: "RequestedOn", width: 100, cellRenderer: GridColumnSettings.FormatRequestedOnDateTime, },
+    { headerName: "Requesting Dept", field: "RequestingDepartmentName", width: 100, },
+    { headerName: "Requesting Dr.", field: "RequestingConsultantName", width: 100 },
+    { headerName: "Consulted On", field: "ConsultedOn", width: 100, cellRenderer: GridColumnSettings.FormatConsultedOnDateTime },
+    { headerName: "Consulting Dept", field: "ConsultingDepartmentName", width: 100 },
+    { headerName: "Consulting Dr.", field: "ConsultingDoctorName", width: 100 },
+    { headerName: "Status", field: "Status", width: 100 },
+    { headerName: "Action", field: "Status", width: 150, cellRenderer: GridColumnSettings.ConsultationRequestActionTemplate },
   ];
 
+  static FormatRequestedOnDateTime(params) {
+    return moment(params.data.RequestedOn).format("YYYY-MM-DD HH:mm A");
+  }
+  static FormatConsultedOnDateTime(params) {
+    return params.data.ConsultedOn ? moment(params.data.ConsultedOn).format("YYYY-MM-DD HH:mm A") : 'Pending';
+  }
+  static ConsultationRequestActionTemplate(params) {
+    let template = ``;
+    const currentUserId = GridColumnSettings.currentUserId;
+    const isAdmin = GridColumnSettings.isAdmin;
 
-  static CreatedOn(params) {
-    return moment(params.data.CreatedOn).format("YYYY-MM-DD HH:mm A");
+    const { RequestingConsultantId, ConsultingDoctorId, Status } = params.data;
+    const status = Status ? Status.toLowerCase() : null;
+
+    const canRespond = GridColumnSettings.securityService.HasPermission("btn-nursing-consultation-request-respond");
+    const canView = GridColumnSettings.securityService.HasPermission("btn-nursing-consultation-request-view");
+
+    if (status === ENUM_ConsultationRequestStatus.Requested.toLowerCase()) {
+      if ((ConsultingDoctorId === currentUserId || isAdmin) && canRespond) {
+        template += `
+          <a danphe-grid-action="respond" class="grid-action">
+            Respond
+          </a>`;
+      }
+    }
+
+    if ((RequestingConsultantId === currentUserId || isAdmin) && canView) {
+      template += `
+        <a danphe-grid-action="view" class="grid-action">
+          View
+        </a>`;
+    }
+
+    return template;
+  }
+
+
+  IntakeOutput = [
+    { headerName: "Recorded On", field: "RecordedDate", width: 110 },
+    { headerName: "Time", field: "RecordedTime", width: 80 },
+    { headerName: "Entry", field: "IntakeOutputType", width: 70 },
+    { headerName: "IntakeOutput Type", field: "", width: 130, cellRenderer: GridColumnSettings.FormatIntakeOutPutType },
+    { headerName: "Quantity(ml)", field: "IntakeOutputValue", width: 90 },
+    { headerName: "Color", field: "Color", width: 60 },
+    { headerName: "Quality", field: "Quality", width: 60 },
+    { headerName: "Remarks", field: "Remarks", width: 80 },
+    { headerName: "Balance", field: "Balance", width: 50 },
+    {
+      headerName: "Action",
+      field: "",
+      width: 120,
+      cellRenderer: (params) => {
+        const CurrentUserId = GridColumnSettings.currentUserId;
+        const isEditable = params.data.CreatedBy === CurrentUserId;
+        return isEditable
+          ? `
+            <div>
+              <a danphe-grid-action="edit" class="grid-action">Edit</a>
+              <i class="fa fa-trash" style="margin-left: 10px; color: black; zoom: 1.5;" danphe-grid-action="delete"></i>
+            </div>
+          `
+          : `
+            <div>
+              <a class="grid-action disabled" style="pointer-events: none; opacity: 0.5;">Edit</a>
+              <i class="fa fa-trash" style="margin-left: 10px; color: grey; zoom: 1.5; pointer-events: none; opacity: 0.5;"></i>
+            </div>
+          `;
+      },
+
+    }
+  ];
+  private static FormatIntakeOutPutType(params) {
+    let InatkeOutput;
+    if (params.data.ParameterChildValue)
+      InatkeOutput = `${params.data.ParameterMainValue}/${params.data.ParameterChildValue}`;
+    else {
+      InatkeOutput = params.data.ParameterMainValue;
+    }
+    return InatkeOutput;
+  }
+  OTMachineListGridColumns = [
+    { headerName: "Machine Name", field: "MachineName", width: 300 },
+    { headerName: "Machine Charge", field: "MachineCharge", width: 300 },
+    { headerName: "IsActive", field: "IsActive", width: 120 },
+    {
+      headerName: "Actions", field: "", width: 150,
+      cellRenderer: GridColumnSettings.OTMachineListActions
+    },
+  ];
+
+  private static OTMachineListActions(params) {
+    let template;
+    if (params.data && GridColumnSettings.securityService.HasPermission("btn-ot-machine-edit")) {
+      template = `<a danphe-grid-action="edit" class="grid-action"> <i class="fa fa-edit"></i>Edit</a>`;
+    }
+    return template;
+  }
+
+  PersonnelTypeListGridColumns = [
+    { headerName: "Personnel Type", field: "PersonnelType", width: 300 },
+    { headerName: "IsActive", field: "IsActive", width: 120 },
+    {
+      headerName: "Actions", field: "", width: 150,
+      cellRenderer: GridColumnSettings.PersonnelTypeListActions
+    },
+  ];
+
+  private static PersonnelTypeListActions(params) {
+    let template;
+    if (params.data && GridColumnSettings.securityService.HasPermission("btn-ot-personnel-type-edit")) {
+      template = `<a danphe-grid-action="edit" class="grid-action"> <i class="fa fa-edit"></i>Edit</a>`;
+    }
+    return template;
+  }
+
+  OTSurgeryListGridColumns = [
+    { headerName: "Sugery Name", field: "SurgeryName", width: 100 },
+    { headerName: "Sugery Code", field: "SurgeryCode", width: 100 },
+    { headerName: "Description", field: "Description", width: 200 },
+    { headerName: "IsActive", field: "IsActive", width: 50 },
+    {
+      headerName: "Actions", field: "", width: 150,
+      cellRenderer: GridColumnSettings.OTSurgeryListActions
+    },
+  ];
+
+  private static OTSurgeryListActions(params): string {
+    let template: string = ``;
+    if (params.data && !params.data.IsSystemDefault && GridColumnSettings.securityService.HasPermission("btn-ot-surgery-edit")) {
+      template = `<a danphe-grid-action="edit" class="grid-action"> <i class="fa fa-edit"></i>Edit</a>`;
+    }
+    if (params.data && params.data.IsActive && GridColumnSettings.securityService.HasPermission("ot-map-surgery-checklist-view")) {
+      template += `<a danphe-grid-action="map-surgery-checklist" class="grid-action"> <i class="fa fa-edit"></i>Map SurgeryCheckList</a>`;
+    }
+    return template;
+  }
+
+
+  static ConsumptionTypeGridColumns = [
+    { headerName: "Consumption Type Name", field: "ConsumptionTypeName", width: 150 },
+    { headerName: "Is Active", field: "IsActive", width: 100 },
+    { headerName: "Action", field: "", width: 100, cellRenderer: GridColumnSettings.ConsumptionTypeGridActionCellRenderer },
+  ];
+  static ConsumptionTypeGridActionCellRenderer(params) {
+    let template = ``;
+    if (params.data.IsActive) {
+      template += `<a danphe-grid-action="edit" class="grid-action">
+                Edit
+             </a>
+             <a danphe-grid-action="deActivate" class="grid-action">
+                Deactivate
+             </a>`;
+    }
+    else {
+      template += `<a danphe-grid-action="activate" class="grid-action">
+                Activate
+             </a>`;
+    }
+    return template;
+  }
+
+  static ClaimSubmissionReportGridCol = [
+    { headerName: "Transaction Date", field: "TransactionDate", width: 60 },
+    { headerName: "VisitType", field: "VisitType", width: 60 },
+    { headerName: "HospitalClaimCode", field: "ClaimCode", width: 60 },
+    { headerName: "Claim Ref. No.", field: "ClaimReferenceNo", width: 60 },
+    { headerName: "Policy No.", field: "PolicyNumber", width: 60 },
+    { headerName: "Patient Name", field: "PatientName", width: 75 },
+    { headerName: "Hospital No.", field: "HospitalNumber", width: 60 },
+    { headerName: "Status", field: "Status", width: 60 },
+    { headerName: "Invoice No.", field: "InvoiceNos", width: 45 },
+    { headerName: "Cash Amount", field: "CashAmount", width: 50 },
+    { headerName: "Credit Amount", field: "CreditAmount", width: 50 },
+    { headerName: "Total Amount", field: "TotalBillAmount", width: 50 },
+  ];
+
+  public PatientVisitWiseReferralCommissionGridCols = [
+    { headerName: "Visit Date", field: "VisitDate", width: 110, cellRenderer: GridColumnSettings.VisitDateOnlyRenderer },
+    { headerName: "Visit Code", field: "VisitCode", width: 140 },
+    { headerName: "HospitalNo", field: "PatientCode", width: 140 },
+    { headerName: "Patient Name", field: "ShortName", width: 140 },
+    { headerName: "Age/Sex", field: "Age", width: 120 },
+    { headerName: "ReferralAmount", field: "ReferralAmount", width: 120 },
+    {
+      headerName: "Entered ?",
+      field: "ReferalCount",
+      width: 250,
+      cellRenderer: GridColumnSettings.InvoiceEnteredCellRenderer,
+    }
+  ];
+
+  public MarketingReferralSchemeGridCols = [
+    { headerName: "ReferralScheme Name", field: "ReferralSchemeName", width: 140, },
+    { headerName: "Description", field: "Description", width: 140 },
+    { headerName: "ReferralPreference", field: "ReferralPreference", width: 140 },
+    { headerName: "Referral %", field: "ReferralPercentage", width: 140 },
+    { headerName: "ReferralAmount", field: "ReferralAmount", width: 120 },
+    { headerName: "IsActive?", field: "IsActive", width: 120 },
+    {
+      headerName: "Action",
+      field: "",
+
+      width: 200,
+      cellRenderer: GridColumnSettings.ActivateDeactivateReferralScheme,
+
+    },
+  ];
+
+  public static ActivateDeactivateReferralScheme(params) {
+    let template;
+    if (params.data.IsActive) {
+      template = `<a danphe-grid-action="activateReferralScheme" class="grid-action">
+    Deactivate
+  </a>
+<a danphe-grid-action="edit" class="grid-action">Edit</a >`;
+    } else {
+      template = `<a danphe-grid-action="deactivateReferralScheme" class="grid-action">
+      Activate
+     </a>`;
+    }
+    return template;
+  }
+
+  public static ManageVisitActionsRenderer(params) {
+    let template = '';
+    if (params.data) {
+      const visitType = params.data.VisitType;
+      const appointmentType = params.data.AppointmentType;
+      const daysPassed = params.data.DaysPassed;
+      const maxAllowedFollowupDays = params.data.MaxAllowedFollowUpDays;
+      const maxAllowedReferralDays = params.data.MaxAllowedReferralDays;
+      const parentVisitId = params.data.ParentVisitId;
+
+      const actionConditions = {
+        ShowSticker: false,
+        ShowFollowup: false,
+        ShowRefer: false
+      };
+
+      switch (visitType) {
+        case ENUM_VisitType.outdoor: {
+          actionConditions.ShowSticker = true;
+          actionConditions.ShowFollowup = false;
+          actionConditions.ShowRefer = false;
+          break;
+        }
+        case ENUM_VisitType.outpatient: {
+          if ((appointmentType === ENUM_AppointmentType.new || appointmentType === ENUM_AppointmentType.revisit) && daysPassed === 0 && !parentVisitId) {
+            actionConditions.ShowSticker = true;
+            actionConditions.ShowFollowup = false;
+            actionConditions.ShowRefer = true;
+          } else if ((appointmentType === ENUM_AppointmentType.new || appointmentType === ENUM_AppointmentType.revisit)) {
+            actionConditions.ShowSticker = true;
+            actionConditions.ShowFollowup = (daysPassed > 0 && daysPassed <= maxAllowedFollowupDays) ? true : false;
+            actionConditions.ShowRefer = (daysPassed > 0 && daysPassed <= maxAllowedReferralDays) ? true : false;
+          } else if (appointmentType === ENUM_AppointmentType.followup && parentVisitId) {
+            actionConditions.ShowSticker = true;
+            actionConditions.ShowFollowup = false;
+            actionConditions.ShowRefer = false;
+          } else if (appointmentType === ENUM_AppointmentType.referral && parentVisitId) {
+            actionConditions.ShowSticker = true;
+            actionConditions.ShowFollowup = (daysPassed > 0 && daysPassed <= maxAllowedFollowupDays) ? true : false;
+            actionConditions.ShowRefer = (daysPassed >= 0 && daysPassed <= maxAllowedReferralDays) ? true : false;
+          }
+          break;
+        }
+        case ENUM_VisitType.inpatient: {
+          if ((appointmentType === ENUM_AppointmentType.new || appointmentType === ENUM_AppointmentType.revisit) && daysPassed === 0 && !parentVisitId) {
+            actionConditions.ShowSticker = true;
+            actionConditions.ShowFollowup = false;
+            actionConditions.ShowRefer = false;
+          } else if ((appointmentType === ENUM_AppointmentType.new || appointmentType === ENUM_AppointmentType.revisit) && (daysPassed > 0 && daysPassed <= maxAllowedFollowupDays)) {
+            actionConditions.ShowSticker = true;
+            actionConditions.ShowFollowup = true;
+            actionConditions.ShowRefer = false;
+          } else if ((appointmentType === ENUM_AppointmentType.new || appointmentType === ENUM_AppointmentType.revisit) && (daysPassed > 0 && daysPassed > maxAllowedFollowupDays)) {
+            actionConditions.ShowSticker = true;
+            actionConditions.ShowFollowup = false;
+            actionConditions.ShowRefer = false;
+          }
+          break;
+        }
+        case ENUM_VisitType.emergency: {
+          actionConditions.ShowSticker = true;
+          actionConditions.ShowFollowup = false;
+          actionConditions.ShowRefer = false;
+          break;
+        }
+        default: {
+          break;
+        }
+      }
+
+      if (actionConditions.ShowSticker && actionConditions.ShowFollowup && actionConditions.ShowRefer) {
+        template = `<a danphe-grid-action="referral" class="grid-action">refer </a>
+                    <a danphe-grid-action="followup" class="grid-action">followup </a>
+                    <a danphe-grid-action="printsticker" class="grid-action" title="Print OPD-Sticker">
+                    <i class="glyphicon glyphicon-print" ></i>&nbsp;sticker </a>`;
+      } else if (actionConditions.ShowSticker && actionConditions.ShowFollowup && !actionConditions.ShowRefer) {
+        template = `<a danphe-grid-action="followup" class="grid-action">followup </a>
+                    <a danphe-grid-action="printsticker" class="grid-action" title="Print OPD-Sticker">
+                    <i class="glyphicon glyphicon-print" ></i>&nbsp;sticker </a>`;
+      } else if (actionConditions.ShowSticker && !actionConditions.ShowFollowup && actionConditions.ShowRefer) {
+        template = `<a danphe-grid-action="referral" class="grid-action">refer </a>
+                    <a danphe-grid-action="printsticker" class="grid-action" title="Print OPD-Sticker">
+                    <i class="glyphicon glyphicon-print" ></i>&nbsp;sticker </a>`;
+      } else if (actionConditions.ShowSticker && !actionConditions.ShowFollowup && !actionConditions.ShowRefer) {
+        template = `<a danphe-grid-action="printsticker" class="grid-action" title="Print OPD-Sticker">
+                   <i class="glyphicon glyphicon-print" ></i>&nbsp;sticker </a>`;
+      } else {
+        template = ``;
+      }
+    }
+
+    return template;
+  }
+
+  static PHRMCreditBillSearch = [
+    {
+      headerName: "Scheme",
+      field: "SchemeName",
+      width: 100
+    },
+    {
+      headerName: "Hospital Number",
+      field: "PatientCode",
+      width: 170
+    },
+    {
+      headerName: "Patient Name",
+      field: "ShortName",
+      width: 160
+    },
+    {
+      headerName: "Visit Type",
+      field: "VisitType",
+      width: 130
+    },
+    {
+      headerName: "Age/Sex",
+      field: "",
+      width: 110,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatient
+    },
+    {
+      headerName: "Contact No.",
+      field: "PhoneNumber",
+      width: 100
+    },
+
+    {
+      headerName: "Visit Date",
+      field: "VisitDate",
+      width: 180,
+      cellRenderer: GridColumnSettings.PHRMProvisionalDateTimeRenderer,
+    },
+    { headerName: "Total", field: "TotalCredit", width: 110 },
+    {
+      headerName: "Action",
+      field: "",
+      width: 200,
+      template: `<a danphe-grid-action="showDetails" class="grid-action">
+                Show Details
+             </a>
+             <a danphe-grid-action="view" class="grid-action">
+                Print
+             </a>
+             `
+    },
+
+  ];
+
+  static PHRMProvisionalDateTimeRenderer(params) {
+    return moment(params.data.VisitDate).format("YYYY-MM-DD HH:mm A");
+  }
+
+  static PharmacyProvisionalBillColumns = [
+    {
+      headerName: "Scheme",
+      field: "SchemeName",
+      width: 100
+    },
+    {
+      headerName: "Hospital Number",
+      field: "PatientCode",
+      width: 170
+    },
+    {
+      headerName: "Patient Name",
+      field: "ShortName",
+      width: 160
+    },
+    {
+      headerName: "Visit Type",
+      field: "VisitType",
+      width: 130
+    },
+    {
+      headerName: "Age/Sex",
+      field: "",
+      width: 110,
+      cellRenderer: GridColumnSettings.AgeSexRendererPatient
+    },
+    {
+      headerName: "Contact No.",
+      field: "ContactNo",
+      width: 100
+    },
+
+    {
+      headerName: "Last Bill Date",
+      field: "VisitDate",
+      width: 180,
+      cellRenderer: GridColumnSettings.PharmacyProvisionalDateTimeRenderer,
+    },
+    { headerName: "Total", field: "TotalCredit", width: 110 },
+    {
+      headerName: "Action",
+      field: "",
+      width: 200,
+      template: `<a danphe-grid-action="showDetails" class="grid-action">
+                Show Details
+             </a>
+             <a danphe-grid-action="view" class="grid-action">
+                Print
+             </a>
+             `
+    },
+
+  ];
+
+  static PharmacyProvisionalDateTimeRenderer(params) {
+    return moment(params.data.VisitDate).format("YYYY-MM-DD HH:mm A");
+  }
+
+  static ProcessedClaimColumn = [
+    { headerName: "Submission Date", field: "ClaimedDate", width: 140, },
+    { headerName: "Claim Code", field: "ClaimCode", width: 140, },
+    { headerName: "Policy No", field: "PolicyNo", width: 140 },
+    { headerName: "Patient Name", field: "ShortName", width: 140 },
+    { headerName: "Gender", field: "Gender", width: 140 },
+    { headerName: "Hospital No", field: "PatientCode", width: 140 },
+    { headerName: "Claim Reference No", field: "ClaimReferenceNo", width: 120 },
+    { headerName: "Action", field: "", width: 140, cellRenderer: GridColumnSettings.ProcessedClaimAction, },
+  ];
+  public static ProcessedClaimAction(params) {
+    let template;
+    if (params.data) {
+      template = `<a danphe-grid-action="Upload" class="grid-action"> Upload </a>`;
+    }
+    return template;
+  }
+  static ClaimDocumentReceivedReportColumn = [
+    { headerName: "Hospital No", field: "HospitalNo", width: 80 },
+    { headerName: "Patient Name", field: "PatientName", width: 80 },
+    { headerName: "Member No", field: "MemberNo", width: 80 },
+    { headerName: "Claim Code", field: "ClaimCode", width: 80 },
+    { headerName: "InvoiceNo", field: "InvoiceNo", width: 80 },
+    { headerName: "InvoiceDate", field: "InvoiceDate", width: 80, cellRenderer: GridColumnSettings.FormatInvoiceDate },
+    { headerName: "TotalAmount", field: "TotalAmount", width: 80 },
+    { headerName: "Scheme", field: "Scheme", width: 80 },
+    { headerName: "DocumentReceivedDate", field: "DocumentReceivedDate", width: 120, cellRenderer: GridColumnSettings.FormatDocumentReceivedDate },
+    { headerName: "Remarks", field: "Remarks", width: 80 },
+    { headerName: "User", field: "User", width: 80 }
+  ];
+  static FormatInvoiceDate(params) {
+    if (params && params.data.InvoiceDate) {
+      return moment(params.data.InvoiceDate).format("YYYY-MM-DD");
+    }
+  }
+  static FormatDocumentReceivedDate(params) {
+    if (params && params.data.DocumentReceivedDate) {
+      return moment(params.data.DocumentReceivedDate).format("YYYY-MM-DD");
+    }
   }
 }

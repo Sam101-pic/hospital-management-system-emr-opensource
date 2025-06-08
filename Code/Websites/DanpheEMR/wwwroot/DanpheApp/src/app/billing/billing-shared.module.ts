@@ -24,10 +24,14 @@ import { PartialPaymentComponent } from './ip-billing/partial-payment/partial-pa
 import { UpdateItemPriceComponent } from './ip-billing/update-item-price/update-item-price.component';
 import { BIL_Print_ProvisionalCancellationReceiptComponent } from './print-pages/bill-provisional-cancel-receipt/bill-provisional-cancel-receipt';
 import { BillAdditionalItemSelectComponent } from './shared/additional-item-select/bill-additional-item-select.component';
+import { BillInsuranceService } from './shared/bill-insurance.service';
 import { BillingInvoiceBlService } from './shared/billing-invoice.bl.service';
 import { BillingMasterBlService } from './shared/billing-master.bl.service';
 import { BillingMasterDlService } from './shared/billing-master.dl.service';
+import { BillingSalesSummaryComponent } from './shared/billing-sales-summary/billing-sales-summary.component';
+import { PrintBillingSalesSummaryComponent } from './shared/billing-sales-summary/print-billing-sales-summary.component';
 import { SelectEthnicGroupComponent } from './shared/ethnic-group/select-ethnic-group.component';
+import { FonePayDynamicQRComponent } from './shared/fonepay-dynamic-qr/fonepay-dynamic-qr.component';
 import { OtherCurrencyCalculationComponent } from './shared/other-currency-calculation/other-currency-calcaultion.component';
 import { PaymentModeInfoComponent } from './shared/payment-mode-info/payment-mode-info.component';
 import { SelectPriceCategoryComponent } from './shared/price-category-select/price-category-select.component';
@@ -44,8 +48,8 @@ import { WardBillItemRequestComponent } from './shared/ward-bill-item-request/wa
     BillingDLService,
     BillingMasterBlService,
     BillingMasterDlService,
-    BillingInvoiceBlService
-  ],
+    BillingInvoiceBlService,
+    BillInsuranceService],
 
   imports: [ReactiveFormsModule,
     FormsModule,
@@ -72,7 +76,10 @@ import { WardBillItemRequestComponent } from './shared/ward-bill-item-request/wa
     BillAdditionalItemSelectComponent,
     BIL_Print_ProvisionalCancellationReceiptComponent,
     OtherCurrencyCalculationComponent,
-    BillEditProvisionalItemsComponent
+    BillEditProvisionalItemsComponent,
+    FonePayDynamicQRComponent,
+    BillingSalesSummaryComponent,
+    PrintBillingSalesSummaryComponent
   ],
 
   exports: [
@@ -94,7 +101,9 @@ import { WardBillItemRequestComponent } from './shared/ward-bill-item-request/wa
     BillAdditionalItemSelectComponent,
     BIL_Print_ProvisionalCancellationReceiptComponent,
     OtherCurrencyCalculationComponent,
-    BillEditProvisionalItemsComponent
+    BillEditProvisionalItemsComponent,
+    FonePayDynamicQRComponent,
+    BillingSalesSummaryComponent
   ]
 })
 export class BillingSharedModule {

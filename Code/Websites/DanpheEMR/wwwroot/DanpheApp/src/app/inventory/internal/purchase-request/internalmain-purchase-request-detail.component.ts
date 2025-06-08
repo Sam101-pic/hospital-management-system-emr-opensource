@@ -1,11 +1,12 @@
-import { Component, OnInit, OnDestroy } from "@angular/core";
-import { InventoryService } from "../../shared/inventory.service";
-import { InventoryBLService } from "../../shared/inventory.bl.service";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { CoreService } from "../../../core/shared/core.service";
+import { Component, OnDestroy, OnInit } from "@angular/core";
 import { Router } from "@angular/router";
-import { RouteFromService } from "../../../shared/routefrom.service";
+import { CoreService } from "../../../core/shared/core.service";
 import { PurchaseRequestVM } from "../../../procurement/purchase-request/purchase-request-view/purchase-request-view.component";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { RouteFromService } from "../../../shared/routefrom.service";
+import { InventoryBLService } from "../../shared/inventory.bl.service";
+import { InventoryService } from "../../shared/inventory.service";
+
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 
 @Component({
@@ -88,24 +89,24 @@ export class InternalmainPurchaseRequestDetailComponent implements OnInit, OnDes
     this.router.navigate(["/Inventory/InternalMain/PurchaseRequest/PurchaseRequestAdd"])
   }
   WithdrawPurchaseRequest() {
-    this.CancelRemarksVar=this.PurchaseRequestVM.PurchaseRequest.CancelRemarks;
-    if(this.CancelRemarksVar.trim()== null){
+    this.CancelRemarksVar = this.PurchaseRequestVM.PurchaseRequest.CancelRemarks;
+    if (this.CancelRemarksVar.trim() == null) {
       this.messageBoxService.showMessage("Failed", ["Remarks is required."]);
     }
-    else{
+    else {
       this.inventoryBLService.WithdrawPurchaseRequestById(this.PurchaseRequestVM.PurchaseRequest.PurchaseRequestId, this.PurchaseRequestVM.PurchaseRequest.CancelRemarks)
-      .subscribe(res => {
-        if (res.Status == "OK") {
-          this.messageBoxService.showMessage("Success", ["Purchase Request " + this.PurchaseRequestVM.PurchaseRequest.PRNumber + " is successfully withdrawn."]);
-        }
-        else {
-          this.messageBoxService.showMessage("Failed", ["Something went wrong..."]);
-          console.log(res.ErrorMessage);
-        }
-      });
-    this.RouteBack();
+        .subscribe(res => {
+          if (res.Status == "OK") {
+            this.messageBoxService.showMessage("Success", ["Purchase Request " + this.PurchaseRequestVM.PurchaseRequest.PRNumber + " is successfully withdrawn."]);
+          }
+          else {
+            this.messageBoxService.showMessage("Failed", ["Something went wrong..."]);
+            console.log(res.ErrorMessage);
+          }
+        });
+      this.RouteBack();
     }
-    
+
   }
   RouteBack() {
     this.router.navigate([this.routeFromService.RouteFrom]);
@@ -117,5 +118,8 @@ export class InternalmainPurchaseRequestDetailComponent implements OnInit, OnDes
   callBackPrint() {
     this.printDetaiils = null;
     this.showPrint = false;
+  }
+  ClearRemarks() {
+    this.PurchaseRequestVM.PurchaseRequest.CancelRemarks = "";
   }
 }

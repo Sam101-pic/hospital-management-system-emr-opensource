@@ -1,3 +1,103 @@
+export enum ENUM_ServiceItemStatus {
+  All = 'All',
+  Active = 'Active',
+  Inactive = 'Inactive'
+}
+export enum ENUM_TriageStatus {
+  TriageDone = 'Triage Done',
+  All = 'All'
+
+}
+export enum ENUM_MappingType {
+  Default = 'Default Mapping',
+  DepartmentLevel = 'Department Level',
+  UserLevel = 'User Level',
+}
+export enum ENUM_PhrasesAccessibility {
+  Personal = 'Personal',
+  Shared = 'Shared'
+}
+
+export enum ENUM_BillingCounterType {
+  BILLING = 'BILLING',
+  LAB = 'LAB',
+  NURSING = 'NURSING',
+  RADIOLOGY = 'RADIOLOGY',
+  EMERGENCY = 'EMERGENCY',
+  MATERNITY = 'MATERNITY'
+}
+export enum ENUM_VisitDateFilter {
+  Today = 'Today',
+  Custom = 'Custom',
+}
+
+export enum ENUM_EscapeKey {
+  EscapeKey = 'Escape'
+}
+
+export enum ENUM_ClinicalHeading_HeadingType {
+  Document = 'Document',
+  Section = 'Section'
+}
+export enum ENUM_InvestigationLAB_ValueType {
+  number = 'number',
+  text = 'text'
+
+}
+export enum ENUM_ClinicalTemplate_Option {
+  FreeText = 'FreeText',
+  CK_Editor = 'CK_Editor'
+
+}
+
+
+export enum ENUM_ClinicalPhrases_EditorType {
+  SimpleText = 'SimpleText',
+  Editor = 'Editor'
+}
+export enum ENUM_ClinicalFieldQuestionary_AnswerType {
+  SingleSelection = "Single Selection",
+  Textbox = "Textbox",
+  FreeType = "Free Type",
+  MultipleSelect = "Multiple Select"
+}
+export enum ENUM_ClinicalFieldQuestionaryOption_DynamicGrid {
+  GridClass = "col-md-6",
+  PrimaryGridClass = "col-md-12",
+  DefaultFormGridClass = "col-md-5",
+  SecondaryGridClass = "col-md-3"
+}
+
+export const ENUM_FilterStatusOptions = [
+  { label: 'Admission Date', value: "admissionDate" },
+  { label: 'Discharged Date', value: "dischargedDate" }
+];
+
+export enum ENUM_ClinicalField_CSS {
+  FlexContainer = 'flex-container',
+  FlexItem = 'flex-item',
+}
+export enum ENUM_FormlyJsonValues {
+  Input = 'input',
+  Textarea = 'textarea',
+  Select = 'select',
+  Number = 'number',
+  Remark = 'Remark'
+
+}
+
+export enum ENUM_ClinicalField_InputType {
+  Questionnaire = 'Questionnaire',
+  SingleSelection = 'Single Selection',
+  Textbox = 'Textbox',
+  FreeType = 'Free Type',
+  MultipleSelect = 'Multiple Select',
+  FileUpload = 'File Upload',
+  SmartTemplate = 'SmartTemplate',
+  Number = 'Number',
+  SmartPrintableForm = 'SmartPrintableForm'
+}
+
 export enum ENUM_BillingStatus {
   paid = "paid",
   unpaid = "unpaid",
@@ -28,14 +128,23 @@ export enum ENUM_BillDepositType {
 export enum ENUM_VisitType {
   inpatient = "inpatient",
   outpatient = "outpatient",
-  emergency = "emergency"
+  emergency = "emergency",
+  outdoor = "outdoor"
 }
-
+export enum ENUM_AdmissionStatus {
+  discharged = "discharged",
+  admitted = "admitted"
+}
+export enum ENUM_DateReturnValues {
+  Today = 'today',
+  Yesterday = 'yesterday',
+}
 export enum ENUM_AppointmentType {
   new = "New",
   followup = "followup",
   transfer = "Transfer",
-  referral = "Referral"
+  referral = "Referral",
+  revisit = "Revisit"
 }
 
 export enum ENUM_VisitStatus {
@@ -64,6 +173,7 @@ export enum ENUM_PriceCategory {
 
 export enum ENUM_LabOrderStatus {
   Active = "active",
+  SamplePending = "sample-pending",
   Pending = "pending",
   ResultAdded = "result-added",
   ReportGenerated = "report-generated"
@@ -76,9 +186,9 @@ export enum ENUM_LabUrgency {
 }
 
 export enum ENUM_LabTemplateType {
-  normal = "normal",
-  html = "html",
-  culture = "culture"
+  Normal = "normal",
+  Html = "html",
+  Culture = "culture"
 }
 
 export enum ENUM_LabRunNumType {
@@ -163,7 +273,9 @@ export enum ENUM_ACC_ReportStaticName {
   CashBankBookReport = 'CashBankBookReport',
   DayBookReport = 'DayBookReport',
   SubLedgerReport = 'SubLedgerReport',
-  AccountHeadDetailReport = 'AccountHeadDetailReport'
+  AccountHeadDetailReport = 'AccountHeadDetailReport',
+  InvoiceWiseAgeingReport = 'InvoiceWiseAgeingReport',
+  TransactionWiseAgeingReport = 'TransactionWiseAgeingReport',
 }
 export enum ENUM_ACC_ReportName {
   LedgerReport = "/Accounting/Reports/LedgerReport",
@@ -178,6 +290,8 @@ export enum ENUM_ACC_ReportName {
   DayBookReport = '/Accounting/Reports/DayBookReport',
   SubLedgerReport = '/Accounting/Reports/SubLedgerReport',
   AccountHeadDetailReport = '/Accounting/Reports/AccountHeadDetailReport',
+  InvoiceWiseAgeingReport = '/Accounting/Reports/AgeingReport/InvoiceWiseAgeingReport',
+  TransactionWiseAgeingReport = '/Accounting/Reports/AgeingReport/TransactionWiseAgeingReport',
 }
 export enum ENUM_SSF_EligibilityType {
   Medical = "Medical",
@@ -253,10 +367,6 @@ export enum ENUM_ClaimExtensionUrl {
   Diabetes = 'Diabetes'
 }
 
-export enum ENUM_ICDCoding {
-  ICD10 = 'icd_0'
-}
-
 export enum ENUM_DefaultICDCode {
   A09 = "A09"
 }
@@ -266,11 +376,6 @@ export enum ENUM_ClaimCategory {
   Product = 'product',
   Item = 'item'
 }
-
-export enum ENUM_ClaimResourceType {
-  ResourceType = 'Claim'
-}
-
 export enum ENUM_MessageBox_Status {
   Success = "success",
   Error = "error",
@@ -401,6 +506,10 @@ export enum ENUM_ACC_RouteFrom {
   EditVoucher = "EditVoucher",
   VoucherVerify = "VoucherVerify"
 }
+export enum ENUM_APP_RouteFrom {
+  AppointmentList = 'AppointmentList',
+  Appointment = 'Appointment'
+}
 
 export enum ENUM_MembershipTypeName {
   SSF = "SSF",
@@ -487,9 +596,17 @@ export enum ENUM_IntegrationNames {
   BedCharges = "Bed Charges"
 }
 
+export enum ENUM_ChiefComplaint_Unit {
+  Days = "Days",
+  Weeks = "Weeks",
+  Months = "Months",
+  Years = "Years"
+}
+
 export enum ENUM_ModuleName {
   Pharmacy = 'Pharmacy',
-  Dispensary = 'Dispensary'
+  Dispensary = 'Dispensary',
+  Lab = 'Lab'
 }
 
 export enum ENUM_Deposit_OrganizationOrPatient {
@@ -531,6 +648,12 @@ export enum ENUM_PharmacyPurchaseOrderVerificationStatus {
   rejected = "rejected",
   all = "all"
 }
+export enum ENUM_InventoryPurchaseOrderVerificationStatus {
+  pending = "pending",
+  approved = "approved",
+  rejected = "rejected",
+  all = "all"
+}
 
 
 export enum ENUM_PharmacyRequisitionVerificationStatus {
@@ -563,13 +686,14 @@ export enum ENUM_CancellationService {
 }
 
 export enum ENUM_ProvisionalBillingContext {
-  Outpatient = "Outpatient",
+  Outpatient = "outpatient",
   ProvisionalDischarge = "ProvisionalDischarge"
 }
 export enum ENUM_DischargeType {
   Lama = "LAMA",
   Death = "Death",
   Recovered = "Recovered",
+  Delivery = 'Delivery'
 }
 
 export enum ENUM_Genders {
@@ -612,11 +736,12 @@ export enum ENUM_DischargeSummaryDisplayLabels {
   CheckedBy = "<strong> Checked By : </strong>",
   Medications = "<strong> Medications : </strong>",
   LabTests = "<strong> Lab Tests : </strong>",
-  Consultants = "<strong> Consultants : </strong>"
+  Consultants = "<strong> Consultants : </strong>",
+  Investigations = "<strong>Investigations</strong>"
 }
 export enum ENUM_CalendarTypes {
-    English = "en",
-    Nepali = "np"
+  English = "en",
+  Nepali = "np"
 }
 
 export enum ENUM_SSF_BookingStatus {
@@ -635,4 +760,360 @@ export enum ENUM_ExternalLab_SampleStatus {
   SampleCollected = "Sample Collected",
   SampleDispatched = "Sample Dispatched",
   ReportReceived = "Report Received"
+}
+
+export enum ENUM_OT_BookingStatus {
+  Booked = "Booked",
+  Scheduled = "Scheduled",
+  InProgress = "InProgress",
+  Concluded = "Concluded",
+  Cancelled = "Cancelled",
+}
+
+export enum ENUM_OT_CheckListInputType {
+  SingleSelection = "Single Selection",
+  MultipleSelection = "Multiple Selection",
+  File = "File",
+  ShortDescription = "Short Description",
+  LongDescription = "Long Description"
+}
+export enum ENUM_OnlinePaymentMode {
+  FonePay = "fonepay"
+}
+export enum ENUM_POS_ResponseStatus {
+  Success = "000",
+  Failed = "05"
+}
+
+export enum ENUM_FewaPay_TransactionTypes {
+  FonePay = "fonepay",
+  Sale = "sale",
+  NepalPay = "nepalpay",
+  SmartQr = "smartqr"
+}
+
+export enum ENUM_FewaPayMessageTypes {
+  PaymentInfoRequest = "paymentInfoRequest",
+  PaymentInfoResponse = "paymentInfoResponse"
+}
+
+export enum ENUM_PaymentModeSubCategory {
+  Card = "card",
+  FonePay = "fonepay",
+  NepalPay = "nepalpay"
+}
+
+export enum ENUM_LaboratoryResultValidation {
+  Check100 = "check100"
+}
+
+export enum ENUM_InsuranceIdentifierWithSBCode {
+  SB = "SB"
+}
+export enum ENUM_AddressType {
+  Physical = "physical"
+}
+
+
+export enum ENUM_INVPurchaseOrderStatus {
+  Pending = "pending",
+  Active = "active",
+  Complete = "complete",
+  Cancel = "cancelled"
+}
+
+export enum ENUM_PHRMRequisitionStatus {
+  Pending = "pending",
+  Active = "active",
+  Complete = "complete",
+  Cancel = "cancelled",
+  Partial = 'partial'
+}
+
+export enum ENUM_ACCSectionName {
+  Billing = "Billing",
+  Pharmacy = "Pharmacy",
+  Inventory = "Inventory",
+  Incentive = "Incentive"
+}
+export enum ENUM_MarketingReferralPreference {
+  Amount = "amount",
+  Percentage = "percentage"
+}
+export enum ENUM_ICDCoding {
+  ICD10 = 'icd_0',
+  ICD11 = 'icd_1'
+}
+
+export enum ENUM_DefaultICDCode {
+  Code_A01 = '1A01',
+  Code_1A00 = '1A00',
+  Code_5B5G = '5B5G'
+}
+
+export enum ENUM_ClaimResourceType {
+  ResourceType = 'Claim',
+}
+
+export enum ENUM_OT_SurgeryType {
+  Elective = "Elective",
+  Emergency = "Emergency",
+  Unplanned = "Unplanned"
+}
+
+export enum ENUM_OT_Priority {
+  Normal = "Normal",
+  ASAP = 'ASAP'
+}
+
+export enum ENUM_OTChecklistFileFormats {
+  jpegImage = "image/jpeg",
+  pngImage = "image/png",
+  jpgImage = "image/jpg",
+}
+export enum ENUM_CareType_Shorthand {
+  IPD = "I",
+  OPD = "O",
+}
+export enum ENUM_LabVerificationStatus {
+  Pending = "Pending",
+  PreVerified = "Pre-Verified",
+  All = "All"
+}
+
+export enum ENUM_MaritalStatus {
+  Married = "Married",
+  UnMarried = "UnMarried"
+}
+export enum ENUM_INVRequisitionStatus {
+  Pending = "pending",
+  Active = "active",
+  Complete = "complete",
+  Cancel = "cancelled",
+  Partial = 'partial',
+  Withdrawn = "withdrawn"
+}
+export enum ENUM_ACC_ConsumptionLevel {
+  InventorySubCategory = "inventorysubcategory",
+  InventorySubStore = "inventorysubstore"
+
+}
+export enum ENUM_ACC_SectionCodes {
+  Billing = "BL",
+  Pharmacy = "PH",
+  Incentive = "INCTV",
+  Inventory = "INV",
+}
+export enum ENUM_VitalsEyeScale {
+  Scale1 = "No eye opening",
+  Scale2 = "Eye opening to pain",
+  Scale3 = "Eye opening to sound",
+  Scale4 = "Eyes open spontaneously",
+}
+export enum ENUM_VitalVerbalScale {
+  Scale1 = "No verbal response",
+  Scale2 = "Incomprehensible sounds",
+  Scale3 = "Inappropriate words",
+  Scale4 = "Confused",
+  Scale5 = "Orientated",
+}
+export enum ENUM_VitalsMotorScale {
+  Scale1 = "No motor response",
+  Scale2 = "Abnormal extension to pain",
+  Scale3 = "Abnormal flexion to pain",
+  Scale4 = "Withdrawal from pain",
+  Scale5 = "Localizing pain",
+  Scale6 = "Obeys commands",
+}
+export enum ENUM_PrintTemplateTypes {
+  OpBilling = "op-billing",
+  IpBilling = "ip-billing",
+  IpDischarge = "ip-discharge",
+  IpDischargeStatement = "ip-discharge-summary",
+  IpDischargeStatementDetailed = "ip-discharge-detail",
+  IpEstimationSummary = "ip-estimation-discharge-summary",
+  IpEstimationDetailed = "ip-estimation-discharge-Details",
+}
+
+export enum ENUM_ClaimInformationCategory {
+  Explanation = 'explanation'
+}
+
+export enum ENUM_ManageVisitsGridActions {
+  Referral = "referral",
+  Sticker = "printsticker",
+  FollowUp = "followup"
+}
+
+export enum ENUM_FewaPayTransactionFrom {
+  OpBilling = "OpBilling",
+  IpBilling = "IpBilling",
+  BillingDeposit = "BillingDeposit",
+  Appointment = "Appointment",
+  ProvisionalClearance = "ProvisionalClearance",
+  BillingSettlement = "BillingSettlement",
+  DispensarySales = "DispensarySales",
+  DispensaryProvisionalClearance = "DispensaryProvisionalClearance",
+  DispensarySettlement = "DispensarySettlement",
+}
+
+export enum ENUM_AppointmentTypeForReport {
+  All = "All",
+  New = "New",
+  FreeFollowUp = "Followup (Free)",
+  PaidFollowUp = "Followup (Paid)",
+  Referral = "Referral",
+  Revisit = "Revisit"
+}
+
+export enum ENUM_FollowUpTypes {
+  FreeFollowUp = "free_followup",
+  PaidFollowUp = "paid_followup",
+}
+export enum ENUM_Emergency_DateFilter_Type {
+
+  VisitDate = "Visit Date",
+  FinalizedDate = "Finalized Date"
+}
+export enum ENUM_Emergency_Finalized_Status_Type {
+  All = "All",
+  LAMA = "LAMA",
+  Transferred = "Transferred",
+  Discharges = "Discharged",
+  Admitted = "Admitted",
+  Death = "Death",
+  DOR = "DOR",
+  Absconded = "Absconded"
+
+}
+
+export enum ENUM_VitalsType {
+  Vitals = "Vitals",
+  Biometric = "Biometric",
+  AssessmentScale = "AssessmentScale"
+}
+
+
+export enum ENUM_TemplateType {
+  Clinical = "Clinical",
+  OT = "OT"
+}
+export enum ENUM_MedicalRoute {
+  Mouth = 'mouth',
+  Intravenous = 'intravenous',
+  Intramuscular = 'intramuscular',
+  Inhalation = 'inhalation',
+  Vaginally = 'vaginally',
+  Eyes = 'eyes',
+  IntravitrealInjection = 'intravitreal injection'
+}
+export enum ENUM_Medication_Status {
+  Active = 'Active',
+  Withdraw = 'Withdraw',
+  Hold = 'Hold'
+}
+export enum ENUM_Medication_Status_Filter {
+  NotInPlan = 'Not In Plan',
+  Active = 'Active',
+  Withdraw = 'Withdraw',
+  Hold = 'Hold'
+}
+
+
+export enum ENUM_ClinicalHeaderType {
+  inpatient = "PATIP001",
+  outpatient = "PATOPD001",
+  emergency = "PATER001",
+  hospital = "CLNHEAD001",
+  vitals = "VITAL001",
+  footer = "NOTESFOOTER01",
+
+}
+
+export enum ENUM_DiagnosisType {
+  FinalDiagnosis = "FinalDiagnosis",
+  ProvisionalDiagnosis = "ProvisionalDiagnosis"
+}
+
+export enum ENUM_OTCategories {
+  Major = "major",
+  Minor = "minor"
+}
+
+
+export enum ENUM_GlobalSearchOptions {
+  Phrases = 'Phrases'
+}
+
+export enum ENUM_PrintSheetTemplateCodes {
+  DefaultTemplateSuffix = 'Default',
+  TemplatePrefix = 'PrescriptionSheet'
+}
+
+
+export enum ENUM_Add_UpdateAction {
+  Add = 'Add',
+  Update = 'Update'
+}
+
+
+export enum ENUM_VisitTypeFormatted {
+  Inpatient = "IPD",
+  Outpatient = "OPD",
+  Emergency = "ER",
+  Outdoor = "outdoor"
+}
+
+export enum ENUM_PrintSheetTemplateVisitType {
+  Inpatient = "IP",
+  Outpatient = "OP",
+  Emergency = "ER",
+}
+export enum Enum_PatientHistoryViewCategory {
+  VisitDetails = 0,
+  AdmissionDetails = 1,
+  DrugDetails = 2,
+  LadDetails = 3,
+  RadiologyDetails = 4,
+  BillingDetails = 5,
+  DocumentsDetails = 6,
+  SalesSummaryReport = 7
+}
+
+export enum Bill_Types_Applicable {
+  Inpatient = "inpatient",
+  Outpatient = "outpatient",
+  Both = "both"
+}
+
+export enum Percentage_Type {
+  Performer = 'Performer',
+  Prescriber = 'Prescriber',
+  Referrer = 'Referrer',
+}
+export enum Enum_PrescriptionOrderStatus {
+  Active = "active",
+  Partial = "partial",
+  Discarded = "discarded",
+  Final = "final"
+}
+
+
+export enum ENUM_Module {
+
+  NURSING = 'nursing',
+
+}
+export enum LabPageAction {
+  SampleReceive = "sample-receive",
+  ExternalLab = "external-lab",
+  Other = "other"
+}
+
+export enum ENUM_TemplateStyleName {
+  Default = 'default',
+}
+
+export enum ENUM_VisitDepartmentName {
+  Emergency = 'Emergency'
 }

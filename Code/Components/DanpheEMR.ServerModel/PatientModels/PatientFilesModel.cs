@@ -31,6 +31,11 @@ namespace DanpheEMR.ServerModel
 
         [NotMapped]
         public bool? HasFile { get; set; }
+        [NotMapped]
+        public string BinaryData { get; set; }
+        [NotMapped]
+        public string PatientCode { get; set; }
+
 
     }
 }

@@ -22,7 +22,7 @@ export class InvoiceItemDetailToBeReturn {
     FiscalYearName: string = '';
     FiscalYearId: number = 0;
     Checked: boolean = false;
-    InvoiceReturnId: boolean = false;
+    InvoiceReturnId: number = 0;
     InvoiceNo: number = 0;
     CreatedOn: string = "";
     IsCoPayment: boolean = false;
@@ -30,6 +30,8 @@ export class InvoiceItemDetailToBeReturn {
     ReturnCreditAmount: number = 0;
     PatientId: number = 0;
     SchemeId: number = 0;
-
+    ClaimCode: number = null;
+    ExpiryDate: string = null;
+    VisitType: string =null;
 
 }

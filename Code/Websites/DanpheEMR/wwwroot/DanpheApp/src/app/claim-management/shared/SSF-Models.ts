@@ -154,6 +154,7 @@ export class ClaimBookingRoot_DTO {
   // public ClaimBookings = new Array<ClaimBooking_DTO>();
   public BillingInvoiceNo: string = "";
   public PharmacyInvoiceNo: string = "";
+  public IsCreditNote: boolean = false;
 }
 
 export class ClaimBooking_DTO {

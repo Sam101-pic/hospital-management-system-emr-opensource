@@ -46,6 +46,7 @@ namespace DanpheEMR.Controllers.Lab
                               join employee in labDbContext.Employee on req.PrescriberId equals employee.EmployeeId into emptemp
                               from e in emptemp.DefaultIfEmpty()
                               where temp.ReportTemplateID == templateId && pat.PatientId == patientId && labtest.LabReportId == labReportId
+                              && labtest.IsActive == true
 
                               select new
                               {
@@ -73,6 +74,7 @@ namespace DanpheEMR.Controllers.Lab
                                            join result in labDbContext.LabTestComponentResults on req.RequisitionId equals result.RequisitionId
                                            //where result.IsPrint == false && req.OrderStatus == "final" &&
                                            where req.OrderStatus == "final" && test.ReportTemplateId == templateId && result.LabReportId == labReportId
+                                           && result.IsActive == true
                                            orderby test.LabSequence ascending
                                            group req by new
                                            {
@@ -90,7 +92,7 @@ namespace DanpheEMR.Controllers.Lab
                                                Labsequence = grp.Key.LabSequence,
                                                Components = (
                                                              from res in labDbContext.LabTestComponentResults
-                                                             where res.RequisitionId == grp.Key.RequisitionId
+                                                             where res.RequisitionId == grp.Key.RequisitionId && res.IsActive == true
                                                              select new
                                                              {
                                                                  ComponentName = res.ComponentName,
@@ -216,7 +218,7 @@ namespace DanpheEMR.Controllers.Lab
                               //below is equivalent syntax as LEFT JOIN. needed since providerid could be null in some cases.
                               join employee in labDbContext.Employee on req.PrescriberId equals employee.EmployeeId into emptemp
                               from e in emptemp.DefaultIfEmpty()
-                              where temp.ReportTemplateID == templateId && pat.PatientId == patientId && labtest.LabReportId == labReportId
+                              where temp.ReportTemplateID == templateId && pat.PatientId == patientId && labtest.LabReportId == labReportId && labtest.IsActive == true
                               select new
                               {
                                   TemplateName = temp.ReportTemplateShortName,
@@ -240,7 +242,7 @@ namespace DanpheEMR.Controllers.Lab
                                            where req.PatientId == pat.PatientId
                                            join test in labDbContext.LabTests on req.LabTestId equals test.LabTestId
                                            join result in labDbContext.LabTestComponentResults on req.RequisitionId equals result.RequisitionId
-                                           where req.OrderStatus == "final" && test.ReportTemplateId == templateId && result.LabReportId == labReportId
+                                           where req.OrderStatus == "final" && test.ReportTemplateId == templateId && result.LabReportId == labReportId && result.IsActive == true
                                            group req by new
                                            {
                                                test.LabTestName,
@@ -257,7 +259,7 @@ namespace DanpheEMR.Controllers.Lab
 
                                                Components = (
                                                              from res in labDbContext.LabTestComponentResults
-                                                             where res.RequisitionId == grp.Key.RequisitionId
+                                                             where res.RequisitionId == grp.Key.RequisitionId && res.IsActive == true
                                                              select new
                                                              {
                                                                  ComponentName = res.ComponentName,

@@ -99,9 +99,9 @@
       </div>
     </div>
 
-    <div class="col-lg-3 col-md-3" *ngIf="BillingRequestDisplaySettings.ReferredBy || isEHS">
+    <div class="col-lg-3 col-md-3" *ngIf="BillingRequestDisplaySettings.Prescriber || isEHS">
       <div class="flex select-flex">
-        <label>Prescriber:</label>
+        <label>Prescriber<sup *ngIf="BillingRequestDisplaySettings.IsPrescriberMandatory">*</sup>:</label>
         <select-referrer *ngIf="isReferrerLoaded" [selected-ref-id]="selectedPrescriberId"
                          [allow-external]="false"
                          (on-referrer-change)="OnPrescriberChanged($event)" class="ref-er">
@@ -171,8 +171,7 @@
                              autocomplete="off" formControlName="ItemName" display-property-name="ItemName"
                              [list-formatter]="billingInvoiceBlService.ItemsListFormatter"
                              (valueChanged)="AssignSelectedInvoiceItem()"
-                             (focusout)="OnEmptyItemNameField()"
-                             [attr.disabled]="(SelectedPackage.IsEditable === true? true : null)"
+                             (focusout)="OnEmptyItemNameField(); ValidateItemSelected();"
                              [source]="ServiceItems" [(ngModel)]="selectedInvoiceItem"
                              value-property-name=null max-num-list="30"
                              onClick="this.select();" [min-chars]="2" match-formatted="true"
@@ -195,7 +194,7 @@
                   <td *ngIf="!isPackageBilling">
                     <div class="form-group">
                       <input type="number" class="form-control" id="id_billing_serviceItemQty"
-                             formControlName="Quantity" placeholder="Qty" (focusout)="OnItemQuantityChanged()"
+                             formControlName="Quantity" placeholder="Qty" (focusout)="OnItemQuantityChanged();ValidateForCappingItems($event)"
                              [attr.disabled]="InvoiceItemFormControls.ServiceItemId.errors"
                              (keyup.enter)="GoToNextElement('id_btn_add_serviceItem')" onClick="this.select();"
                              (wheel)="coreService.PreventNumberChangeOnScroll($event)"
@@ -206,7 +205,7 @@
                     <div class="form-group">
                       <input type="number" min="0" class="form-control" id="id_billing_serviceItemPrice" onClick="this.select();"
                              formControlName="Price" placeholder="Price"
-                             [attr.disabled]="(EnablePrice === true ? null : true)  && ((!IsPackageServiceItemEditMode && SelectedPackage.IsEditable) === true? true : null)"
+                             [attr.disabled]="(EnablePrice === false ? true : null)"
                              (wheel)="coreService.PreventNumberChangeOnScroll($event)" (focusout)="CalculateAfterPriceChanged()"
                              (keyup.enter)="GoToNextElement('id_billing_serviceItemDiscPercent')"
                              [ngClass]="{'border-red': (InvoiceItemFormControls.Price.invalid && (InvoiceItemFormControls.Price.dirty || InvoiceItemFormControls.Price.touched))}">
@@ -223,7 +222,7 @@
                       <input type="number" class="form-control" id="id_billing_serviceItemDiscPercent"
                              formControlName="DiscountPercent" placeholder="Disc%"
                              (focusout)="OnItemDiscountPercentChanged()"
-                             [attr.disabled]="(DisableItemLevelDiscPercent === true ? true : null) && ((!IsPackageServiceItemEditMode && SelectedPackage.IsEditable) === true? true : null)"
+                             [attr.disabled]="(DisableItemLevelDiscPercent === true ? true : null) || ((!IsPackageServiceItemEditMode && SelectedPackage.IsEditable) === true? true : null)"
                              onClick="this.select();"
                              (keyup.enter)="GoToNextElement('id_billing_performer')"
                              (wheel)="coreService.PreventNumberChangeOnScroll($event)"
@@ -236,7 +235,7 @@
                       <input type="number" class="form-control" id="id_billing_serviceItemDiscAmount"
                              formControlName="DiscountAmount" placeholder="DiscAmt"
                              (focusout)="OnItemDiscountAmountChanged()"
-                             [attr.disabled]="(DisableItemLevelDiscAmount === true ? true : null) && ((!IsPackageServiceItemEditMode && SelectedPackage.IsEditable) === true? true : null)"
+                             [attr.disabled]="(DisableItemLevelDiscAmount === true ? true : null) || ((!IsPackageServiceItemEditMode && SelectedPackage.IsEditable) === true? true : null)"
                              onClick="this.select();"
                              (wheel)="coreService.PreventNumberChangeOnScroll($event)"
                              [ngClass]="{'border-red': InvoiceItemFormControls.DiscountAmount.errors }">
@@ -256,11 +255,11 @@
                       <input danphe-auto-complete autocomplete="off" type="text" class="form-control" id="id_billing_performer"
                              formControlName="PerformerName" [source]="doctorsList" display-property-name="FullName"
                              [list-formatter]="billingInvoiceBlService.PerformerListFormatter" value-property-name=null
-                             match-formatted="true" max-num-list="10" [(ngModel)]="SelectedPerformer"
+                             [min-chars]="1" match-formatted="true" max-num-list="10" [(ngModel)]="SelectedPerformer"
                              placeholder="Enter Name" onClick="this.select();" (focusout)="AssignSelectedPerformer()"
                              (keyup.enter)="GoToNextElement((IsPackageServiceItemEditMode === true) ? 'id_update_package_billing_service_item_button' : 'id_btn_add_serviceItem')"
                              onClick="this.select();"
-                             [attr.disabled]="InvoiceItemFormControls.ServiceItemId.errors">
+                             [attr.disabled]="(InvoiceItemFormControls.ServiceItemId.errors || (!isPackageBilling && isPackageBilling) || (isPackageBilling && !SelectedPackage.IsEditable)) ? true : null">
                     </div>
                     <div class="color-red font-sm"
                          *ngIf="InvoiceItemFormControls.PerformerId.errors">
@@ -299,7 +298,7 @@
             <thead>
               <tr>
                 <th></th>
-                <th *ngIf="SelectedPackage.IsEditable"></th>
+                <th *ngIf="SelectedPackage.IsEditable || ShowItemLevelDiscount"></th>
                 <th>#</th>
                 <th>ItemCode</th>
                 <th>ItemName</th>
@@ -316,7 +315,8 @@
                   <a class="btn btn-danger" (click)="RemoveInvoiceItem(i)" title="Click to remove this item">
                     <i class="fa fa-times"></i></a>
                 </td>
-                <td *ngIf="SelectedPackage.IsEditable" style="cursor: pointer; font-size: 15px;" (click)="EditPackageInvoiceServiceItem(item)">
+                <td *ngIf="SelectedPackage.IsEditable || ShowItemLevelDiscount" style="cursor: pointer; font-size: 15px;"
+                    (click)="EditPackageInvoiceServiceItem(item)">
                   <span><i class="fa fa-pencil"></i></span>
                 </td>
                 <td>{{i + 1}}</td>
@@ -351,6 +351,11 @@
               <h5 class="billing-head">Billing History</h5>
             </div>
             <table class="b-htable">
+              <tr style="cursor: pointer;"
+                  *ngIf="SchemePriceCategory && (SchemePriceCategory.IsCreditLimited || SchemePriceCategory.IsGeneralCreditLimited)">
+                <td style="color: rgb(151, 16, 16);">Credit Limit <b class="colon">:</b></td>
+                <td class="" style="color: rgb(151, 16, 16); font-weight: bold;">{{CreditLimitToDisplay}}</td>
+              </tr>
               <tr style="cursor: pointer;">
                 <td style="color: red;">Credit <b class="colon">:</b></td>
                 <td class="" style="color: red;">{{patBillHistory.CreditAmount}}</td>
@@ -480,8 +485,8 @@
             <tr class="ht-managed">
               <td>
                 <span style="font-size: 16px;">
-                  <strong *ngIf="(SchemePriceCategory.IsCoPayment || model.PaymentMode === 'cash')">CASH:</strong>
-                  <strong *ngIf="(!SchemePriceCategory.IsCoPayment && model.PaymentMode !== 'cash')">CREDIT:</strong>
+                  <strong *ngIf="(SchemePriceCategory.IsCoPayment || (model.PaymentMode === 'cash') || model.PaymentMode === 'others')">CASH:</strong>
+                  <strong *ngIf="(!SchemePriceCategory.IsCoPayment && (model.PaymentMode === 'credit'))">CREDIT:</strong>
                 </span>
               </td>
               <td>
@@ -606,7 +611,7 @@
                    (cancel)="handleCancel()"
                    class="btn creamyblue btn-success"
                    rbac-permission='{"name":"btn-opbilling-provisional","actionOnInvalid":"remove"}'
-                   [disabled]="loading || isPackageBilling"
+                   [disabled]="loading || DisablePrintProvisional"
                    value="Print Provisional Slip">
 
             <!-- @*<a class="btn btn-danger" [disabled]="loading" routerLink="/Billing/SearchPatient">Cancel</a>*@ -->
@@ -623,6 +628,9 @@
 
           </div>
         </div>
+      </div>
+      <div *ngIf="(DisplayPrintProvisionalButton && isPackageBilling)" class=" note-div">
+        <p class="note"> Note: Provisional not allowed in Health Packages.</p>
       </div>
     </div>
     <!--END: Total Calculation Display-->
@@ -679,18 +687,21 @@
 <div class="popup-static portlet box portlet-fullscreen custom_modal" *ngIf="showInvoicePrintPage">
   <div class="portlet-body form align-items-center">
     <div class="row">
-      <div class="col-md-8 col-md-offset-2">
+      <div class="col-md-10 col-md-offset-1">
         <div class="modelbox-div clearfix">
           <a class="btn btn-danger del-btn" (click)="CloseInvoicePrint()">X</a>
-          <div *ngIf="!isProvisionalBilling">
-            <bil-print-invoice-main [invoiceNumber]="bil_InvoiceNo" [fiscalYrId]="bil_FiscalYrId" [bil-txn-id]="bil_BilTxnId">
-            </bil-print-invoice-main>
-          </div>
-          <div *ngIf="isProvisionalBilling">
-            <bil-print-provisional-slip [PatientId]="provReceiptInputs.PatientId" [ProvFiscalYrId]="provReceiptInputs.ProvFiscalYrId"
-                                        [ProvReceiptNo]="provReceiptInputs.ProvReceiptNo" [visitType]="provReceiptInputs.visitType"
-                                        [schemeId]="SchemePriceCategory.SchemeId">
-            </bil-print-provisional-slip>
+          <div id="id_invoice_section">
+            <div *ngIf="!isProvisionalBilling">
+              <bil-print-invoice-main [invoiceNumber]="bil_InvoiceNo" [fiscalYrId]="bil_FiscalYrId" [bil-txn-id]="bil_BilTxnId"
+                                      [invoice-from]="'Billing'" [allow-hib-live-claim]="true">
+              </bil-print-invoice-main>
+            </div>
+            <div *ngIf="isProvisionalBilling">
+              <bil-print-provisional-slip [PatientId]="provReceiptInputs.PatientId" [ProvFiscalYrId]="provReceiptInputs.ProvFiscalYrId"
+                                          [ProvReceiptNo]="provReceiptInputs.ProvReceiptNo" [visitType]="provReceiptInputs.visitType"
+                                          [schemeId]="SchemePriceCategory.SchemeId">
+              </bil-print-provisional-slip>
+            </div>
           </div>
         </div>
       </div>
@@ -698,3 +709,8 @@
   </div>
 </div>
 <!--End: Invoice Print Popup-->
+
+<!--START: Dynamic QR Popup -->
+<fonepay-dynamic-qr *ngIf="ShowDynamicQr" [dynamic-qr-message]="DynamicQrMessage" [total-amount]="model.TotalAmount"
+                    (callback-message)="OnDynamicQrCallback($event)"></fonepay-dynamic-qr>
+<!--END: Dynamic QR Popup-->

@@ -20,6 +20,7 @@ namespace DanpheEMR.ViewModel.Dispensary
         public string ReceivedBy { get; set; }
         public IList<GetRequisitionItemViewDto> RequisitionItems { get; set; }
         public string RequestedStoreName { get; set; }
+        public string VerificationStatus { get; set; }
 
         public GetRequisitionViewDto()
         {
@@ -42,5 +43,8 @@ namespace DanpheEMR.ViewModel.Dispensary
         public DateTime? CancelledOn { get; set; }
         public string CancelRemarks { get; set; }
         public double? DispatchedQuantity { get; set; }
+        public string Unit { get; set; }
+        public string ItemCode { get; set; }
+
     }
 }

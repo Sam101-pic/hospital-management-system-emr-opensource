@@ -145,12 +145,11 @@
                       </label>
                     </div>
                     <div class="col-md-12">
-                      <select [(ngModel)]="selectedReferralScheme"
-                              formControlName="ReferralSchemeId"
+                      <select formControlName="ReferralSchemeId"
                               (change)="onReferralSchemeSelected($event)" class="form-control referring-party-input"
                               style="width: 100%;">
-                        <option [ngValue]="null" disabled>Select Referral Scheme</option>
-                        <option *ngFor="let scheme of referralSchemeList" [ngValue]="scheme">{{ scheme.ReferralSchemeName }}</option>
+                        <option value="" disabled>Select Referral Scheme</option>
+                        <option *ngFor="let scheme of referralSchemeList" value="{{scheme.ReferralSchemeId}}">{{ scheme.ReferralSchemeName }}</option>
                       </select>
                       <span *ngIf="ReferralEntryValidator.dirty && ReferralEntryValidator.invalid ">
                         <span class="color-red font-sm"

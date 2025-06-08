@@ -13,6 +13,7 @@ export class VisitStickerData_DTO {
     public VisitTypeFormatted: string = "";
     public AppointmentType: string = "";
     public DepartmentName: string = "";
+    public DepartmentCode: string = "";
     public PerformerName: string = "";
     public TicketCharge: number = 0;
     public WardName: string = "";

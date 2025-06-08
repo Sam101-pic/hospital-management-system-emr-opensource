@@ -112,9 +112,10 @@ export class FiscalYearCalendarComponent implements OnInit {
 
       this.currentENMonth = moment(this.HospitalInfoMaster.TodaysDate).format("YYYY-MMM");
       let todaysDateNepali = this.nepaliCalendarService.ConvertEngToNepDate(this.HospitalInfoMaster.TodaysDate);
-      let currFYear = this.fiscalYearForMonthCalendar.find(f => f.FiscalYearId === this.HospitalInfoMaster.CurrFiscalYear.FiscalYearId);
-      this.currentNPMonth = currFYear.NepaliMonthList.find(m => m.MonthNumber === todaysDateNepali.Month).MonthName;
-
+      let currFYear = this.fiscalYearForMonthCalendar.find(f => f.FiscalYearId == this.HospitalInfoMaster.CurrFiscalYear.FiscalYearId);
+      if (currFYear) {
+        this.currentNPMonth = currFYear.NepaliMonthList.find(m => m.MonthNumber == todaysDateNepali.Month).MonthName;
+      }
     }
     this.showAdBsButton = this.coreService.showCalendarADBSButton;
     this.GetCalendarParameter();

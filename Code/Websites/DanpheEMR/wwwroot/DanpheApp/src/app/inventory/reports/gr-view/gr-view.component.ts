@@ -1,14 +1,15 @@
-import { Component, Input, ChangeDetectorRef, Output, EventEmitter } from "@angular/core";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { InventoryBLService } from "../../shared/inventory.bl.service";
-import { CoreService } from "../../../core/shared/core.service";
-import { GoodsReceipt } from "../../shared/goods-receipt.model";
-import { GoodsReceiptItems } from "../../shared/goods-receipt-item.model";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 import * as moment from "moment/moment";
+import { CoreService } from "../../../core/shared/core.service";
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { GoodsReceiptItems } from "../../shared/goods-receipt-item.model";
+import { GoodsReceipt } from "../../shared/goods-receipt.model";
+import { InventoryBLService } from "../../shared/inventory.bl.service";
 @Component({
   selector: "gr-view",
   templateUrl: "./gr-view.component.html",
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class GRViewComponent {
   public goodsreceiptID: number = null;
@@ -31,7 +32,7 @@ export class GRViewComponent {
     public messageBoxService: MessageboxService,
     public inventoryBLService: InventoryBLService,
     public coreservice: CoreService
-  ) { 
+  ) {
     this.GeneralFieldLabel = coreservice.GetFieldLabelParameter();
   }
 
@@ -139,4 +140,10 @@ export class GRViewComponent {
         "Please enter parameter values for Inventory Billing header",
       ]);
   }
+  hotkeys(event): void {
+    if (event.keyCode === 27) {
+      this.Close();
+    }
+  }
+
 }

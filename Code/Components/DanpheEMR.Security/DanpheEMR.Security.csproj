@@ -338,6 +338,8 @@
     <Compile Include="RBAC\RbacOtherModels.cs" />
     <Compile Include="RBAC\RbacPermission.cs" />
     <Compile Include="RBAC\DanpheRBAC.cs" />
+    <Compile Include="RBAC\RbacPolicy.cs" />
+    <Compile Include="RBAC\RbacPolicyRoleMapping.cs" />
     <Compile Include="RBAC\RbacRole.cs" />
     <Compile Include="RBAC\RbacApplication.cs" />
     <Compile Include="RBAC\RbacUser.cs" />

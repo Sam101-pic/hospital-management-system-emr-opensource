@@ -6,6 +6,7 @@ using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ViewModel.Dispensary;
 using Microsoft.Extensions.Options;
+using Org.BouncyCastle.Bcpg;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
@@ -27,7 +28,6 @@ namespace DanpheEMR.Services.Dispensary
 
         public async Task<GetAllRequisitionVm> GetAllAsync(DateTime FromDate, DateTime ToDate)
         {
-            var realToDate = ToDate.AddDays(1);
             return new GetAllRequisitionVm
             {
                 requisitionList = await (from R in db.StoreRequisition
@@ -45,7 +45,7 @@ namespace DanpheEMR.Services.Dispensary
                                              CreatedByName = E.Salutation + ". " + E.FirstName + " " + (string.IsNullOrEmpty(E.MiddleName) ? "" : E.MiddleName + " ") + E.LastName,
                                              CanDispatchItem = true,
                                              CanApproveTransfer = (R.RequisitionStatus == "pending" && R.VerifierIds == null) ? true : false    //If verifierIds is null then it comes from Dispendary Transfer
-                                         }).Where(s => s.RequisitionDate > FromDate && s.RequisitionDate < realToDate).OrderByDescending(s => s.RequisitionDate).ThenBy(s => s.CanApproveTransfer == false).ThenBy(s => s.RequisitionStatus).ToListAsync()
+                                         }).Where(s => DbFunctions.TruncateTime(s.RequisitionDate) >= DbFunctions.TruncateTime(FromDate) && DbFunctions.TruncateTime(s.RequisitionDate) <= DbFunctions.TruncateTime(ToDate)).OrderByDescending(s => s.RequisitionDate).ThenBy(s => s.CanApproveTransfer == false).ThenBy(s => s.RequisitionStatus).ToListAsync()
             };
         }
 
@@ -54,7 +54,6 @@ namespace DanpheEMR.Services.Dispensary
             // check if receive feature is enabled or not
             var IsReceiveFeatureEnabledStr = db.CFGParameters.Where(p => p.ParameterGroupName == "Pharmacy" && p.ParameterName == "EnableReceiveItemsInDispensary").Select(p => p.ParameterValue).FirstOrDefault();
             bool IsReceivedFeatureEnabled;
-            var realToDate = ToDate.AddDays(1);
             bool.TryParse(IsReceiveFeatureEnabledStr, out IsReceivedFeatureEnabled);
             return new GetAllRequisitionByDispensaryIdVm
             {
@@ -74,7 +73,7 @@ namespace DanpheEMR.Services.Dispensary
                                              IsNewDispatchAvailable = DGrouped.Any(d => d.ReceivedById == null),
                                              RequestedStoreName = S.Name,
 
-                                         }).Where(s => s.RequisitionDate > FromDate && s.RequisitionDate < realToDate).OrderByDescending(s => s.RequisitionDate).ThenBy(s => s.IsNewDispatchAvailable == false).ThenBy(s => s.RequisitionStatus).ToListAsync()
+                                         }).Where(s => DbFunctions.TruncateTime(s.RequisitionDate) >= DbFunctions.TruncateTime(FromDate) && DbFunctions.TruncateTime(s.RequisitionDate) <= DbFunctions.TruncateTime(ToDate)).OrderByDescending(s => s.RequisitionDate).ThenBy(s => s.IsNewDispatchAvailable == false).ThenBy(s => s.RequisitionStatus).ToListAsync()
             };
         }
         public async Task<GetItemsForRequisitionVm> GetItemsForRequisition(bool IsInsurance)
@@ -82,32 +81,40 @@ namespace DanpheEMR.Services.Dispensary
             var mainStoreId = db.PHRMStore.Where(a => a.Category == "store" && a.SubCategory == "pharmacy").Select(a => a.StoreId).FirstOrDefault();
             return new GetItemsForRequisitionVm
             {
-                ItemList = await (from I in db.PHRMItemMaster
-                                  from U in db.PHRMUnitOfMeasurement.Where(u => u.UOMId == I.UOMId).DefaultIfEmpty()
-                                  from G in db.PHRMGenericModel.Where(G => G.GenericId == I.GenericId).DefaultIfEmpty()
-                                  from Stk in db.StoreStocks.Where(s => s.ItemId == I.ItemId && s.IsActive == true && s.StoreId == mainStoreId).DefaultIfEmpty()
-                                  where IsInsurance == false || (IsInsurance == true && I.IsInsuranceApplicable == true)
-                                  group new { I, U, G, Stk } by new { I.ItemId, I.ItemName, I.ItemCode, G.GenericName, U.UOMName } into IGrouped
-                                  select new GetItemsForRequisitionDto
-                                  {
-                                      ItemId = IGrouped.Key.ItemId,
-                                      ItemName = IGrouped.Key.ItemName,
-                                      ItemCode = IGrouped.Key.ItemCode,
-                                      GenericName = IGrouped.Key.GenericName ?? "N/A",
-                                      UOMName = IGrouped.Key.UOMName ?? "N/A",
-                                      AvailableQuantity = (IGrouped.FirstOrDefault().Stk != null) ? IGrouped.Sum(a => a.Stk.AvailableQuantity) : 0,
-                                      IsActive = IGrouped.Select(a => a.I.IsActive).FirstOrDefault()
-                                  }).ToListAsync()
+                ItemList = (from I in db.PHRMItemMaster
+                            from U in db.PHRMUnitOfMeasurement.Where(u => u.UOMId == I.UOMId).DefaultIfEmpty()
+                            from G in db.PHRMGenericModel.Where(G => G.GenericId == I.GenericId).DefaultIfEmpty()
+                            from Stk in db.StoreStocks.Where(s => s.ItemId == I.ItemId && s.IsActive == true && s.StoreId == mainStoreId && s.StockMaster.ExpiryDate >= DateTime.Now && s.AvailableQuantity > 0).DefaultIfEmpty()
+                            where IsInsurance == false || (IsInsurance == true && I.IsInsuranceApplicable == true)
+                            group new { I, U, G, Stk } by new { I.ItemId, I.ItemName, I.ItemCode, I.GenericId, G.GenericName, U.UOMName } into IGrouped
+                            select new GetItemsForRequisitionDto
+                            {
+                                ItemId = IGrouped.Key.ItemId,
+                                ItemName = IGrouped.Key.ItemName,
+                                ItemCode = IGrouped.Key.ItemCode ?? "N/A",
+                                GenericId = IGrouped.Key.GenericId,
+                                GenericName = IGrouped.Key.GenericName ?? "N/A",
+                                UOMName = IGrouped.Key.UOMName ?? "N/A",
+                                AvailableQuantity = (IGrouped.FirstOrDefault().Stk != null) ? IGrouped.Sum(a => a.Stk.AvailableQuantity) : 0,
+                                IsActive = IGrouped.Select(a => a.I.IsActive).FirstOrDefault()//,
+                                                                                              //ExpiryDate =IGrouped.Key.ExpiryDate
+                            }).ToList()
             };
         }
 
         public async Task<GetRequisitionViewVm> GetRequisitionViewByIdAsync(int id)
         {
             var requisition = await (from R in db.StoreRequisition.Where(R => R.RequisitionId == id)
-                                     from C in db.Employees.Where(E => E.EmployeeId == R.CreatedBy)
-                                     from DI in db.StoreDispatchItems.Where(D => D.RequisitionId == R.RequisitionId).DefaultIfEmpty()
-                                     from DIEmployee in db.Employees.Where(E => E.EmployeeId == DI.CreatedBy).DefaultIfEmpty()
-                                     from S in db.PHRMStore.Where(A => A.StoreId == R.StoreId).DefaultIfEmpty()
+                                     join C in db.Employees on R.CreatedBy equals C.EmployeeId
+                                     join DI in db.StoreDispatchItems on R.RequisitionId equals DI.RequisitionId into DIGroup
+                                     from DIItem in DIGroup.DefaultIfEmpty()
+                                     join DIEmp in db.Employees on DIItem.CreatedBy equals DIEmp.EmployeeId into DIEmpGroup
+                                     from DIEmployee in DIEmpGroup.DefaultIfEmpty()
+                                     join ReceivedByEmp in db.Employees on DIItem.ReceivedById equals ReceivedByEmp.EmployeeId into ReceivedBy
+                                     from ReceivedByEmployee in ReceivedBy.DefaultIfEmpty()
+                                     join S in db.PHRMStore on R.StoreId equals S.StoreId
+                                     join ver in db.VerificationModels on R.VerificationId equals ver.VerificationId into verification
+                                     from verify in verification.DefaultIfEmpty()
                                      select new GetRequisitionViewDto
                                      {
                                          RequisitionId = R.RequisitionId,
@@ -115,13 +122,15 @@ namespace DanpheEMR.Services.Dispensary
                                          RequisitionDate = R.RequisitionDate,
                                          RequisitionStatus = R.RequisitionStatus,
                                          RequestedBy = C.FullName,
-                                         DispatchedBy = (DI != null) ? DIEmployee.FullName : "",
-                                         ReceivedBy = (DI != null) ? DI.ReceivedBy : "",
-                                         RequestedStoreName = S.Name
+                                         DispatchedBy = (DIItem != null) ? DIEmployee.FullName : "",
+                                         ReceivedBy = (ReceivedByEmployee != null) ? ReceivedByEmployee.FullName : "",
+                                         RequestedStoreName = S.Name,
+                                         VerificationStatus = verify.VerificationStatus
                                      }).FirstOrDefaultAsync();
 
             requisition.RequisitionItems = await (from RI in db.StoreRequisitionItems
                                                   join I in db.PHRMItemMaster on RI.ItemId equals I.ItemId
+                                                  join U in db.PHRMUnitOfMeasurement on I.UOMId equals U.UOMId
                                                   join G in db.PHRMGenericModel on I.GenericId equals G.GenericId
                                                   join CU in db.Employees on RI.CancelledBy equals CU.EmployeeId into CUs
                                                   from CULJ in CUs.DefaultIfEmpty()
@@ -139,7 +148,9 @@ namespace DanpheEMR.Services.Dispensary
                                                       RI.RequisitionItemStatus,
                                                       FullName = CULJ != null ? CULJ.FullName : null,
                                                       RI.CancelledOn,
-                                                      RI.CancelRemarks
+                                                      RI.CancelRemarks,
+                                                      Unit = U.UOMName == null ? "N/A" : U.UOMName,
+                                                      ItemCode = I.ItemCode == null ? "N/A" : I.ItemCode,
                                                   } into RequisitionView
                                                   select new GetRequisitionItemViewDto
                                                   {
@@ -155,7 +166,9 @@ namespace DanpheEMR.Services.Dispensary
                                                       RequestedItemStatus = RequisitionView.Key.RequisitionItemStatus,
                                                       CancelledBy = RequisitionView.Key.FullName,
                                                       CancelledOn = RequisitionView.Key.CancelledOn,
-                                                      CancelRemarks = RequisitionView.Key.CancelRemarks
+                                                      CancelRemarks = RequisitionView.Key.CancelRemarks,
+                                                      Unit = RequisitionView.Key.Unit,
+                                                      ItemCode = RequisitionView.Key.ItemCode,
                                                   }).ToListAsync();
 
             return new GetRequisitionViewVm { requisition = requisition };

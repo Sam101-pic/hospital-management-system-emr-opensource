@@ -1,17 +1,15 @@
 import { Component } from "@angular/core";
-import { FiscalYearModel } from '../shared/fiscalyear.model';
-import * as moment from 'moment/moment';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { CommonFunctions } from '../../../shared/common.functions';
-import { ReverseTransactionModel } from '../shared/reverse-transaction.model';
-import { AccountingBLService } from "../../shared/accounting.bl.service";
 import { Router } from "@angular/router";
-import { isNull } from "util";
+import * as moment from 'moment/moment';
 import { CoreService } from '../../../core/shared/core.service';
-import { SectionModel } from "../shared/section.model";
-import { SettingsBLService } from "../../../settings-new/shared/settings.bl.service";
 import { SecurityService } from "../../../security/shared/security.service";
+import { SettingsBLService } from "../../../settings-new/shared/settings.bl.service";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { AccountingBLService } from "../../shared/accounting.bl.service";
 import { AccountingService } from '../../shared/accounting.service';
+import { ReverseTransactionModel } from '../shared/reverse-transaction.model';
+import { SectionModel } from "../shared/section.model";
 
 @Component({
   selector: 'reverse-transaction',
@@ -28,10 +26,7 @@ export class ReverseTransaction {
     public router: Router,
     public accountingBLService: AccountingBLService,
     public coreService: CoreService, public settingsBLService: SettingsBLService,
-    public securityService:SecurityService,public accountingService: AccountingService) {
-    //this.transaction.TransactionDate = moment().format('YYYY-MM-DD');
-    //this.transaction.Section = 2;
-    // this.LoadCalendarTypes();         
+    public securityService: SecurityService, public accountingService: AccountingService) {
     this.calType = this.coreService.DatePreference;
     this.GetSection();
   }
@@ -50,17 +45,17 @@ export class ReverseTransaction {
     if (this.CheckValidDate()) {
       this.accountingBLService.UndoTransaction(this.transaction)
         .subscribe(res => {
-          if (res.Status == "OK") {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
             if (res.Results == true) {
-              this.msgBoxServ.showMessage('success', ['Transaction is reversed successfully.']);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Transaction is reversed successfully.']);
               this.Close();
             }
             else
-              this.msgBoxServ.showMessage('', ['No records Found..Select Different Date..']);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['No records Found..Select Different Date..']);
           }
         },
           err => {
-            this.msgBoxServ.showMessage("error", ['There is problem, please try again']);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['There is problem, please try again']);
           });
     }
 
@@ -79,15 +74,19 @@ export class ReverseTransaction {
   }
   public CheckValidDate() {
     if (!this.validDate) {
-      this.msgBoxServ.showMessage("error", ['Select proper date']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['Select proper date']);
       return false;
     }
-    if (this.transaction.TransactionDate > moment().format('YYYY-MM-DD')) {
-      this.msgBoxServ.showMessage("error", ["Select Valid Date."]);
+    if (this.transaction.TransactionDate > moment().format(ENUM_DateTimeFormat.Year_Month_Day)) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Select Valid Date."]);
       return false;
     }
     else if (this.transaction.Reason == null || this.transaction.Reason.length < 20) {
-      this.msgBoxServ.showMessage('error', ['Please enter minimum 20 char reason'])
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['Reason of reverse transaction should be minimum 20 character long.'])
+      return false;
+    }
+    else if (this.transaction.Section === 0) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, [`Please select at least one section from the dropdown and try again.`]);
       return false;
     }
     else return true;
@@ -96,7 +95,7 @@ export class ReverseTransaction {
   public GetSection() {
     this.settingsBLService.GetApplicationList()
       .subscribe(res => {
-        if (res.Status == 'OK') {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.applicationList = res.Results;
           let sectionApplication = this.applicationList.filter(a => a.ApplicationCode == "ACC-Section" && a.ApplicationName == "Accounts-Sections")[0];
           if (sectionApplication != null || sectionApplication != undefined) {
@@ -116,7 +115,13 @@ export class ReverseTransaction {
             this.transaction.Section = defSection.SectionId;
           }
           else {
-            this.transaction.Section = this.sectionList[0].SectionId;
+            if (this.sectionList.length > 0) {
+              this.transaction.Section = this.sectionList[0].SectionId;
+            }
+            else {
+              this.transaction.Section = 0;
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, [`No Section is mapped with selected Account Division.`]);
+            }
           }
         }
 

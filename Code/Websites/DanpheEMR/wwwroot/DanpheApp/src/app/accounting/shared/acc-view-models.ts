@@ -1,7 +1,9 @@
+import * as moment from "moment";
 import { AuditTrailModel } from "../../../app/system-admin/shared/audit-trail-model";
 import { CodeDetailsModel } from "../../shared/code-details.model";
 import { ChartofAccountModel } from "../settings/shared/chart-of-account.model";
 import { CostCenterModel } from "../settings/shared/cost-center.model";
+import { Hospital_DTO } from "../settings/shared/dto/hospitals.dto";
 import { FiscalYearModel } from "../settings/shared/fiscalyear.model";
 import { LedgerModel } from "../settings/shared/ledger.model";
 import { ledgerGroupModel } from "../settings/shared/ledgerGroup.model";
@@ -18,13 +20,14 @@ export class AccHospitalInfoVM {
     public ActiveHospitalId: number = 0;
     public FiscalYearList: Array<FiscalYearModel> = [];
     public SectionList: Array<SectionModel> = [];
-    public TodaysDate: string = null;
+    public TodaysDate: string = moment().format("YYYY-MM-DD");
 
     //below properties are only for client side..
     public HospitalShortName: string = null;
     public HospitalLongName: string = null;
     public TotalHospitalPermissionCount: number = 0;
     public CurrFiscalYear: FiscalYearModel = new FiscalYearModel();
+    public PermissionId: number = 0;
 }
 
 //mumbai-team-june2021-danphe-accounting-cache-change
@@ -42,4 +45,5 @@ export class AccCacheDataVM {
     public LedgersALL: Array<LedgerModel> = new Array<LedgerModel>();
     public SubLedgerAll: Array<SubLedger_DTO> = new Array<SubLedger_DTO>();
     public CostCenters: Array<CostCenterModel> = new Array<CostCenterModel>();
+    public Hospitals: Array<Hospital_DTO> = new Array<Hospital_DTO>();
 }

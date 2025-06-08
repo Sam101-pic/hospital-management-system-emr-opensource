@@ -137,29 +137,50 @@ import { DanphePrintComponent } from "./print-service/print.component";
 import { ResetNursingContextGuard } from "./reser-nursingcontext-guard";
 import { ResetEmergencyContextGuard } from "./reset-emergencycontext-guard";
 //import { PdfViewerModule } from 'ng2-pdf-viewer'; //rusha:30May'21--commented until proper solution is found.
+import { BIL_Print_ProvisionalSlip_Component } from "../billing/print-pages/provisional-slip/bil-print-provisional-slip.component";
+import { DischargePatientReferralComponent } from "../discharge-summary/add-view-summary/discharge-patient-referral/discharge-patient-referral-add.component";
 import { CMHDischargeSummaryTemplateComponent } from "../discharge-summary/add-view-summary/view-templates/CMH/cmh-discharge-summary-template.comonent";
 import { FishTailDischargeSummaryViewTemplateComponent } from "../discharge-summary/add-view-summary/view-templates/FishTail/fishtail-discharge-summary-template.comonent";
 import { SCHDischargeSummaryTemplateComponent } from "../discharge-summary/add-view-summary/view-templates/SCH/sch-discharge-summary-template.comonent";
 import { DefaultDischargeSummaryTemplateComponent } from "../discharge-summary/add-view-summary/view-templates/default-discharge-summary-template.comonent";
 import { DischargeSummaryAddComponent } from "../discharge-summary/add/discharge-summary-add.component";
 import { DischargeSummaryViewComponent } from "../discharge-summary/view/discharge-summary-view.component";
+import { SalesReturnInvoiceViewComponent } from "../dispensary/dispensary-main/sales-main/sales-return/sales-return-invoice-view/sales-return-invoice-view.component";
+import { ConsumptionTypeListComponent } from "../inventory/settings/consumption-type/consumption-type-list.component";
+import { ConsumptionTypeComponent } from "../inventory/settings/consumption-type/consumption-type.component";
+import { PHRMGoodReceiptViewComponent } from "../pharmacy/order/phrm-gr-view/phrm-goods-receipt-view.component";
+import { PhrmGRViewNpComponent } from "../pharmacy/order/phrm-gr-view/phrm-gr-view-np.component";
 import { PharmacyCreditNotePrintComponent } from "../pharmacy/receipt/pharmacy-credit-note-print/pharmacy-credit-note-print.component";
 import { PharmacyInvoicePrintComponent } from "../pharmacy/receipt/pharmacy-invoice-print/pharmacy-invoice-print.component";
+import { PharmacyProvisionalEstimationBillPrintComponent } from "../pharmacy/receipt/pharmacy-provisional-estimation-bill-print/pharmacy-provisional-estimation-bill-print.component";
 import { PharmacyProvisionalInvoicePrintComponent } from "../pharmacy/receipt/pharmacy-provisional-invoice-print/pharmacy-provisional-invoice-print.component";
 import { PharmacyProvisionalReturnInvoicePrintComponent } from "../pharmacy/receipt/pharmacy-provisional-invoice-return/pharmacy-provisional-invoice-return-print.component";
 import { PharmacyReceiptComponent } from "../pharmacy/receipt/pharmacy-receipt.component";
+import { PHRMBillSummaryReportDetailComponent } from "../pharmacy/report/bills-summary/phrm-bills-summary-report-detail.component";
+import { PHRMBillSummaryReportReceiptComponent } from "../pharmacy/report/bills-summary/phrm-bills-summary-report-receipt.component";
+import { PHRMBillSummaryReportComponent } from "../pharmacy/report/bills-summary/phrm-bills-summary-report.component";
 import { PhrmInvoiceViewComponent } from "../pharmacy/sale/invoice-view/phrm-invoice-view.component";
 import { PHRMUpdateMRPComponent } from "../pharmacy/setting/mrp/phrm-update-mrp.component";
 import { MunicipalitySelectComponent } from "./address-controls/municipality-select.component";
 import { DanpheConfirmationDialogComponent } from "./danphe-confirmation-dialog/danphe-confirmation-dialog.component";
 import { DanpheConfirmationDirective } from "./danphe-confirmation-dialog/danphe-confirmation.directive";
+import { DanpheSummernoteComponent } from "./danphe-summer-note/danphe-summernote.component";
+import { CommonFiscalYearCalendarComponent } from "./date-controls/common-fiscal-year-calendar/common-fiscal-year-calendar.component";
+import { MedicalDiagnosisComponent } from "./diagnosis/medical-diagnosis.component";
 import { DndDirective } from "./dnd.directive";
+import { FocusTextboxDirective } from "./global-search/focus-textbox.directive";
+import { GlobalSearchComponent } from "./global-search/global-search.component";
+import { HibLiveClaimComponent } from "./hib-live-claim/hib-live-claim.component";
 import { InventoryFieldCustomizationService } from "./inventory-field-customization.service";
+import { LoadingSpinnerComponent } from "./loading/loading-spinner.component";
+import { loadingInterceptorProviders } from "./loading/shared/loading-interceptor.service";
 import { DispatchNpViewComponent } from './nepali-receipt-views/dispatch-np-view/dispatch-np-view.component';
 import { RequisitionNpViewComponent } from "./nepali-receipt-views/requisition-np-view/requisition-np-view.component";
+import { PackageBillingService } from "./package-billing.service";
 import { Pagination } from "./pagination/pagination.component";
 import { GRChargesPipe } from "./pipes/gr-charges.pipe";
 import { ItemListFilterPipe } from "./pipes/list-filter.pipe";
+import { MedicationDateTimePipe } from "./pipes/medication-datetime.pipe";
 import { PaymentDetailsPipe } from "./pipes/payment-details.pipe";
 import { DanphePrintNewComponent } from "./print-service/print-new.component";
 import { ProgressBarComponent } from "./progress-bar/progress-bar.component";
@@ -202,7 +223,9 @@ import { authInterceptorProviders } from "./token-interceptor/token-interceptor.
     },
     LabService,
     InventoryFieldCustomizationService,
-    authInterceptorProviders
+    authInterceptorProviders,
+    loadingInterceptorProviders,
+    PackageBillingService
   ],
   imports: [
     ReactiveFormsModule,
@@ -245,6 +268,7 @@ import { authInterceptorProviders } from "./token-interceptor/token-interceptor.
     LabTestsViewReportFormat2Component,
     PostReportComponent, //sud:14Jan'19-- for Edit doctor feature, need to Revise this..
     ViewReportComponent,
+    MedicationDateTimePipe,
 
     LabTestsAddResultComponent,
     DanpheMultiSelectComponent,
@@ -325,9 +349,30 @@ import { authInterceptorProviders } from "./token-interceptor/token-interceptor.
     DanpheConfirmationDirective,
     DanphePrintNewComponent,
     PharmacyProvisionalInvoicePrintComponent,
-    PharmacyProvisionalReturnInvoicePrintComponent
-
-
+    PharmacyProvisionalReturnInvoicePrintComponent,
+    PHRMGoodReceiptViewComponent,
+    PhrmGRViewNpComponent,
+    PhrmInvoiceViewComponent,
+    SalesReturnInvoiceViewComponent,
+    PHRMGoodReceiptViewComponent,
+    PhrmGRViewNpComponent,
+    PhrmInvoiceViewComponent,
+    SalesReturnInvoiceViewComponent,
+    DischargePatientReferralComponent,
+    ConsumptionTypeComponent,
+    ConsumptionTypeListComponent,
+    CommonFiscalYearCalendarComponent,
+    LoadingSpinnerComponent,
+    PharmacyProvisionalEstimationBillPrintComponent,
+    PHRMBillSummaryReportComponent,
+    PHRMBillSummaryReportDetailComponent,
+    PHRMBillSummaryReportReceiptComponent,
+    BIL_Print_ProvisionalSlip_Component,
+    DanpheSummernoteComponent,
+    FocusTextboxDirective,
+    GlobalSearchComponent,
+    MedicalDiagnosisComponent,
+    HibLiveClaimComponent
   ],
   exports: [
     DanpheDateTime,
@@ -336,6 +381,7 @@ import { authInterceptorProviders } from "./token-interceptor/token-interceptor.
     HasValuePipe,
     NepaliDatePipe,
     BooleanParameterPipe,
+    MedicationDateTimePipe,
     //LoadingComponent,
     NumberInWordsPipe,
     // Ng2TabModule,
@@ -431,8 +477,25 @@ import { authInterceptorProviders } from "./token-interceptor/token-interceptor.
     DanpheConfirmationDirective,
     DanphePrintNewComponent,
     PharmacyProvisionalInvoicePrintComponent,
-    PharmacyProvisionalReturnInvoicePrintComponent
-
+    PharmacyProvisionalReturnInvoicePrintComponent,
+    PhrmInvoiceViewComponent,
+    SalesReturnInvoiceViewComponent,
+    PHRMGoodReceiptViewComponent,
+    PhrmGRViewNpComponent,
+    PhrmInvoiceViewComponent,
+    SalesReturnInvoiceViewComponent,
+    DischargePatientReferralComponent,
+    ConsumptionTypeComponent,
+    ConsumptionTypeListComponent,
+    CommonFiscalYearCalendarComponent,
+    LoadingSpinnerComponent,
+    PharmacyProvisionalEstimationBillPrintComponent,
+    DanpheSummernoteComponent,
+    BIL_Print_ProvisionalSlip_Component,
+    FocusTextboxDirective,
+    GlobalSearchComponent,
+    MedicalDiagnosisComponent,
+    HibLiveClaimComponent
   ],
   entryComponents: [DanpheConfirmationDialogComponent]
 })

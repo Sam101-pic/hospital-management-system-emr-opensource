@@ -1,11 +1,14 @@
 import { Injectable } from '@angular/core';
 import * as _ from 'lodash';
+import { INSClaimSubmissionMultipleDocument_DTO, INSClaimSubmissionSingleDocument_DTO } from '../../insurance/nep-gov/shared/ins-claim-submission-document.dto';
+import { HibLiveClaimDTO } from '../../shared/hib-live-claim/dtos/hib-live-claim.dto';
 import { ClaimBillReviewDTO } from './DTOs/ClaimManagement_BillReview_DTO';
 import { InsuranceClaimPayment } from './DTOs/ClaimManagement_ClaimPayment_DTO';
 import { InsurancePendingClaim } from './DTOs/ClaimManagement_PendingClaims_DTO';
 import { SubmittedClaimDTO } from './DTOs/ClaimManagement_SubmittedClaim_DTO';
 import { BillingCreditBillItem_DTO } from './DTOs/billing-credit-bill-item.dto';
 import { PharmacyCreditBillItem_DTO } from './DTOs/pharmacy-credit-bill-item.dto';
+import { AddAttachmentDTO } from './DTOs/processed-claim.dto';
 import { ClaimManagementDLService } from './claim-management.dl.service';
 
 @Injectable()
@@ -17,98 +20,106 @@ export class ClaimManagementBLService {
   ) { }
 
   //#region Get
-  public GetInsuranceApplicableCreditOrganizations() {
+  GetInsuranceApplicableCreditOrganizations() {
     return this.claimManagementDLService.GetInsuranceApplicableCreditOrganizations()
       .map(res => { return res })
   }
 
-  public GetBillReviewList(FromDate: string, ToDate: string, CreditOrganizationId: number) {
-    return this.claimManagementDLService.GetClaimReviewList(FromDate, ToDate, CreditOrganizationId)
+  GetBillReviewList(FromDate: string, ToDate: string, CreditOrganizationId: number, patientId: number) {
+    return this.claimManagementDLService.GetClaimReviewList(FromDate, ToDate, CreditOrganizationId, patientId)
       .map(res => { return res });
   }
 
-  public CheckClaimCode(claimCode: number) {
-    return this.claimManagementDLService.CheckClaimCode(claimCode)
+  CheckClaimCode(claimCode: number, patientVisitId: number, creditOrganizationId: number, ApiIntegrationName: string, patientId: number) {
+    return this.claimManagementDLService.CheckClaimCode(claimCode, patientVisitId, creditOrganizationId, ApiIntegrationName, patientId)
       .map(res => { return res });
   }
 
-  public GetClaimSubmissionPendingList(CreditOrganizationId: number) {
+  GetClaimSubmissionPendingList(CreditOrganizationId: number) {
     return this.claimManagementDLService.GetClaimSubmissionPendingList(CreditOrganizationId)
       .map(res => { return res });
   }
 
-  public GetInvoicesByClaimSubmissionId(ClaimSubmissionId: number) {
+  GetInvoicesByClaimSubmissionId(ClaimSubmissionId: number) {
     return this.claimManagementDLService.GetInvoicesByClaimSubmissionId(ClaimSubmissionId)
       .map(res => { return res });
   }
 
-  public GetDocumentForPreviewByFileId(FileId: number) {
+  GetDocumentForPreviewByFileId(FileId: number) {
     return this.claimManagementDLService.GetDocumentForPreviewByFileId(FileId)
       .map(res => { return res });
   }
 
-  public GetDocumentsByClaimCode(ClaimCode: number) {
+  GetDocumentsByClaimCode(ClaimCode: number) {
     return this.claimManagementDLService.GetDocumentsByClaimCode(ClaimCode)
       .map(res => { return res });
   }
 
-  public GetPaymentPendingClaims(CreditOrganizationId: number) {
+  GetPaymentPendingClaims(CreditOrganizationId: number) {
     return this.claimManagementDLService.GetPaymentPendingClaims(CreditOrganizationId)
       .map(res => { return res });
   }
 
-  public GetInsurancePayments(claimSubmissionId: number) {
+  GetInsurancePayments(claimSubmissionId: number) {
     return this.claimManagementDLService.GetInsurancePayments(claimSubmissionId)
       .map(res => { return res });
   }
 
-  public ClaimDetailsForPreview(claimSubmissionId: number) {
+  ClaimDetailsForPreview(claimSubmissionId: number) {
     return this.claimManagementDLService.ClaimDetailsForPreview(claimSubmissionId)
       .map(res => { return res });
   }
 
-  public GetBillingCreditNotesByBillingTransactionId(BillingTransactionId: number) {
+  GetBillingCreditNotesByBillingTransactionId(BillingTransactionId: number) {
     return this.claimManagementDLService.GetBillingCreditNotesByBillingTransactionId(BillingTransactionId)
       .map(res => { return res });
   }
 
-  public GetPharmacyCreditNotesByInvoiceId(InvoiceId: number) {
+  GetPharmacyCreditNotesByInvoiceId(InvoiceId: number) {
     return this.claimManagementDLService.GetPharmacyCreditNotesByInvoiceId(InvoiceId)
       .map(res => { return res });
   }
 
-  public GetBillingCreditBillItems(BillingTransactionId: number) {
+  GetBillingCreditBillItems(BillingTransactionId: number) {
     return this.claimManagementDLService.GetBillingCreditBillItems(BillingTransactionId)
       .map(res => res);
   }
 
-  public GetPharmacyCreditBillItems(PharmacyInvoiceId: number) {
+  GetPharmacyCreditBillItems(PharmacyInvoiceId: number) {
     return this.claimManagementDLService.GetPharmacyCreditBillItems(PharmacyInvoiceId)
       .map(res => res);
   }
 
-  public GetApiIntegrationNameByOrganizationId(OrganizationId: number) {
+  GetApiIntegrationNameByOrganizationId(OrganizationId: number) {
     return this.claimManagementDLService.GetApiIntegrationNameByOrganizationId(OrganizationId)
       .map(res => res);
   }
 
+  GetInitiatedClaimCodesByPatientId(patientId: number) {
+    return this.claimManagementDLService.GetInitiatedClaimCodesByPatientId(patientId).map(res => res);
+  }
+
+  GetFinalBillSummaryByClaimCode(claimCode: number) {
+    return this.claimManagementDLService.GetFinalBillSummaryByClaimCode(claimCode).map(res => res);
+  }
+
 
   //Hitting Other Controller than Claim Management
-  public GetBankList() {
+  GetBankList() {
     return this.claimManagementDLService.GetBankList()
       .map(res => { return res });
   }
 
-  public GetInvoiceReceiptByInvoiceId(invoiceId: number) {
+  GetInvoiceReceiptByInvoiceId(invoiceId: number) {
     return this.claimManagementDLService.GetInvoiceReceiptByInvoiceId(invoiceId).map(res => res);
   }
 
-  public GetPharmacySaleReturnInvoiceItemsByInvoiceId(invoiceId: number) {
+  GetPharmacySaleReturnInvoiceItemsByInvoiceId(invoiceId: number) {
     return this.claimManagementDLService.GetPharmacySaleReturnInvoiceItemsByInvoiceId(invoiceId)
       .map(res => { return res });
   }
 
-  public GetPatientsWithVisitsInfo(searchTxt) {
+  GetPatientsWithVisitsInfo(searchTxt) {
     return this.claimManagementDLService.GetPatientsWithVisitsInfo(searchTxt)
       .map(res => res);
   }
@@ -116,17 +127,17 @@ export class ClaimManagementBLService {
 
 
   //#region Post
-  public SendBillForClaimScrubbing(bills: Array<ClaimBillReviewDTO>) {
+  SendBillForClaimScrubbing(bills: Array<ClaimBillReviewDTO>) {
     return this.claimManagementDLService.SendBillForClaimScrubbing(bills)
       .map(res => { return res });
   }
 
-  public SubmitClaim(claimDTO: SubmittedClaimDTO) {
+  SubmitClaim(claimDTO: SubmittedClaimDTO) {
     return this.claimManagementDLService.SubmitClaim(claimDTO)
       .map(res => { return res });
   }
 
-  public AddInsuranceClaimPayment(claimPaymentObject: InsuranceClaimPayment) {
+  AddInsuranceClaimPayment(claimPaymentObject: InsuranceClaimPayment) {
     return this.claimManagementDLService.AddInsuranceClaimPayment(claimPaymentObject)
       .map(res => { return res });
   }
@@ -134,66 +145,122 @@ export class ClaimManagementBLService {
 
 
   //#region Put
-  public UpdateClaimableStatus(bills: Array<ClaimBillReviewDTO>, claimableStatus: boolean) {
+  UpdateClaimableStatus(bills: Array<ClaimBillReviewDTO>, claimableStatus: boolean) {
     return this.claimManagementDLService.UpdateClaimableStatus(bills, claimableStatus)
       .map(res => { return res });
   }
 
-  public UpdateClaimableStatusOfClaimedInvoice(bill: ClaimBillReviewDTO, claimableStatus: boolean) {
+  UpdateClaimableStatusOfClaimedInvoice(bill: ClaimBillReviewDTO, claimableStatus: boolean) {
     return this.claimManagementDLService.UpdateClaimableStatusOfClaimedInvoice(bill, claimableStatus)
       .map(res => { return res });
   }
 
-  public RevertInvoiceBackToBillReview(bill: ClaimBillReviewDTO) {
+  RevertInvoiceBackToBillReview(bill: ClaimBillReviewDTO) {
     return this.claimManagementDLService.RevertInvoiceBackToBillReview(bill)
       .map(res => { return res });
   }
 
-  public SaveClaimAsDraft(claimDTO: SubmittedClaimDTO) {
+  SaveClaimAsDraft(claimDTO: SubmittedClaimDTO) {
     return this.claimManagementDLService.SaveClaimAsDraft(claimDTO)
       .map(res => { return res });
   }
 
-  public UpdateClaimableCode(bills: Array<ClaimBillReviewDTO>, claimCode: number) {
+  UpdateClaimableCode(bills: Array<ClaimBillReviewDTO>, claimCode: number) {
     return this.claimManagementDLService.UpdateClaimableCode(bills, claimCode)
       .map(res => { return res });
   }
 
-  public UpdateApprovedAndRejectedAmount(claimDTO: InsurancePendingClaim) {
+  UpdateApprovedAndRejectedAmount(claimDTO: InsurancePendingClaim) {
     return this.claimManagementDLService.UpdateApprovedAndRejectedAmount(claimDTO)
       .map(res => { return res });
   }
 
-  public ConcludeClaim(claimSubmissionId: number) {
+  ConcludeClaim(claimSubmissionId: number) {
     return this.claimManagementDLService.ConcludeClaim(claimSubmissionId)
       .map(res => { return res });
   }
 
-  public RevertClaimBackToClaimScrubbing(claimSubmissionId: number) {
+  RevertClaimBackToClaimScrubbing(claimSubmissionId: number) {
     return this.claimManagementDLService.RevertClaimBackToClaimScrubbing(claimSubmissionId)
       .map(res => { return res });
   }
 
-  public UpdateBillingCreditItemClaimableStatus(BillingCreditBillItem: BillingCreditBillItem_DTO) {
+  UpdateBillingCreditItemClaimableStatus(BillingCreditBillItem: BillingCreditBillItem_DTO) {
     let temp = _.omit(BillingCreditBillItem, ['ItemName', 'Quantity', 'TotalAmount']);
     return this.claimManagementDLService.UpdateBillingCreditItemClaimableStatus(temp)
       .map(res => res);
   }
 
-  public UpdatePharmacyCreditItemClaimableStatus(PharmacyCreditBillItem: PharmacyCreditBillItem_DTO) {
+  UpdatePharmacyCreditItemClaimableStatus(PharmacyCreditBillItem: PharmacyCreditBillItem_DTO) {
     let temp = _.omit(PharmacyCreditBillItem, ['ItemName', 'Quantity', 'TotalAmount']);
     return this.claimManagementDLService.UpdatePharmacyCreditItemClaimableStatus(temp)
       .map(res => res);
   }
 
-  public UpdateInsuranceClaimPayment(claimPaymentObject: InsuranceClaimPayment) {
+  UpdateInsuranceClaimPayment(claimPaymentObject: InsuranceClaimPayment) {
     return this.claimManagementDLService.UpdateInsuranceClaimPayment(claimPaymentObject)
       .map(res => { return res });
   }
   //#endregion
-  public GetECHSPatientWithVisitInformation(searchTxt) {
+  GetECHSPatientWithVisitInformation(searchTxt) {
     return this.claimManagementDLService.GetECHSPatientWithVisitInformation(searchTxt)
       .map(res => res);
   }
+  ClaimableInvoicesDetailInfo(phrmInvoiceIds: string, billingInvoiceIds: string) {
+    return this.claimManagementDLService.ClaimableInvoicesDetailInfo(phrmInvoiceIds, billingInvoiceIds).map((responseData) => {
+      return responseData;
+    });
+  }
+  UploadSingleClaimFile(claimUploadSingleFileUploadRequest: INSClaimSubmissionSingleDocument_DTO) {
+    return this.claimManagementDLService.UploadSingleClaimFile(claimUploadSingleFileUploadRequest).map((responseData) => {
+      return responseData;
+    });
+  }
+  UploadMultipleClaimFile(claimUploadMultipleFileUploadRequest: INSClaimSubmissionMultipleDocument_DTO) {
+    return this.claimManagementDLService.UploadMultipleClaimFile(claimUploadMultipleFileUploadRequest).map((responseData) => {
+      return responseData;
+    });
+  }
+  PrepareClaimPayment(claim: InsurancePendingClaim) {
+    return this.claimManagementDLService.PrepareClaimPayment(claim)
+      .map(res => { return res });
+  }
+  GetDiagnosis() {
+    return this.claimManagementDLService.GetDiagnosis().map((responseData) => {
+      return responseData;
+    });
+  }
+  GetDoctorListWithNMCNo() {
+    return this.claimManagementDLService.DoctorListWithNMCNo().map((responseData) => {
+      return responseData;
+    });
+  }
+  GetClaimCodeWiseReportData(ClaimCode: number) {
+    return this.claimManagementDLService.GetClaimCodeWiseReports(ClaimCode)
+      .map(res => res);
+  }
 
+  SubmitHibLiveClaim(hibLiveClaim: HibLiveClaimDTO) {
+    return this.claimManagementDLService.SubmitHibLiveClaim(hibLiveClaim)
+      .map(res => res);
+  }
+  UpdateDocumentUpdateStatus(bills: Array<ClaimBillReviewDTO>) {
+    return this.claimManagementDLService.UpdateDocumentUpdateStatus(bills)
+      .map(res => { return res });
+  }
+  GetSubmittedClaims(fromDate: string, toDate: string) {
+    return this.claimManagementDLService.GetSubmittedClaims(fromDate, toDate).map(res => {
+      return res;
+    });
+  }
+  UploadDocument(addAttachment: AddAttachmentDTO) {
+    return this.claimManagementDLService.UploadDocument(addAttachment).map(res => {
+      return res;
+    });
+  }
+  GetClaimDocumentReceivedReport(FromDate: string, ToDate: string, PatientId: number, ClaimCode: number, InvoiceNo: string) {
+    return this.claimManagementDLService.GetClaimDocumentReceivedReport(FromDate, ToDate, PatientId, ClaimCode, InvoiceNo).map(res => {
+      return res;
+    });
+  }
 }

@@ -17,6 +17,7 @@ export class BillServiceItemSchemeSetting_DTO {
   public ModifiedOn: string = null;
   public IsActive: boolean = true;
   public ServiceDepartmentId: number = 0;
+  public Price: number = 0;
   public itemIsSelected: boolean = false;
 
   public IsValidRegDiscountPercent: boolean = true;
@@ -27,5 +28,6 @@ export class BillServiceItemSchemeSetting_DTO {
 
   public IsValidCopayCreditPercent: boolean = true;
   public initialSelectionState: boolean;
+  DepartmentId: number = 0;
 
 }

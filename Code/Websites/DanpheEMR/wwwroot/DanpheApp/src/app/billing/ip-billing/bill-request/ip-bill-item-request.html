@@ -33,7 +33,7 @@
               <div class="div col-md-6" style="padding: 0px;">
                 <h3> <span>{{PatientInfo.ShortName}}({{PatientInfo.PatientCode}})</span> </h3>
               </div>
-              <div *ngIf="SchemePriceCategory.AllowProvisionalBilling" class="col-md-6"
+              <div *ngIf="BillingRequestDisplaySettings.AllowPackageBilling" class="col-md-6"
                    style="padding: 0px; text-align: right; display:flex; align-items:center; justify-content:flex-end">
                 <input type="checkbox" name="do-package-billing"
                        id="id_input_do_package_billing" [(ngModel)]="IsPackageBilling"
@@ -71,6 +71,7 @@
                            display-property-name="BillingPackageName" value-property-name="BillingPackageId"
                            [list-formatter]="ServicePackagesListFormatter"
                            (valueChanged)="OnServicePackageSelection()"
+                           [min-chars]="1"
                            max-num-list="15" [grid-sort]="'BillingPackageName'" onClick="this.select();"
                            style="height: 30px; width: 250% !important;" />
                   </div>
@@ -89,7 +90,7 @@
                   <table class="table billing-table inv_table table-bordered p2">
                     <thead>
                       <tr>
-                        <th *ngIf="!IsPackageBilling"></th>
+                        <th *ngIf="(!IsPackageBilling || (IsPackageBilling && SelectedPackage && !SelectedPackage.IsHealthPackage))"></th>
                         <th sortable-header col="department"><b>Department</b></th>
                         <th sortable-header col="refdoctorname" *ngIf="BillingRequestDisplaySettings.Prescriber">
                           <b>Prescriber</b>
@@ -97,7 +98,7 @@
                         <th sortable-header col="assigndoctorname" *ngIf="BillingRequestDisplaySettings.Performer">
                           <b>Performer</b>
                         </th>
-                        <th *ngIf="!IsPackageBilling"></th>
+                        <th *ngIf="(!IsPackageBilling || (IsPackageBilling && SelectedPackage && !SelectedPackage.IsHealthPackage))"></th>
                         <th sortable-header col="itemnames"><b>ItemName</b></th>
                         <th sortable-header col="quantity"><b>Qty</b></th>
                         <th><b>Price</b></th>
@@ -109,7 +110,7 @@
                     </thead>
                     <tbody>
                       <tr *ngFor="let row of BillingTransaction.BillingTransactionItems; let i = index">
-                        <td *ngIf="!IsPackageBilling">
+                        <td *ngIf="(!IsPackageBilling || (IsPackageBilling && SelectedPackage && !SelectedPackage.IsHealthPackage))">
                           <a (click)="deleteRow(i)" title="Click to remove this item">
                             <i class=" btn btn-danger delBtn fa fa-times" style="color: #fff !important;"></i>
                           </a>
@@ -153,7 +154,7 @@
                                  [hidden]="row.IsValidCheck('PerformerId','required')">Performer is mandatory</div>
                           </form>
                         </td>
-                        <td *ngIf="!IsPackageBilling">
+                        <td *ngIf="(!IsPackageBilling || (IsPackageBilling && SelectedPackage && !SelectedPackage.IsHealthPackage))">
                           <a (click)="AddNewBillTxnItemRow(i)" title="Click to add new item">
                             <i class="fa fa-plus btn btn-success delBtn inpatient-addBtn"
                                style="color: #fff !important;"></i>
@@ -170,8 +171,9 @@
                                    [source]="row.ItemList" placeholder="Enter Item Name" display-property-name="ItemName"
                                    value-property-name=null style="width:282px; text-transform: uppercase;" match-formatted="true"
                                    [match-property-csv]="'ItemCode,ItemName'" [grid-sort]="'ItemName'"
+                                   [attr.disabled]="isPackageItem(row) ? true : null"
                                    (valueChanged)="AssignSelectedItem(i)" max-num-list="50" onClick="this.select();"
-                                   id="{{ 'items-box'+i }}" [attr.disabled]="IsPackageBilling ? true : null" />
+                                   id="{{ 'items-box'+i }}" />
                             <div class="color-red font-sm" *ngIf="row.IsDuplicateItem">Duplicate Item not allowed</div>
                             <div class="color-red font-sm" *ngIf="row.IsDirty('ItemName')"
                                  [hidden]="row.IsValidCheck('ItemName','required')"> Item Name is required</div>
@@ -186,7 +188,8 @@
                         <td>
                           <form [formGroup]="row.BillingTransactionItemValidator">
                             <input [(ngModel)]="row.Quantity" style="width:62px" min="0"
-                                   oninput="validity.valid||(value='');" (ngModelChange)="CalculationForAll() "
+                                   oninput="validity.valid||(value='');" (ngModelChange)="CalculationForAll()"
+                                   (focusout)="ValidateForCappingItems($event,i)"
                                    class="form-control cstm-form-control " name="quantity" type="number"
                                    onClick="this.select();" formControlName="Quantity"
                                    (wheel)="coreService.PreventNumberChangeOnScroll($event)" [attr.disabled]="IsPackageBilling ? true : null">

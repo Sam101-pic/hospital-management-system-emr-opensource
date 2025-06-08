@@ -21,7 +21,7 @@
                         <span>&nbsp;
                             {{dispatchItems[0].DispatchedDate |date : 'yyyy-MM-dd'}}
                             &nbsp;&nbsp;
-                            <i *ngIf="dispatchItems[0].DispatchedDate ">({{dispatchItems[0].DispatchedDate | nepaliDate:'format':'YYYY-MM-DD'}} 
+                            <i *ngIf="dispatchItems[0].DispatchedDate ">({{dispatchItems[0].DispatchedDate | nepaliDate:'format':'YYYY-MM-DD'}}
                                 )</i>
                         </span>
                     </label>
@@ -55,7 +55,7 @@
                     </div>
                     <div class="col-md-5" *ngIf="showSubstore" style="display: flex; align-items: center;">
                         <label><b>Issue No.<sup style="color: red;">*</sup>:</b></label>
-                        <input id="show-issueNo" type="number" placeholder="Issue No" [(ngModel)]="DispatchNo" [ngModelOptions]="{standalone: true}">
+                        <input id="show-issueNo" type="number" placeholder="Issue No" [(ngModel)]="IssueNo" [ngModelOptions]="{standalone: true}">
                     </div>
                 </div>
             </form>
@@ -145,8 +145,8 @@
                                                onclick="this.select();" (keyup.enter)="OnPressedEnterKeyInQuantityField(i)"
                                                (wheel)="coreService.PreventNumberChangeOnScroll($event)">
                                         <div *ngIf="row.IsDirty('DispatchedQuantity')" class="error-message"
-                                             [hidden]="row.IsValidCheck('DispatchedQuantity','required')">
-                                            Quantity is required
+                                             [hidden]="row.IsValidCheck('DispatchedQuantity','min') && row.IsValidCheck('DispatchedQuantity','required')">
+                                            Invalid Qty.
                                         </div>
                                         <div *ngIf="row.IsDirty('DispatchedQuantity')" class="error-message"
                                              [hidden]="row.AvailableQuantity >= row.DispatchedQuantity">
@@ -194,7 +194,7 @@
         <div>
             <mark>Note: Direct Dispatch will automatically create new requisition and dispatch it.</mark>
         </div>
-        <button id="directDispatch" class="btn green btn-success tooltip" (click)="DirectDispatch()" [disabled]="loading">Direct Dispatch </button>
+        <button id="directDispatch" class="btn green btn-success" (click)="DirectDispatch()" [disabled]="loading">Direct Dispatch </button>
         <span></span>
         <input type="button" class="btn btn-danger" [disabled]="loading" (click)="Cancel()" value="Discard Changes">
         <span></span>

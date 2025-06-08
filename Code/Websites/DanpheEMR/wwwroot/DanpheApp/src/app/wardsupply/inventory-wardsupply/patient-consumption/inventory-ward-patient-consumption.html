@@ -12,9 +12,12 @@
   <div class="col-md-8 col-xs-12">
     <div class="col-md-7">
       <div class="form-group">
-        <div class="row clearfix"><label class="control-label col-md-3">Consumption Date<b class="color-red"> *</b><b style="float:right;">:</b></label>
+        <div class="row clearfix"><label class="control-label col-md-3">Consumption Date<b class="color-red"> *</b><b
+               style="float:right;">:</b></label>
           <div class="col-md-9">
-            <danphe-date-picker [(ngModel)]="ConsumptionDate" ngDefaultControl [CalendarTypes]="'en,np'" [ngModelOptions]="{standalone: true}"> </danphe-date-picker>
+            <danphe-date-picker [(ngModel)]="ConsumptionDate" ngDefaultControl [CalendarTypes]="'en,np'" [ngModelOptions]="{standalone: true}"
+                                [previous-fiscal-year]="AllowPreviousFiscalYear">
+            </danphe-date-picker>
           </div>
         </div>
       </div>
@@ -27,7 +30,11 @@
   <div class="col-md-6">
     <label for="srch_PatientList" class="col-md-3" style="font-weight: 600;font-size: medium;"> Select
       Patient<sup>*</sup>:</label>
-    <input danphe-auto-complete id="srch_PatientList" class="form-control searchtbx" [(ngModel)]="SelectedPatient" [list-formatter]="PatientListFormatter" [source]="AllPatientSearchAsync.bind(this)" [path-to-data]="'Results'" placeholder="search by HospitalNo, Patient Name" display-property-name="ShortName" value-property-name=null (ngModelChange)="PatientInfoChanged()" onClick="this.select();" max-num-list="500" [min-chars]="3" match-formatted="true" [grid-sort]="'ShortName'" style="width: 400px !important;" (keyup.enter)="FocusElementById('itemName0')" />
+    <input danphe-auto-complete id="srch_PatientList" class="form-control searchtbx" [(ngModel)]="SelectedPatient"
+           [list-formatter]="PatientListFormatter" [source]="AllPatientSearchAsync.bind(this)" [path-to-data]="'Results'"
+           placeholder="search by HospitalNo, Patient Name" display-property-name="ShortName" value-property-name=null
+           (ngModelChange)="PatientInfoChanged()" onClick="this.select();" max-num-list="500" [min-chars]="3" match-formatted="true"
+           [grid-sort]="'ShortName'" style="width: 400px !important;" (keyup.enter)="FocusElementById('itemName0')" />
     <span class="color-red font-sm" [hidden]="ValidPatient">Patient is Required!</span>
 
     <!-- (keyup.enter)="SetFocusOnButton('btn_billRequest')" -->
@@ -48,20 +55,28 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let row of SelecetdItemList; let i = index">
+        <tr *ngFor="let row of SelectedItemList; let i = index">
           <td style="width: 46px;"><a class="" (click)="DeleteRow(i)"><i class="btn btn-xs btn-danger fa fa-times"></i></a></td>
           <td style="width: auto;" class="autocomplete-item">
             <form [formGroup]="row.ConsumptionValidator" autocomplete="off">
-              <input danphe-auto-complete class="form-control" id="itemName{{i}}" [(ngModel)]="row.SelectedItem" [source]="ItemTypeListWithItems" [list-formatter]="ItemListFormatter" placeholder="--Select Item--" display-property-name="ItemName" value-property-name=null onClick="this.select();" (valueChanged)="onChangeItem($event,i)" max-num-list="20" min-chars="1" [grid-sort]="'ItemName'" match-formatted="true" [ngModelOptions]="{standalone:true}" (keyup.enter)="OnPressedEnterKeyInItemField(i)" (keyup.esc)="DeleteRow(i)" />
-              <!--<span class="color-red font-sm" *ngIf="row.IsDirty('ItemName')" [hidden]="row.IsValid('ItemName','required')">Select Item..</span>-->
+              <input danphe-auto-complete class="form-control" id="itemName{{i}}" [(ngModel)]="row.SelectedItem" [source]="ItemTypeListWithItems"
+                     [list-formatter]="ItemListFormatter" placeholder="--Select Item--" display-property-name="ItemName" value-property-name=null
+                     onClick="this.select();" (valueChanged)="onChangeItem($event,i)" max-num-list="20" min-chars="1" [grid-sort]="'ItemName'"
+                     match-formatted="true" formControlName="ItemName" (keyup.enter)="OnPressedEnterKeyInItemField(i)"
+                     (keyup.esc)="DeleteRow(i)" />
+              <span class="color-red font-sm" *ngIf="row.IsDirty('ItemName')" [hidden]="row.IsValid('ItemName','required')">Select Item..</span>
             </form>
           </td>
           <td style="width: 80px;">{{row.Code}}</td>
           <td style="width: 80px;">{{row.UOMName}}</td>
-          <td style="width: 150px;"><input [(ngModel)]="row.Quantity" [ngModelOptions]="{standalone: true}" min="0" class="form-control" type="number" value="" disabled></td>
+          <td style="width: 150px;"><input [(ngModel)]="row.Quantity" [ngModelOptions]="{standalone: true}" min="0" class="form-control" type="number"
+                   value="" disabled></td>
           <td style="width: 150px;">
             <form [formGroup]="row.ConsumptionValidator">
-              <input [(ngModel)]="row.ConsumeQuantity" formControlName="ConsumeQuantity" min="1" class="form-control" type="number" onwheel="this.blur()" value="" id="qtyip{{i}}" (keyup.enter)="AddRow()" onClick="this.select();"> <span class="color-red font-sm" [hidden]="row.IsValid('ConsumeQuantity','min(1)')">Enter Quantity..</span> <span class="color-red font-sm" *ngIf="row.IsDirty('ConsumeQuantity')" [hidden]="row.ConsumeQuantity<=row.Quantity">Consume Qty is greater.</span>
+              <input [(ngModel)]="row.ConsumeQuantity" formControlName="ConsumeQuantity" min="1" class="form-control" type="number"
+                     onwheel="this.blur()" value="" id="qtyip{{i}}" (keyup.enter)="AddRow()" onClick="this.select();"> <span class="color-red font-sm"
+                    [hidden]="row.IsValid('ConsumeQuantity','min(1)')">Enter Quantity..</span> <span class="color-red font-sm"
+                    *ngIf="row.IsDirty('ConsumeQuantity')" [hidden]="row.ConsumeQuantity<=row.Quantity">Consume Qty is greater.</span>
             </form>
           </td>
           <td style="width: 46px;"><a class="btn btn-primary btn-xs" (click)="AddRow()"><i class="fa fa-plus"></i></a>

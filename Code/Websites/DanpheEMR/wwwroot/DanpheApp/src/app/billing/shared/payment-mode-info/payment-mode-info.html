@@ -82,7 +82,7 @@
     <td class="nxt-td"> Payment Options: </td>
     <td>
       <select [(ngModel)]="PaymentMode" class="mb-8" name="pay_mode" id="pay_mode"
-              (change)="OnPaymentModeChange()" [disabled]="isGovInsurance || disablePaymentModeDropDown">
+              (change)="OnPaymentModeChange()" [disabled]="isGovInsurance || disablePaymentModeDropDown" style="margin-left:-10px; width: 100%;">
         <option *ngFor="let paymentMode of FilteredMajorPaymentMode ; let i=index"
                 value="{{paymentMode.PaymentSubCategoryName}}">{{ paymentMode.PaymentSubCategoryName }}</option>
       </select>
@@ -108,7 +108,7 @@
   <tr>
 
     <td *ngIf="PaymentDetails && PaymentMode.toLocaleLowerCase() =='others'"></td>
-    <td *ngIf="PaymentDetails && PaymentMode.toLocaleLowerCase() =='others'" style="text-align: right;">
+    <td *ngIf="PaymentDetails && PaymentMode.toLocaleLowerCase() =='others'">
       <i class="fa fa-edit edit-payment-detail" (click)="ShowEdit()"> edit payment detail </i>
     </td>
   </tr>
@@ -118,7 +118,7 @@
     </td>
     <td>
       <textarea style="height: 60px;" [(ngModel)]="PaymentDetails" (change)="OnPaymentModeChange()"
-                [disabled]="PaymentMode.toLocaleLowerCase() == 'others'" class="mb-8">
+                [disabled]="PaymentMode.toLocaleLowerCase() == 'others'">
       </textarea>
     </td>
   </tr>

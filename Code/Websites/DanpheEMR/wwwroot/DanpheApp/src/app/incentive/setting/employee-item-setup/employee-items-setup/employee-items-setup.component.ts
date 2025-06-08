@@ -2,12 +2,16 @@ import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from '@angu
 import { cloneDeep } from 'lodash';
 import * as moment from 'moment/moment';
 import { CoreService } from '../../../../core/shared/core.service';
+import { EmployeeBillItemsMap_DTO } from '../../../../incentive/shared/employee-billItems-map.dto';
 import { SecurityService } from '../../../../security/shared/security.service';
+import { Department } from '../../../../settings-new/shared/department.model';
 import { PriceCategory } from '../../../../settings-new/shared/price.category.model';
+import { SettingsBLService } from '../../../../settings-new/shared/settings.bl.service';
+import { ServiceDepartmentVM } from '../../../../shared/common-masters.model';
 import { DanpheHTTPResponse } from '../../../../shared/common-models';
 import { CommonFunctions } from '../../../../shared/common.functions';
 import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../../shared/shared-enums';
+import { Bill_Types_Applicable, ENUM_DanpheHTTPResponses, ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status, Percentage_Type } from '../../../../shared/shared-enums';
 import { EmployeeBillItemsMapModel } from '../../../shared/employee-billItems-map.model';
 import { EmployeeIncentiveInfoModel } from '../../../shared/employee-incentiveInfo.model';
 import { IncentiveBLService } from '../../../shared/incentive.bl.service';
@@ -29,6 +33,7 @@ export class EmployeeItemsSetupComponent {
   public FilteredItemList: any = [];
   public currentEmployeeIncentiveInfo: EmployeeIncentiveInfoModel = new EmployeeIncentiveInfoModel();
   public EmployeePreviousBillItems: Array<EmployeeBillItemsMapModel> = [];
+  EmployeePreviousBillItemsMapped: Array<EmployeeBillItemsMap_DTO> = [];
 
   public ItemsSetup: EmployeeIncentiveSetupVM = new EmployeeIncentiveSetupVM();
   public categoryList = [];
@@ -47,6 +52,7 @@ export class EmployeeItemsSetupComponent {
   public selectedProfile: any;
   public searchText: string = null;
   public showProfileTable: boolean = true;
+  public EmployeeIncentiveList: Array<any> = [];
 
   @Input('all-profileList')
   public profileList: Array<ProfileModel> = new Array<ProfileModel>();
@@ -68,6 +74,8 @@ export class EmployeeItemsSetupComponent {
   @Output("incentive-info-change")
   incentiveInfoSetupChange: EventEmitter<object> = new EventEmitter<object>();
 
+  @Input('IsViewMapping')
+  IsViewMapping: boolean = false;
   public EmployeeItemGridColumns: Array<any> = [];
   public ProfilePreviewGridColumns: Array<any> = [];
   public DocObj: any = null;
@@ -76,11 +84,35 @@ export class EmployeeItemsSetupComponent {
   public PriceCategories = new Array<PriceCategory>();
   public SelectedPriceCategoryId: number = null;
   public NewEmployeeIncentiveInfo: boolean = true;
-
+  DepartmentList = new Array<Department>();
+  ServiceDepartmentList: Array<ServiceDepartmentVM> = new Array<ServiceDepartmentVM>();
+  FilterServiceDepartmentList: Array<ServiceDepartmentVM> = new Array<ServiceDepartmentVM>();
+  SelectedDepartmentIds: number[] = [];
+  ServiceItemSettingList: Array<EmployeeIncentiveSetupVM> = new Array<EmployeeIncentiveSetupVM>();
+  FilteredServiceItemSettingDropDownList = new Array<EmployeeIncentiveSetupVM>();
+  ServiceDepartmentIds: number[] = [];
+  ServiceItemList: EmployeeIncentiveSetupVM[] = [];
+  SelectedItem = new EmployeeIncentiveSetupVM();
+  SelectedItemIds: number[] = [];
+  SelectAll: boolean = false;
+  PerformerPercent: number = 0;
+  PrescriberPercent: number = 0;
+  ReferrerPercent: number = 0;
+  Outpatient: boolean = false;
+  Inpatient: boolean = false;
+  PerformerPercentMsg: string;
+  PrescriberPercentMsg: string;
+  ReferrerPercentMsg: string;
+  DisplayedServiceItems = [];
+  AlredyMappedServiceItems = []
+  IsBulkApplied: boolean;
+  SearchItemName: string = '';
+  IsSaveButtonEnable: boolean = false;
   constructor(public msgBoxServ: MessageboxService,
     public changeDetector: ChangeDetectorRef,
     public incentiveBLService: IncentiveBLService,
     public securityService: SecurityService,
+    public settingsBLService: SettingsBLService,
     public coreService: CoreService) {
     const allPriceCategories = this.coreService.Masters.PriceCategories;
     if (allPriceCategories && allPriceCategories.length > 0) {
@@ -91,6 +123,7 @@ export class EmployeeItemsSetupComponent {
     this.ProfilePreviewGridColumns = INCTVGridColumnSettings.ProfilePreviewList;
     this.GetIncentiveOpdIpdSettings();
     this.GetCategoryList();
+
   }
 
   ngOnInit() {
@@ -110,6 +143,7 @@ export class EmployeeItemsSetupComponent {
     // }
 
 
+
     if (this.CurrentEmployeeId) {
       this.update = true;
       this.NewEmployeeIncentiveInfo = false;
@@ -126,6 +160,9 @@ export class EmployeeItemsSetupComponent {
     // this.FilteredItemList = this.allBillItems;
 
     // console.log(this.DocObj);
+    this.GetEmployeeIncentiveInfo();
+    this.GetServiceDepartments();
+    this.GetDepartmentList();
   }
 
   GetEmployeeBillItemsList(empId) {
@@ -133,9 +170,54 @@ export class EmployeeItemsSetupComponent {
       this.incentiveBLService.GetEmployeeBillItemsList(empId)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-            var employeeIncentiveInfo = res.Results;
+            const employeeIncentiveInfo = res.Results;
             this.EmployeePreviousBillItems = employeeIncentiveInfo.EmployeeBillItemsMap;
+            this.EmployeePreviousBillItemsMapped = employeeIncentiveInfo.EmployeeBillItemsMap;
             this.currentEmployeeIncentiveInfo = employeeIncentiveInfo;
+            const mappedData = (employeeIncentiveInfo.EmployeeBillItemsMap).map(item => {
+              const mappedItem = {
+                EmployeeBillItemsMapId: item.EmployeeBillItemsMapId || 0,
+                EmployeeId: item.EmployeeId || 0,
+                PriceCategoryId: item.PriceCategoryId || 0,
+                PriceCategoryName: item.PriceCategoryName || "",
+                ServiceItemId: item.ServiceItemId || 0,
+                ServiceDepartmentId: item.ServiceDepartmentId || 0,
+                PerformerPercent: item.PerformerPercent || 0,
+                PrescriberPercent: item.PrescriberPercent || 0,
+                ReferrerPercent: item.ReferrerPercent || 0,
+                HasGroupDistribution: item.HasGroupDistribution || false,
+                IsActive: item.IsActive !== undefined ? item.IsActive : true,
+                BillingTypesApplicable: item.BillingTypesApplicable || null,
+                GroupDistribution: item.GroupDistribution || [],
+                ItemName: item.ItemName,
+                Price: item.Price,
+                IsSelected: true,
+                IpdSelected: false,
+                OpdSelected: false,
+              } as EmployeeBillItemsMap_DTO;
+              switch (item.BillingTypesApplicable) {
+                case 'inpatient':
+                  mappedItem.IpdSelected = true;
+                  mappedItem.OpdSelected = false;
+                  break;
+                case 'outpatient':
+                  mappedItem.OpdSelected = true;
+                  mappedItem.IpdSelected = false;
+                  break;
+                case 'both':
+                  mappedItem.OpdSelected = true;
+                  mappedItem.IpdSelected = true;
+                  break;
+                default:
+                  mappedItem.OpdSelected = false;
+                  mappedItem.IpdSelected = false;
+                  break;
+              }
+              return mappedItem;
+            });
+            this.DisplayedServiceItems = mappedData;
+            this.AlredyMappedServiceItems = mappedData;
+
             //console.log(this.currentEmployeeIncentiveInfo);
             //var pricecategoryObj = this.categoryList.find(a => a.PriceCategoryName == "Normal");
             //this.currentEmployeeIncentiveInfo.PriceCategoryId = pricecategoryObj.PriceCategoryId;
@@ -170,7 +252,7 @@ export class EmployeeItemsSetupComponent {
     this.incentiveBLService.GetCategoryList()
       .subscribe(res => {
         if (res.Status == 'OK') {
-          this.categoryList = res.Results;
+          this.PriceCategories = res.Results;
         }
         else {
           this.msgBoxServ.showMessage('failed', [res.ErrorMessage]);
@@ -318,64 +400,98 @@ export class EmployeeItemsSetupComponent {
   }
 
   public SaveIncentiveItem() {
-    if (this.ItemsSetup && this.ItemsSetup.ItemName) {
-      var EmployeeBillItemsObj = new EmployeeBillItemsMapModel();
-      EmployeeBillItemsObj.EmployeeId = this.DocObj.EmployeeId;
-      EmployeeBillItemsObj.PriceCategoryId = this.SelectedPriceCategoryId;// this.currentEmployeeIncentiveInfo.PriceCategoryId;
-      EmployeeBillItemsObj.ServiceItemId = this.ItemsSetup.ItemName.ServiceItemId;
-      EmployeeBillItemsObj.PerformerPercent = this.ItemsSetup.PerformerPercent ? this.ItemsSetup.PerformerPercent : 0;
-      EmployeeBillItemsObj.PrescriberPercent = this.ItemsSetup.PrescriberPercent ? this.ItemsSetup.PrescriberPercent : 0;
-      EmployeeBillItemsObj.ReferrerPercent = this.ItemsSetup.ReferrerPercent ? this.ItemsSetup.ReferrerPercent : 0;
-      // let serviceItem = this.allBillItems.find(a => a.ServiceItemId == this.ItemsSetup.ItemName.ServiceItemId);
-      // EmployeeBillItemsObj.ServiceItemId = serviceItem.ServiceItemId;
-      EmployeeBillItemsObj.ItemName = this.ItemsSetup.ItemName;
-      EmployeeBillItemsObj.DepartmentName = this.ItemsSetup.SelServDepartment;
-      EmployeeBillItemsObj.GroupDistribution = null;
-      EmployeeBillItemsObj.HasGroupDistribution = false;
-      EmployeeBillItemsObj.IsActive = true;
-      EmployeeBillItemsObj.CreatedBy = this.securityService.loggedInUser.EmployeeId;//change this and assign from server side..
-      EmployeeBillItemsObj.CreatedOn = moment().format('YYYY-MM-DD');
 
-      if (this.ItemsSetup.OpdSelected && this.ItemsSetup.IpdSelected) {
-        EmployeeBillItemsObj.BillingTypesApplicable = 'both';
-      }
-      else if (this.ItemsSetup.OpdSelected) {
-        EmployeeBillItemsObj.BillingTypesApplicable = 'outpatient';
-      }
-      else if (this.ItemsSetup.IpdSelected) {
-        EmployeeBillItemsObj.BillingTypesApplicable = 'inpatient';
-      }
-      else {
-        //EmployeeBillItemsObj.BillingTypesApplicable = 'both';
-        this.msgBoxServ.showMessage('Warning', ['Select Ipd/Opd to proceed']);
-        return;
-      }
-      this.currentEmployeeIncentiveInfo.EmployeeBillItemsMap.push(EmployeeBillItemsObj)
+    if (!this.SelectedPriceCategoryId || this.SelectedPriceCategoryId === 0) {
 
-      this.currentEmployeeIncentiveInfo.CreatedBy = this.securityService.loggedInUser.EmployeeId;//change this and assign from server side..
-      this.currentEmployeeIncentiveInfo.CreatedOn = moment().format('YYYY-MM-DD');
-
-
-      this.incentiveBLService.SaveEmployeeBillItemsMap(this.currentEmployeeIncentiveInfo)
-        .subscribe((res: DanpheHTTPResponse) => {
-          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-            this.GetEmployeeBillItemsList(res.Results.EmployeeId);
-            this.ItemsSetup = new EmployeeIncentiveSetupVM();
-            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Employee BillItems Map is successfully saved!!']);
-            this.OnDepartmentChange();//this is needed to refresh the items list.
-            this.SetFocusOn_SearchBox("srch_itemName");
-          }
-          else {
-            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
-            console.log(res.ErrorMessage);
-          }
-        });
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Please select a PriceCategory before loading data.']);
+      return;
     }
-    else {
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Select Item and add Assign and referer percentage.']);
+    const selectedItems = this.DisplayedServiceItems.filter(item => item.IsSelected);
+
+    if (selectedItems.length === 0) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please select at least one item to save.']);
+      return;
+    }
+
+    const invalidPercentItems = selectedItems.filter(item =>
+      item.PerformerPercent < 0 || item.PerformerPercent > 100 ||
+      item.PrescriberPercent < 0 || item.PrescriberPercent > 100 ||
+      item.ReferrerPercent < 0 || item.ReferrerPercent > 100
+    );
+
+    if (invalidPercentItems.length > 0) {
+      const invalidItemsNames = invalidPercentItems.map(item => item.ItemName).join(', ');
+      this.msgBoxServ.showMessage('failed', [`The following items have invalid percentage values (should be between 0 and 100): ${invalidItemsNames}`]);
+      return;
     }
 
 
+    // const zeroPercentItems = selectedItems.filter(item =>
+    //   item.PerformerPercent === 0 && item.PrescriberPercent === 0 && item.ReferrerPercent === 0
+    // );
+
+    // if (zeroPercentItems.length > 0) {
+    //   const zeroPercentItemNames = zeroPercentItems.map(item => item.ItemName).join(', ');
+    //   this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, [`The items must have At least one percentage (Performer, Prescriber, or Referrer) greater than 0: ${zeroPercentItemNames}`]);
+    //   return;
+    // }
+
+
+    const mappedItems = selectedItems.map(item => {
+      const employeeBillItemsObj = new EmployeeBillItemsMapModel();
+      employeeBillItemsObj.EmployeeBillItemsMapId = item.EmployeeBillItemsMapId || 0;
+      employeeBillItemsObj.EmployeeId = this.DocObj.EmployeeId;
+      employeeBillItemsObj.PriceCategoryId = this.SelectedPriceCategoryId || item.PriceCategoryId;
+      employeeBillItemsObj.ServiceItemId = item.ServiceItemId;
+      employeeBillItemsObj.PerformerPercent = item.PerformerPercent || 0;
+      employeeBillItemsObj.PrescriberPercent = item.PrescriberPercent || 0;
+      employeeBillItemsObj.ReferrerPercent = item.ReferrerPercent || 0;
+      employeeBillItemsObj.ItemName = item.ItemName;
+      employeeBillItemsObj.DepartmentName = item.DepartmentName;
+      employeeBillItemsObj.GroupDistribution = null;
+      employeeBillItemsObj.HasGroupDistribution = false;
+      employeeBillItemsObj.IsActive = true;
+      employeeBillItemsObj.CreatedBy = this.securityService.loggedInUser.EmployeeId;
+      employeeBillItemsObj.CreatedOn = moment().format('YYYY-MM-DD');
+      employeeBillItemsObj.BillingTypesApplicable = item.OpdSelected && item.IpdSelected
+        ? Bill_Types_Applicable.Both
+        : item.OpdSelected
+          ? Bill_Types_Applicable.Outpatient
+          : item.IpdSelected
+            ? Bill_Types_Applicable.Inpatient
+            : '';
+
+      return employeeBillItemsObj;
+    });
+
+    const invalidItems = selectedItems.filter(item => !item.OpdSelected && !item.IpdSelected);
+
+    if (invalidItems.length > 0) {
+      const invalidItemsNames = invalidItems.map(item => item.ItemName).join(', ');
+      this.msgBoxServ.showMessage('Warning', [`The following items must have either Outpatient or Inpatient selected: ${invalidItemsNames}`]);
+      return;
+    }
+
+    // Update the current incentive info
+    this.currentEmployeeIncentiveInfo.EmployeeBillItemsMap = mappedItems;
+    this.currentEmployeeIncentiveInfo.CreatedBy = this.securityService.loggedInUser.EmployeeId;
+    this.currentEmployeeIncentiveInfo.CreatedOn = moment().format('YYYY-MM-DD');
+
+
+    this.incentiveBLService.SaveEmployeeBillItemsMap(this.currentEmployeeIncentiveInfo)
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.GetEmployeeBillItemsList(res.Results.EmployeeId);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Employee BillItems Map is successfully saved!!']);
+          this.OnDepartmentChange(); // Refresh the items list
+          this.ClearForm();
+          this.SetFocusOn_SearchBox("srch_itemName");
+          this.ClosePopup()
+        } else {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+          console.error(res.ErrorMessage);
+        }
+      });
   }
 
   public EmployeeListFormatter(data: any): string {
@@ -593,38 +709,46 @@ export class EmployeeItemsSetupComponent {
         return;
       }
     }
-    if (this.showProfleDD && this.selProfileForAttach == null) {
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Please select a profile first']);
+    if (this.showProfleDD) {
+      if (this.selProfileForAttach == null) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Please select a profile first']);
+        return;
+      }
     } else {
-      if (this.currentEmployeeIncentiveInfo && this.currentEmployeeIncentiveInfo.EmployeeId) {
-        this.currentEmployeeIncentiveInfo.CreatedBy = this.securityService.loggedInUser.EmployeeId;//change this and assign from server side..
-        this.currentEmployeeIncentiveInfo.CreatedOn = moment().format('YYYY-MM-DD');
-        this.incentiveBLService.SaveEmployeeBillItemsMap(this.currentEmployeeIncentiveInfo)
-          .subscribe(res => {
-            if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-              this.NewEmployeeIncentiveInfo = false;
-              this.update = true;//after this part, it will be treated as update.
-              //this.changeDetector.detectChanges();
-              this.currentEmployeeIncentiveInfo = res.Results;
-              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Employee Incentive Info is successfully saved!!']);
-
-
-              //After the success, we need to Re-Bind with the grid and group distribution part..
-              this.GetEmployeeBillItemsList(this.currentEmployeeIncentiveInfo.EmployeeId);
-              //this.EmployeePreviousBillItems = this.currentEmployeeIncentiveInfo.EmployeeBillItemsMap;
-
-              this.changeDetector.detectChanges();
-            }
-            else {
-              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Something Went Wrong ,Please Try Again']);
-              console.log(res.ErrorMessage);
-            }
-          });
-      }
-      else {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Select Dotor to save employee incentive info.']);
-      }
+      this.currentEmployeeIncentiveInfo.EmployeeBillItemsMap = [];
     }
+
+
+
+    if (this.currentEmployeeIncentiveInfo && this.currentEmployeeIncentiveInfo.EmployeeId) {
+      this.currentEmployeeIncentiveInfo.CreatedBy = this.securityService.loggedInUser.EmployeeId;//change this and assign from server side..
+      this.currentEmployeeIncentiveInfo.CreatedOn = moment().format('YYYY-MM-DD');
+      this.incentiveBLService.SaveEmployeeBillItemsMap(this.currentEmployeeIncentiveInfo)
+        .subscribe(res => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            this.NewEmployeeIncentiveInfo = false;
+            this.update = true;//after this part, it will be treated as update.
+            //this.changeDetector.detectChanges();
+            this.currentEmployeeIncentiveInfo = res.Results;
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Employee Incentive Info is successfully saved!!']);
+
+
+            //After the success, we need to Re-Bind with the grid and group distribution part..
+            this.GetEmployeeBillItemsList(this.currentEmployeeIncentiveInfo.EmployeeId);
+            //this.EmployeePreviousBillItems = this.currentEmployeeIncentiveInfo.EmployeeBillItemsMap;
+
+            this.changeDetector.detectChanges();
+          }
+          else {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Something Went Wrong ,Please Try Again']);
+            console.log(res.ErrorMessage);
+          }
+        });
+    }
+    else {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Select Dotor to save employee incentive info.']);
+    }
+
 
   }
 
@@ -752,16 +876,24 @@ export class EmployeeItemsSetupComponent {
 
   public PreviewItem(data) {
     this.selProfileForAttach = data;
+    this.selectedRadioButton = data.ProfileName;
+    this.selectedProfile = data;
+    this.SaveSelectedProfile();
     this.incentiveBLService.GetProfileItemsMapping(this.selProfileForAttach.ProfileId)
       .subscribe(res => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           let profile = res.Results;
 
+          if (!profile.MappedItems || profile.MappedItems.length === 0) {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`No items are mapped to this profile.`]);
+            return;
+          }
           this.currentEmployeeIncentiveInfo.EmployeeBillItemsMap = [];//clear billitems map on profile changed.
 
           profile.MappedItems.forEach(el => {
             let EmployeeBillItemsObj = new EmployeeBillItemsMapModel();
-            EmployeeBillItemsObj.PriceCategoryId = this.SelectedPriceCategoryId;// el.PriceCategoryId;
+            EmployeeBillItemsObj.EmployeeId = this.DocObj.EmployeeId;
+            EmployeeBillItemsObj.PriceCategoryId = el.PriceCategoryId;
             EmployeeBillItemsObj.PriceCategoryName = el.PriceCategoryName;
             EmployeeBillItemsObj.ServiceItemId = el.ServiceItemId;
             EmployeeBillItemsObj.ItemName = el.ItemName;
@@ -815,12 +947,11 @@ export class EmployeeItemsSetupComponent {
     this.showPreview = false;
   }
   public radioChanged(event, profile) {
-    if (this.selectedRadioButton == null) {
-      this.selProfileForAttach = null;
-    } else {
-      this.selProfileForAttach = profile;
-    }
+    this.selProfileForAttach = this.selectedRadioButton ? profile : null;
+    this.selectedProfile = profile;
+    this.SaveSelectedProfile();
   }
+
 
   public DiscardSelectedProfile() {
     this.selectedRadioButton = null;
@@ -838,12 +969,15 @@ export class EmployeeItemsSetupComponent {
       this.GetServiceItemsByPriceCategoryId(priceCategoryId);
     }
   }
+
   GetServiceItemsByPriceCategoryId(priceCategoryId: number): void {
     this.incentiveBLService.GetItemsForIncentive(priceCategoryId)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.DiscardItem();
           const serviceItems = res.Results;
+          this.ServiceItemList = serviceItems;
+          this.FilteredServiceItemSettingDropDownList = serviceItems;
           this.GetDepartmentsForSearchDDL(serviceItems);
           this.FilteredItemList = serviceItems;
         }
@@ -853,8 +987,337 @@ export class EmployeeItemsSetupComponent {
         }
       });
   }
-}
 
+  public GetEmployeeIncentiveInfo() {
+    try {
+      this.incentiveBLService.GetEmployeeIncentiveInfo()
+        .subscribe(res => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            this.EmployeeIncentiveList = res.Results;
+            const incentiveEmployeeIds = this.EmployeeIncentiveList.map(emp => emp.EmployeeId);
+            this.filteredEmpList = this.allDoctorList.filter(doc => !incentiveEmployeeIds.includes(doc.EmployeeId));
+          }
+          else {
+            this.msgBoxServ.showMessage('failed', [res.ErrorMessage]);
+            console.log(res.ErrorMessage);
+          }
+        });
+    } catch (error) {
+
+    }
+  }
+
+  OnPriceCategoryChangedIncentiveItems($event): void {
+    if ($event) {
+      const priceCategoryId = +$event.target.value;
+      this.SelectedPriceCategoryId = priceCategoryId;
+      this.IsSaveButtonEnable = false;
+    }
+  }
+  GetDepartmentList() {
+    this.settingsBLService.GetDepartments().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+        this.DepartmentList = res.Results;
+      }
+    });
+  }
+  GetServiceDepartments() {
+    this.ServiceDepartmentList = this.coreService.Masters.ServiceDepartments;
+    this.FilterServiceDepartmentList = this.ServiceDepartmentList;
+  }
+  // AssignDepartment($event) {
+  //   if ($event) {
+  //     this.SelectedDepartmentIds = $event.map(a => a.DepartmentId);
+
+
+  //     this.FilterServiceDepartmentList = this.ServiceDepartmentList.filter(sd =>
+  //       this.SelectedDepartmentIds.includes(sd.DepartmentId)
+  //     );
+
+
+  //     const serviceDeptIds = this.FilterServiceDepartmentList.map(sd => sd.ServiceDepartmentId);
+  //     this.FilteredServiceItemSettingDropDownList = this.ServiceItemList.filter(itm =>
+  //       serviceDeptIds.includes(itm.ServiceDepartmentId)
+  //     );
+  //   } else {
+
+  //     this.FilterServiceDepartmentList = [...this.ServiceDepartmentList];
+  //     this.FilteredServiceItemSettingDropDownList = [...this.ServiceItemList];
+  //   }
+  // }
+  AssignDepartment($event) {
+    if ($event && $event.length > 0) {
+      this.SelectedDepartmentIds = $event.map(a => a.DepartmentId);
+      this.FilterServiceDepartmentList = this.ServiceDepartmentList.filter(sd =>
+        this.SelectedDepartmentIds.includes(sd.DepartmentId)
+      );
+      const serviceDeptIds = this.FilterServiceDepartmentList.map(sd => sd.ServiceDepartmentId);
+      this.FilteredServiceItemSettingDropDownList = this.ServiceItemList.filter(itm =>
+        serviceDeptIds.includes(itm.ServiceDepartmentId)
+      );
+    } else {
+      this.SelectedDepartmentIds = [];
+      this.FilterServiceDepartmentList = [...this.ServiceDepartmentList];
+      this.FilteredServiceItemSettingDropDownList = [...this.ServiceItemList];
+    }
+  }
+
+  AssignDefaultDepartment($event) {
+    if ($event) {
+      this.ServiceDepartmentIds = $event.map(a => a.ServiceDepartmentId);
+      this.FilteredServiceItemSettingDropDownList = this.ServiceItemList.filter(itm =>
+        this.ServiceDepartmentIds.includes(itm.ServiceDepartmentId)
+      );
+    } else {
+      this.ServiceDepartmentIds = [];
+      this.FilteredServiceItemSettingDropDownList = [...this.ServiceItemList];
+    }
+  }
+
+
+  ToggleSelectAll(event) {
+    const isChecked = event.target.checked;
+    this.SelectAll = isChecked;
+
+    this.DisplayedServiceItems.forEach(item => {
+      item.IsSelected = isChecked;
+      if (isChecked) {
+        item.PerformerPercent = item.PerformerPercent || 0;
+        item.PrescriberPercent = item.PrescriberPercent || 0;
+        item.ReferrerPercent = item.ReferrerPercent || 0;
+        item.OpdSelected = item.OpdSelected || this.Outpatient;
+        item.IpdSelected = item.IpdSelected || this.Inpatient;
+      } else {
+        item.OpdSelected = item.OpdSelected || this.Outpatient;
+        item.IpdSelected = item.IpdSelected || this.Inpatient;
+      }
+      item.IsBulkApplied = isChecked;
+    });
+  }
+  ApplyBulkPercentage(type: Percentage_Type.Performer | Percentage_Type.Prescriber | Percentage_Type.Referrer) {
+    this.DisplayedServiceItems.forEach(item => {
+      if (item.IsSelected) {
+        switch (type) {
+          case 'Performer':
+            item.PerformerPercent = this.PerformerPercent;
+            break;
+          case 'Prescriber':
+            item.PrescriberPercent = this.PrescriberPercent;
+            break;
+          case 'Referrer':
+            item.ReferrerPercent = this.ReferrerPercent;
+            break;
+        }
+      }
+    });
+  }
+  ApplyBulkOutpatient(event) {
+    const isChecked = event.target.checked;
+    this.DisplayedServiceItems.forEach(item => {
+      if (item.IsSelected) {
+        item.OpdSelected = isChecked;
+        item.IsBulkApplied = isChecked;
+      }
+    });
+  }
+
+  ApplyBulkInpatient(event) {
+    const isChecked = event.target.checked;
+    this.DisplayedServiceItems.forEach(item => {
+      if (item.IsSelected) {
+        item.IpdSelected = isChecked;
+        item.IsBulkApplied = isChecked;
+      }
+    });
+  }
+
+
+  ApplyIndividualOutpatient(row) {
+    row.IsBulkApplied = false;
+  }
+
+  ApplyIndividualInpatient(row) {
+    row.IsBulkApplied = false;
+  }
+  IsAnyRowSelected(): boolean {
+    return this.FilteredServiceItemSettingDropDownList.some(item => item.IsSelected);
+  }
+
+  OnDiscountPercentCheckboxChange(row) {
+    if (!row.IsSelected) {
+      row.IsSelected = false;
+    } else {
+
+      row.IsSelected = true;
+      row.PerformerPercent = row.PerformerPercent || 0;
+      row.PrescriberPercent = row.PrescriberPercent || 0;
+      row.ReferrerPercent = row.ReferrerPercent || 0;
+    }
+  }
+
+  CheckGlobalDiscountPercent() {
+    const minimumDiscountPercent = 0;
+    const maxDiscountPercent = 100;
+
+    if (this.PerformerPercent < minimumDiscountPercent || this.PerformerPercent > maxDiscountPercent) {
+      this.PerformerPercentMsg = "Invalid percent";
+    } else {
+      this.PerformerPercentMsg = "";
+    }
+
+    if (this.PrescriberPercent < minimumDiscountPercent || this.PrescriberPercent > maxDiscountPercent) {
+      this.PrescriberPercentMsg = "Invalid percent";
+    } else {
+      this.PrescriberPercentMsg = "";
+    }
+
+    if (this.ReferrerPercent < minimumDiscountPercent || this.ReferrerPercent > maxDiscountPercent) {
+      this.ReferrerPercentMsg = "Invalid percent";
+    } else {
+      this.ReferrerPercentMsg = "";
+    }
+  }
+  LoadFilteredData() {
+    if (!this.SelectedPriceCategoryId || this.SelectedPriceCategoryId === 0) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Please select a PriceCategory before loading data.']);
+      return;
+    }
+    this.IsSaveButtonEnable = true;
+    let filteredServiceDepartmentIds: number[] = [];
+    if (this.ServiceDepartmentIds && this.ServiceDepartmentIds.length > 0) {
+      filteredServiceDepartmentIds = this.ServiceDepartmentIds;
+    } else if (this.SelectedDepartmentIds && this.SelectedDepartmentIds.length > 0) {
+      filteredServiceDepartmentIds = this.ServiceDepartmentList
+        .filter(sd => this.SelectedDepartmentIds.includes(sd.DepartmentId))
+        .map(sd => sd.ServiceDepartmentId);
+    }
+
+    const requestPayload = {
+      PriceCategoryId: this.SelectedPriceCategoryId,
+      ServiceDepartmentIds: filteredServiceDepartmentIds,
+    };
+
+    this.incentiveBLService.GetFilteredServiceItems(requestPayload).subscribe(
+      (res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+          const newServiceItems = res.Results;
+          const filteredMappedItems = this.AlredyMappedServiceItems
+            .filter(item =>
+              item.PriceCategoryId === this.SelectedPriceCategoryId &&
+              (filteredServiceDepartmentIds.length === 0 || filteredServiceDepartmentIds.includes(item.ServiceDepartmentId))
+            )
+            .map(mappedItem => ({
+              ...mappedItem,
+              IsSelected: true,
+            }));
+          const mappedServiceItemIds = filteredMappedItems.map(item => item.ServiceItemId);
+          const filteredNewServiceItems = newServiceItems.filter(
+            newItem => !mappedServiceItemIds.includes(newItem.ServiceItemId)
+          );
+          this.DisplayedServiceItems = [
+            ...filteredMappedItems,
+            ...filteredNewServiceItems.map(newItem => ({
+              ...newItem,
+              PrescriberPercent: 0,
+              ReferrerPercent: 0,
+              PerformerPercent: 0,
+              OpdSelected: true,
+              IpdSelected: true,
+              IsSelected: false,
+              IsBulkApplied: false,
+            }))
+          ];
+
+          this.FilteredServiceItemSettingDropDownList = [...this.DisplayedServiceItems];
+        } else {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+        }
+      },
+      error => {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Error occurred while loading data: ' + error]);
+      }
+    );
+  }
+
+
+  ClearForm() {
+    this.DisplayedServiceItems = [];
+    this.SelectAll = false;
+    this.PerformerPercent = 0;
+    this.PrescriberPercent = 0;
+    this.ReferrerPercent = 0;
+    this.Inpatient = false;
+    this.Outpatient = false;
+  }
+
+  public ItemListFormatter(data: any): string {
+    let html = data["ItemName"];
+    return html;
+  }
+  BillingTypesApplicable = (billingType: string) => {
+    switch (billingType) {
+      case 'inpatient':
+        return { IpdSelected: true, OpdSelected: false };
+      case 'outpatient':
+        return { IpdSelected: false, OpdSelected: true };
+      case 'both':
+        return { IpdSelected: true, OpdSelected: true };
+      default:
+        return { IpdSelected: true, OpdSelected: true };
+    }
+  };
+  SearchServiceItem() {
+    const searchQuery = (this.SearchItemName || '').toString().trim().toLowerCase();
+
+    if (searchQuery) {
+      this.DisplayedServiceItems = this.DisplayedServiceItems.filter(item =>
+        item.ItemName.toLowerCase().includes(searchQuery)
+      );
+
+      if (this.DisplayedServiceItems.length === 0) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['No matching items found.']);
+      }
+    } else {
+      // const mappedItems = [...this.EmployeePreviousBillItemsMapped];
+      const additionalItems = this.FilteredServiceItemSettingDropDownList.filter(item =>
+        !this.EmployeePreviousBillItemsMapped.some(mapped => mapped.ServiceItemId === item.ServiceItemId)
+      );
+
+
+      this.DisplayedServiceItems = [...additionalItems].map(item => {
+        const originalMappedItem = this.EmployeePreviousBillItemsMapped.find(
+          mapped => mapped.ServiceItemId === item.ServiceItemId
+        );
+        if (originalMappedItem) {
+          const { IpdSelected, OpdSelected } = this.BillingTypesApplicable(originalMappedItem.BillingTypesApplicable);
+          return {
+            ...item,
+            IpdSelected,
+            OpdSelected,
+            IsSelected: true,
+          };
+        } else {
+          return {
+            ...item,
+            IpdSelected: true,
+            OpdSelected: true,
+            IsSelected: item.IsSelected || false,
+          };
+        }
+      });
+    }
+  }
+  public OnExistingMappingToggle(isChecked: boolean): void {
+    if (!isChecked) {
+      this.selProfileForAttach = null;
+      this.selectedProfile = null;
+      this.currentEmployeeIncentiveInfo.EmployeeBillItemsMap = [];
+      this.EmployeePreviousBillItems = [];
+      this.showPreview = false;
+    }
+  }
+
+}
 class EmployeeIncentiveSetupVM {
   public SelServDepartment: any = null;
   public ItemName: any = null;
@@ -867,7 +1330,11 @@ class EmployeeIncentiveSetupVM {
   public OpdSelected: boolean = true;
   public IpdSelected: boolean = true;
   public ServiceItemId: number = null;
+  public ServiceDepartmentId: number = null;
   public PriceCategoryId: number = null;
+  public IsSelected: boolean = false;
+  IsBulkApplied: boolean = false;
+  public BillingTypesApplicable: string = null;
 }
 
 

@@ -1,23 +1,15 @@
-import { Component } from '@angular/core';
-import { Input, Output, EventEmitter, OnInit } from "@angular/core";
-import { ADT_BLService } from '../shared/adt.bl.service';
-import { PatientBedInfo } from '../shared/patient-bed-info.model';
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { DanpheHTTPResponse } from '../../shared/common-models';
-import { Bed } from '../shared/bed.model';
-import { Ward } from '../shared/ward.model';
-import { Patient } from '../../patients/shared/patient.model';
-import { BedFeature } from '../shared/bedfeature.model';
-import { PatientBedInfoVM } from '../shared/admission.view.model';
-import * as moment from 'moment/moment';
+import { Component, Input } from '@angular/core';
 import {
-  NgForm,
-  FormGroup,
-  FormControl,
-  Validators,
   FormBuilder,
-  ReactiveFormsModule
-} from '@angular/forms'
+  FormGroup,
+  Validators
+} from '@angular/forms';
+import { DanpheHTTPResponse } from '../../shared/common-models';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../shared/shared-enums';
+import { ReservedBedDetail_DTO } from '../shared/DTOs/adt-reserved-bed-detail.dto';
+import { PatientBedInfoVM } from '../shared/admission.view.model';
+import { ADT_BLService } from '../shared/adt.bl.service';
 
 @Component({
   selector: "patient-admission-history",
@@ -31,19 +23,41 @@ export class AdmittedPatientHistory {
   public prevEndedOn: string = null;
   public validDate: boolean = true;
   public showEdit: boolean = true;
-  @Input()
-  public ipVisitid: number;
-
+  @Input('ipPatientVisitId') IPPatientVisitId: number;
+  @Input('ipPatientId') IPPatientId: number;
+  ReservedBedDetail = new ReservedBedDetail_DTO();
+  ShowActiveBedReservation: boolean = false;
   public AdmissionDateValidator: FormGroup = null;
   constructor(public admissionBLService: ADT_BLService,
     public msgBoxServ: MessageboxService) {
     this.SetValidators();
   }
   ngOnInit() {
-    if (this.ipVisitid) {
-      this.GetPatientWardInfo(this.ipVisitid);
+    if (this.IPPatientVisitId) {
+      this.GetPatientWardInfo(this.IPPatientVisitId);
+      if (this.IPPatientId) {
+        this.GetReservedBedDetail(this.IPPatientId, this.IPPatientVisitId);
+      }
       this.validDate = true;
     }
+  }
+
+  GetReservedBedDetail(patientId: number, patientVisitId: number): void {
+    this.admissionBLService.GetReservedBedDetail(patientId, patientVisitId)
+      .subscribe((res: DanpheHTTPResponse): void => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          if (res.Results) {
+            this.ReservedBedDetail = res.Results;
+            this.ShowActiveBedReservation = true;
+          }
+        }
+        else {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+        }
+      },
+        (err): void => {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Error : ${err.ErrorMessage}`]);
+        });
   }
 
   public GetPatientWardInfo(PatVisitId: number) {
@@ -92,7 +106,7 @@ export class AdmittedPatientHistory {
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status == "OK") {
             this.msgBoxServ.showMessage("success", ["Dates changed successfully."]);
-            this.GetPatientWardInfo(this.ipVisitid);
+            this.GetPatientWardInfo(this.IPPatientVisitId);
             this.showDatePicker[index] = false;
             this.showEdit = true;
           }

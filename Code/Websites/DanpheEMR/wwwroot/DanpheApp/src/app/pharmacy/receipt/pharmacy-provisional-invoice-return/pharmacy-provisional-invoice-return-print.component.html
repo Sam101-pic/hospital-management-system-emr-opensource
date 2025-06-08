@@ -119,9 +119,9 @@
                 </tr>
                 <tr *ngIf="ProvisionalInvoiceReturn.PatientInfo">
                   <td colspan="6" style="text-align: left;">
-                    <p class="c_paragraphs"><strong>Address: </strong><span
-                            *ngIf="ProvisionalInvoiceReturn.PatientInfo.Address!==null">{{ProvisionalInvoiceReturn.PatientInfo.Address}},</span>
-                      {{ProvisionalInvoiceReturn.PatientInfo.CountrySubDivisionName}} </p>
+                    <p class="c_paragraphs"><strong>Address: </strong>
+                      {{coreService.SortPatientAddress(ProvisionalInvoiceReturn.PatientInfo)}}
+                    </p>
                   </td>
                   <td colspan="6" style="text-align: right;">
                     <p class="c_paragraphs"><strong> Age/Sex :</strong>{{ProvisionalInvoiceReturn.PatientInfo.DateOfBirth | DanpheDateTime:'age'
@@ -157,20 +157,22 @@
           <tr style="color:black!important;">
             <th style="padding: 3px 5px !important;"><strong>SN.</strong></th>
             <th colspan="4" style="padding: 3px 5px !important;"> <strong>Particular(s)</strong></th>
+            <th style="padding: 3px 5px !important;"><strong>HS Code</strong></th>
             <th style="padding: 3px 5px !important;"><strong>Qty</strong></th>
             <th colspan="2" style="padding: 3px 5px !important;"><strong>Expiry</strong></th>
             <th style="padding: 3px 5px !important;"><strong>Batch</strong></th>
-            <th style="padding: 3px 5px !important;"><strong>Rack No.</strong></th>
+            <th *ngIf="showRackNoInPrint" style="padding: 3px 5px !important;"><strong>Rack No.</strong></th>
             <th style="padding: 3px 5px !important;"><strong>Rate</strong></th>
             <th style="padding: 3px 5px !important; text-align: right;"><strong>Amount</strong></th>
           </tr>
           <tr *ngFor="let row of ProvisionalInvoiceReturn.ProvisionalInvoiceItems; let i=index" style="color:black!important;">
             <td style="padding: 3px 5px !important; ">{{i+1}}</td>
             <td colspan="4" style="padding: 3px 5px !important;">{{row.ItemDisplayName}} </td>
+            <td style="padding: 3px 5px !important; ">{{row.HSCode}}</td>
             <td style="padding: 3px 5px !important; ">{{row.Quantity}}</td>
             <td colspan="2" style="padding: 3px 5px !important; ">{{row.ExpiryDate | date: 'dd MMM yyy'}}</td>
             <td style="padding: 3px 5px !important;  ">{{row.BatchNo}}</td>
-            <td style="padding: 3px 5px !important;  ">{{row.RackNo}}</td>
+            <td *ngIf="showRackNoInPrint" style="padding: 3px 5px !important;  ">{{row.RackNo}}</td>
             <td style="padding: 3px 5px !important;  ">{{row.SalePrice | number: "1.2-4"}} </td>
             <td style="padding: 3px 5px !important; text-align: right; ">{{row.SubTotal | number: "1.2-4"}}</td>
           </tr>
@@ -181,19 +183,19 @@
             </td>
             <td colspan="3" style="padding: 5px!important; text-align: right;">
               <p class="c_paragraphs"><strong>SubTotal: </strong></p>
-              <p *ngIf="ProvisionalInvoiceReturn.DiscountAmount  && IsItemLevelDiscountApplicable || IsMainDiscountAvailable" class="c_paragraphs">
+              <p *ngIf="ProvisionalInvoiceReturn.DiscountAmount" class="c_paragraphs">
                 <strong>Discount:</strong>
               </p>
-              <p *ngIf="ProvisionalInvoiceReturn.VATAmount && IsItemLevelVATApplicable" class="c_paragraphs"><strong>VAT:</strong></p>
+              <p *ngIf="ProvisionalInvoiceReturn.VATAmount" class="c_paragraphs"><strong>VAT:</strong></p>
               <p *ngIf="ProvisionalInvoiceReturn.CoPaymentCashAmount" class="c_paragraphs"><strong>CoPay Cash Amount: </strong></p>
               <p *ngIf="ProvisionalInvoiceReturn.CoPaymentCreditAmount" class="c_paragraphs"><strong>CoPay Credit Amount: </strong></p>
               <p class="c_paragraphs"><strong>Total Amount: </strong></p>
             </td>
             <td style="padding: 5px!important; text-align: right;">
               <p class="c_paragraphs">{{ProvisionalInvoiceReturn.SubTotal | number: "1.2-4"}}</p>
-              <p class="c_paragraphs" *ngIf="ProvisionalInvoiceReturn.DiscountAmount  && IsItemLevelDiscountApplicable || IsMainDiscountAvailable">
+              <p class="c_paragraphs" *ngIf="ProvisionalInvoiceReturn.DiscountAmount">
                 {{ProvisionalInvoiceReturn.DiscountAmount |number: "1.2-4"}}</p>
-              <p class="c_paragraphs" *ngIf="ProvisionalInvoiceReturn.VATAmount && IsItemLevelVATApplicable">{{ProvisionalInvoiceReturn.VATAmount |
+              <p class="c_paragraphs" *ngIf="ProvisionalInvoiceReturn.VATAmount">{{ProvisionalInvoiceReturn.VATAmount |
                 number: "1.2-4"}}
               <p *ngIf="ProvisionalInvoiceReturn.CoPaymentCashAmount" class="c_paragraphs">{{ProvisionalInvoiceReturn.CoPaymentCashAmount | number:
                 "1.2-4"}}</p>

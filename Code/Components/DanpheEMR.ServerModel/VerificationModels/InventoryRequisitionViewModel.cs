@@ -55,6 +55,8 @@ namespace DanpheEMR.ServerModel
     public class VER_PODetailModel
     {
         public int? PurchaseOrderId { get; set; }
+        public int? PONumber { get; set; }
+
         public DateTime? PoDate { get; set; }
         public string VendorName { get; set; }
         public string ContactAddress { get; set; }

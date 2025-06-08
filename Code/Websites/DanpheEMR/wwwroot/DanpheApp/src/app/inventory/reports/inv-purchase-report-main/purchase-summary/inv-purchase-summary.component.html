@@ -81,7 +81,8 @@
 </div>
 <div class="row">
     <div class="col-md-6">
-        <from-to-date-select (on-change)="onDateChange($event)">
+        <from-to-date-select (on-change)="onDateChange($event)"
+                             [date-settings-name]="'common-range-with-today'">
         </from-to-date-select>
     </div>
 
@@ -89,7 +90,9 @@
         <div class="form-group row">
             <label class="control-label col-md-4">Vendor<b style="float:right;">:</b></label>
             <div class="col-md-6 autocomplete-item">
-                <input id="VendorName" danphe-auto-complete class="form-control" [(ngModel)]="selectedVndr" [source]="VendorList" [list-formatter]="VendorListFormatter" placeholder="Vendor Name" display-property-name="VendorName" value-property-name=null (valueChanged)="GetVendorDetails()" (focusout)="GetVendorDetails()" onclick="this.select();" [match-formatted]="true" />
+                <input id="VendorName" danphe-auto-complete class="form-control" [(ngModel)]="selectedVndr" [source]="VendorList"
+                       [list-formatter]="VendorListFormatter" placeholder="Vendor Name" display-property-name="VendorName" value-property-name=null
+                       (valueChanged)="GetVendorDetails()" (focusout)="GetVendorDetails()" onclick="this.select();" [match-formatted]="true" />
             </div>
         </div>
     </div>
@@ -107,7 +110,11 @@
 
 <div class="row">
     <div class="col-lg-12 col-sm-12">
-        <danphe-grid [grid-colDefaults]="purchaseSummaryGridColumns" [grid-data]="purchaseSummaryRecordListFiltered" (onDateChange)="onDateChange($event)" (grid-actions)="GridAction($event)" [NepaliDateInGridParams]="NepaliDateInGridSettings" [grid-exportOptions]="GetGridExportOptions()" [grid-showExport]="true" [report-for]="'inventory'" [report-title]="'Purchase Summary Report'" [show-header]="true" [grid-footer-content]="footerContent" [filter-parameters]="FilterParameters">
+        <danphe-grid [grid-colDefaults]="purchaseSummaryGridColumns" [grid-data]="purchaseSummaryRecordListFiltered"
+                     (onDateChange)="onDateChange($event)" (grid-actions)="GridAction($event)" [NepaliDateInGridParams]="NepaliDateInGridSettings"
+                     [grid-exportOptions]="GetGridExportOptions()" [grid-showExport]="true" [report-for]="'inventory'"
+                     [report-title]="'Purchase Summary Report'" [show-header]="true" [grid-footer-content]="footerContent"
+                     [filter-parameters]="FilterParameters">
         </danphe-grid>
     </div>
     <div class="col-lg-6 col-sm-12 col-md-6" style="margin-bottom: 10px !important;">

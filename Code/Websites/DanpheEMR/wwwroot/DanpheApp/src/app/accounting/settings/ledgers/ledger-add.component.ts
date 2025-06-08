@@ -4,10 +4,11 @@ import { CoreService } from "../../../core/shared/core.service";
 import { SecurityService } from '../../../security/shared/security.service';
 import { SettingsBLService } from "../../../settings-new/shared/settings.bl.service";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { AccountingBLService } from '../../shared/accounting.bl.service';
 import { AccountingService } from "../../shared/accounting.service";
 import { AccountingSettingsBLService } from '../shared/accounting-settings.bl.service';
+import { ChartofAccountModel } from "../shared/chart-of-account.model";
 import { LedgerModel } from '../shared/ledger.model';
 import { ledgerGroupModel } from '../shared/ledgerGroup.model';
 
@@ -38,7 +39,7 @@ export class LedgersAddComponent {
 
   public provisionalLedgerCode: number = 0;
 
-  public allcoaList: any[];
+  public allcoaList: Array<ChartofAccountModel> = new Array<ChartofAccountModel>();
   public ledgerTypeParamter: any;
 
   constructor(public accountingSettingsBLService: AccountingSettingsBLService,
@@ -85,7 +86,7 @@ export class LedgersAddComponent {
       if (ledgers.length > 0) {
         this.ledgerTypeParamter = JSON.parse(ledgers[0].ParameterValue);
       } else {
-        this.msgBoxServ.showMessage("error", ['Ledgers type not found.']);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Ledgers type not found.']);
       }
     } catch (ex) {
       this.ShowCatchErrMessage(ex);
@@ -111,7 +112,7 @@ export class LedgersAddComponent {
   AddLedger() {
     this.CheckDrCrValidation();
     if (this.CurrentLedger.LedgerGroupId == 0 || this.CurrentLedger.LedgerGroupId == null) {
-      this.msgBoxServ.showMessage("error", ["Please select ledger group"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please select ledger group"]);
     }
     else {
       let ledgerValidation = true;
@@ -135,8 +136,8 @@ export class LedgersAddComponent {
         this.accountingSettingsBLService.AddLedgerList(this.NewledgerList)
           .subscribe(
             res => {
-              if (res.Status == "OK") {
-                this.msgBoxServ.showMessage("success", ["Ledgers Added"]);
+              if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Ledgers Added"]);
                 // this.CurrentLedger
                 this.CallBackAddLedger(res);
                 this.CurrentLedger = new LedgerModel();
@@ -148,7 +149,7 @@ export class LedgersAddComponent {
                 this.Close();
               }
               else {
-                this.msgBoxServ.showMessage("error", ["Duplicate ledger not allowed"]);
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Duplicate ledger not allowed"]);
                 this.loading = false;
               }
             },
@@ -204,7 +205,7 @@ export class LedgersAddComponent {
 
   //after adding Ledger is succesfully added  then this function is called.
   CallBackAddLedger(res) {
-    if (res.Status == "OK" && res.Results != null) {
+    if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results != null) {
       res.Results.forEach(ledger => {//mumbai-team-june2021-danphe-accounting-cache-change
         ledger.PrimaryGroup = this.CurrentLedger.PrimaryGroup;
         ledger.COA = this.CurrentLedger.COA;
@@ -218,11 +219,11 @@ export class LedgersAddComponent {
       this.ledgerList = new Array<LedgerModel>();
       this.callbackAdd.emit(true);
     }
-    else if (res.Status == "OK" && res.Results == null) {
-      this.msgBoxServ.showMessage("notice-message", ["Ledger under LedgerGroup already exist.Please deactivate the previous ledger to add a new one with same name"]);
+    else if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results == null) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["Ledger under LedgerGroup already exist.Please deactivate the previous ledger to add a new one with same name"]);
     }
     else {
-      this.msgBoxServ.showMessage("error", ["Check log for details"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Check log for details"]);
       console.log(res.ErrorMessage);
     }
   }
@@ -246,7 +247,7 @@ export class LedgersAddComponent {
       if (!AllowToCreateLedgers) {
         let ledgerGroupUnqName = this.ledgerTypeParamter.filter(l => l.LedgergroupUniqueName == this.selLedgerGroup.Name);
         if (ledgerGroupUnqName.length > 0) {
-          this.msgBoxServ.showMessage('Notice', ['Create ledger for this ledgerGroup from respective tab']);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Create ledger for this ledgerGroup from respective tab']);
         }
         else {
         }
@@ -280,7 +281,7 @@ export class LedgersAddComponent {
     // this.coaList = Array.from([new Set(selectedPrimaryGroupList.map(i => i.COA))][0]);
     let primaryGroupId = this.primaryGroupList.filter(p => p.PrimaryGroupName == this.CurrentLedger.PrimaryGroup)[0].PrimaryGroupId;
     this.coaList = this.allcoaList.filter(c => c.PrimaryGroupId == primaryGroupId);
-    this.CurrentLedger.COA = this.coaList[0].ChartOfAccountName;
+    this.CurrentLedger.COA = this.coaList.length > 0 ? this.coaList[0].ChartOfAccountName : "";
     this.COAChanged();
     //}
   }
@@ -307,7 +308,7 @@ export class LedgersAddComponent {
 
       if (count > 0 || check > 1) {
         this.NewledgerList[index].LedgerName = null;
-        this.msgBoxServ.showMessage("notice", ['duplicate ledger not allowed']);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['duplicate ledger not allowed']);
         this.loading = false;
       }
 
@@ -387,12 +388,12 @@ export class LedgersAddComponent {
       });
       // }
       if (foundDuplicate > 0) {
-        this.msgBoxServ.showMessage("notice", ['duplicate ledger not allowed, please check.']);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['duplicate ledger not allowed, please check.']);
       }
       return temp;
     }
     else {
-      this.msgBoxServ.showMessage("notice", ['LedgerName required.']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['LedgerName required.']);
       this.loading = false;
     }
   }
@@ -466,7 +467,6 @@ export class LedgersAddComponent {
       this.NewledgerList.forEach(l => {
         if (!l.Code) {
           l.Code = pLedCode.toString();
-
         }
         pLedCode++;
       });

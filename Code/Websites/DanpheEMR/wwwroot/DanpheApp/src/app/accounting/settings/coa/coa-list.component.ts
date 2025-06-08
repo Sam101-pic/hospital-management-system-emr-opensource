@@ -1,10 +1,11 @@
 import { Component } from "@angular/core";
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import GridColumnSettings from "../../../shared/danphe-grid/grid-column-settings.constant";
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { AccountingService } from '../../shared/accounting.service';
 import { AccountingSettingsBLService } from "../shared/accounting-settings.bl.service";
 import { ChartofAccountModel } from "../shared/chart-of-account.model";
-import { AccountingService } from '../../shared/accounting.service';
 
 @Component({
     templateUrl: './coa-list.html'
@@ -25,7 +26,7 @@ export class COAListComponent {
     public update: boolean = false;
 
     constructor(public accountingSettingsBLService: AccountingSettingsBLService,
-        public msgBox: MessageboxService,public accountingService: AccountingService) {
+        public msgBox: MessageboxService, public accountingService: AccountingService) {
         this.coaGridColumns = GridColumnSettings.coaList;
         this.getPrimaryGroupList();
         this.getCoaList();
@@ -39,9 +40,9 @@ export class COAListComponent {
         }
     }
     public getPrimaryGroupList() {
-            if (this.accountingService.accCacheData.PrimaryGroup && this.accountingService.accCacheData.PrimaryGroup.length > 0) {//mumbai-team-june2021-danphe-accounting-cache-change
-                this.primaryGroupList = this.accountingService.accCacheData.PrimaryGroup;//mumbai-team-june2021-danphe-accounting-cache-change
-                this.primaryGroupList = this.primaryGroupList.slice();//mumbai-team-june2021-danphe-accounting-cache-change
+        if (this.accountingService.accCacheData.PrimaryGroup && this.accountingService.accCacheData.PrimaryGroup.length > 0) {//mumbai-team-june2021-danphe-accounting-cache-change
+            this.primaryGroupList = this.accountingService.accCacheData.PrimaryGroup;//mumbai-team-june2021-danphe-accounting-cache-change
+            this.primaryGroupList = this.primaryGroupList.slice();//mumbai-team-june2021-danphe-accounting-cache-change
         }
     }
     COAGridActions($event: GridEmitModel) {
@@ -53,11 +54,12 @@ export class COAListComponent {
                 this.coaObj.ChartOfAccountName = $event.Data.ChartOfAccountName;
                 this.coaObj.Description = $event.Data.Description;
                 this.coaObj.IsActive = $event.Data.IsActive;
+                this.coaObj.IsSystemDefault = $event.Data.IsSystemDefault;
                 this.coaObj.PrimaryGroupId = $event.Data.PrimaryGroupId;
                 this.update = true;
                 this.showAddPage = true;
-                this.oldCoaObj =  new ChartofAccountModel();
-                this.oldCoaObj = Object.assign(this.oldCoaObj,this.coaObj);
+                this.oldCoaObj = new ChartofAccountModel();
+                this.oldCoaObj = Object.assign(this.oldCoaObj, this.coaObj);
                 break;
             }
             default:
@@ -106,18 +108,18 @@ export class COAListComponent {
     }
     UpdateCOA() {
         let flag = true;
-        if(this.coaObj.PrimaryGroupId != this.oldCoaObj.PrimaryGroupId || this.coaObj.ChartOfAccountName != this.oldCoaObj.ChartOfAccountName){
-            
-            let existingCOA = this.coaList.filter(c => (c.PrimaryGroupId == this.coaObj.PrimaryGroupId && c.ChartOfAccountName == this.coaObj.ChartOfAccountName) ).length;
+        if (this.coaObj.PrimaryGroupId != this.oldCoaObj.PrimaryGroupId || this.coaObj.ChartOfAccountName != this.oldCoaObj.ChartOfAccountName) {
+
+            let existingCOA = this.coaList.filter(c => (c.PrimaryGroupId == this.coaObj.PrimaryGroupId && c.ChartOfAccountName == this.coaObj.ChartOfAccountName)).length;
 
             flag = (existingCOA > 0) ? false : true;
-    
+
             if (!flag) {
                 this.showMessageBox("Error", "COA is already existed");
                 return;
             }
         }
-       
+
         //for checking validations, marking all the fields as dirty and checking the validity.
         for (var i in this.coaObj.COAValidator.controls) {
             this.coaObj.COAValidator.controls[i].markAsDirty();
@@ -125,31 +127,35 @@ export class COAListComponent {
         }
 
         if (this.coaObj.IsValidCheck(undefined, undefined)) {
-            this.accountingSettingsBLService.UpdateCOA(this.coaObj)
-                .subscribe(
-                    res => {
+            this.accountingSettingsBLService.UpdateCOA(this.coaObj).subscribe(
+                res => {
+                    if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
                         // remove the element which was edited
-                        let index = this.accountingService.accCacheData.COA.findIndex(x => x.ChartOfAccountId == this.coaObj.ChartOfAccountId)//mumbai-team-june2021-danphe-accounting-cache-change    
-                        this.accountingService.accCacheData.COA.splice(index,1); //mumbai-team-june2021-danphe-accounting-cache-change    
-                        this.accountingService.accCacheData.COA.push(res.Results); //mumbai-team-june2021-danphe-accounting-cache-change
+                        let index = this.accountingService.accCacheData.COA.findIndex(x => x.ChartOfAccountId == this.coaObj.ChartOfAccountId); // mumbai-team-june2021-danphe-accounting-cache-change    
+                        this.accountingService.accCacheData.COA.splice(index, 1, res.Results); // mumbai-team-june2021-danphe-accounting-cache-change    
+                        // this.accountingService.accCacheData.COA.push(res.Results); // mumbai-team-june2021-danphe-accounting-cache-change
                         this.getCoaList();
-                        this.showMessageBox("success", "COA Updated");
+                        this.msgBox.showMessage(ENUM_MessageBox_Status.Success, ["COA Updated"]);
                         this.coaObj = new ChartofAccountModel();
                         this.showAddPage = false;
                         this.update = false;
-                    },
-                    err => {
-                        this.showMessageBox("Error", err);
-                    });
+                    } else {
+                        this.showMessageBox(ENUM_MessageBox_Status.Error, res.ErrorMessage);
+                    }
+                },
+                err => {
+                    this.showMessageBox(ENUM_MessageBox_Status.Error, err);
+                }
+            );
         }
-        this.oldCoaObj =  new ChartofAccountModel();
+        this.oldCoaObj = new ChartofAccountModel();
     }
     showMessageBox(status: string, message: string) {
         this.msgBox.showMessage(status, [message]);
     }
     Close() {
         this.showAddPage = false;
-        this.oldCoaObj =  new ChartofAccountModel();
+        this.oldCoaObj = new ChartofAccountModel();
         this.coaObj = new ChartofAccountModel();
     }
     PrimaryGroupChanged() {

@@ -11,5 +11,7 @@ namespace DanpheEMR.Controllers.Settings.DTO
         public string BedFeatureFullName { get; set; }
         public double? BedPrice { get; set; }
         public bool IsActive { get; set; }
+        public bool IsPresentationGrouping { get; set; }
+        public string GroupCode { get; set; }
     }
 }

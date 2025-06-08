@@ -4,6 +4,7 @@ import * as moment from 'moment/moment';
 import { CoreService } from "../../core/shared/core.service";
 import { PHRMStoreModel } from "../../pharmacy/shared/phrm-store.model";
 import { SecurityService } from "../../security/shared/security.service";
+import { GeneralFieldLabels } from "../../shared/DTOs/general-field-label.dto";
 import { ActivateInventoryService } from "../../shared/activate-inventory/activate-inventory.service";
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../shared/danphe-grid/NepaliColGridSettingsModel";
 import GridColumnSettings from '../../shared/danphe-grid/grid-column-settings.constant';
@@ -15,9 +16,12 @@ import { InventoryBLService } from "../shared/inventory.bl.service";
 import { InventoryService } from '../shared/inventory.service';
 import { RequisitionItems } from "../shared/requisition-items.model";
 import { Requisition } from "../shared/requisition.model";
-import { GeneralFieldLabels } from "../../shared/DTOs/general-field-label.dto";
 
-@Component({ templateUrl: "./requisition-list.component.html" })
+@Component({
+  templateUrl: "./requisition-list.component.html",
+  host: { '(window:keydown)': 'hotkeys($event)' }
+}
+)
 export class RequisitionListComponent {
   public RequisitionGridData: Array<Requisition> = null;
   public RequisitionGridDataFiltered: Array<Requisition> = null;
@@ -66,6 +70,8 @@ export class RequisitionListComponent {
   showDispatchDetailsPopup: boolean = false;
 
   public GeneralFieldLabel = new GeneralFieldLabels();
+  public VerificationLevel: number = 0;
+  public MinimumDispatchLevel: number = 0;
 
   constructor(public coreService: CoreService, private _activeInvService: ActivateInventoryService, public InventoryBLService: InventoryBLService, public inventoryService: InventoryService, public router: Router, public routeFrom: RouteFromService, public messageBoxService: MessageboxService, public securityService: SecurityService) {
     var colSettings = new GridColumnSettings(this.securityService);
@@ -79,6 +85,7 @@ export class RequisitionListComponent {
     this.GetInventoryBillingHeaderParameter();
     this.currentActiveInventory = _activeInvService.activeInventory;
     this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
+    this.GetSigningPanelConfiguration();
   }
   BackToGrid() {
     this.showItemwise = false;
@@ -227,7 +234,7 @@ export class RequisitionListComponent {
           this.inventoryService.DispatchId = $event.Data.DispatchId;
           this.inventoryService.RequisitionId = this.requisitionId;
           this.inventoryService.StoreName = this.storeName;
-          this.inventoryService.CreatedOn = $event.Data.CreatedOn;
+          this.inventoryService.CreatedOn = $event.Data.DispatchedDate;
           this.showDispatchDetailsPopup = true;
         }
         break;
@@ -269,7 +276,7 @@ export class RequisitionListComponent {
   }
 
   private CheckIfDispatchAllowed(data: Requisition): boolean {
-    return (data.MaxVerificationLevel != 0 && data.CurrentVerificationLevelCount < data.MaxVerificationLevel) ? false : true;
+    return (data.MaxVerificationLevel != 0 && (data.CurrentVerificationLevelCount == this.MinimumDispatchLevel || data.MaxVerificationLevel == data.CurrentVerificationLevelCount)) ? true : false;
   }
 
   //route to dispatch all by Item
@@ -362,5 +369,19 @@ export class RequisitionListComponent {
     this.inventoryService.RequisitionId = null;
     this.inventoryService.StoreName = null;
     this.inventoryService.StoreId = null;
+  }
+  hotkeys(event): void {
+    if (event.keyCode === 27) {
+      this.CloseRequisitionDetailsPopup();
+      this.Close();
+    }
+  }
+  GetSigningPanelConfiguration() {
+    var signingPanelConfigurationParameter = this.coreService.Parameters.find(param => param.ParameterGroupName === 'Inventory' && param.ParameterName == "SigningPanelConfiguration")
+    if (signingPanelConfigurationParameter) {
+      let signingPanelConfigurationParameterValue = JSON.parse(signingPanelConfigurationParameter.ParameterValue);
+      this.VerificationLevel = signingPanelConfigurationParameterValue.VerificationLevel;
+      this.MinimumDispatchLevel = signingPanelConfigurationParameterValue.MinimumDispatchLevel;
+    }
   }
 }

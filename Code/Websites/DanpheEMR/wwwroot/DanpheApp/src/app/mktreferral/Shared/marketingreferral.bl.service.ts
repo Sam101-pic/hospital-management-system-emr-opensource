@@ -2,9 +2,11 @@ import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import { CoreDLService } from "../../core/shared/core.dl.service";
 import { DanpheHTTPResponse } from "../../shared/common-models";
+import { PatientVisitLevelReferralCommission_DTO } from "./DTOs/patient-referral-commission.dto";
 import { ReferralCommission_DTO } from "./DTOs/referral-commission.dto";
 import { ReferringOrganization_DTO } from "./DTOs/referral-organization.dto";
 import { ReferralParty_DTO } from "./DTOs/referral-party.dto";
+import { ReferralScheme_DTO } from "./DTOs/referral-scheme.dto";
 import { MarketingReferralDLService } from "./marketingreferral.dl.service";
 
 
@@ -19,8 +21,8 @@ export class MarketingReferralBLService {
                 return res;
             });
     }
-    public GetMarketingReferralDetailReport(fromDate, toDate, ReferringPartyId): Observable<DanpheHTTPResponse> {
-        return this.mktreferralDLService.GetMarketingReferralDetailReport(fromDate, toDate, ReferringPartyId)
+    public GetMarketingReferralDetailReport(fromDate, toDate, referringPartyId, referringGroupId, areaCode, referringOrganizationId): Observable<DanpheHTTPResponse> {
+        return this.mktreferralDLService.GetMarketingReferralDetailReport(fromDate, toDate, referringPartyId, referringGroupId, areaCode, referringOrganizationId)
             .map(res => {
                 return res;
             });
@@ -109,5 +111,42 @@ export class MarketingReferralBLService {
             .map(res => {
                 return res;
             });
+    }
+
+    public GetMasterDataForFilter(): Observable<DanpheHTTPResponse> {
+        return this.mktreferralDLService.GetMasterDataForFilter()
+            .map(res => {
+                return res;
+            });
+    }
+
+    public GetPatientVisitWiseReferralCommission(fromDate: string, toDate: string): Observable<DanpheHTTPResponse> {
+        return this.mktreferralDLService.GetPatientVisitWiseReferralCommission(fromDate, toDate)
+            .map(res => { return res; });
+    }
+
+    public SaveReferralScheme(referralScheme: ReferralScheme_DTO): Observable<DanpheHTTPResponse> {
+        return this.mktreferralDLService.SaveReferralScheme(referralScheme)
+            .map(res => { return res; });
+    }
+    public UpdateReferralScheme(referralScheme: ReferralScheme_DTO): Observable<DanpheHTTPResponse> {
+        return this.mktreferralDLService.UpdateReferralScheme(referralScheme)
+            .map(res => { return res; });
+    }
+    public ActivateDeactivateReferralScheme(referralScheme: ReferralScheme_DTO): Observable<DanpheHTTPResponse> {
+        return this.mktreferralDLService.ActivateDeactivateReferralScheme(referralScheme)
+            .map(res => { return res; });
+    }
+    public AddPatientReferralCommission(patientVisitLevelReferralCommission: PatientVisitLevelReferralCommission_DTO): Observable<DanpheHTTPResponse> {
+        return this.mktreferralDLService.AddPatientReferralCommission(patientVisitLevelReferralCommission)
+            .map(res => { return res; });
+    }
+    public GetReferralCommissionDetails(patientVisitId: number): Observable<DanpheHTTPResponse> {
+        return this.mktreferralDLService.GetReferralCommissionDetails(patientVisitId)
+            .map(res => { return res; });
+    }
+    public DeletePatientReferralCommission(referralCommissionId: number): Observable<DanpheHTTPResponse> {
+        return this.mktreferralDLService.DeletePatientReferralCommission(referralCommissionId)
+            .map(res => { return res; });
     }
 }

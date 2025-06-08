@@ -10,6 +10,7 @@ import { DanpheCache, MasterType } from '../../../shared/danphe-cache-service-ut
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
 import { ENUM_ACC_PaymentMode, ENUM_ACC_RouteFrom, ENUM_ACC_VoucherCode, ENUM_CalanderType, ENUM_DanpheHTTPResponseText, ENUM_Data_Type, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { AccountingReportsBLService } from '../../reports/shared/accounting-reports.bl.service';
 import { AccountingSettingsBLService } from '../../settings/shared/accounting-settings.bl.service';
 import { CostCenterModel } from '../../settings/shared/cost-center.model';
 import { FiscalYearModel } from "../../settings/shared/fiscalyear.model";
@@ -25,6 +26,7 @@ import { SubLedger_DTO } from '../../transactions/shared/DTOs/subledger-dto';
 import { TransactionItem } from '../../transactions/shared/transaction-item.model';
 import { TransactionModel } from '../../transactions/shared/transaction.model';
 import { Voucher } from '../../transactions/shared/voucher';
+import { BankReconciliationCategory } from '../reconcile-bank-transactions/bank-reconciliation.model';
 @Component({
     selector: 'suspense-account-reconciliation',
     templateUrl: './suspense-reconciliation.component.html',
@@ -80,13 +82,14 @@ export class SuspenseAccountReconciliationComponent {
     public suspenseAccountRefVoucherDetail: Array<SuspenseAccountReconciliationDetail_DTO> = new Array<SuspenseAccountReconciliationDetail_DTO>();
     public selectedSuspenseAccountDetail: SuspenseAccountReconciliationDetail_DTO = new SuspenseAccountReconciliationDetail_DTO();
     public suspenseAccountReconciliationTransaction: SuspenseAccountTransaction_DTO = new SuspenseAccountTransaction_DTO();
+    public BankReconciliationCategory: Array<BankReconciliationCategory> = new Array<BankReconciliationCategory>();
 
     constructor(
         public accountingBLService: AccountingBLService,
         public msgBoxServ: MessageboxService,
         public changeDetectorRef: ChangeDetectorRef, public coreService: CoreService, public accountingService: AccountingService,
         public router: Router, public routeFromService: RouteFromService, public securityService: SecurityService,
-        public accountingSettingBlService: AccountingSettingsBLService) {
+        public accountingSettingBlService: AccountingSettingsBLService, public accReportBLService: AccountingReportsBLService) {
         this.setParameterValues();
         this.subLedgerMaster = this.ledgerWiseSubLedgerMaster[0] = this.accountingService.accCacheData.SubLedgerAll ? this.accountingService.accCacheData.SubLedgerAll : [];
         this.DrCrList = [{ 'DrCr': 'Dr' }, { 'DrCr': 'Cr' }];
@@ -107,6 +110,7 @@ export class SuspenseAccountReconciliationComponent {
         if (!!this.accountingService.accCacheData.FiscalYearList && this.accountingService.accCacheData.FiscalYearList.length > 0) {//mumbai-team-june2021-danphe-accounting-cache-change
             this.coreService.SetFiscalYearList(this.accountingService.accCacheData.FiscalYearList);//mumbai-team-june2021-danphe-accounting-cache-change
         }
+        this.GetReconciliationCategory();
     }
 
     ngOnInit() {
@@ -226,7 +230,7 @@ export class SuspenseAccountReconciliationComponent {
                         this.bankLedgerList = this.allLedgerList.filter(a => a.LedgerGroupId === ledgerGroup.LedgerGroupId);
                     }
                 }
-                this.suspenseAccountLedger = this.allLedgerList.find(a => a.Name === 'LCL_SUSPENSE_A/C');
+                //this.suspenseAccountLedger = this.allLedgerList.find(a => a.Name === 'LCL_SUSPENSE_A/C');
             }
         } catch (ex) {
             this.ShowCatchErrMessage(ex);
@@ -340,6 +344,10 @@ export class SuspenseAccountReconciliationComponent {
 
         this.transaction.UpdateValidator("off", "PayeeName", "required");
         this.transaction.UpdateValidator("off", "ChequeNumber", "");
+        this.transaction.TransactionItems.forEach(item => {
+            if (!this.subLedgerAndCostCenterSetting.EnableSubLedger)
+                item.UpdateValidator("off", "SubLedgerId", "required");
+        });
         if (!this.CheckCalculations()) {
             return false;
         }
@@ -1013,5 +1021,23 @@ export class SuspenseAccountReconciliationComponent {
 
     public CallBackTransactionClose() {
         this.ChangeFocus("suspenseAccount_reconciliation_referenceVoucherNumber");
+    }
+
+    public GetReconciliationCategory() {
+        try {
+            this.accReportBLService.GetReconciliationCategory()
+                .subscribe(res => {
+                    if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+                        this.BankReconciliationCategory = res.Results;
+                        let suspenseAccount = this.BankReconciliationCategory.find(a => a.CategoryName === "SUSPENSE A/C");
+                        if (suspenseAccount) {
+                            this.suspenseAccountLedger = this.allLedgerList.find(a => a.LedgerId === suspenseAccount.MappedLedgerId)
+                        }
+                    }
+                });
+        }
+        catch (ex) {
+            console.log(ex);
+        }
     }
 }

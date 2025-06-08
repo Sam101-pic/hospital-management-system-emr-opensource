@@ -20,5 +20,6 @@ namespace DanpheEMR.ServerModel
         [NotMapped]
         public virtual List<MappingDetailModel> MappingDetail { get; set; }
         public int? CustomVoucherId { get; set; }
+        public int HospitalId { get; set; }
     }
 }

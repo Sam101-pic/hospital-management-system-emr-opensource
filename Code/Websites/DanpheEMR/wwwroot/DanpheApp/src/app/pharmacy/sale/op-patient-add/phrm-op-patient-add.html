@@ -10,12 +10,48 @@
             <button class="btn btn-danger" (click)="Close()">X</button>
           </div>
           <div class="modelbox-body p2">
+            <div class="row margin-bottom-10">
+              <div class="col-md-2">
+                <label for="id_search_PatientList_freeVisit" style="font-size:16px !important">Search Existing Patients:</label>
+              </div>
+              <div class="col-md-4">
+                <input danphe-auto-complete id="id_search_PatientList_freeVisit" class="form-control searchtbx" [(ngModel)]="PatientObj"
+                       [list-formatter]="PatientListFormatter" [source]="AllPatientSearchAsync.bind(this)" [path-to-data]="'Results'"
+                       placeholder="Search by HospitalNo, Patient Name, Phone Number" display-property-name="ShortName" value-property-name=null
+                       (ngModelChange)="PatientInfoChanged()" onClick="this.select();" max-num-list="500"
+                       [min-chars]="PatientSearchMinCharacterCount" match-formatted="true"
+                       [grid-sort]="'ShortName'" style="width: 100% !important;" />
+              </div>
+              <div class="col-md-6"></div>
+            </div>
+            <div class="row margin-bottom-10">
+              <div class="col-md-12">
+                <registration-scheme-select (on-change)="OnRegistrationSchemeChanged($event)"
+                                            [service-billing-context]="serviceBillingContext">
+                </registration-scheme-select>
+              </div>
+
+            </div>
             <div class="row">
               <div class="col-md-12" *ngIf="showPopUp == true">
                 <div>
                   <form [formGroup]="newPatient.PHRMPatientValidator" class="form-horizontal">
                     <div class="row">
                       <div class="col-md-6 col-xs-12">
+                        <div class="form-group">
+                          <label for="newSalutation" class="control-label col-md-4">Salutation<b
+                               style="float:right;">:</b></label>
+                          <div class="col-md-3">
+                            <select id="id_bill_op_patient_add_salutation" class="form-control" [(ngModel)]="newPatient.Salutation"
+                                    formControlName="Salutation"
+                                    (change)="setFocusById('newPatFirstName')">
+                              <option value="" disabled selected>--select--</option>
+                              <option *ngFor="let salutation of SalutationList" [value]="salutation.SalutationName">{{ salutation.SalutationName }}
+                              </option>
+                            </select>
+                          </div>
+                          <div class="col-md-1"> </div>
+                        </div>
                         <div class="form-group">
                           <label for="newPatFirstName" class="control-label col-md-4">First Name<b class="color-red">
                               *</b><b style="float:right;">:</b></label>
@@ -105,7 +141,8 @@
                               <div class="row">
                                 <input id="Age" class="form-control" type="number" min="0" max="150"
                                        formControlName="Age" (focusout)="CalculateDob();" [(ngModel)]="newPatient.Age"
-                                       placeholder="Age" (keyup.enter)="setFocusById('Contact')" />
+                                       placeholder="Age"
+                                       (keyup.enter)="newPatient.EthnicGroup ? setFocusById('Contact') : setFocusById('id_select_ethnic_group')" />
                               </div>
                             </div>
                             <div class="col-md-9">
@@ -113,7 +150,8 @@
                                 <div class="col-md-12" style="padding: 0;">
                                   <div class="input-group padding-7-tp">
                                     <select id="ageUnit" class="form-control" [(ngModel)]="newPatient.AgeUnit"
-                                            [ngModelOptions]="{standalone: true}" (ngModelChange)="CalculateDob()">
+                                            [ngModelOptions]="{standalone: true}" (ngModelChange)="CalculateDob()"
+                                            [disabled]="ExistingPatientSearched ? true : null">
                                       <option value="Y" selected>Years</option>
                                       <option value="M">Months</option>
                                       <option value="D">Days</option>
@@ -143,6 +181,17 @@
                                         [hidden]="newPatient.IsValidCheck('Age','required')"> Age is required.</span></div>
                               </div>
                             </div>
+                          </div>
+                        </div>
+                        <div class="form-group">
+                          <label for="" class="control-label col-md-4">Caste/Ethnic Group<b class="color-red"> *</b><b
+                               style="float:right;">:</b></label>
+                          <div class="col-md-7">
+                            <select-ethnic-group
+                                                 [patient-ethnic-group]="newPatient.EthnicGroup" [lastName]="PatientLastName"
+                                                 (on-ethnic-group-change)="OnEthnicGroupChangeCallBack($event)"
+                                                 (change)="setFocusById('Contact')">
+                            </select-ethnic-group>
                           </div>
                         </div>
                       </div>
@@ -228,7 +277,7 @@
           <div class="modelbox-footer">
             <div class="all-buttons text-right">
               <button id="registerPatient" type="button" class="btn green btn-success tooltip" [disabled]="loading"
-                      (click)="SavePateintLocally()"> OK</button>
+                      (click)="CheckValidationsAndSave()"> OK</button>
               <button type="button" class="btn btn-cancel btn-sm margin-7-hr" (click)="Close()"> Close </button>
             </div>
           </div>

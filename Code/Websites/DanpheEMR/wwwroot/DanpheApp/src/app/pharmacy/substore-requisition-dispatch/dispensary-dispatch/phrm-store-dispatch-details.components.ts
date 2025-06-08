@@ -63,7 +63,7 @@ export class PHRMStoreDispatchDetailsComponent {
                         this.requisitionItemsDetails.forEach(itm => {
                               itm.CreatedOn = moment(itm.CreatedOn).format('YYYY-MM-DD');
                         });
-                        this.requisitionDate = this.requisitionItemsDetails[0].CreatedOn;
+                        this.requisitionDate = this.requisitionItemsDetails[0].RequisitionDate;
                         this.createdby = this.requisitionItemsDetails[0].CreatedByName;
                         this.dispatchedby = this.requisitionItemsDetails[0].DispatchedByName;
                         this.receivedby = this.requisitionItemsDetails.find(a => a.ReceivedBy != null).ReceivedBy;

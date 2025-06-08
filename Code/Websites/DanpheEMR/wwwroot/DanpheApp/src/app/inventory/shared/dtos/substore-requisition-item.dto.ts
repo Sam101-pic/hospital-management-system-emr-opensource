@@ -24,4 +24,6 @@ export class SubStoreRequisitionItems_DTO {
     public RequisitionItemId: number = null;
     public ItemCategory: string = null;
     public IsActive: boolean = false;
+    public Specification: string = null;
+    public IsSelected: boolean = false;
 }

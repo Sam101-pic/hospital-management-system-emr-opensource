@@ -51,9 +51,9 @@ export class EditDoctorFeatureComponent {
 
     //for grid
     this.editDoctorGridColumns = GridColumnSettings.EditDoctorItemList;
-    this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('Date', true));
+    this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('Date', false));
 
-    //giving default to the to and from date 
+    //giving default to the to and from date
     //this.currentEditDocotorModel.ToDate = moment().format('YYYY-MM-DD');
     //this.currentEditDocotorModel.FromDate = moment().add(-1, 'days').format('YYYY-MM-DD');
     this.patGirdDataApi = APIsByType.BillingEditDoctor;
@@ -140,8 +140,9 @@ export class EditDoctorFeatureComponent {
   Callback(res: Array<EditDoctorFeatureViewModel>) {
     this.editDoctorModels = new Array<EditDoctorFeatureViewModel>();
     //this.changeDetector.detectChanges();
-    if (res.length != 0) {
 
+    if (res.length != 0) {
+      this.GetDoctorList();
       for (var i = 0; i < res.length; i++) {
         var editDoctorModel: EditDoctorFeatureViewModel = new EditDoctorFeatureViewModel();
         editDoctorModel.Date = moment(res[i].Date).format("YYYY-MM-DD");
@@ -169,9 +170,21 @@ export class EditDoctorFeatureComponent {
           }
 
         }
+        if (this.doctorList && res[i].ReferredById) {
+          var docObj = this.doctorList.find(a => a.EmployeeId == res[i].ReferredById);
+          if (docObj) {
+            editDoctorModel.ReferrerName = docObj.EmployeeName;
+            editDoctorModel.ReferredById = docObj.EmployeeId;
+          }
+        }
         editDoctorModel.BillStatus = res[i].BillStatus;
         this.editDoctorModels.push(editDoctorModel);
 
+      }
+      if (this.editDoctorModels && this.editDoctorModels.length > 0) {
+        this.editDoctorModels.map(EDM => {
+          EDM.Age = this.coreService.CalculateAge(EDM.DateOfBirth);
+        })
       }
 
     }
@@ -207,10 +220,10 @@ export class EditDoctorFeatureComponent {
 
     this.showEditDoctorPage = false;
   }
-  //this function is called from the grid 
+  //this function is called from the grid
   //and in this function data is passed to the popup model(edit-component)
   EditDoctor(event, data) {
-    // to detect the change 
+    // to detect the change
     this.showEditDoctorPage = false;
     //assigning the value
     var selectedItem = Object.create(data);
@@ -223,7 +236,7 @@ export class EditDoctorFeatureComponent {
   }
 
   public doctorList: any;
-  //load doctor  
+  //load doctor
   GetDoctorList(): void {
     this.billingBLService.GetAllReferrerList()
       .subscribe(res => this.CallBackGenerateDoctor(res));

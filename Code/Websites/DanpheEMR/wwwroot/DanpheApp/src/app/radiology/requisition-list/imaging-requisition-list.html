@@ -1,7 +1,8 @@
 <div class="wrapper">
   <div class="flex-container flex-align-center margin-15-bt margin-5-tp">
     <div class="flex-1">
-      <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject font-blue-sharp bold uppercase">Active Imaging Request</span> </div>
+      <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span
+              class="caption-subject font-blue-sharp bold uppercase">Active Imaging Request</span> </div>
     </div>
     <div class="flex-1 text-right">
       <div>
@@ -12,9 +13,16 @@
   </div>
   <div class="row">
     <div class="col-md-12 col-lg-12 col-sm-12">
-      <danphe-post-report [showreport]="showreport" [report]="selectedReport" [patient]="patientDetails" (add-report)="AddReport($event)"></danphe-post-report>
-      <danphe-grid *ngIf="!loadingGridData" [grid-colDefaults]="imgReqListGridColumns" [grid-data]="imagingReportsFiltered" [rangeType]="dateRange" (onDateChange)="onGridDateChange($event)" [date-range-options]="'1D,1W,1M,3M'" [show-CustomDate]="true" (grid-actions)="ImagingRequisitionListGridActions($event)" [show-print-button]="false" [NepaliDateInGridParams]="NepaliDateInGridSettings"> </danphe-grid>
-      <danphe-view-imaging-report [print-without-preview]="true" *ngIf="showImagingReport" [requisitionId]="requisitionId" (on-report-edit)="GetBackOnClose($event)"></danphe-view-imaging-report>
+      <danphe-post-report *ngIf="showreport" [showreport]="showreport" [report]="selectedReport" [patient]="patientDetails"
+                          (add-report)="AddReport($event)"></danphe-post-report>
+      <danphe-grid *ngIf="!loadingGridData" [grid-colDefaults]="imgReqListGridColumns" [grid-data]="imagingReports" [rangeType]="dateRange"
+                   (onDateChange)="onGridDateChange($event)" [date-settings-name]="'rad-grid'" [show-CustomDate]="true"
+                   (grid-actions)="ImagingRequisitionListGridActions($event)"
+                   [show-print-button]="false" [NepaliDateInGridParams]="NepaliDateInGridSettings"
+                   [date-settings-name]="'rad-grid'">
+      </danphe-grid>
+      <danphe-view-imaging-report [print-without-preview]="true" *ngIf="showImagingReport" [requisitionId]="requisitionId"
+                                  (on-report-edit)="GetBackOnClose($event)"></danphe-view-imaging-report>
     </div>
   </div>
 
@@ -33,7 +41,10 @@
                 <a style="float:right;  margin-top:-32px;" class="btn btn-danger" (click)="Close()" title="Cancel">X</a>
               </div>
               <div class="col-md-12" style="border-bottom:solid 1px black;">
-                <b> Patient Name: </b><span> {{patientDetails.FirstName}} {{patientDetails.LastName}} ({{patientDetails.PatientCode}}) </span> &nbsp;&nbsp; <b>Age/Sex:</b> <span>{{patientDetails.Age }}/{{patientDetails.Gender}}</span> &nbsp;&nbsp; <b>Phone No: </b><span> {{patientDetails.PhoneNumber}} </span> &nbsp;&nbsp; <b>Request On:</b><span> {{reportData.CreatedOn | DanpheDateTime:'format':'YYYY-MM-DD HH:mm'}}</span> <br />
+                <b> Patient Name: </b><span> {{patientDetails.FirstName}} {{patientDetails.LastName}} ({{patientDetails.PatientCode}}) </span>
+                &nbsp;&nbsp; <b>Age/Sex:</b> <span>{{patientDetails.Age }}/{{patientDetails.Gender}}</span> &nbsp;&nbsp; <b>Phone No: </b><span>
+                  {{patientDetails.PhoneNumber}} </span> &nbsp;&nbsp; <b>Request On:</b><span> {{reportData.CreatedOn |
+                  DanpheDateTime:'format':'YYYY-MM-DD HH:mm'}}</span> <br />
                 <danphe-cust-date (onDateChange)="onDateChange($event)" [rangeType]="dateRange"></danphe-cust-date>
               </div>
               <div class="row">
@@ -59,7 +70,8 @@
                             <div class="input-group">
                               <div class="icheck-inline">
                                 <label class="mt-checkbox mt-checkbox-outline">
-                                  <input type="radio" value={{row.PatientStudyId}} (ngModelChange)="onSelectionChange(row.PatientStudyId)" [(ngModel)]="row.PatientStudyId">
+                                  <input type="radio" value={{row.PatientStudyId}} (ngModelChange)="onSelectionChange(row.PatientStudyId)"
+                                         [(ngModel)]="row.PatientStudyId">
                                   <span></span>
                                 </label>
                               </div>
@@ -117,8 +129,12 @@
                       <br />
                       <div class="col-md-5">Film Type<b class="color-red"> *</b></div>
                       <div class="col-md-7">
-                        <input class="form-control" danphe-auto-complete [(ngModel)]="selectedFilmType" [list-formatter]="FilmTypeListFormatter" [source]="filmList" placeholder="Select The Film Type" display-property-name="FilmTypeDisplayName" value-property-name=null formControlName="FilmType" onclick="this.select()" (valueChanged)="loadFilmType()" max-num-list="10">
-                        <span class="color-red" *ngIf="filmTypeValidatorModel.IsDirty('FilmType')" [hidden]="filmTypeValidatorModel.IsValidCheck('FilmType','required')">FilmType Is Required</span>
+                        <input class="form-control" danphe-auto-complete [(ngModel)]="selectedFilmType" [list-formatter]="FilmTypeListFormatter"
+                               [source]="filmList" placeholder="Select The Film Type" display-property-name="FilmTypeDisplayName"
+                               value-property-name=null formControlName="FilmType"
+                               onclick="this.select()" (valueChanged)="loadFilmType()" max-num-list="10">
+                        <span class="color-red" *ngIf="filmTypeValidatorModel.IsDirty('FilmType')"
+                              [hidden]="filmTypeValidatorModel.IsValidCheck('FilmType','required')">FilmType Is Required</span>
                       </div>
                     </div>
                   </div>

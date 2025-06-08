@@ -3,7 +3,7 @@ import { ChangeDetectorRef, Component, Input } from '@angular/core';
 import { Router } from '@angular/router';
 import * as moment from 'moment/moment';
 import { CoreService } from '../../../core/shared/core.service';
-import { ENUM_PrintingType, PrinterSettingsModel } from '../../../settings-new/printers/printer-settings.model';
+import { ENUM_PrintType, ENUM_PrintingType, PrinterSettingsModel } from '../../../settings-new/printers/printer-settings.model';
 import { NepaliCalendarService } from '../../../shared/calendar/np/nepali-calendar.service';
 import { CommonFunctions } from '../../../shared/common.functions';
 import { DanpheLoadingInterceptor } from '../../../shared/danphe-loader-intercepter/danphe-loading.services';
@@ -12,6 +12,7 @@ import { RouteFromService } from '../../../shared/routefrom.service';
 import { BillInvoiceReturnModel } from '../../shared/bill-invoice-return.model';
 import { BillingBLService } from '../../shared/billing.bl.service';
 import { BillingService } from '../../shared/billing.service';
+import { PrintTemplateType } from '../../shared/print-template-type.model';
 
 @Component({
   selector: 'bill-print-credit-note',
@@ -48,8 +49,8 @@ export class Bill_Print_CreditNote_Component {
   public isDataLoaded: boolean = false;
 
   public loading: boolean = false;
-
-
+  DynamicCreditNoteTemplate: string = "";
+  public PrintTemplateTypeSettings = new PrintTemplateType();
 
   constructor(
     public BillingBLService: BillingBLService,
@@ -66,7 +67,7 @@ export class Bill_Print_CreditNote_Component {
     let paramValue = this.coreService.Parameters.find(a => a.ParameterName === 'BillingHeader').ParameterValue;
     if (paramValue)
       this.headerDetail = JSON.parse(paramValue);
-    //this.SetPrinterFromParam();
+    this.ReadPrintReceiptDisplaySettingParameter();
 
   }
 
@@ -79,8 +80,12 @@ export class Bill_Print_CreditNote_Component {
       this.router.navigate(['Billing/DuplicatePrints/InvoiceReturn']);
     }
   }
-
   ngAfterViewInit() {
+    //id_btn_print_dynamic_credit_note_receipt    let btnObj = document.getElementById('btnPrintDischargeInvoice');
+    let btnObj = document.getElementById('id_btn_print_dynamic_credit_note_receipt');
+    if (btnObj) {
+      btnObj.focus();
+    }
 
   }
 
@@ -91,6 +96,9 @@ export class Bill_Print_CreditNote_Component {
       .subscribe(res => {
         if (res.Status == "OK") {
           this.Patient = res.Results.BillReturnTransaction.Patient;
+          if (this.Patient && this.Patient.Age) {
+            this.Patient.Age = this.coreService.CalculateAge(this.Patient.DateOfBirth);
+          }
           this.BillReturnUserName = res.Results.UserName;
           this.ReturnInvoice = res.Results.BillReturnTransaction;
           this.ReferenceInvoiceDate = res.Results.ReferenceInvoiceDate;
@@ -104,6 +112,7 @@ export class Bill_Print_CreditNote_Component {
 
           this.isDataLoaded = true;
           this.coreService.FocusInputById("btnPrintCreditNote");
+          this.RenderDynamicTemplateForCreditNote(res);
         }
         else {
           this.msgBoxServ.showMessage("error", ["Unable to fetch Credit Note. Pls try again later.."]);
@@ -129,6 +138,38 @@ export class Bill_Print_CreditNote_Component {
 
   public openBrowserPrintWindow: boolean = false;
   public browserPrintContentObj: any;
+
+
+  private RenderDynamicTemplateForCreditNote(res: any) {
+    let htmlElement = document.getElementById("id_dynamic_template_return_invoice_detail");
+    if (htmlElement && this.PrintTemplateTypeSettings && this.PrintTemplateTypeSettings.Enable) {
+      let returnInvoiceData = document.createElement('div');
+      returnInvoiceData.innerHTML = res.Results.InvoicePrintTemplate;
+      this.DynamicCreditNoteTemplate = res.Results.InvoicePrintTemplate;
+      document.getElementById('id_dynamic_template_return_invoice_detail').appendChild(returnInvoiceData);
+      this.changeDetector.detectChanges();
+    }
+  }
+
+  public PrintDynamicReceipt() {
+    this.loading = true;
+    //Open 'Browser Print' if printer not found or selected printing type is Browser.
+    this.GenerateDynamicInvoicePrintBrowser(this.DynamicCreditNoteTemplate);
+    this.loading = false;
+  }
+
+  GenerateDynamicInvoicePrintBrowser(dataToPrint: string) {
+    let iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.contentWindow.document.open();
+    iframe.contentWindow.document.write(dataToPrint);
+    iframe.contentWindow.document.close();
+
+    setTimeout(function () {
+      document.body.removeChild(iframe);
+    }, 500);
+
+  }
 
   public print() {
     this.loading = true;
@@ -168,7 +209,16 @@ export class Bill_Print_CreditNote_Component {
       this.loading = false;
     }
   }
+  ReadPrintReceiptDisplaySettingParameter() {
+    let currParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "UseDynamicInvoicePrint");
+    if (currParam && currParam.ParameterValue) {
+      const paramValue = JSON.parse(currParam.ParameterValue) as Array<PrintTemplateType>;
 
+      if (paramValue) {
+        this.PrintTemplateTypeSettings = paramValue.find(p => p.PrintType === ENUM_PrintType.returnInvoice);
+      }
+    }
+  }
 
   public MakeReceipt() {
     let totalHeight_lines = this.selectedPrinter.Height_Lines;

@@ -14,6 +14,7 @@ namespace DanpheEMR.Services.LIS
         LISComponentMapModel GetSelectedMappedDataById(int id);
         void AddUpdateMapping(List<LISComponentMapModel> mapping);
         void DeleteMapping(int id, int userId);
+        void ActivateMapping(int id, int userId);
         Task<List<MachineResultsFormatted>> GetMachineResults(int machineId, DateTime fromDate, DateTime toDate);
         IEnumerable<LISMachineMaster> GetAllMachines();
         Task<bool> AddLISDataToDanphe(List<MachineResultsVM> machineData);

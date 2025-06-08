@@ -38,7 +38,9 @@ namespace DanpheEMR.ServerModel.AccountingModels
         public string BankRefNumber { get; set; }
         public int VoucherTypeId { get; set; }
         public int PartyLedgerId { get; set; }
-        public int PartySubLedgerId { get; set; }
+        public int? PartySubLedgerId { get; set; }
+        public int? SubLedgerId { get; set; }
+        public int TransactionItemId { get; set; }
     }
 
     public class BankReconciliationVM

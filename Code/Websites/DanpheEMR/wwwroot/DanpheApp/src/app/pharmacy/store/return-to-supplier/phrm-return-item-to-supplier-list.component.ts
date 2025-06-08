@@ -1,18 +1,20 @@
-import { Component, ChangeDetectorRef } from "@angular/core";
-import PHRMGridColumns from '../../shared/phrm-grid-columns';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import { PHRMReturnToSupplierModel } from "../../shared/phrm-return-to-supplier.model";
-import { PHRMReturnToSupplierItemModel } from "../../shared/phrm-return-to-supplier-items.model"
-import { PharmacyBLService } from "../../shared/pharmacy.bl.service"
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service"
-import * as moment from 'moment/moment';
-import { PHRMSupplierModel } from "../../shared/phrm-supplier.model";
-import { CoreService } from "../../../core/shared/core.service";
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { ChangeDetectorRef, Component } from "@angular/core";
 import { ActivatedRoute } from "@angular/router";
-import { PharmacyService } from "../../shared/pharmacy.service";
+import * as moment from 'moment/moment';
+import { CoreService } from "../../../core/shared/core.service";
 import { SecurityService } from "../../../security/shared/security.service";
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
+import { PharmacyService } from "../../shared/pharmacy.service";
+import PHRMGridColumns from '../../shared/phrm-grid-columns';
+import { PHRMReturnToSupplierItemModel } from "../../shared/phrm-return-to-supplier-items.model";
+import { PHRMReturnToSupplierModel } from "../../shared/phrm-return-to-supplier.model";
+import { PHRMSupplierModel } from "../../shared/phrm-supplier.model";
+
+
 @Component({
     templateUrl: "./phrm-return-item-to-supplier-list.html",
     host: { '(window:keydown)': 'hotkeys($event)' }
@@ -40,7 +42,7 @@ export class PHRMReturnItemToSupplierListComponent {
     public toDate: string = null;
     public dateRange: string = "last1Week";  //by default show last 1 week data.;
     public ReturnToSupplierId: number = null;
-    public returnType = [{ id: 1, name: "Breakage" }, { id: 2, name: "Expiry" }, { id: 3, name: "Breakage and Expiry" }];
+    public returnType = [{ id: 1, name: "Breakage" }, { id: 2, name: "Expiry" }, { id: 3, name: "Breakage and Expiry" }, { id: 4, name: "Others" }];
     public RetType: any;
     public returnsuppList: Array<any> = [];
     public userName: any;
@@ -52,13 +54,12 @@ export class PHRMReturnItemToSupplierListComponent {
     printDetaiils: any;
     showFreeQty: boolean;
     showCCCharge: boolean;
-
+    patientQRCodeInfo: string = '';
     public GeneralFieldLabel = new GeneralFieldLabels();
     constructor(public coreService: CoreService,
         public pharmacyBLService: PharmacyBLService,
         public changeDetector: ChangeDetectorRef,
         public msgBoxServ: MessageboxService, public securityService: SecurityService, public route: ActivatedRoute, public pharmacyService: PharmacyService) {
-        /////Grid Coloumn Variable
         this.returnToSupplierListGridColumns = PHRMGridColumns.PHRMReturnItemToSupplierList;
         this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('ReturnDate', false));
         this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
@@ -95,18 +96,6 @@ export class PHRMReturnItemToSupplierListComponent {
     ReturnToSupplierGridAction($event: GridEmitModel) {
         switch ($event.Action) {
             case "view": {
-                this.currentSupplier = Object.assign({}, $event.Data);
-                this.currentSupplier["Remarks"] = $event.Data.Remarks;
-                for (let i = 0; i < this.returnType.length; i++) {
-                    if ($event.Data.ReturnStatus == this.returnType[i].id) {
-                        this.RetType = this.returnType[i].name;
-                    }
-
-                }
-                this.goodReceiptPrintId = $event.Data.GoodReceiptPrintId;
-                this.returnDate = moment($event.Data.ReturnDate).format("YYYY-DD-MM");
-                this.userName = $event.Data.UserName;
-                this.time = $event.Data.ReturnDate;
                 this.ShowRetSuppItemsDetailsByRetSuppId($event.Data.ReturnToSupplierId);
                 break;
             }
@@ -130,94 +119,62 @@ export class PHRMReturnItemToSupplierListComponent {
     }
     ///this function is for when enduser Clicks on View in POList 
     ShowRetSuppItemsDetailsByRetSuppId(returnToSupplierId) {
-        this.showRetSuppItemsbyRetSuppID = false;
-        this.changeDetector.detectChanges();
-        ///After ChangeDetection We r changing showRetSuppItemsbyRetSuppID=true because we have to display ModelPopupBox Based on this Flag
-        this.showRetSuppItemsbyRetSuppID = true;
-        //////Here is Logic To Minimize the Server Call on Each request : Umed-21/12/2017
-        /////Every New Request We go to Server 
-        ////After that we can store Result data to some varible and Once again if same request is come  then we can display data from locally store varible (without making new Server call)
-        //localDatalist is Array of POItems in this variable we are storing Response Data 
 
-
-        //len is local varibale deceleration
-        var len = this.localDatalist.length;
-        ///lopping Each Locally store data and if perticular data is found on selected returnToSupplierId , then we can push selected data to selectedDatalist array 
-        for (var i = 0; i < len; i++) {
-            let selectedDataset = this.localDatalist[i];
-            if (selectedDataset.ReturnToSupplierId == returnToSupplierId) {
-                this.selectedDatalist.push(selectedDataset);
-            }
-
-
-
-        }
-
-        ///if we have some selectedDatalist then we can display that on View 
-        if (this.selectedDatalist[0] && returnToSupplierId) {
-            ///storing selectedDatalist to PHRMRetSuppItemsList to Display in View
-            this.PHRMRetSuppItemsList = this.selectedDatalist;
-            ///after passing data to View - we have to make sure that selectedDatalist should be Empty
-            this.selectedDatalist = new Array<PHRMReturnToSupplierItemModel>();
-            this.SetFocusOnButton("printButton");
-
-        }
-        else {
-            (   /////making new server call through BL and DL service By Passing returnToSupplierId
-                this.pharmacyBLService.GetReturnDetailByRetSuppId(returnToSupplierId)
-                    .subscribe(res => {
-                        if (res.Status == "OK") {
-                            ////this is the final data and we have stored in PHRMRetSuppItemsList because we have to display data in View
-                            this.PHRMRetSuppItemsList = res.Results.returnToSupplierItemsList;
-                            this.returnSupplierData = res.Results.returnSupplierData;
-                            this.userName = this.returnSupplierData.UserName;
-                            this.time = this.returnSupplierData.Time;
-                            let returnType = this.returnSupplierData.ReturnType
-                            for (let i = 0; i < this.returnType.length; i++) {
-                                if (returnType == this.returnType[i].id) {
-                                    this.RetType = this.returnType[i].name;
-                                }
-                            }
-
-                            this.currentSupplier.CreditNotePrintId = this.returnSupplierData.CreditNoteNo;
-                            this.currentSupplier.CreditNoteNo = this.returnSupplierData.SuppliersCRN;
-                            this.currentSupplier.SupplierName = this.returnSupplierData.SupplierName;
-                            this.currentSupplier.PANNumber = this.returnSupplierData.PanNo;
-                            this.currentSupplier.ContactNo = this.returnSupplierData.ContactNo;
-                            let ReturnDate = this.returnSupplierData.ReturnDate;
-                            this.returnDate = moment(ReturnDate).format("YYYY-MM-DD");
-                            this.goodReceiptPrintId = this.returnSupplierData.RefNo;
-                            this.currentSupplier.Remarks = this.returnSupplierData.Remarks;
-
-                            // this.time = res.Results[0].CreatedOn;
-                            this.PHRMRetSuppItemsList.forEach(supItm => {
-                                supItm.ExpiryDate = moment(supItm.ExpiryDate).format("YYYY-MM-DD");
-                                supItm.DiscountedAmount = (supItm.DiscountPercentage * supItm.SubTotal) / 100;
-                                supItm.VATAmount = (supItm.SubTotal - supItm.DiscountedAmount) * supItm.VATPercentage / 100;
-
-                            });
-
-                            this.currentSupplier['DiscountAmouhn']
-                            ///After that we are passing same Results To localDatalist to minimize the server call and once same request is come, then display data in view by using that
-                            ///insted of making server call we can fatch data from Local 
-                            this.PHRMRetSuppItemsList.forEach(itm => { this.localDatalist.push(itm); });
-                            this.currentSupplier.SubTotal = this.PHRMRetSuppItemsList.reduce((acc, itm) => acc + itm.SubTotal, 0);
-                            this.currentSupplier.DiscountAmount = this.PHRMRetSuppItemsList.reduce((acc, itm) => acc + itm.DiscountedAmount, 0);
-                            this.currentSupplier.VATAmount = this.PHRMRetSuppItemsList.reduce((acc, itm) => acc + itm.VATAmount, 0);
-                            this.currentSupplier.TotalAmount = this.PHRMRetSuppItemsList.reduce((acc, itm) => acc + itm.TotalAmount, 0);
-                            this.SetFocusOnButton("printButton");
-
-
-                        } else {
-                            this.msgBoxServ.showMessage("failed", ['Failed to get OrderList.' + res.ErrorMessage]);
+        this.pharmacyBLService.GetReturnDetailByRetSuppId(returnToSupplierId)
+            .subscribe(res => {
+                if (res.Status == "OK") {
+                    this.PHRMRetSuppItemsList = res.Results.returnToSupplierItemsList;
+                    this.returnSupplierData = res.Results.returnSupplierData;
+                    this.userName = this.returnSupplierData.UserName;
+                    this.time = this.returnSupplierData.Time;
+                    switch (this.returnSupplierData.ReturnType) {
+                        case 1: {
+                            this.RetType = "Breakage";
+                            break;
                         }
-                    },
-                        err => {
-                            this.msgBoxServ.showMessage("error", ['Failed to get OrderList.' + err.ErrorMessage]);
+                        case 2: {
+                            this.RetType = "Expiry";
+                            break;
                         }
-                    )
+                        case 3: {
+                            this.RetType = "Breakage and Expiry";
+                            break;
+                        }
+                        case 4: {
+                            this.RetType = "Others";
+                            break;
+                        }
+                    }
+                    //  this.RetType = this.returnSupplierData.ReturnType;
+                    this.currentSupplier.CreditNotePrintId = this.returnSupplierData.CreditNoteNo;
+                    this.currentSupplier.CreditNoteNo = this.returnSupplierData.SuppliersCRN;
+                    this.currentSupplier.SupplierName = this.returnSupplierData.SupplierName;
+                    this.currentSupplier.PANNumber = this.returnSupplierData.PanNo;
+                    this.currentSupplier.ContactNo = this.returnSupplierData.ContactNo;
+                    let ReturnDate = this.returnSupplierData.ReturnDate;
+                    this.returnDate = moment(ReturnDate).format("YYYY-MM-DD");
+                    this.goodReceiptPrintId = this.returnSupplierData.RefNo;
+                    this.currentSupplier.Remarks = this.returnSupplierData.Remarks;
+                    this.time = this.PHRMRetSuppItemsList[0].CreatedOn;
+                    this.PHRMRetSuppItemsList.forEach(itm => { this.localDatalist.push(itm); });
+                    this.currentSupplier.SubTotal = this.PHRMRetSuppItemsList.reduce((acc, itm) => acc + itm.SubTotal, 0);
+                    this.currentSupplier.DiscountAmount = this.PHRMRetSuppItemsList.reduce((acc, itm) => acc + itm.DiscountedAmount, 0);
+                    this.currentSupplier.VATAmount = this.PHRMRetSuppItemsList.reduce((acc, itm) => acc + itm.VATAmount, 0);
+                    this.currentSupplier.TotalAmount = this.PHRMRetSuppItemsList.reduce((acc, itm) => acc + itm.TotalAmount, 0);
+                    this.showRetSuppItemsbyRetSuppID = true;
+                    this.SetFocusOnButton("printButton");
+
+
+                } else {
+                    this.msgBoxServ.showMessage("failed", ['Failed to get OrderList.' + res.ErrorMessage]);
+                }
+
+            },
+                err => {
+                    this.msgBoxServ.showMessage("error", ['Failed to get OrderList.' + err.ErrorMessage]);
+                }
             )
-        }
+
     }
 
     /////For Closing ModelBox Popup
@@ -284,5 +241,6 @@ class ReturnToSupplierData {
     RefNo: number = 0;
     SupplierName: string = '';
     Remarks: string = '';
+    CreatedOn: string = '';
 }
 

@@ -1,36 +1,35 @@
-import { Component, ViewChild, ChangeDetectorRef } from "@angular/core";
-import { Router } from '@angular/router';
+import { ChangeDetectorRef, Component } from "@angular/core";
 
-import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
 import GridColumnSettings from '../../shared/danphe-grid/grid-column-settings.constant';
+import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
 
-import { PatientService } from '../../patients/shared/patient.service';
-import { VisitService } from '../../appointments/shared/visit.service';
-import { ImagingItemReport, RadiologyScanDoneDetail } from '../shared/imaging-item-report.model';
-import { Patient } from '../../patients/shared/patient.model';
-import { ImagingItemRequisition } from '../shared/imaging-item-requisition.model';
-import { ImagingBLService } from '../shared/imaging.bl.service';
 import * as moment from 'moment/moment';
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { ImagingPatientStudy } from "../shared/imaging-patient-study.model";
+import { VisitService } from '../../appointments/shared/visit.service';
 import { CoreService } from "../../core/shared/core.service";
+import { Patient } from '../../patients/shared/patient.model';
+import { PatientService } from '../../patients/shared/patient.service';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { ImagingItemReport, RadiologyScanDoneDetail } from '../shared/imaging-item-report.model';
+import { ImagingPatientStudy } from "../shared/imaging-patient-study.model";
+import { ImagingBLService } from '../shared/imaging.bl.service';
 //needed to assign external html as innerHTML property of some div
 //otherwise angular removes some css property from the DOM. 
 import { DomSanitizer } from '@angular/platform-browser';
-import { ImagingType } from "../shared/imaging-type.model";
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from "../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { SecurityService } from "../../security/shared/security.service";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { FilmTypeModel } from "../shared/imaging-film-type-model";
 import { FilmTypeValidatorModel } from "../shared/imaging-filmtype-validator-model";
+import { ImagingType } from "../shared/imaging-type.model";
 
 @Component({
-  templateUrl: "./imaging-requisition-list.html" //  "/RadiologyView/ImagingRequisitionList"
+  templateUrl: "./imaging-requisition-list.html", //  "/RadiologyView/ImagingRequisitionList"
+  host: { '(window:keydown)': 'hotkeys($event)' }
+
 })
 export class ImagingRequisitionListComponent {
 
   public CurrentImagingReport: ImagingItemReport = new ImagingItemReport();
   public imagingReports: Array<ImagingItemReport> = new Array<ImagingItemReport>();
-  public imagingReportsFiltered: Array<ImagingItemReport> = new Array<ImagingItemReport>();
   public imagingReportsLight: Array<ImagingItemReport> = new Array<ImagingItemReport>();
   //public NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
   //enable preview is for success or error dialog box.
@@ -50,13 +49,13 @@ export class ImagingRequisitionListComponent {
   public isShowButton: boolean = false;
   public imagingTypes: Array<ImagingType> = new Array<ImagingType>();
 
-  public filmTypeList:Array<FilmTypeModel> = new Array<FilmTypeModel>();// Alll list that comes from database
-  public filteredFilmTypeList:Array<FilmTypeModel> = new Array<FilmTypeModel>(); //Filtered list for selected type
-  public filmList:any;
-  public displayFilmDetail:boolean = false;
-  public selectedFilmType = { FilmTypeId:null, FilmTypeDisplayName:null};
+  public filmTypeList: Array<FilmTypeModel> = new Array<FilmTypeModel>();// Alll list that comes from database
+  public filteredFilmTypeList: Array<FilmTypeModel> = new Array<FilmTypeModel>(); //Filtered list for selected type
+  public filmList: any;
+  public displayFilmDetail: boolean = false;
+  public selectedFilmType = { FilmTypeId: null, FilmTypeDisplayName: null };
   public filmTypeValidatorModel: FilmTypeValidatorModel = new FilmTypeValidatorModel();
-  public isFilmTypeValid:boolean = true;
+  public isFilmTypeValid: boolean = true;
 
   //used to pass value to rangeType in custom-date
   public dateRange: string = "last1Week";  //by default show last 1 week data.;
@@ -89,11 +88,11 @@ export class ImagingRequisitionListComponent {
     public msgBoxServ: MessageboxService,
     public coreService: CoreService,
     public securityService: SecurityService,
-   
+
     public sanitizer: DomSanitizer) {
 
     //this.getImagingType();
-    this.selectedFilmType=null;
+    this.selectedFilmType = null;
     this.getFilmTypeData();
 
     this.GetButtonBehavior();
@@ -102,26 +101,26 @@ export class ImagingRequisitionListComponent {
     //this.GetImagingReqsAndReportsByStatus();//don't need this here since gridOnchange gets called automatically after loading.
     this.enableDoctorUpdateFromSignatory = this.coreService.UpdateAssignedToDoctorFromAddReportSignatory();
   }
-  ngOnInit(){
+  ngOnInit() {
     this.filmList = [];
-    this.filteredFilmTypeList =[];
-    
+    this.filteredFilmTypeList = [];
+
   }
-  
-  getFilmTypeData(){
+
+  getFilmTypeData() {
     this.imagingBLService.GetFilmTypeData()
-    .subscribe(res => {
-      if (res.Status == "OK") {
-        this.filmTypeList = res.Results;
-       
-      }
-      else
-        this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
-    });
+      .subscribe(res => {
+        if (res.Status == "OK") {
+          this.filmTypeList = res.Results;
+
+        }
+        else
+          this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+      });
 
   }
 
-  
+
   getRadRequisitionListFilteredColumns(columnObj: any): Array<any> {
     let cols = GridColumnSettings.ImagingRequisitionListSearch;
     var filteredColumns = [];
@@ -171,17 +170,11 @@ export class ImagingRequisitionListComponent {
         .subscribe(res => {
           if (res.Status == "OK") {
             this.imagingReports = res.Results;
-            this.imagingReportsFiltered = res.Results;
-            //this.imagingReports.forEach(x => {
-            //  x.IsShowButton = this.isShowButton;
-            //  x.ProviderName= x.ProviderName ? x.ProviderName:'self';
-            //});
-            //if (this.selImgType == 'All') {
-            //  this.imagingReportsFiltered = this.imagingReports.filter(x => x.IsActive == true);
-
-            //} else {
-            //  this.imagingReportsFiltered = this.imagingReports.filter(x => (x.ImagingTypeName == this.selImgType) && (x.IsActive == true));
-            //}
+            if (this.imagingReports && this.imagingReports.length > 0) {
+              this.imagingReports.map(IR => {
+                IR.Patient.Age = this.coreService.CalculateAge(IR.Patient.DateOfBirth);
+              });
+            }
             this.enablePreview = true;
           }
           else
@@ -284,16 +277,16 @@ export class ImagingRequisitionListComponent {
           this.scanDetail.ImagingRequisitionId = $event.Data.ImagingRequisitionId;
           this.scanDetail.PatientCode = $event.Data.Patient.PatientCode;
           this.scanDetail.ShortName = $event.Data.Patient.ShortName;
-          this.filmList =[];
+          this.filmList = [];
           this.displayFilmDetail = false;
-          this.selectedFilmType=null;
-          this.filteredFilmTypeList = this.filmTypeList.filter(a=>a.ImagingTypeId == $event.Data.ImagingTypeId);
-          if(this.filteredFilmTypeList.length>0){
+          this.selectedFilmType = null;
+          this.filteredFilmTypeList = this.filmTypeList.filter(a => a.ImagingTypeId == $event.Data.ImagingTypeId);
+          if (this.filteredFilmTypeList.length > 0) {
             this.displayFilmDetail = true;
             this.filteredFilmTypeList.forEach(a => {
-              this.filmList.push({"FilmTypeId":a.FilmTypeId,"FilmTypeDisplayName":a.FilmTypeDisplayName});
+              this.filmList.push({ "FilmTypeId": a.FilmTypeId, "FilmTypeDisplayName": a.FilmTypeDisplayName });
             });
-            
+
           }
           // this.filmList.push({"FilmTypeId":"1","FilmType":"8*10"});
           // this.filmList.push({"FilmTypeId":"2","FilmType":"87*10"});
@@ -308,8 +301,8 @@ export class ImagingRequisitionListComponent {
   }
 
   SaveScanData() {
-    this.filmTypeValidatorModel.UpdateValidator("on","FilmType","required");
-    if(!this.displayFilmDetail){
+    this.filmTypeValidatorModel.UpdateValidator("on", "FilmType", "required");
+    if (!this.displayFilmDetail) {
       this.filmTypeValidatorModel.UpdateValidator("off", "FilmType", null);
     }
     for (var i in this.filmTypeValidatorModel.FilmTypeValidator.controls) {
@@ -317,32 +310,32 @@ export class ImagingRequisitionListComponent {
       this.filmTypeValidatorModel.FilmTypeValidator.controls[i].updateValueAndValidity();
     }
     if (this.filmTypeValidatorModel.IsValidCheck(undefined, undefined)) {
-      if(this.displayFilmDetail){
-        if(this.selectedFilmType.FilmTypeId >0){
-      
-          this.scanDetail.FilmTypeId= this.selectedFilmType.FilmTypeId;
+      if (this.displayFilmDetail) {
+        if (this.selectedFilmType.FilmTypeId > 0) {
+
+          this.scanDetail.FilmTypeId = this.selectedFilmType.FilmTypeId;
           this.putScan();
         }
-        else{
+        else {
           this.resetValididation();
-          this.isFilmTypeValid=false;
-          this.msgBoxServ.showMessage('error',["Sorry FilmType is Invalid"]);
+          this.isFilmTypeValid = false;
+          this.msgBoxServ.showMessage('error', ["Sorry FilmType is Invalid"]);
           this.loadingGridData = false;
-          this.loading=false;
+          this.loading = false;
         }
 
       }
-      else{
-          this.putScan();
+      else {
+        this.putScan();
       }
     }
-    else{
+    else {
       this.loadingGridData = false;
-      this.loading=false;
+      this.loading = false;
     }
   }
 
-  putScan(){
+  putScan() {
     this.loadingGridData = true;
     if (this.loading) {
       console.log(this.scanDetail);
@@ -378,7 +371,7 @@ export class ImagingRequisitionListComponent {
     this.showScanDone = false;
   }
 
-  resetValididation(){
+  resetValididation() {
     this.filmTypeValidatorModel.UpdateValidator("off", "FilmType", null);
     this.filmTypeValidatorModel.FilmTypeValidator.controls["FilmType"].markAsDirty();
     this.filmTypeValidatorModel.FilmTypeValidator.controls["FilmType"].updateValueAndValidity();
@@ -410,7 +403,9 @@ export class ImagingRequisitionListComponent {
             selReport.ReportText = res.Results.ReportText;
             selReport.ReportTemplateId = res.Results.ReportTemplateId;
             selReport.TemplateName = res.Results.TemplateName;
-            
+
+            selReport.ReportTemplateIdsCSV = res.Results.ReportTemplateIdsCSV;
+
             //IMPORTANT: sanitizer.bypassSecurity : Needed to retain style/css of innerHTML !! --sud:12Apr'18'
             //let reportText = this.sanitizer.bypassSecurityTrustHtml(res.Results.ReportText);
 
@@ -531,41 +526,6 @@ export class ImagingRequisitionListComponent {
     }
   }
 
-  ////get list of report of the selected patient.
-  //GetPatientReportsByImagineType(frmDate: string, fileToDate: string): void {
-
-  //  this.imagingBLService.GetAllImagingReports(frmDate, fileToDate)
-  //    .subscribe(res => {
-  //      if ((res.Status == "OK") && (res.Results != null)) {
-  //        this.imagingReports = res.Results;
-  //        if (this.selImgType == 'All') {
-  //          this.imagingReportsFiltered = this.imagingReports;
-  //        } else {
-  //          this.imagingReportsFiltered = this.imagingReports.filter(x => x.ImagingTypeName == this.selImgType);
-  //        }
-
-  //        this.imagingReportsFiltered.forEach(val => {
-  //          if (val.Signatories) {
-  //            let signatures = JSON.parse(val.Signatories);
-  //            var name = '';
-  //            for (var i = 0; i < signatures.length; i++) {
-  //              if (signatures[i].EmployeeFullName) {
-  //                name = name + signatures[i].EmployeeFullName + ((i + 1 == signatures.length) ? '' : ' , ');
-  //              }
-  //            }
-  //            val.ReportingDoctorNamesFromSignatories = name;
-  //          } else {
-  //            val.ReportingDoctorNamesFromSignatories = '';
-  //          }
-  //        });
-  //        this.enablePreview = true;
-  //      }
-  //      else {
-  //        this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
-  //      }
-  //    });
-  //}
-
   //call back after imaging files attachment completed 
   CallBackPostImagingFile(res) {
     this.imagingReports[this.selIndex].PatientStudyId = res.PatientStudyId;
@@ -630,5 +590,9 @@ export class ImagingRequisitionListComponent {
     this.filmTypeValidatorModel.FilmType = this.selectedFilmType ? this.selectedFilmType.FilmTypeDisplayName : null;
   }
 
-    
+  hotkeys(event: any): void {
+    if (event.keyCode === 27) {
+      this.Close();
+    }
+  }
 }

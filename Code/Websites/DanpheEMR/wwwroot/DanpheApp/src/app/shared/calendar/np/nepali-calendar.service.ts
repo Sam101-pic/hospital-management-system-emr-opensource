@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
 import * as moment from 'moment/moment';
 import {
-  NepaliDate, NepaliMonth, NepaliDay, NepaliYear, NepaliHours, NepaliMinutes, NepaliAMPM
+  NepaliDate,
+  NepaliDay,
+  NepaliHours, NepaliMinutes
 } from './nepali-dates';
 
 @Injectable()
@@ -99,7 +101,7 @@ export class NepaliCalendarService {
     NepaliCalendarService.yr_mth_bs_static[1997] = [31, 31, 32, 31, 31, 31, 30, 30, 29, 30, 30, 30];
     NepaliCalendarService.yr_mth_bs_static[1998] = [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30];//days are corrected in this year: sud:15Mar'19
     NepaliCalendarService.yr_mth_bs_static[1999] = [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31];//days are corrected in this year: sud:15Mar'19
-    ///data below this are verified, but not above this.. 
+    ///data below this are verified, but not above this..
     NepaliCalendarService.yr_mth_bs_static[2000] = [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31];
     NepaliCalendarService.yr_mth_bs_static[2001] = [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30];
     NepaliCalendarService.yr_mth_bs_static[2002] = [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30];
@@ -183,8 +185,8 @@ export class NepaliCalendarService {
     // Below Dates are verified taking reference from Nepali Patro Online...
     NepaliCalendarService.yr_mth_bs_static[2079] = [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30];//pass
     NepaliCalendarService.yr_mth_bs_static[2080] = [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30];//pass
-    NepaliCalendarService.yr_mth_bs_static[2081] = [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 30];//pass
-    NepaliCalendarService.yr_mth_bs_static[2082] = [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30];//verify again
+    NepaliCalendarService.yr_mth_bs_static[2081] = [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31];//pass
+    NepaliCalendarService.yr_mth_bs_static[2082] = [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30];//pass
     NepaliCalendarService.yr_mth_bs_static[2083] = [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30];//verify again
     NepaliCalendarService.yr_mth_bs_static[2084] = [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31];//verify again
     NepaliCalendarService.yr_mth_bs_static[2085] = [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31];//verify again
@@ -210,7 +212,7 @@ export class NepaliCalendarService {
     let yrMonths = this.yr_mth_bs[yrNoBS];
     //get current month's day count (mth-1) since index starts from 0.
     let mthMaxDays = yrMonths[mthNoBS - 1];
-    //filter and return only valid days of that month. 
+    //filter and return only valid days of that month.
     let retDays = NepaliDay.GetAllNepaliDays().filter(d => d.dayNumber <= mthMaxDays);
     return retDays;
   }
@@ -294,7 +296,7 @@ export class NepaliCalendarService {
 
 
       let timeStr = retEngDate.toString().concat('T', hrsStr, ':', minStr);
-      //let timeFromStr = moment(timeStr).format('YYYY-MM-DDTHH:MM');                        
+      //let timeFromStr = moment(timeStr).format('YYYY-MM-DDTHH:MM');
       retEngDate = timeStr;
 
     }
@@ -308,12 +310,12 @@ export class NepaliCalendarService {
     dateObject.months = parseInt(moment(engDate).format('MM'));
     dateObject.hours = parseInt(moment(engDate).format('hh'));
     var engYY: number = moment().toObject().years;
-    //this is english date: 1900. 
+    //this is english date: 1900.
     // To change 2042 to more than this we need to update our mappings of nepali and engish dates.. // krishna, 20thMay'22
     if (dateObject.years > 1900 && dateObject.years <= 2042) {
       engYY = dateObject.years;
-    }else{
-      throw("Cannot Convert this year ("+dateObject.years+")AD to Nepali." + "Not implemented in calendar service");
+    } else {
+      throw ("Cannot Convert this year (" + dateObject.years + ")AD to Nepali." + "Not implemented in calendar service");
     }
 
 
@@ -857,7 +859,7 @@ export class NepaliCalendarService {
     dateObject.months = parseInt(moment(engDate).format('MM'));
     dateObject.hours = parseInt(moment(engDate).format('hh'));
     var engYY: number = moment().toObject().years;
-    //this is english date: 1900. 
+    //this is english date: 1900.
     if (dateObject.years > 1900 && dateObject.years < 2040) {
       engYY = dateObject.years;
     }
@@ -989,8 +991,8 @@ export class NepaliCalendarService {
 
   //sud:19Sept'20--To ger Start date and end date (in AD) for current selected Nepali Month.
   //used in Accounting and other modules.
-  //Usage Example: GetStartEndDatesOfNepaliMonth_InEngFormat(2077,4) to get Start/EndDate of 2077-Shrawan Month. 
-  //Usage Example: GetStartEndDatesOfNepaliMonth_InEngFormat(2075,9) to get Start/EndDate of 2075-Poush Month. 
+  //Usage Example: GetStartEndDatesOfNepaliMonth_InEngFormat(2077,4) to get Start/EndDate of 2077-Shrawan Month.
+  //Usage Example: GetStartEndDatesOfNepaliMonth_InEngFormat(2075,9) to get Start/EndDate of 2075-Poush Month.
   public GetStartEndDatesOfNepaliMonth_InEngFormat(nepYearNo: number, nepMonthNo: number) {
     let mthIndex = nepMonthNo - 1;//index will be current-1
     let totalDaysInNepMonth = NepaliCalendarService.yr_mth_bs_static[nepYearNo][mthIndex];

@@ -89,5 +89,7 @@ namespace DanpheEMR.ServerModel
         [NotMapped]
         public int? CreditOrganizationId { get; set; }
         public decimal? CCAmount { get; set; }
+        [NotMapped]
+        public decimal TaxableSubTotal { get; set; }
     }
 }

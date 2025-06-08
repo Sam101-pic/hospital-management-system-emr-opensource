@@ -29,6 +29,7 @@ namespace DanpheEMR.ServerModel
         public int? ModifiedBy { get; set; }
         public DateTime? CreatedOn { get; set; }
         public DateTime? ModifiedOn { get; set; }
+        public bool IsActive { get; set; }
         public virtual PatientModel Patient { get; set; }
     }
 

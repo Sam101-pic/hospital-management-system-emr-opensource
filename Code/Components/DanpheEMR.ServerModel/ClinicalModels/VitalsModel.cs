@@ -40,6 +40,11 @@ namespace DanpheEMR.ServerModel
         public DateTime? CreatedOn { get; set; }
         public DateTime VitalsTakenOn { get; set; }
         public DateTime? ModifiedOn { get; set; }
+        public string Eyes { get; set; }
+        public string Motor { get; set; }
+        public string Verbal { get; set; }
+      
+        public string Remarks { get; set; }
         //public virtual PatientModel Patient { get; set; }
     }
 }

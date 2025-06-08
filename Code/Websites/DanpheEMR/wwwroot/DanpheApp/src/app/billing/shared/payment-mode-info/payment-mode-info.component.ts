@@ -159,6 +159,9 @@ export class PaymentModeInfoComponent {
   public selectedCreditOrganizationId: number = null;
   public creditPaymentMode: string = ENUM_BillPaymentMode.credit;
 
+  @Input('clear-payment-detail')
+  public clearPaymentDetail: boolean = false;
+
   constructor(public coreService: CoreService,
     public msgBoxServ: MessageboxService,
     public billingService: BillingService,
@@ -177,6 +180,10 @@ export class PaymentModeInfoComponent {
       this.OnPaymentModeChange();
     } else if (this.PaymentMode.toLowerCase() !== ENUM_BillPaymentMode.credit.toLowerCase()) {
       this.Initialize();
+    }
+    if (this.clearPaymentDetail) {
+      this.PaymentMode = "Cash";
+      this.selectedCreditOrganizationId = null;
     }
   }
 
@@ -245,8 +252,8 @@ export class PaymentModeInfoComponent {
       this.FilteredMajorPaymentMode = this.FilteredMajorPaymentMode.filter(a => a.PaymentSubCategoryName.toLowerCase() === ENUM_BillPaymentMode.cash.toLowerCase() || a.PaymentSubCategoryName.toLocaleLowerCase() == "others");
 
 
-    if (this.TransactionType == "depositreturn" && this.PageInfo.PageName.toLocaleLowerCase() == "dispensarydeposit") {
-      this.FilteredMajorPaymentMode = this.FilteredMajorPaymentMode.filter(a => a.PaymentSubCategoryName.toLowerCase() === ENUM_BillPaymentMode.cash);
+    if (this.TransactionType.toLocaleLowerCase() == "returndeposit" && (this.PageInfo.PageName.toLocaleLowerCase() == "dispensarydeposit" || this.PageInfo.PageName.toLocaleLowerCase() ==='billingdeposit')) {
+      this.FilteredMajorPaymentMode = this.FilteredMajorPaymentMode.filter(a => a.PaymentSubCategoryName.toLowerCase() !== ENUM_BillPaymentMode.credit);
     }
     if (this.IsCoPayment) {
       this.FilteredMajorPaymentMode = this.FilteredMajorPaymentMode.filter(a => a.PaymentSubCategoryName.toLowerCase() !== ENUM_BillPaymentMode.credit.toLowerCase());

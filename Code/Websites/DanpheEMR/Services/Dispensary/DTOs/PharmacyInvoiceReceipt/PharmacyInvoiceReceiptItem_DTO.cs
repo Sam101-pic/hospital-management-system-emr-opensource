@@ -19,5 +19,7 @@ namespace DanpheEMR.Services.Dispensary.DTOs.PharmacyInvoiceReceipt
         public decimal VATAmount { get; set; }
         public decimal DiscountAmount { get; set; }
         public decimal TotalAmount { get; set; }
+        public string ItemCode { get; set; }
+        public string HSCode { get; set; }
     }
 }

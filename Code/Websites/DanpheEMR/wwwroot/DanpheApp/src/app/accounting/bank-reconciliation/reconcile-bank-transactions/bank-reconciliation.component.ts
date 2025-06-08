@@ -8,6 +8,7 @@ import { BankReconciliationAdditionalTransaction_DTO } from '../../settings/shar
 import { LedgerModel } from '../../settings/shared/ledger.model';
 import { AccountingBLService } from '../../shared/accounting.bl.service';
 import { AccountingService } from '../../shared/accounting.service';
+import { SubLedger_DTO } from '../../transactions/shared/DTOs/subledger-dto';
 import { Voucher } from '../../transactions/shared/voucher';
 import { BankReconciliationCategory, BankReconcliationModelNew } from './bank-reconciliation.model';
 
@@ -52,6 +53,9 @@ export class BankReconciliationComponent implements OnInit {
   public txnHistory: any;
   public showVoucherHeadCol: boolean = false;
   public dateRange: string = '';
+  public SelectedSubLedger: SubLedger_DTO = new SubLedger_DTO();
+  public SubLedgerList: Array<SubLedger_DTO> = new Array<SubLedger_DTO>();
+
 
   public openingBalance = {
     ReconcileOpening: 0
@@ -62,17 +66,27 @@ export class BankReconciliationComponent implements OnInit {
   public showAdditionalTxnPopUp: boolean = false;
   public bankReconciliationAdditionalTxn: BankReconciliationAdditionalTransaction_DTO = new BankReconciliationAdditionalTransaction_DTO();
   public selectedBankReconciliationCategory: BankReconciliationCategory = new BankReconciliationCategory();
+  public HospitalId: number = 1;
+  public subLedgerAndCostCenterSetting = {
+    "EnableSubLedger": false,
+    "EnableCostCenter": false
+  };
 
   constructor(public accReportBLService: AccountingReportsBLService, public coreService: CoreService,
     public msgBoxServ: MessageboxService, public accBLService: AccountingBLService,
     public changeDetector: ChangeDetectorRef, private formBuilder: FormBuilder,
     public accountingService: AccountingService,) {
+    this.SubLedgerList = this.accountingService.accCacheData.SubLedgerAll;
     this.calType = "en,np";
     this.GetLedgers();
     this.GetReconciliationCategory();
     this.showVoucherHead();
     this.accountingService.getCoreparameterValue();
     this.voucherTypeList = this.accountingService.accCacheData.VoucherType.filter(a => a.VoucherCode === ENUM_ACC_VoucherCode.PaymentVoucher || a.VoucherCode === ENUM_ACC_VoucherCode.ReceiptVoucher || a.VoucherCode === ENUM_ACC_VoucherCode.ContraVoucher);
+    let subLedgerParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Accounting" && a.ParameterName === "SubLedgerAndCostCenter");
+    if (subLedgerParam) {
+      this.subLedgerAndCostCenterSetting = JSON.parse(subLedgerParam.ParameterValue);
+    }
   }
 
   ngOnInit() {
@@ -85,6 +99,7 @@ export class BankReconciliationComponent implements OnInit {
         let ledgerGroup = this.accountingService.accCacheData.LedgerGroups.find(a => a.Name === codeDetail.Name);
         if (ledgerGroup) {
           this.ledgerList = this.accountingService.accCacheData.Ledgers.filter(a => a.LedgerGroupId === ledgerGroup.LedgerGroupId);
+          this.SubLedgerList = this.SubLedgerList.filter(a => this.ledgerList.some(b => b.LedgerId === a.LedgerId));
         }
       }
       this.ledgerList = this.ledgerList.slice();
@@ -109,8 +124,12 @@ export class BankReconciliationComponent implements OnInit {
   }
   CheckSelLedger(): boolean {
 
-    if (!this.selLedger || typeof (this.selLedger) !== ENUM_Data_Type.Object || this.selLedger.LedgerId <= 0) {
+    if (!this.subLedgerAndCostCenterSetting.EnableSubLedger && (!this.selLedger || typeof (this.selLedger) !== ENUM_Data_Type.Object || this.selLedger.LedgerId <= 0)) {
       this.selLedger = undefined;
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select at least one bank ledger."]);
+      return false;
+    }
+    else if (this.subLedgerAndCostCenterSetting.EnableSubLedger && (!this.SelectedSubLedger || typeof (this.SelectedSubLedger) !== ENUM_Data_Type.Object || this.SelectedSubLedger.SubLedgerId <= 0)) {
       this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select at least one bank ledger."]);
       return false;
     }
@@ -131,7 +150,7 @@ export class BankReconciliationComponent implements OnInit {
     try {
       if (this.CheckSelLedger() && this.checkDateValidation()) {
         let num = this.FilterReconcileData();
-        this.accReportBLService.GetBankReconcillationReport(Number(this.selLedger.LedgerId), this.fromDate, this.toDate, this.fiscalYearId, this.selectedVoucher.VoucherId, num)
+        this.accReportBLService.GetBankReconcillationReport(Number(this.subLedgerAndCostCenterSetting.EnableSubLedger ? this.SelectedSubLedger.LedgerId : this.selLedger.LedgerId), this.fromDate, this.toDate, this.fiscalYearId, this.selectedVoucher.VoucherId, num, this.SelectedSubLedger.SubLedgerId)
           .subscribe(res => {
             if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
               this.openingBalance.ReconcileOpening = res.Results.ReconcileOpening[0].ReconcileOpeningBalance;
@@ -487,7 +506,7 @@ export class BankReconciliationComponent implements OnInit {
     try {
       let txn = this.ledgerResult[i];
 
-      this.accBLService.GetTransactionbyVoucher(txn.VoucherNumber, txn.SectionId, txn.FiscalYearId)
+      this.accBLService.GetTransactionbyVoucher(txn.VoucherNumber, txn.SectionId, txn.FiscalYearId, this.HospitalId)
         .subscribe(res => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK) {
             this.txnItems = res.Results.txnList;

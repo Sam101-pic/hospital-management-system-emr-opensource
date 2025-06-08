@@ -48,6 +48,9 @@ export class PatientLabSample {
 
   public IsOutsourceTest: boolean = false;//sud:22Aug'23--To display Outsource or not..
   public DefaultOutsourceVendorId: number = 0;
+  public LabTestSpecimen: Array<Object> = null;
+  public LabTestName: string = null;
+  public SampleCodeFormatted: string = null;
 }
 export class LabTestSpecimen {
   public SpecimenId: number;

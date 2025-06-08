@@ -1,6 +1,7 @@
 
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
 import { DanpheHTTPResponse } from '../common-models';
 @Injectable(
     {
@@ -20,5 +21,9 @@ export class StickerDLService {
     }
     public GetRegistrationStickerSettingsAndData(PatientVisitId: number) {
         return this.http.get<DanpheHTTPResponse>(`/api/Stickers/RegistrationStickerSettingsAndData?PatientVisitId=${PatientVisitId}`, this.options);
+    }
+
+    public GetTemplateByTemplateCode(templateCode: string, patientVisitId: number): Observable<DanpheHTTPResponse> {
+        return this.http.get<DanpheHTTPResponse>(`/api/NewClinical/Template?templateCode=${templateCode}&patientVisitId=${patientVisitId}`, this.options);
     }
 }

@@ -1656,7 +1656,7 @@ export class BillingTransactionComponent {
 
   GetVisitContext(patientId: number, visitId: number) {
     if (patientId && visitId) {
-      this.BillingBLService.GetDataOfInPatient(patientId, visitId)
+      this.BillingBLService.GetPatientCurrentVisitContext(patientId, visitId)
         .subscribe(res => {
           if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
             this.currPatVisitContext = res.Results;
@@ -1678,7 +1678,7 @@ export class BillingTransactionComponent {
 
   isClaimSuccessful = false;
   isClaimed(LatestClaimCode: number, PatientId: number): void {
-    this.BillingBLService.IsClaimed(LatestClaimCode, PatientId)
+    this.BillingBLService.IsClaimed_SSF(LatestClaimCode, PatientId)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           if (res.Results === true) {

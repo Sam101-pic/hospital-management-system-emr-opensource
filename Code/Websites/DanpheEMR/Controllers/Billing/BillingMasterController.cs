@@ -5,6 +5,7 @@ using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
+using DanpheEMR.ServerModel.BillingModels.Config;
 using DanpheEMR.Services.Billing;
 using DanpheEMR.Services.Billing.DTO;
 using DanpheEMR.Services.BillSettings.DTOs;
@@ -36,6 +37,15 @@ namespace DanpheEMR.Controllers.Billing
         public async Task<IActionResult> GetServiceItems(string serviceBillingContext, int schemeId, int priceCategoryId)
         {
             Func<Task<object>> func = () => _billingMasterService.GetServiceItems(priceCategoryId, schemeId, serviceBillingContext, _billingDbContext);
+            return await InvokeHttpGetFunctionAsync(func);
+        }
+
+        [HttpGet]
+        [Route("MasterServiceItems")]
+        [Produces(typeof(DanpheHTTPResponse<List<ServiceItemDetails_DTO>>))]
+        public async Task<IActionResult> GetMasterServiceItems()
+        {
+            Func<Task<object>> func = () => _billingMasterService.GetMasterServiceItems(_billingDbContext);
             return await InvokeHttpGetFunctionAsync(func);
         }
 
@@ -122,9 +132,9 @@ namespace DanpheEMR.Controllers.Billing
 
         [HttpGet]
         [Route("ServicePackages")]
-        public async Task<IActionResult> ServicePackages(int schemeId, int priceCategoryId)
+        public async Task<IActionResult> ServicePackages( int priceCategoryId)
         {
-            Func<Task<object>> func = () => _billingMasterService.GetServicePackages(_billingDbContext, schemeId, priceCategoryId);
+            Func<Task<object>> func = () => _billingMasterService.GetServicePackages(_billingDbContext, priceCategoryId);
             return await InvokeHttpGetFunctionAsync(func);
         }
 
@@ -145,8 +155,24 @@ namespace DanpheEMR.Controllers.Billing
             Func<Task<object>> func = () => _billingMasterService.GetPriceCategoryServiceItems(_billingDbContext, priceCategoryId);
             return await InvokeHttpGetFunctionAsync(func);
         }
+        
+        [HttpGet]
+        [Route("SchemesForReport")]
+        [Produces(typeof(BillSchemeForReport_DTO))]
+        public async Task<IActionResult> GetSchemesForReport()
+        {
+            Func<Task<object>> func = () => _billingMasterService.GetSchemesForReport(_billingDbContext);
+            return await InvokeHttpGetFunctionAsync(func);
+        }
 
-
+        [HttpGet]
+        [Route("InsuranceMasterItems")]
+        [Produces(typeof(InsuranceMasterItemsModel))]
+        public async Task<IActionResult> GetInsuranceMasterItems()
+        {
+            Func<Task<object>> func = async() => await _billingMasterService.GetInsuranceMasterItems(_billingDbContext);
+            return await InvokeHttpGetFunctionAsync(func);
+        }
 
         [HttpPost]
         [Route("ServiceItemSetting")]
@@ -155,7 +181,7 @@ namespace DanpheEMR.Controllers.Billing
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
 
             Func<Task<object>> func = () => _billingMasterService.AddServiceItemSchemeSettings(_billingDbContext, billServiceItemSchemeSettingdto, currentUser);
-            return await InvokeHttpGetFunctionAsync(func);
+            return await InvokeHttpPostFunctionAsync_New(func);
         }
     }
 }

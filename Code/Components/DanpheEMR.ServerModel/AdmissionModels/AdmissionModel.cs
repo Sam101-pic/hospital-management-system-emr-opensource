@@ -85,6 +85,10 @@ namespace DanpheEMR.ServerModel
         public bool IsProvisionalDischarge { get; set; }//Krishna, 29thAug'23, This will track Provisional Discharge
         public bool IsProvisionalDischargeCleared { get; set; }//Krishna, 29thAug'23, This will track Whether Provisional Discharge is cleared or not.
 
+        [NotMapped]
+        public List<AddPatientVisitConsultants_DTO> AddPatientVisitConsultants { get; set; }
+      
+
 
     }
     //Bibek, 26thJune'23 
@@ -93,5 +97,13 @@ namespace DanpheEMR.ServerModel
         public string CareOfPersonName { get; set; }
         public string CareOfPersonRelation { get; set; }
         public string CareOfPersonPhoneNo { get; set; }
+    }
+
+    //Krishna, 09thApril, 2024, This is added here because we need to pass Consultants in the Body of Admission Request which is using AdmissionModel and we could not make reference to the project where DTO is kept
+    public class AddPatientVisitConsultants_DTO
+    {
+        public string VisitType { get; set; }
+        public int ConsultantId { get; set; }
+        public bool IsPrimaryConsultant { get; set; }
     }
 }

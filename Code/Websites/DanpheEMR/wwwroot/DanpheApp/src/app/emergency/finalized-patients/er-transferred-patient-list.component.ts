@@ -165,13 +165,13 @@ export class ERTransferredPatientListComponent {
   public ReturnFromPatRegistrationEdit($event) {
     this.CloseAllERPatientPopUp();
     if ($event.submit) {
-      let itmIndex = this.allTransferredPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
-      if (itmIndex >= 0) {
-        this.allTransferredPatients.splice(itmIndex, 1, $event.ERPatient);
-        this.allTransferredPatients = this.allTransferredPatients.slice();
-      } else {
-        this.GetERTransferredPatientList();
-      }
+      // let itmIndex = this.allTransferredPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
+      // if (itmIndex >= 0) {
+      //   this.allTransferredPatients.splice(itmIndex, 1, $event.ERPatient);
+      //   this.allTransferredPatients = this.allTransferredPatients.slice();
+      // } else {
+      this.GetERTransferredPatientList();
+      // }
     }
   }
 

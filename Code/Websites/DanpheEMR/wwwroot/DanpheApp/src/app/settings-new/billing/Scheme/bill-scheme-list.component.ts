@@ -7,6 +7,8 @@ import {
   ENUM_MessageBox_Status,
 } from "../../../shared/shared-enums";
 import { BillingSchemeModel } from "../../shared/bill-scheme.model";
+import { CreditOrganization } from "../../shared/creditOrganization.model";
+import { PriceCategory } from "../../shared/price.category.model";
 import { SettingsService } from "../../shared/settings-service";
 import { SettingsBLService } from "../../shared/settings.bl.service";
 
@@ -25,10 +27,17 @@ export class BillSchemeListComponent {
     new Array<BillingSchemeModel>();
   public loading: boolean;
   public billSchemeToEdit: BillingSchemeModel = new BillingSchemeModel();
+  public CreditOrganizations: Array<CreditOrganization> =
+    new Array<CreditOrganization>();
+
+  public priceCategoryList: Array<PriceCategory> = new Array<PriceCategory>();
+
+
+
   public SchemeId: number = 0;
   public SchemeCode: string = '';
   public SchemeName: string = '';
-  public SelectedScheme = {SchemeId: 0, SchemeCode: '', SchemeName: ''}
+  public SelectedScheme = { SchemeId: 0, SchemeCode: '', SchemeName: '' }
 
   constructor(
     public settingsServ: SettingsService,
@@ -40,6 +49,12 @@ export class BillSchemeListComponent {
       this.settingsServ.settingsGridCols.billSchemeGridCols;
     this.GetBillingSchemes();
   }
+
+  ngOnInit() {
+    this.getCreditOrganizationList();
+    this.GetPriceCategory();
+  }
+
 
   ShowAddNewPage(): void {
     this.componentMode = "add";
@@ -87,13 +102,12 @@ export class BillSchemeListComponent {
         );
         this.billSchemeToEdit = $event.Data.SchemeId;
         this.ShowSchemeAddUpdatePage = true;
-
         break;
       }
       case "ItemSettings": {
-        this.SelectedScheme.SchemeId=$event.Data.SchemeId;
-        this.SelectedScheme.SchemeCode= $event.Data.SchemeCode;
-        this.SelectedScheme.SchemeName=$event.Data.SchemeName;
+        this.SelectedScheme.SchemeId = $event.Data.SchemeId;
+        this.SelectedScheme.SchemeCode = $event.Data.SchemeCode;
+        this.SelectedScheme.SchemeName = $event.Data.SchemeName;
         this.ShowSchemeItemSettingsPage = true;
         break;
       }
@@ -175,4 +189,35 @@ export class BillSchemeListComponent {
         });
     }
   }
+
+  public getCreditOrganizationList() {
+    this.settingsBlService.GetCreditOrganizationList().subscribe((res) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+        const creditOrgs = res.Results;
+        if (creditOrgs && creditOrgs.length) {
+          this.CreditOrganizations = creditOrgs.filter(c => c.IsActive === true);
+        }
+      } else {
+        alert("Failed ! " + res.ErrorMessage);
+      }
+    });
+  }
+
+  GetPriceCategory() {
+    this.settingsBlService
+      .GetPriceCategory()
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          const priceCategories = res.Results;
+          if (priceCategories && priceCategories.length) {
+            this.priceCategoryList = priceCategories.filter(p => p.IsActive === true);
+          }
+        } else {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [
+            "price category not available",
+          ]);
+        }
+      });
+  }
+
 }

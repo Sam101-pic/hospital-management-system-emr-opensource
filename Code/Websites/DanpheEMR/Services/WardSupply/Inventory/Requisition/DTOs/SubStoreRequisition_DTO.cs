@@ -15,6 +15,7 @@ namespace DanpheEMR.Services.WardSupply.Inventory.Requisition.DTOs
         public string RequisitionStatus { get; set; }
         public bool IsDirectDispatched { get; set; }
         public int? VerificationId { get; set; }
+        public DateTime? RequisitionDate { get; set; }
         public List<SubStoreRequisitionItems_DTO> RequisitionItems { get; set; }
     }
 }

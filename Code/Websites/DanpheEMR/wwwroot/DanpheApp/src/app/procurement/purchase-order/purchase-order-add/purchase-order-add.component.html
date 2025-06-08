@@ -101,7 +101,7 @@
 </style>
 <div class="row">
     <div class="col-md-12">
-        <div class="caption lb-caption col-md-4">
+        <div class="caption lb-caption col-md-4" style="padding-left:0px !important;">
             <!-- <i class="glyphicon glyphicon-asterisk font-red-sunglo"></i> -->
             <span class="caption-subject"> {{EditPO ? 'Edit':'Add'}} Purchase Order</span>
         </div>
@@ -119,8 +119,8 @@
                     <div class="row">
                         <div class="po-form--control-with-validation col-md-3">
                             <div class="po-form--control">
-                                <label class=" control-label">Vendor<b>:</b></label>
-                                <div class="div-relative autocomplete-item">
+                                <label class=" control-label col-md-3">Vendor<sup class="color-red">*</sup><b style="float:right;">: </b></label>
+                                <div class="div-relative autocomplete-item col-md-9">
                                     <input id="VendorName" danphe-auto-complete class="form-control" [(ngModel)]="selectedVndr" [source]="VendorList"
                                            [list-formatter]="myVendorListFormatter" placeholder="Vendor Name" display-property-name="VendorName"
                                            value-property-name=null
@@ -145,24 +145,39 @@
                             </div>
                         </div>
                         <div class="po-form--control col-md-3">
-                            <label class="control-label">PO Date<b>: </b></label>
-                            <danphe-date-picker name="PoDate" [(ngModel)]="currentPO.PoDate" [ngModelOptions]="{standalone: true}"
-                                                [CalendarTypes]="'np,en'">
-                            </danphe-date-picker>
-                        </div>
-                        <div class="po-form--control col-md-3">
-                            <label class="control-label">Delivery Date<b>:</b></label>
-                            <danphe-date-picker name="DeliveryDate" [(ngModel)]="currentPO.DeliveryDate" [ngModelOptions]="{standalone: true}"
-                                                [CalendarTypes]="'np,en'" [allow-future-date]="true">
-                            </danphe-date-picker>
+                            <label class="control-label col-md-3" style="text-align:center !important;">PO Date<b style="float:right;">: </b></label>
+                            <div class="col-md-9">
+                                <danphe-date-picker name="PoDate" [(ngModel)]="currentPO.PoDate" formControlName="PoDate"
+                                                    [CalendarTypes]="'np,en'" [previous-fiscal-year]="AllowPreviousFiscalYear">
+                                </danphe-date-picker>
+                            </div>
                         </div>
                         <div class="po-form--control-with-validation col-md-3">
                             <div class="po-form--control">
-                                <label class="control-label">Currency Code<sup class="color-red">*</sup><b>: </b></label>
-                                <input danphe-auto-complete class="form-control" placeholder="Currency Code" placeholder="Currency Code"
-                                       [list-formatter]="myCurrencyCodeListFormatter" display-property-name="CurrencyCode" [source]="currencyCodeList"
-                                       [(ngModel)]="selectedCurrencyCode" formControlName="CurrencyCode"
-                                       (focusout)="SelectCurrencyCodeFromSearchBox()" />
+                                <label class="control-label col-md-4" style="text-align:center !important;">Delivery Date<b
+                                       style="float:right;">:</b></label>
+                                <div class="col-md-8">
+                                    <danphe-date-picker name="DeliveryDate" [(ngModel)]="currentPO.DeliveryDate" formControlName="DeliveryDate"
+                                                        [CalendarTypes]="'np,en'" [allow-future-date]="true">
+                                    </danphe-date-picker>
+                                </div>
+                            </div>
+                            <div style="color:red"
+                                 *ngIf="currentPO.PurchaseOrderValidator.hasError('invalidDateComparison', ['DeliveryDate'])">
+                                Delivery Date must be equal or greater than PO Date.
+                            </div>
+                        </div>
+                        <div class="po-form--control-with-validation col-md-3">
+                            <div class="po-form--control">
+                                <label class="control-label col-md-5" style="text-align:center !important;">Currency Code<sup
+                                         class="color-red">*</sup><b style="float:right">: </b></label>
+                                <div class="col-md-7">
+                                    <input danphe-auto-complete class="form-control" placeholder="Currency Code" placeholder="Currency Code"
+                                           [list-formatter]="myCurrencyCodeListFormatter" display-property-name="CurrencyCode"
+                                           [source]="currencyCodeList"
+                                           [(ngModel)]="selectedCurrencyCode" formControlName="CurrencyCode"
+                                           (focusout)="SelectCurrencyCodeFromSearchBox()" />
+                                </div>
                             </div>
                             <div style="color:red" *ngIf="currentPO.IsDirty('CurrencyCode')"
                                  [hidden]="currentPO.IsValidCheck('CurrencyCode','required')">
@@ -447,7 +462,8 @@
                             <div>
                                 <div class="custom-control  custom-checkbox verification-check">
                                     <input type="checkbox" class="custom-control-input" id="defaultUnchecked"
-                                           [(ngModel)]="currentPO.IsVerificationEnabled" (ngModelChange)="ShowVerifiers()">
+                                           [(ngModel)]="currentPO.IsVerificationEnabled" (ngModelChange)="ShowVerifiers()"
+                                           [disabled]="!HasPermission">
                                     <label title="Check If Verification Needed" class="custom-control-label" for="defaultUnchecked">Need
                                         Verification</label>
                                 </div>
@@ -456,7 +472,8 @@
                                         <div class="row">
                                             <div class="col-md-5">
                                                 <button title="Delete this Verifier" class="btn btn-sm btn-danger" (click)="DeleteVerifier(i)"
-                                                        [disabled]="CheckIfDeleteVerifierAllowed()"><i class="glyphicon glyphicon-minus"></i>
+                                                        [disabled]="!HasPermission || CheckIfDeleteVerifierAllowed()"><i
+                                                       class="glyphicon glyphicon-minus"></i>
                                                 </button>
                                                 <label class="verifier" for="inputIconEx{{i}}">
                                                     <i class="fa fa-user"></i>{{GetSignatoryName(i)}}
@@ -465,11 +482,13 @@
                                             <div class="col-md-6">
                                                 <input danphe-auto-complete class="form-control " autocomplete="off" [source]="VerifierList"
                                                        [(ngModel)]="verifier" [list-formatter]="VerifierListFormatter" placeholder="Select Verifier"
-                                                       display-property-name="Name" max-num-list="10" (valueChanged)="AssignVerifier($event,i)" />
+                                                       display-property-name="Name" max-num-list="10" (focusout)="AssignVerifier(verifier,i)"
+                                                       [disabled]="!HasPermission" />
                                             </div>
                                             <div class="col-md-1">
                                                 <button title="Add Verifier" class="btn btn-sm btn-primary" (click)="AddVerifier()"
-                                                        [disabled]="CheckIfAddVerifierAllowed()"><i class="glyphicon glyphicon-plus"></i></button>
+                                                        [disabled]="!HasPermission || CheckIfAddVerifierAllowed()"><i
+                                                       class="glyphicon glyphicon-plus"></i></button>
                                             </div>
                                         </div>
                                     </div>

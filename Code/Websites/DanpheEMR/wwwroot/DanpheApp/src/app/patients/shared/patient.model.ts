@@ -78,6 +78,7 @@ export class Patient {
   public IsOutdoorPat: boolean = false;
   public PatientNameLocal: string = "";
   public Address: string = null;
+  public FullAddress: string = "";
   public IsDialysis: boolean = false;
   public DialysisCode: number = null;
   public DischargeDate: string = null; // added to fix production build error EMR_V2.1.8
@@ -196,6 +197,11 @@ export class Patient {
   public SchemeId: number = null; //! Krishna, 2ndOctober'23, Added this to transfer data to Referral Visit instance
   public DepartmentName: string = null;
   public AdmittedDate: string = null;
+  public IsNHSIPatient: boolean = false;
+
+  public PatientVisitId: number = null;
+  public AgeSex: string = null;
+  public SalutationName: string = '';
 
   constructor() {
 
@@ -203,6 +209,7 @@ export class Patient {
 
     const _formBuilder = new FormBuilder();
     this.PatientValidator = _formBuilder.group({
+      'SalutationName': [''],
       'FirstName': ['', Validators.compose([Validators.required, Validators.maxLength(30)])],
       'LastName': ['', Validators.compose([Validators.required, Validators.maxLength(30)])],
       'MiddleName': ['', Validators.compose([Validators.maxLength(30)])],
@@ -217,7 +224,8 @@ export class Patient {
       'Email': ['', Validators.pattern('^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$')],
       'PhoneNumber': ['', Validators.compose([Validators.required, Validators.pattern('^[0-9]{1,10}$')])],
       'PassportNumber': ['', Validators.compose([Validators.maxLength(12)])],
-      'LandLineNumber': ['', Validators.compose([Validators.pattern('^[0-9]{1,9}$')])],
+      // 'LandLineNumber': ['', Validators.compose([Validators.pattern('^[0-9]{1,9}$')])],
+      'LandLineNumber': ['', Validators.compose([Validators.pattern(/^(\+|\d|[\s\(\)\.\-])+$|^(\+)$/)])],
       'CountryId': ['', Validators.required],
       //'Address': ['', Validators.required],
       'PANNumber': ['', Validators.compose([Validators.maxLength(20)])],
@@ -226,7 +234,9 @@ export class Patient {
       'Rank': [''],
       'DependentId': [''],
       'IDCardNumber': [''],
-
+      'CareTakerName': [''],
+      'RelationWithPatient': [''],
+      'CareTakerContact': [''],
     });
 
   }

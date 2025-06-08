@@ -16,6 +16,7 @@
     "strict": false,
     "skipLibCheck": true,
     "paths": {
+      "@angular/*": [ "node_modules/@angular/*"],
       "*": [ "./typings/*" ],
       "htmlDocx": [
         "./typings/modules/htmldocx/htmldocx.d.ts"
@@ -28,7 +29,7 @@
   "compileOnSave": false,
   "include": [
     "src/**/*"
-  ],
+],
   "exclude": [
     "node_modules",
     "src/**/*.spec.ts"

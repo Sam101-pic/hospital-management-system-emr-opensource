@@ -19,8 +19,10 @@
           </thead>
           <thead class="sample-main-head">
             <tr>
-              <th>Requested On <b *ngIf="!IsLocalDate">(AD)</b><b *ngIf="IsLocalDate">(BS)</b>
-                <div class="tooltip ng-star-inserted" style="color: #0069FF;z-index: inherit;">
+              <th>Requested On
+                <b *ngIf="!IsLocalDate && !IsEnglishCalendarType">(AD)</b>
+                <b *ngIf="IsLocalDate && !IsEnglishCalendarType">(BS)</b>
+                <div *ngIf="!IsEnglishCalendarType" class="tooltip ng-star-inserted" style="color: #0069FF;z-index: inherit;">
                   <span style="display: inline-block;background: #D8DEF1;cursor: pointer;">
                     <i class="fa fa-refresh" (click)="ChangeDateFormat()"></i>
                   </span>

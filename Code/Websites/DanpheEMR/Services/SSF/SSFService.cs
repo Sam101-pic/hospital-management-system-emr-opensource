@@ -7,16 +7,18 @@ using DanpheEMR.ServerModel.SSFModels.ClaimResponse;
 using DanpheEMR.ServerModel.SSFModels.SSFResponse;
 using DanpheEMR.Services.SSF.DTO;
 using DanpheEMR.Utilities;
-using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Org.BouncyCastle.Bcpg.OpenPgp;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
+using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -88,6 +90,11 @@ namespace DanpheEMR.Services.SSF
                         pdetails.img = GetSsfPatientPhoto(client, patientImagePath);
                     }
                 }
+                else
+                {
+                    var details = await response.Content.ReadAsStringAsync();
+                    throw new Exception(details);
+                }
                 return pdetails;
             }
 
@@ -141,6 +148,11 @@ namespace DanpheEMR.Services.SSF
                         eligibilityResponse = ParseSSFEligibilityResponse(data, ssfDbContext);
                     }
 
+                }
+                else
+                {
+                    var details = await response.Content.ReadAsStringAsync();
+                    throw new Exception(details);
                 }
                 return eligibilityResponse;
             }
@@ -220,7 +232,7 @@ namespace DanpheEMR.Services.SSF
                 OpdBalance = Convert.ToDecimal(medicalOP.valueString),
                 IPBalance = Convert.ToDecimal(medicalIP.valueString),
                 SsfEligibilityType = ENUM_SSF_EligibilityType.Medical
-            }); ;
+            });
             return elegibilityResponse;
         }
 
@@ -245,6 +257,11 @@ namespace DanpheEMR.Services.SSF
                     var details = await response.Content.ReadAsStringAsync();
                     var data = JsonConvert.DeserializeObject<EmployerRoot>(details);
                     company = data.company;
+                }
+                else
+                {
+                    var details = await response.Content.ReadAsStringAsync();
+                    throw new Exception(details);
                 }
             }
             return company;
@@ -274,6 +291,11 @@ namespace DanpheEMR.Services.SSF
                     var data = JsonConvert.DeserializeObject<EmployerRoot>(details);
                     company = data.company;
                 }
+                else
+                {
+                    var details = await response.Content.ReadAsStringAsync();
+                    throw new Exception(details);
+                }
             }
             return company;
         }
@@ -292,6 +314,10 @@ namespace DanpheEMR.Services.SSF
                 client.BaseAddress = new Uri(SSFCred.SSFurl);
                 var jsonContent = JsonConvert.SerializeObject(claimRoot);
                 StringContent content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                Log.Information($"Header is prepared to submit to the ssf server, for patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId}");
+                Log.Information($"Claim Object we are sending to ssf server, for patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId} is \n {jsonContent}");
+
                 var response = await client.PostAsync($"Claim/", content);
                 var result = "";
                 var errorResult = new ErrorRoot();
@@ -301,15 +327,21 @@ namespace DanpheEMR.Services.SSF
                 if (response.IsSuccessStatusCode)
                 {
                     result = await response.Content.ReadAsStringAsync();
+
+                    Log.Information($"The Response received from SSF Server is, for patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId} is \n {result}");
+
                     serializeData = JsonConvert.DeserializeObject<SSFClaimResponse>(result);
                     responseStatus = ENUM_Danphe_HTTP_ResponseStatus.OK;
                 }
                 else
                 {
+                    Log.Warning($"Claim Submission falied, for patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId} ");
+
                     responseStatus = ENUM_Danphe_HTTP_ResponseStatus.Failed;
                     if (response.Content.Headers.ContentType?.MediaType != "text/html")
                     {
                         var errorString = await response.Content.ReadAsStringAsync();
+                        Log.Warning($"Claim Submission falied, for patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId} and Error Response received as, \n {errorString} ");
                         dynamic errorJson = JsonConvert.DeserializeObject(errorString);
                         if (errorJson != null && errorJson.issue.Count > 0) {
                             if (errorJson.issue[0].details.text is string)
@@ -337,6 +369,8 @@ namespace DanpheEMR.Services.SSF
                     {
                         var errorString = await response.Content.ReadAsStringAsync();
                         errorMessage = errorString;
+                        Log.Warning($"Claim Submission falied, for patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId} and Error Response received as, \n {errorString} ");
+
                     }
 
                 }
@@ -353,7 +387,6 @@ namespace DanpheEMR.Services.SSF
 
                 if (PreviousClaimResponse != null)
                 {
-
                     //PreviousClaimResponse.ClaimReferenceNo = serializeData.id;
                     PreviousClaimResponse.ClaimReferenceNo = claimReferenceNo != null ? claimReferenceNo : serializeData.id;//Keeping it like this incase if claimReferenceNo is not found there will be uuid which can be used to find ClaimReferenceNo later.
                     PreviousClaimResponse.ClaimStatus = serializeData.status;
@@ -363,6 +396,9 @@ namespace DanpheEMR.Services.SSF
                     PreviousClaimResponse.ResponseDate = DateTime.Now;
                     PreviousClaimResponse.ClaimCount += 1;
                     await ssfDbContext.SaveChangesAsync();
+
+                    Log.Information($"Claim Response from SSF Server is updated in our database,for patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId} ");
+
                 }
                 else
                 {
@@ -385,6 +421,8 @@ namespace DanpheEMR.Services.SSF
                     claimResponseList.Add(item);
                     ssfDbContext.SSFClaimResponseDetail.AddRange(claimResponseList);
                     await ssfDbContext.SaveChangesAsync();
+                    Log.Information($"Claim Response from SSF Server is added in our database,for patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId} ");
+
                 }
 
                 //Krishna, this will update the IsClaimed Status of Booking List for this specific Claim
@@ -398,6 +436,7 @@ namespace DanpheEMR.Services.SSF
                             book.IsClaimed = true;
                         });
                         await ssfDbContext.SaveChangesAsync();
+                        Log.Information($"Claim Status is updated in our database,for patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId} ");
                     }
                 }
 
@@ -409,9 +448,10 @@ namespace DanpheEMR.Services.SSF
                 };
                 return outputResult;
             }
-            catch (Exception ee)
+            catch (Exception ex)
             {
-                throw ee;
+                Log.Error($"Exception is thrown during claim Submission process for SSF Patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId}");
+                throw new Exception($"Exception is thrown during claim Submission process for SSF Patient, {claimRoot.patient.reference} with claimCode {claimRoot.clientClaimId}, exception details is, \n {ex.ToString()}"); ;
             }
         }
 
@@ -524,6 +564,10 @@ namespace DanpheEMR.Services.SSF
                 var jsonContent = JsonConvert.SerializeObject(claimBookingObj);
                 StringContent content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
                 //var response = await client.PostAsync($"BookingService/", content);
+
+                Log.Information($"Header information is prepared to submit claim booking details, for patient {claimBooking_DTO.Patient} with claimCode {claimBooking_DTO.LatestClaimCode}");
+                Log.Information($"Claim Booking Object we are sending to SSF Server, for patient {claimBooking_DTO.Patient} with claimCode {claimBooking_DTO.LatestClaimCode} is \n {jsonContent}");
+
                 var response = await client.PostAsync(ENUM_SSF_ApiEndPoints.BookingService, content);
                 var result = "";
                 var errorResult = new ErrorRoot();
@@ -534,15 +578,23 @@ namespace DanpheEMR.Services.SSF
                 if (response.IsSuccessStatusCode)
                 {
                     result = await response.Content.ReadAsStringAsync();
+
+                    Log.Information($"Claim Booking Response is received from SSF Server, for patient {claimBooking_DTO.Patient} with claimCode {claimBooking_DTO.LatestClaimCode} and Response is \n {result}");
+
                     serializeData = JsonConvert.DeserializeObject<ClaimBookingResponseRoot>(result);
                     responseStatus = ENUM_Danphe_HTTP_ResponseStatus.OK;
                 }
                 else
                 {
+                    Log.Warning($"Claim Booking failed, for patient {claimBookingObj.Patient} with claimCode {claimBookingObj.client_claim_id} for invoice {claimBookingObj.client_invoice_no}");
+
                     responseStatus = ENUM_Danphe_HTTP_ResponseStatus.Failed;
                     if (response.Content.Headers.ContentType?.MediaType != "text/html")
                     {
                         var errorString = await response.Content.ReadAsStringAsync();
+
+                        Log.Warning($"Claim Booking failed, for patient {claimBookingObj.Patient} with claimCode {claimBookingObj.client_claim_id} for invoice {claimBookingObj.client_invoice_no} with response \n {errorString}");
+
                         dynamic errorJson = JsonConvert.DeserializeObject(errorString);
                         if (errorJson != null && errorJson.issue.Count > 0)
                         {
@@ -571,6 +623,7 @@ namespace DanpheEMR.Services.SSF
                     {
                         var errorString = await response.Content.ReadAsStringAsync();
                         errorMessage = errorString;
+                        Log.Warning($"Claim Booking failed, for patient {claimBookingObj.Patient} with claimCode {claimBookingObj.client_claim_id} for invoice {claimBookingObj.client_invoice_no} with response \n {errorString}");
                     }
                 }
 
@@ -583,10 +636,10 @@ namespace DanpheEMR.Services.SSF
                 };
                 return outputResult;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-
-                throw;
+                Log.Error($"Exception is thrown while bokking claim,for patient {claimBooking_DTO.Patient} with claimCode {claimBooking_DTO.LatestClaimCode}, exception details is, \n {ex.Message} "); ;
+                throw new Exception($"Exception is thrown while bokking claim,for patient {claimBooking_DTO.Patient} with claimCode {claimBooking_DTO.LatestClaimCode}, exception details is, \n {ex.Message} ");
             }
         }
 
@@ -595,6 +648,10 @@ namespace DanpheEMR.Services.SSF
             ClaimBooking claimBooking = new ClaimBooking();
             if (claimBookingRoot.IsAccidentCase)
             {
+                if (claimBookingRoot.IsCreditNote)
+                {
+                    claimBooking.bookedAmount = -(float)claimBookingRoot.bookedAmount;
+                }
                 claimBooking.bookedAmount = (float)claimBookingRoot.bookedAmount; //(int)claimBookingRoot.bookedAmount;
                 claimBooking.Patient = claimBookingRoot.Patient;
                 claimBooking.scheme = ENUM_SSF_SchemeTypes.Accident;
@@ -604,6 +661,10 @@ namespace DanpheEMR.Services.SSF
             }
             else
             {
+                if (claimBookingRoot.IsCreditNote)
+                {
+                    claimBooking.bookedAmount = -(float)claimBookingRoot.bookedAmount;
+                }
                 claimBooking.bookedAmount = (float)claimBookingRoot.bookedAmount; //(int)(claimBookingRoot.bookedAmount);
                 claimBooking.Patient = claimBookingRoot.Patient;
                 claimBooking.scheme = ENUM_SSF_SchemeTypes.Medical;
@@ -619,10 +680,12 @@ namespace DanpheEMR.Services.SSF
             if (responseStatus == ENUM_Danphe_HTTP_ResponseStatus.OK)
             {
                 SaveSuccesfulClaimBooking(ssfDbContext, result, claimBooking_DTO, currentUser);
+                Log.Information($"Claim Booking Response is saved successfully in our database after successful Claim Booking, for patient {claimBooking_DTO.Patient} with ClaimCode {claimBooking_DTO.LatestClaimCode}");
             }
             else
             {
                 SaveUnsuccessfulClaimBooking(ssfDbContext, currentUser, claimBooking_DTO);
+                Log.Warning($"Claim Booking Response is saved successfully in our database after failed Claim Booking, for patient {claimBooking_DTO.Patient} with ClaimCode {claimBooking_DTO.LatestClaimCode}");
             }
         }
 
@@ -731,6 +794,168 @@ namespace DanpheEMR.Services.SSF
                                                 BookingStatus = s.BookingStatus,
                                             }).ToListAsync();
             return claimBooking;
+        }
+
+        public async Task<object> CheckClaimBookingStatus(SSFDbContext sSFDbContext, CheckBookingStauts_DTO checkBookingStauts)
+        {
+            using (var client = new HttpClient())
+            {
+                try
+                {
+                    var SSFCred = GetSSFCredentials(sSFDbContext);
+                    var ISO_8859_1 = Encoding.GetEncoding("ISO-8859-1");
+                    var svcCredentials = Convert.ToBase64String(ISO_8859_1.GetBytes(SSFCred.SSFUsername + ":" + SSFCred.SSFPassword));
+                    client.DefaultRequestHeaders.Add("Authorization", "Basic " + svcCredentials);
+                    client.DefaultRequestHeaders.Accept.Clear();
+                    client.DefaultRequestHeaders.Add(SSFCred.SSFRemotekey, SSFCred.SSFRemoteValue);
+                    client.BaseAddress = new Uri(SSFCred.SSFurl);
+                    var payload = GeneratePayloadToCheckBookingStatus(checkBookingStauts);
+                    var jsonContent = JsonConvert.SerializeObject(payload);
+                    StringContent content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                    var response = client.PostAsync($"Request", content).Result;
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var details = await response.Content.ReadAsStringAsync();
+                        if (details != null)
+                        {
+                            var bookingDetails = JsonConvert.DeserializeObject<ClaimBookingDetailsFromSSFServer_Root_DTO>(details);
+                            if (bookingDetails != null)
+                            {
+                                return bookingDetails;
+                            }
+                            else
+                            {
+                                throw new Exception("Could not deserialize the content received from SSF Server with our custom classes");
+                            }
+                        }
+                        else
+                        {
+                            throw new Exception($"{response}");
+                        }
+                    }
+                    else
+                    {
+                        throw new Exception($"The request to SSF Server could not succeed \n {response}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
+                }
+                
+            }
+        }
+
+        private CheckBookingStauts_DTO GeneratePayloadToCheckBookingStatus(CheckBookingStauts_DTO checkBookingStauts)
+        {
+            var payload = new CheckBookingStauts_DTO
+            {
+                resourceType = "ExtraJson",
+                payload = new CheckBookingStatus_Payload
+                {
+                    cmd_action = "action.bookingHistory",
+                    chfid = checkBookingStauts.payload.chfid
+                }
+            };
+            return payload;
+        }
+
+        public async Task<string> GetSSFSubProduct(SSFDbContext sSFDbContext, Int64 claimCode)
+        {
+            var visit = await sSFDbContext.Visits.FirstOrDefaultAsync(a => a.ClaimCode == claimCode);
+            if(visit != null)
+            {
+                return visit.OtherInfo;
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
+
+        public async Task<object> AddAttachments(SSFDbContext sSFDbContext, AddAttachmentDTO addAttachment)
+        {
+            try
+            {
+                var client = new HttpClient();
+                var SSFCred = GetSSFCredentials(sSFDbContext);
+                var ISO_8859_1 = Encoding.GetEncoding("ISO-8859-1");
+                var svcCredentials = Convert.ToBase64String(ISO_8859_1.GetBytes(SSFCred.SSFUsername + ":" + SSFCred.SSFPassword));
+                client.DefaultRequestHeaders.Add("Authorization", "Basic " + svcCredentials);
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Add(SSFCred.SSFRemotekey, SSFCred.SSFRemoteValue);
+                client.BaseAddress = new Uri(SSFCred.SSFurl);
+                var jsonContent = JsonConvert.SerializeObject(addAttachment);
+                StringContent content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                Log.Information($"Header information is prepared to submit attachment, for claim code {addAttachment.claim}.");
+                Log.Information($"Claim Attachment Object we are sending to SSF Server,for claim code {addAttachment.claim} is \n {jsonContent}");
+
+                var response = await client.PostAsync(ENUM_SSF_ApiEndPoints.AddAttachment, content);
+                var errorResult = new AttachmentErrorRoot();
+                string errorMessage = string.Empty;
+                string responseStatus = ENUM_Danphe_HTTP_ResponseStatus.Failed;
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Created) // 201 Created
+                {
+                    return responseContent;
+                    
+                }
+                else
+                {
+                    try
+                    {
+                        errorResult = JsonConvert.DeserializeObject<AttachmentErrorRoot>(responseContent);
+                        if (errorResult != null && errorResult.issue.Count > 0)
+                        {
+                            errorResult.issue.ForEach(a =>
+                            {
+                                var tempErrorMsg = $"({a.details.text})";
+                                errorMessage += tempErrorMsg + ",";
+                            });
+                        }
+
+                        Log.Warning($"Failed to add attachment for claim {addAttachment.claim}. Error: {errorMessage}");
+                        throw new InvalidOperationException(errorMessage);
+                        //return new
+                        //{
+                        //    Status = ENUM_Danphe_HTTP_ResponseStatus.Failed,
+                        //    Results = errorResult,
+                        //    Message = errorMessage
+                        //};
+                    }
+                    catch (JsonException jsonEx)
+                    {
+                        Log.Error($"Failed to parse error response for claim {addAttachment.claim}. Response: {responseContent}. Error: {jsonEx.Message}");
+
+                        return new
+                        {
+                            Status = ENUM_Danphe_HTTP_ResponseStatus.Failed,
+                            Results = responseContent,
+                            Message = "Failed to process server response"
+                        };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Exception is thrown while adding attachment for claim, {addAttachment.claim}, exception details is, \n {ex.Message} ");
+                throw new Exception($"Exception is thrown while adding attachment for claim,  {addAttachment.claim}, exception details is, \n {ex.Message} ");
+            }
+        }
+        //public async Task<object> GetSubmittedClaims(SSFDbContext sSFDbContext, string FromDate, string ToDate)
+        //{
+           
+        //}
+        public async Task<object> GetSubmittedClaims(SSFDbContext sSFDbContext, string FromDate, string ToDate)
+        {
+            List<SqlParameter> paramList = new List<SqlParameter>() {
+                        new SqlParameter("@FromDate", FromDate),
+                        new SqlParameter("@ToDate", ToDate)
+                    };
+            var submittedClaims = DALFunctions.GetDataTableFromStoredProc("SP_SSF_SubmittedClaims", paramList, sSFDbContext);
+            return submittedClaims;
         }
     }
 }

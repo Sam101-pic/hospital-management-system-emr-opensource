@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
+import * as _ from 'lodash';
 import { PatientsDLService } from '../../patients/shared/patients.dl.service';
 import { OperationTheatreDLService } from './ot.dl.service';
-import * as _ from 'lodash';
 
 @Injectable()
 export class OperationTheatreBLService {

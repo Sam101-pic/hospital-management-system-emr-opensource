@@ -11,6 +11,7 @@ namespace DanpheEMR.Services.ClaimManagement.DTOs
         public string HospitalNo;
         public string PatientName;
         public int PatientId;
+        public int PatientVisitId;
         public string AgeSex;
         public DateTime? DateOfBirth;
         public string MemberNo;
@@ -30,5 +31,7 @@ namespace DanpheEMR.Services.ClaimManagement.DTOs
         public bool IsClaimable;
         public bool IsSelected;
         public int? ClaimSubmissionId;
+        public bool IsDocumentReceived { get; set; }
+        public string Remarks { get; set; }
     }
 }

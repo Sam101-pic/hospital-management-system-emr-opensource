@@ -1,6 +1,7 @@
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { Router } from '@angular/router';
 import { CoreService } from "../../core/shared/core.service";
+import { GeneralFieldLabels } from '../../shared/DTOs/general-field-label.dto';
 import { InventoryFieldCustomizationService } from '../../shared/inventory-field-customization.service';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { RouteFromService } from "../../shared/routefrom.service";
@@ -9,10 +10,10 @@ import { RequisitionDispatchItem_DTO } from '../shared/dtos/requisition-dispatch
 import { RequisitionDispatch_DTO } from '../shared/dtos/requisition-dispatch.dto';
 import { InventoryBLService } from "../shared/inventory.bl.service";
 import { InventoryService } from '../shared/inventory.service';
-import { GeneralFieldLabels } from '../../shared/DTOs/general-field-label.dto';
 @Component({
     selector: 'dispatch-receipt-details',
-    templateUrl: "./dispatch-receipt-details.component.html"
+    templateUrl: "./dispatch-receipt-details.component.html",
+    host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class DispatchReceiptDetailsComponent implements OnInit {
     public requisitionItemsDetails: Array<RequisitionDispatchItem_DTO> = new Array<RequisitionDispatchItem_DTO>();
@@ -27,6 +28,7 @@ export class DispatchReceiptDetailsComponent implements OnInit {
     showDispatchRequisitionPopup: boolean = false;
     @Output('call-back-dispatch-detail-popup-close')
     callBackPopupClose: EventEmitter<Object> = new EventEmitter<Object>();
+    DispatchedDate: string = '';
 
     public GeneralFieldLabel = new GeneralFieldLabels();
 
@@ -85,6 +87,9 @@ export class DispatchReceiptDetailsComponent implements OnInit {
             this.setFocusById('printBtn');
             this.requisitionDispatch = res.Results.RequisitionDispatch;
             this.requisitionItemsDetails = res.Results.RequisitionDispatchItems;
+            if (this.requisitionItemsDetails.length > 0) {
+                this.DispatchedDate = this.requisitionItemsDetails[0].DispatchedDate;
+            }
             this.showDispatchRequisitionPopup = true;
         }
         else {
@@ -140,5 +145,11 @@ export class DispatchReceiptDetailsComponent implements OnInit {
         this.showDispatchRequisitionPopup = false;
         this.router.navigate(['/Inventory/InternalMain/Requisition/RequisitionList']);
         this.callBackPopupClose.emit();
+    }
+
+    hotkeys(event): void {
+        if (event.keyCode === 27) {
+            this.Close();
+        }
     }
 }

@@ -6,8 +6,10 @@ import { PatientService } from '../../patients/shared/patient.service';
 import { DanpheHTTPResponse } from "../../shared/common-models";
 import GridColumnSettings from '../../shared/danphe-grid/grid-column-settings.constant';
 import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../shared/routefrom.service';
+import { ENUM_APP_RouteFrom, ENUM_DanpheHTTPResponseText } from '../../shared/shared-enums';
 import { AppointmentBLService } from '../shared/appointment.bl.service';
 import { Appointment } from '../shared/appointment.model';
 import { AppointmentService } from '../shared/appointment.service';
@@ -28,6 +30,7 @@ export class AppointmentListComponent {
   public selDoctor: any = this.defaultDoctor;
   appointmentGridColumns: Array<any> = null;
   selectedDoctor: Array<any> = new Array<any>();
+  NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
 
   selectedAppointment: Appointment = new Appointment();
   public showReason: boolean = false;
@@ -41,20 +44,30 @@ export class AppointmentListComponent {
   public showSummary: boolean = false;
   public summary = {
     NewPatient: 0,
-    FollowUpPatient: 0
+    FollowUpPatient: 0,
+    Revisit: 0
   };
-  constructor(public appointmentBLService: AppointmentBLService,
-    public appointmentService: AppointmentService,
-    public visitBLService: VisitBLService,
-    public visitService: VisitService,
-    public msgBoxServ: MessageboxService, public routeFromService: RouteFromService, public router: Router, public patientService: PatientService) {
+  ShowInpatientMessage: boolean = false;
+  constructor(
+    private _appointmentBLService: AppointmentBLService,
+    private _appointmentService: AppointmentService,
+    private _visitBLService: VisitBLService,
+    private _visitService: VisitService,
+    private _msgBoxServ: MessageboxService,
+    private _routeFromService: RouteFromService,
+    private _router: Router,
+    private _patientService: PatientService
+  ) {
     //needs to clear previously selected appointment
     this.fromDate = moment().format('YYYY-MM-DD');
     this.toDate = moment().format('YYYY-MM-DD');
-    this.appointmentService.CreateNewGlobal();
+    this._appointmentService.CreateNewGlobal();
     this.LoadAppointmentList();
     this.getDocts();
     this.appointmentGridColumns = GridColumnSettings.AppointmentSearch;
+    this.NepaliDateInGridSettings.NepaliDateColumnList.push(
+      new NepaliDateInGridColumnDetail("AppointmentDate", false)
+    );
   }
   ngAfterViewInit() {
     document.getElementById('quickFilterInput').focus();
@@ -62,7 +75,7 @@ export class AppointmentListComponent {
 
   //loads all the list of appointment
   LoadAppointmentList(): void {
-    this.appointmentBLService.LoadAppointmentList(this.fromDate, this.toDate, this.performerId)
+    this._appointmentBLService.LoadAppointmentList(this.fromDate, this.toDate, this.performerId)
       .subscribe(res => {
         if (res.Status == "OK") {
           this.appointments = res.Results;
@@ -88,7 +101,7 @@ export class AppointmentListComponent {
           this.showSummary = true;
         }
         else {
-          this.msgBoxServ.showMessage("failed", [res.ErrorMessage])
+          this._msgBoxServ.showMessage("failed", [res.ErrorMessage])
           //alert("Failed ! " + res.ErrorMessage);
         }
       });
@@ -120,15 +133,15 @@ export class AppointmentListComponent {
         var AppointmentTime;
         this.selectedAppointment.AppointmentStatus = "cancelled";
         this.selectedAppointment.AppointmentTime = this.appointments.find(a => a.AppointmentId === this.selectedAppointment.AppointmentId).AppointmentTime;
-        this.appointmentBLService.UpdateAppointmentStatus(this.selectedAppointment)
+        this._appointmentBLService.UpdateAppointmentStatus(this.selectedAppointment)
           .subscribe(res => {
             if (res.Status == "OK") {
               this.showReason = false;
               this.LoadAppointmentList();
-              this.msgBoxServ.showMessage("notification", ['You have cancelled an appointment']);
+              this._msgBoxServ.showMessage("notification", ['You have cancelled an appointment']);
             }
             else {
-              this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+              this._msgBoxServ.showMessage("failed", [res.ErrorMessage]);
 
             }
           });
@@ -137,16 +150,16 @@ export class AppointmentListComponent {
         this.showReason = false;
       }
     } else {
-      this.msgBoxServ.showMessage("failed", ['Please write reason to cancel']);
+      this._msgBoxServ.showMessage("failed", ['Please write reason to cancel']);
     }
   }
 
 
   getDocts() {
-    this.visitBLService.GetVisitDoctors()
+    this._visitBLService.GetVisitDoctors()
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status == "OK") {
-          this.visitService.ApptApplicableDoctorsList = res.Results;
+          this._visitService.ApptApplicableDoctorsList = res.Results;
           // var defaultProvider = new Object({ PerformerId: 0, PerformerName: 'All Doctors' });
           var withoutProvider = new Object({ PerformerId: -1, PerformerName: 'No Doctor' });
           this.selectedDoctor = res.Results;
@@ -179,67 +192,69 @@ export class AppointmentListComponent {
       case "checkin":
         {
           let selAppt = $event.Data;
-
-          var pat = this.patientService.CreateNewGlobal();
-
-          var aptPat = this.appointmentService.CreateNewGlobal();
-
-          aptPat.AppointmentId = $event.Data.AppointmentId;
-          aptPat.PatientId = $event.Data.PatientId ? $event.Data.PatientId : 0;
-          aptPat.FirstName = $event.Data.FirstName;
-          aptPat.LastName = $event.Data.LastName;
-          aptPat.Gender = $event.Data.Gender;
-          aptPat.Age = $event.Data.Age;
-          aptPat.ContactNumber = $event.Data.ContactNumber;
-          aptPat.AppointmentDate = $event.Data.AppointmentDate;
-          aptPat.AppointmentTime = $event.Data.AppointmentTime;
-          aptPat.PerformerId = $event.Data.PerformerId;
-          aptPat.PerformerName = $event.Data.PerformerName;
-          aptPat.AppointmentStatus = $event.Data.AppointmentStatus;
-          aptPat.AppointmentType = $event.Data.AppointmentType;
-          aptPat.Reason = $event.Data.Reason;
-          aptPat.DepartmentId = $event.Data.DepartmentId;
-
-          this.routeFromService.RouteFrom = "appointment";
-
-
+          let pat = this._patientService.CreateNewGlobal();
+          let aptPat = this._appointmentService.CreateNewGlobal();
+          this._routeFromService.RouteFrom = ENUM_APP_RouteFrom.Appointment.toLowerCase();
           if (selAppt.PatientId) {
             pat.Appointment = $event.Data;
-            this.appointmentBLService.GetPatientById(selAppt.PatientId)
+            this._appointmentBLService.GetPatientById(selAppt.PatientId)
               .subscribe(res => {
-                if (res.Status == "OK") {
-
+                if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
                   let retPatient: Patient = res.Results;
-                  pat.PatientId = retPatient.PatientId;
-                  pat.PatientCode = retPatient.PatientCode;
-                  pat.FirstName = retPatient.FirstName;
-                  pat.LastName = retPatient.LastName;
-                  pat.MiddleName = retPatient.MiddleName;
-                  pat.DateOfBirth = moment(retPatient.DateOfBirth).format('YYYY-MM-DD');
-                  pat.CountrySubDivisionId = retPatient.CountrySubDivision.CountrySubDivisionId;
-                  pat.CountrySubDivisionName = retPatient.CountrySubDivision.CountrySubDivisionName;
-                  pat.Gender = retPatient.Gender;
-                  pat.Age = retPatient.Age;
-                  pat.Email = retPatient.Email;
-                  pat.PhoneNumber = retPatient.PhoneNumber;
-                  pat.ShortName = retPatient.ShortName;
-                  pat.Salutation = retPatient.Salutation;
-                  pat.CountryId = retPatient.CountryId;
-                  pat.IsDobVerified = retPatient.IsDobVerified;
-                  //pat.MembershipTypeId = retPatient.MembershipTypeId;
-                  pat.Address = retPatient.Address;
+                  if (retPatient.IsAdmitted) {
+                    this.ShowInpatientMessage = true;
+                    return;
+                  }
+                  else {
+                    pat.PatientId = retPatient.PatientId;
+                    pat.PatientCode = retPatient.PatientCode;
+                    pat.FirstName = retPatient.FirstName;
+                    pat.LastName = retPatient.LastName;
+                    pat.MiddleName = retPatient.MiddleName;
+                    pat.DateOfBirth = moment(retPatient.DateOfBirth).format('YYYY-MM-DD');
+                    pat.CountrySubDivisionId = retPatient.CountrySubDivisionId;
+                    pat.CountrySubDivisionName = retPatient.CountrySubDivisionName;
+                    pat.Gender = retPatient.Gender;
+                    pat.Age = retPatient.Age;
+                    pat.Email = retPatient.Email;
+                    pat.PhoneNumber = retPatient.PhoneNumber;
+                    pat.ShortName = retPatient.ShortName;
+                    pat.Salutation = retPatient.Salutation;
+                    pat.CountryId = retPatient.CountryId;
+                    pat.IsDobVerified = retPatient.IsDobVerified;
+                    pat.WardNumber = retPatient.WardNumber;
+                    //pat.MembershipTypeId = retPatient.MembershipTypeId;
+                    pat.Address = retPatient.Address;
+
+                    aptPat.AppointmentId = $event.Data.AppointmentId;
+                    aptPat.PatientId = $event.Data.PatientId ? $event.Data.PatientId : 0;
+                    aptPat.FirstName = $event.Data.FirstName;
+                    aptPat.LastName = $event.Data.LastName;
+                    aptPat.Gender = $event.Data.Gender;
+                    aptPat.Age = $event.Data.Age;
+                    aptPat.ContactNumber = $event.Data.ContactNumber;
+                    aptPat.AppointmentDate = $event.Data.AppointmentDate;
+                    aptPat.AppointmentTime = $event.Data.AppointmentTime;
+                    aptPat.PerformerId = $event.Data.PerformerId;
+                    aptPat.PerformerName = $event.Data.PerformerName;
+                    aptPat.AppointmentStatus = $event.Data.AppointmentStatus;
+                    aptPat.AppointmentType = $event.Data.AppointmentType;
+                    aptPat.Reason = $event.Data.Reason;
+                    aptPat.DepartmentId = $event.Data.DepartmentId;
+                    pat.EthnicGroup = retPatient.EthnicGroup;
+                    pat.MaritalStatus = retPatient.MaritalStatus;
+                  }
                 }
-                this.router.navigate(['/Appointment/Visit']);
+                this._router.navigate(['/Appointment/Visit']);
               }
                 ,
                 err => {
-                  this.msgBoxServ.showMessage("error", ["failed to get selected patient"]);
+                  this._msgBoxServ.showMessage("error", ["failed to get selected patient"]);
                   //alert('failed to get selected patient');
 
                 });
           }
           else {
-
             pat.FirstName = selAppt.FirstName;
             pat.LastName = selAppt.LastName;
             pat.MiddleName = selAppt.MiddleName;
@@ -247,8 +262,25 @@ export class AppointmentListComponent {
             pat.Age = selAppt.Age;
             pat.PhoneNumber = selAppt.ContactNumber;
             console.log(pat);
-            this.router.navigate(['/Appointment/Visit']);
+
+            aptPat.AppointmentId = selAppt.AppointmentId;
+            aptPat.PatientId = selAppt.PatientId ? $event.Data.PatientId : 0;
+            aptPat.FirstName = selAppt.FirstName;
+            aptPat.LastName = selAppt.LastName;
+            aptPat.Gender = selAppt.Gender;
+            aptPat.Age = selAppt.Age;
+            aptPat.ContactNumber = selAppt.ContactNumber;
+            aptPat.AppointmentDate = selAppt.AppointmentDate;
+            aptPat.AppointmentTime = selAppt.AppointmentTime;
+            aptPat.PerformerId = selAppt.PerformerId;
+            aptPat.PerformerName = selAppt.PerformerName;
+            aptPat.DepartmentId = selAppt.DepartmentId;
+
+
+            this._router.navigate(['/Appointment/Visit']);
+
           }
+
 
 
 
@@ -285,8 +317,9 @@ export class AppointmentListComponent {
         {
           this.selectedAppointment = $event.Data;
           this.selectedAppointment.AppointmentTime = this.appointments.find(a => a.AppointmentId === this.selectedAppointment.AppointmentId).AppointmentTime;
-          this.appointmentService.globalAppointment = this.selectedAppointment;
-          this.router.navigate(['/Appointment/CreateAppointment']);
+          this._appointmentService.globalAppointment = this.selectedAppointment;
+          this._routeFromService.RouteFrom = ENUM_APP_RouteFrom.AppointmentList;
+          this._router.navigate(['/Appointment/CreateAppointment']);
         }
         break;
 
@@ -299,11 +332,16 @@ export class AppointmentListComponent {
     let originalData = Object.assign(data);
     this.summary.NewPatient = originalData.filter(a => a.AppointmentType.toLowerCase() == 'new').length;
     this.summary.FollowUpPatient = originalData.filter(a => a.AppointmentType.toLowerCase() == 'followup').length;
+    this.summary.Revisit = originalData.filter(a => a.AppointmentType.toLowerCase() == 'revisit').length;
   }
 
   filterByVisitType() {
     this.afterDateFormat = this.beforeDateFormat.filter(a => a.AppointmentType.toLocaleLowerCase() == this.visitType.toLocaleLowerCase());
     if (this.visitType == "")
       this.afterDateFormat = this.beforeDateFormat;
+  }
+  OnFromToDateChange($event) {
+    this.fromDate = $event.fromDate;
+    this.toDate = $event.toDate;
   }
 }

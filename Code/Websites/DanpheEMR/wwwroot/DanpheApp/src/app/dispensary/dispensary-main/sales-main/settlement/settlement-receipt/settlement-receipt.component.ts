@@ -11,7 +11,8 @@ import { MessageboxService } from '../../../../../shared/messagebox/messagebox.s
 @Component({
   selector: 'app-settlement-receipt',
   templateUrl: './settlement-receipt.component.html',
-  styleUrls: ['./settlement-receipt.component.css']
+  styleUrls: ['./settlement-receipt.component.css'],
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class SettlementReceiptComponent implements OnInit {
 
@@ -44,6 +45,9 @@ export class SettlementReceiptComponent implements OnInit {
   public PayableAmount: number = 0;
 
   public EnableEnglishCalendarOnly: boolean = false;
+  public DepositRefund: number = 0;
+  public GrandTotal: number = 0;
+  public RefundAmount: number = 0;
 
   constructor(public msgBoxService: MessageboxService,
     public pharmacyBLService: PharmacyBLService,
@@ -98,6 +102,9 @@ export class SettlementReceiptComponent implements OnInit {
         this.localDate = this.GetLocalDate(this.setlmntToDisplay.SettlementDate);
         this.showReceipt = true;
         this.CalculateTotals();
+        if (this.PatientInfo) {
+          this.PatientInfo.Age = this.coreService.CalculateAge(this.PatientInfo.DateOfBirth);
+        }
       },
         err => {
           this.msgBoxService.showMessage("failed", [err.ErrorMessage]);
@@ -121,15 +128,22 @@ export class SettlementReceiptComponent implements OnInit {
     this.NetAmount = CommonFunctions.parsePhrmAmount(this.SalesTotal - this.SalesReturnTotal);
     this.CashDiscount = this.SettlementInfo.CashDiscountGiven ? this.SettlementInfo.CashDiscountGiven : 0;
     this.PayableAmount = CommonFunctions.parsePhrmAmount(this.NetAmount - this.CashDiscount);
+    this.GrandTotal = this.NetAmount - this.CashDiscount;
     if (this.DepositInfo && this.DepositInfo.length) {
+      this.DepositInfo = this.DepositInfo.filter(d => d.TransactionType === 'Deposit Deducted');
       this.DepositInfo.forEach(a => {
-        if ((a.TransactionType) == "Deposit Deducted") {
-          this.PaidAmount = this.NetAmount - a.Amount - this.CashDiscount;
+        if (this.GrandTotal > a.DepositAmount) {
+          this.PaidAmount = this.GrandTotal - a.DepositAmount;
         }
-      })
+        else {
+          this.DepositRefund = a.DepositAmount - this.GrandTotal;
+        }
+      });
     } else {
-      this.PaidAmount = this.NetAmount - this.CashDiscount;
+      this.PaidAmount = this.GrandTotal;
     }
+
+
   }
   GetLocalDate(engDate: string): string {
     if (this.EnableEnglishCalendarOnly) {
@@ -158,6 +172,11 @@ export class SettlementReceiptComponent implements OnInit {
     // this.settlementInfo = new PHRMSettlementModel();
     this.SettlementInfo = {};
     this.receiptClosed.emit(true);
-
   }
+  public hotkeys(event) {
+    if (event.keyCode === 27) {
+      this.CloseReceipt();
+    }
+  }
+
 }

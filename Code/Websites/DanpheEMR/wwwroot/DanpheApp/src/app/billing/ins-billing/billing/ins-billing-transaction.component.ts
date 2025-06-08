@@ -1596,7 +1596,7 @@ export class INSBillingTransactionComponent {
 
   GetVisitContext(patientId: number, visitId: number) {
     if (patientId && visitId) {
-      this.BillingBLService.GetDataOfInPatient(patientId, visitId)
+      this.BillingBLService.GetPatientCurrentVisitContext(patientId, visitId)
         .subscribe(res => {
           if (res.Status == "OK" && res.Results) {
             this.currPatVisitContext = res.Results;

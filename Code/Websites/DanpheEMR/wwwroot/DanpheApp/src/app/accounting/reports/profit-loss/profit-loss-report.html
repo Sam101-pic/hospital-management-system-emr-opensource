@@ -33,23 +33,33 @@
                     <danphe-cust-date-reusable (onDateChange)="onDateChange($event)" [rangeType]="dateRange"></danphe-cust-date-reusable>
                 </div> -->
 
-            <div class="col-md-7 col-xs-12" style="margin-right: -45px;">
+            <div class="col-md-8 col-xs-12" style="margin-right: -45px; margin-top: 11px;">
                 <div class="form-group">
-                    <label class="control-label noPadding mb10 mt10"> Select Date<b class="color-red">
+                    <label class="control-label noPadding mb10 mt10 col-md-3"> Select Date<b class="color-red">
                             *</b><b style="float:right;">:</b></label>
 
-                    <div>
+                    <div class="col-md-9">
                         <fiscal-year-calendar [showSingleDatePicker]="false" [showAllFiscalYear]="true" (fiscalYearDate)="selectDate($event)">
                         </fiscal-year-calendar>
                     </div>
                 </div>
             </div>
+            <div class="col-md-4 col-xs-12" style="margin-right: -45px;">
 
-            <div class="col-md-1 col-xs-12" style="margin-top: 25px;">
-                <div class="form-group">
-                    <br>
-                    <button class="btn green btn-success" type="button" [disabled]="btndisabled" (click)="loadData()"
-                            title="Load records of selected date"> <i class="fa fa-refresh"></i> Load </button>
+                <div class="col-md-10">
+                    <label class=" col-md-5" style="margin-top: 25px;">Account Section <b class="color-red"> *</b>:</label><br>
+                    <div class="col-md-7">
+                        <select [(ngModel)]="SelectedHospital" class="form-control">
+                            <option *ngFor="let h of HospitalList" value="{{h.HospitalId}}">{{ h.HospitalLongName }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2 col-xs-12">
+                    <div class="form-group">
+                        <br>
+                        <button class="btn green btn-success" type="button" [disabled]="btndisabled" (click)="loadData()"
+                                title="Load records of selected date"> <i class="fa fa-refresh"></i> Load </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -152,7 +162,7 @@
     <h4>No Data Found for selected date period</h4>
 </div>
 <ledger-report-reusable *ngIf="showLedgerDetail" [showLedgerDetail]="showLedgerDetail" [FiscalYearId]="fiscalYearId" [fromDate]="fromDate"
-                        [toDate]="toDate" [ledgerId]="ledgerId" [ledgerCode]="ledgerCode" [ledgerName]="ledgerName"
+                        [toDate]="toDate" [ledgerId]="ledgerId" [ledgerCode]="ledgerCode" [ledgerName]="ledgerName" [HospitalId]="HospitalId"
                         (callback-add)="ShowReport($event)"></ledger-report-reusable>
 
 <app-print-page *ngIf="showPrint" [print-data-header]="printDetaiils"></app-print-page>

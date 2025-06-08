@@ -42,22 +42,29 @@ export class PHRMGoodsReceiptModel {
       public GoodReceiptValidator: FormGroup = null;
       public GoodReceiptItem: Array<PHRMGoodsReceiptItemsModel> = new Array<PHRMGoodsReceiptItemsModel>();
       IsPacking: boolean;
-      IsItemDiscountApplicable: boolean;
+      IsItemDiscountApplicable: boolean = false;
       public PaymentStatus: string = "pending";
       public CCAmount: number = 0;
       public PurchaseOrderNo: number = 0;
       public VATPercentage: number = 0;
+      public PaymentMode: string = '';
+      public CancelRemarks: string = '';
+      public CancelledBy: string = '';
+      public CancelledOn: string = '';
+      public SupplierName: string = '';
+      public ContactNo: string = '';
+      public Pin: string = '';
+      FiscalYearFormatted: string = '';
       constructor() {
             var _formBuilder = new FormBuilder();
             this.GoodReceiptValidator = _formBuilder.group({
-                  'SubTotal': [],
+                  'SubTotal': [0, [Validators.required]],
                   'DiscountPercentage': [0, [Validators.required, Validators.min(0), Validators.max(100)]],
                   'DiscountAmount': [0, [Validators.required, Validators.min(0)]],
-                  'VATAmount': [],
-                  'Adjustment': [],
-                  'TotalAmount': []
-                  /// 'GoodReceiptDate': ['', Validators.compose([Validators.required, this.dateValidator])],
-
+                  'VATAmount': [0, [Validators.required]],
+                  'Adjustment': [0, [Validators.required]],
+                  'TotalAmount': [0, [Validators.required]],
+                  'GoodReceiptDate': ['', Validators.compose([Validators.required])]
             }
             );
       }

@@ -7,7 +7,6 @@ import { MessageboxService } from '../../../shared/messagebox/messagebox.service
 import { PharmacyBLService } from '../../shared/pharmacy.bl.service';
 import { PharmacyService } from '../../shared/pharmacy.service';
 import { PHRMGoodsReceiptModel } from '../../shared/phrm-goods-receipt.model';
-
 @Component({
       selector: "goods-receipt-view",
       templateUrl: "./phrm-goods-receipt-view.html",
@@ -24,7 +23,7 @@ export class PHRMGoodReceiptViewComponent implements OnInit {
       currentGR: PHRMGoodsReceiptModel = new PHRMGoodsReceiptModel();
       headerDetail: { hospitalName, address, email, PANno, tel, DDA };
 
-      isItemLevelDiscountEnabled: boolean;
+      public IsItemLevelDiscountEnabled: boolean = false;
       isPackingEnabled: boolean;
       showFreeQty: boolean = false;
       showCCCharge: boolean = false;
@@ -33,6 +32,11 @@ export class PHRMGoodReceiptViewComponent implements OnInit {
       cancelRemarks: string;
       cancelForm = new FormGroup({ CancelRemarks: new FormControl('', Validators.required) });
       showConfirmationPopUp: boolean = false;
+      CancelRemarks: string = '';
+      GoodReceiptInfo: string = '';
+
+      @Input("EnableAdjustmentEdit")
+      EnableAdjustmentEdit: boolean = false;
 
       public GeneralFieldLabel = new GeneralFieldLabels();
 
@@ -44,7 +48,7 @@ export class PHRMGoodReceiptViewComponent implements OnInit {
             public router: Router) {
             this.GetPharmacyReceiptHeaderParameter();
             this.showItemLevelDiscount();
-            this.showpacking();
+            this.ShowPacking();
             this.checkGRCustomization();
             this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
       }
@@ -58,6 +62,7 @@ export class PHRMGoodReceiptViewComponent implements OnInit {
                         if (res.Status == "OK") {
                               this.currentGR = res.Results.goodReceipt;
                               this.canUserModify = (this.canUserModify && (this.currentGR.IsCancel == false));
+                              this.SetDataToQRCode();
                         }
                         else {
                               this.msgBox.showMessage("Failed", ["Failed to load data."]);
@@ -66,6 +71,26 @@ export class PHRMGoodReceiptViewComponent implements OnInit {
                         console.log(err);
                         this.msgBox.showMessage("Failed", ["Failed to load data."]);
                   })
+      }
+
+      SetDataToQRCode() {
+            let grItemsDetails = '';
+            this.currentGR.GoodReceiptItem.forEach(item => {
+                  grItemsDetails += `ItemName : ${item.ItemName}  BatchNo: ${item.BatchNo}  SalePrice: ${item.SalePrice}  ReceivedQuantity: ${item.ReceivedQuantity} \n`;
+            });
+
+            this.GoodReceiptInfo =
+                  `GRNo: ${this.currentGR.FiscalYearFormatted}- ${this.currentGR.GoodReceiptPrintId}\n` +
+                  `Supplier: ${this.currentGR.SupplierName}\n` +
+                  `InvoiceNo: ${this.currentGR.InvoiceNo}\n` +
+                  `SupplierBillDate: ${this.currentGR.SupplierBillDate}\n` +
+                  `GoodReceiptDate: ${this.currentGR.GoodReceiptDate}\n` +
+                  `Credit Period: ${this.currentGR.CreditPeriod}\n` +
+                  `Items:\n` +
+                  `[\n` +
+                  `${grItemsDetails.substring(0, grItemsDetails.length - 2)}\n` +
+                  `]\n` +
+                  `TotalAmount: ${this.currentGR.TotalAmount}\n`;
       }
 
       GetPharmacyReceiptHeaderParameter() {
@@ -92,13 +117,13 @@ export class PHRMGoodReceiptViewComponent implements OnInit {
 
       //show or hide GR item level discount
       showItemLevelDiscount() {
-            this.isItemLevelDiscountEnabled = true;
+            this.IsItemLevelDiscountEnabled = true;
             let discountParameter = this.coreService.Parameters.find((p) => p.ParameterName == "PharmacyDiscountCustomization" && p.ParameterGroupName == "Pharmacy").ParameterValue;
             discountParameter = JSON.parse(discountParameter);
-            this.isItemLevelDiscountEnabled = (discountParameter.EnableItemLevelDiscount == true);
+            this.IsItemLevelDiscountEnabled = (discountParameter.EnableItemLevelDiscount == true);
       }
       // for show and hide packing feature
-      showpacking() {
+      ShowPacking() {
             this.isPackingEnabled = true;
             let pkg = this.coreService.Parameters.find((p) => p.ParameterName == "PharmacyGRpacking" && p.ParameterGroupName == "Pharmacy").ParameterValue;
             if (pkg == "true") {
@@ -108,7 +133,7 @@ export class PHRMGoodReceiptViewComponent implements OnInit {
             }
       }
       // Confirmation for Good Receipt Cancel
-      cancelGoodsReciept() {
+      CancelGoodsReceipt() {
             this.showConfirmationPopUp = true;
       }
       //Good Receipt Cancellation Method

@@ -1,23 +1,25 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 import { Router } from '@angular/router';
 
-import { ItemModel } from '../shared/item.model';
-import { ItemCategoryModel } from '../shared/item-category.model';
-import { InventorySettingBLService } from "../shared/inventory-settings.bl.service";
 import { SecurityService } from '../../../security/shared/security.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { InventorySettingBLService } from "../shared/inventory-settings.bl.service";
+import { ItemCategoryModel } from '../shared/item-category.model';
+import { ItemModel } from '../shared/item.model';
 //import { RouteFromService } from "../../../shared/routefrom.service";
 //Parse, validate, manipulate, and display dates and times in JS.
+import { animate, style, transition, trigger } from "@angular/animations";
+import { CoreService } from "../../../core/shared/core.service";
+import { ActivateInventoryService } from "../../../shared/activate-inventory/activate-inventory.service";
+import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { ENUM_DanpheHTTPResponses, ENUM_GRItemCategory, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { InventoryService } from "../../shared/inventory.service";
 import { CompanyModel } from "../shared/company/company.model";
 import { CompanyService } from "../shared/company/company.service";
 import { ItemSubCategoryModel } from "../shared/item-subcategory.model";
-import { InventoryService } from "../../shared/inventory.service";
-import { CoreService } from "../../../core/shared/core.service";
-import { trigger, transition, style, animate } from "@angular/animations";
+import { PackagingTypeModel } from "../shared/packaging-type.model";
 import { UnitOfMeasurementModel } from "../shared/unit-of-measurement.model";
 import { VendorsModel } from "../shared/vendors.model";
-import { ENUM_GRItemCategory } from "../../../shared/shared-enums";
-import { ActivateInventoryService } from "../../../shared/activate-inventory/activate-inventory.service";
 @Component({
   selector: 'item-add',
   animations: [
@@ -42,13 +44,16 @@ export class ItemAddComponent {
   public showAddPage: boolean = false;
   @Input("selectedItem")
   public selectedItem: ItemModel;
+
+  @Input("itemList")
+  public ItemList = new Array<ItemModel>();
   @Output("callback-add")
   callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
   public update: boolean = false;
   public CurrentItem: ItemModel;
   public itemList: Array<ItemModel> = new Array<ItemModel>();
   public GetAccountHeadList: Array<ItemModel> = new Array<ItemModel>();
-  public GetPackagingTypeList: Array<ItemModel> = new Array<ItemModel>();
+  public GetPackagingTypeList: Array<PackagingTypeModel> = new Array<PackagingTypeModel>();
   public UOMList: Array<UnitOfMeasurementModel> = new Array<UnitOfMeasurementModel>();
   public ItemCategoryList: Array<ItemCategoryModel> = new Array<ItemCategoryModel>();
   public ItemSubCategoryList: Array<ItemSubCategoryModel> = new Array<ItemSubCategoryModel>();
@@ -243,6 +248,15 @@ export class ItemAddComponent {
       this.CurrentItem.ItemValidator.controls[i].markAsDirty();
       this.CurrentItem.ItemValidator.controls[i].updateValueAndValidity();
     }
+
+    if (this.ItemList && this.ItemList.length) {
+      const isItemNameAlreadyExists = this.ItemList.some(a => a.ItemName.toLowerCase() === this.CurrentItem.ItemName.toLowerCase());
+      if (isItemNameAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add item as the Item Name "${this.CurrentItem.ItemName}" already exists.`]);
+        return;
+      }
+    }
+
     if (this.CurrentItem.IsValidCheck(undefined, undefined) && checkIsValid) {
       this.loading = true;
       //adding ItemType hardcode for now, as discussed Ramavtar 17-Jan-18
@@ -252,9 +266,9 @@ export class ItemAddComponent {
       this.CurrentItem.ModifiedOn = null;
       this.invSettingBL.AddItem(this.CurrentItem)
         .subscribe(
-          res => {
-            if (res.Status == "OK") {
-              this.showMessageBox("success", "Item Added");
+          (res: DanpheHTTPResponse) => {
+            if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+              this.showMessageBox("success", "Item Added Successfully !");
               this.CurrentItem = new ItemModel();
               this.selectedMaintenanceOwner = null;
               this.CallBackAddItem(res)
@@ -290,18 +304,30 @@ export class ItemAddComponent {
       this.CurrentItem.ItemValidator.controls[i].markAsDirty();
       this.CurrentItem.ItemValidator.controls[i].updateValueAndValidity();
     }
+
+    if (this.ItemList && this.ItemList.length) {
+      const isItemNameAlreadyExists = this.ItemList.some(a => a.ItemName.toLowerCase() === this.CurrentItem.ItemName.toLowerCase() && a.ItemId !== this.CurrentItem.ItemId);
+      if (isItemNameAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update item as the Item Name "${this.CurrentItem.ItemName}" already exists.`]);
+        return;
+      }
+    }
+
     if (this.CurrentItem.IsValidCheck(undefined, undefined) && checkIsValid) {
       this.loading = true;
       this.CurrentItem.ItemType = this.ItemCategoryList.find(a => a.ItemCategoryId == this.CurrentItem.ItemCategoryId).ItemCategoryName
       this.CurrentItem.ModifiedBy = this.securityService.GetLoggedInUser().EmployeeId;
       this.invSettingBL.UpdateItem(this.CurrentItem)
         .subscribe(
-          res => {
-            this.showMessageBox("success", "Item Updated");
-            this.CurrentItem = new ItemModel();
-            this.selectedMaintenanceOwner = null;
-            this.CallBackAddItem(res);
-            this.loading = false;
+          (res: DanpheHTTPResponse) => {
+            if (res.Status == ENUM_DanpheHTTPResponses.OK && res.Results) {
+              this.showMessageBox("success", "Item Updated Successfully!");
+              this.CurrentItem = new ItemModel();
+              this.selectedMaintenanceOwner = null;
+              this.CallBackAddItem(res);
+              this.loading = false;
+            }
+
           },
           err => {
             this.logError(err);

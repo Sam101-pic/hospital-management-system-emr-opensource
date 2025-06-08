@@ -29,6 +29,7 @@
                                 <span *ngIf="action=='death'" style="display: inline-block; margin-left: 5px;">Death</span>
                                 <span *ngIf="action=='admitted'" style="display: inline-block; margin-left: 5px;">Admit Patient</span>
                                 <span *ngIf="action=='dor'" style="display: inline-block; margin-left: 5px;">Discharge On Request</span>
+                                <span *ngIf="action=='Absconded'" style="display: inline-block; margin-left: 5px;">Absconded</span>
                             </a>
                         </div>
                     </div>
@@ -56,17 +57,19 @@
                         </div>
                     </div>
                     <div *ngIf="dischargeErAction">
-                        <er-discharge-summary [callFromTriagedAction]="action" [patientId]="ERPatient.PatientId" [visitId]="ERPatient.PatientVisitId"></er-discharge-summary>
+                        <er-discharge-summary [callFromTriagedAction]="action" [patientId]="ERPatient.PatientId"
+                                              [visitId]="ERPatient.PatientVisitId"></er-discharge-summary>
                     </div>
                     <div class="col-md-8" *ngIf="!dischargeErAction">
-                        <label *ngIf="action=='lama'" style="display: block; color: #2d2d2d;">Remarks</label>
-                        <label *ngIf="action=='transferred'" style="display: block; color: #2d2d2d;">Remarks</label>
-                        <label *ngIf="action=='discharged' || dischargeErAction==false" style="display: block; color: #2d2d2d;">Remarks</label>
-                        <label *ngIf="action=='death'" style="display: block; color: #2d2d2d;">Remarks</label>
-                        <label *ngIf="action=='admitted'" style="display: block; color: #2d2d2d;">Remarks</label>
-                        <label *ngIf="action=='dor'" style="display: block; color: #2d2d2d;">Remarks</label>
+                        <label *ngIf="action=='lama'" style="display: block; color: #2d2d2d;">Remarks<sup>*</sup></label>
+                        <label *ngIf="action=='transferred'" style="display: block; color: #2d2d2d;">Remarks<sup>*</sup></label>
+                        <label *ngIf="action=='discharged' || dischargeErAction" style="display: block; color: #2d2d2d;">Remarks<sup>*</sup></label>
+                        <label *ngIf="action=='death'" style="display: block; color: #2d2d2d;">Remarks<sup>*</sup></label>
+                        <label *ngIf="action=='admitted'" style="display: block; color: #2d2d2d;">Remarks<sup>*</sup></label>
+                        <label *ngIf="action=='dor'" style="display: block; color: #2d2d2d;">Remarks<sup>*</sup></label>
                         <textarea style="width: 100%;" rows="4" [(ngModel)]="ERPatient.FinalizedRemarks"></textarea>
-                        <button [disabled]="loading" style="font-size: 16px; display: block; font-weight: 700;margin-top: 12px;" class="btn blue bordered btn-sm" name="update" (click)="loading=true;PutLamaOfERPatient(action);">
+                        <button [disabled]="loading" style="font-size: 16px; display: block; font-weight: 700;margin-top: 12px;"
+                                class="btn blue bordered btn-sm" name="update" (click)="loading=true;PutLamaOfERPatient(action);">
                             <i style="font-size: 16px;" class="fa fa-plus-circle"></i>
                             <span *ngIf="action=='lama'" style="display: inline-block; margin-left: 5px;">Leave Against Medical Advice</span>
                             <span *ngIf="action=='transferred'" style="display: inline-block; margin-left: 5px;">Transfer</span>
@@ -74,12 +77,14 @@
                             <span *ngIf="action=='admitted'" style="display: inline-block; margin-left: 5px;">Admit</span>
                             <span *ngIf="action=='death'" style="display: inline-block; margin-left: 5px;">Death</span>
                             <span *ngIf="action=='dor'" style="display: inline-block; margin-left: 5px;">Discharge</span>
+                            <span *ngIf="action=='Absconded'" style="display: inline-block; margin-left: 5px;">Absconded</span>
                         </button>
                     </div>
 
                 </div>
             </div>
         </div>
-        <a (click)="Close()" style="background: #b51717;padding: 7px 6px 2px;position: absolute;right: 0;top: 0px; color: #fff;"><i class="fa fa-2x fa-close"></i></a>
+        <a (click)="Close()" style="background: #b51717;padding: 7px 6px 2px;position: absolute;right: 0;top: 0px; color: #fff;"><i
+               class="fa fa-2x fa-close"></i></a>
     </div>
 </div>

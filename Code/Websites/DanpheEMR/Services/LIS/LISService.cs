@@ -49,7 +49,8 @@ namespace DanpheEMR.Services.LIS
                                              MachineId = grp.Key,
                                              MachineName = machine.MachineName,
                                              MachineCode = machine.MachineCode,
-                                             ModelName = machine.ModelName
+                                             ModelName = machine.ModelName,
+                                             IsMachineOrderRequired = machine.IsMachineOrderRequired,
                                          }).ToList();
             return data;
         }
@@ -82,7 +83,7 @@ namespace DanpheEMR.Services.LIS
         public async Task<List<LISComponentMapModel>> GetAllMappedData()
         {
             var allLISMasterData = await GetAllLisMasterComponentAsync();
-            var allMappings = lisDbContext.LISComponentMap.AsNoTracking().Where(a => a.IsActive).ToList();
+            var allMappings = lisDbContext.LISComponentMap.AsNoTracking().ToList();
             var allComponents = lisDbContext.LabTestComponents.AsNoTracking().ToList();
 
             var retData = (from map in allMappings
@@ -159,6 +160,18 @@ namespace DanpheEMR.Services.LIS
             }
         }
 
+        public void ActivateMapping(int id, int userId)
+        {
+            var data = lisDbContext.LISComponentMap.Where(d => d.LISComponentMapId == id).FirstOrDefault();
+            if (data != null)
+            {
+                data.IsActive = true;
+                data.ModifiedBy = userId;
+                data.ModifiedOn = System.DateTime.Now;
+                lisDbContext.SaveChanges();
+            }
+        }
+
         public async Task<List<MachineResultsFormatted>> GetMachineResults(int machineId, DateTime fromDate, DateTime toDate)
         {
             var machineList = GetAllMasterDataAsync().GetAwaiter().GetResult().LISMachineMasterList;
@@ -205,7 +218,9 @@ namespace DanpheEMR.Services.LIS
                                              Patient = pat,
                                              Test = test,
                                              Requisition = req,
-                                             Component = comp
+                                             Component = comp,
+                                             DisplaySequence = map.DisplaySequence,
+                                             GroupName = map.GroupName,
                                          }).ToList();
 
             var dataToReturn = (from req in allReqByBarcodeNumber
@@ -234,8 +249,12 @@ namespace DanpheEMR.Services.LIS
                                     LISComponentResultId = lisRes.LISComponentResultId,
                                     IsSelected = false,
                                     IsValueValid = true,
-                                    DateOfBirth = req.Patient.DateOfBirth
-                                }).ToList();
+                                    DateOfBirth = req.Patient.DateOfBirth,
+                                    DisplaySequence = req.DisplaySequence,
+                                    GroupName  = req.GroupName,
+                                    IsGroupValid = true,
+                                    ErrorMessage = "",
+                                }).OrderBy(a => a.DisplaySequence).ToList();
 
             var groupedData = (from d in dataToReturn
                                group d by new { d.BarCodeNumber, d.HospitalNumber, d.RunNumber, d.LabTestName, d.PatientName, d.PatientId, d.LabTestId } into grp
@@ -369,6 +388,9 @@ namespace DanpheEMR.Services.LIS
 
 
                         var allLabRequisitions = lisDbContext.Requisitions.Where(r => distinctReqId.Contains(r.RequisitionId));
+                        DataTable storedProcdureParam = new DataTable();
+                        storedProcdureParam.Columns.Add("RequisitionId", typeof(long));
+                        storedProcdureParam.Columns.Add("OrderStatus", typeof(string));
 
                         foreach (var item in allLabRequisitions)
                         {
@@ -378,14 +400,14 @@ namespace DanpheEMR.Services.LIS
                             lisDbContext.Entry(item).Property(a => a.OrderStatus).IsModified = true;
                             lisDbContext.Entry(item).Property(a => a.ResultAddedBy).IsModified = true;
                             lisDbContext.Entry(item).Property(a => a.ResultAddedOn).IsModified = true;
+                            storedProcdureParam.Rows.Add(item.RequisitionId, ENUM_BillingOrderStatus.Final);
                         }
                         lisDbContext.SaveChanges();
 
 
                         allReqIdListStr = allReqIdListStr.Substring(0, (allReqIdListStr.Length - 1));
                         List<SqlParameter> paramList = new List<SqlParameter>(){
-                                                    new SqlParameter("@allReqIds", allReqIdListStr),
-                                                    new SqlParameter("@status", ENUM_BillingOrderStatus.Final)
+                                                    new SqlParameter("@RequisitionId_OrderStatus", storedProcdureParam)
                                                 };
                         DataTable statusUpdated = DALFunctions.GetDataTableFromStoredProc("SP_Bill_OrderStatusUpdate", paramList, lisDbContext);
 
@@ -469,6 +491,7 @@ namespace DanpheEMR.Services.LIS
                                      join patient in lisDbContext.Patients on requisition.PatientId equals patient.PatientId
                                      join componentMap in lisDbContext.LabTestComponentMap on requisition.LabTestId equals componentMap.LabTestId
                                      join lisComponentMap in lisDbContext.LISComponentMap on componentMap.ComponentId equals lisComponentMap.ComponentId
+                                     where componentMap.IsActive == true && lisComponentMap.IsActive == true
                                      select new
                                      {
                                          requisition,
@@ -481,6 +504,7 @@ namespace DanpheEMR.Services.LIS
 
             var allLISMasterData = await allLISMasterDataTask;
             var orderToInsertData = await orderToInsertTask;
+            allLISMasterData = allLISMasterData.Where(a => a.IsMachineOrderRequired == true).ToList();
 
             // Join allLISMasterData with the other data
             var orderToInsert = (from data in orderToInsertData
@@ -499,7 +523,20 @@ namespace DanpheEMR.Services.LIS
                                  }).ToList();
             if (orderToInsert.Count > 0)
             {
-                var payload = DanpheJSONConvert.SerializeObject(orderToInsert);
+                var groupedMachineOrder = orderToInsert.GroupBy(a => new { a.BarCodeNumber, a.MachineId }).Select(b => new LIS_Machine_Order_DTO
+                {
+                    BarCodeNumber = b.Key.BarCodeNumber.ToString(),
+                    MachineComponentName = String.Join(",", b.Select(a => a.MachineComponentName)),
+                    PatientCode = b.First().PatientCode,
+                    PatientName = b.First().PatientName,
+                    Gender = b.First().Gender,
+                    SpecimenType = b.First().SpecimenType,
+                    MachineId = b.First().MachineId,
+                    MachineName = b.First().MachineName,
+                    CreatedOn = DateTime.Now
+                }).ToList();
+
+                var payload = DanpheJSONConvert.SerializeObject(groupedMachineOrder);
 
                 using (var client = new HttpClient())
                 {

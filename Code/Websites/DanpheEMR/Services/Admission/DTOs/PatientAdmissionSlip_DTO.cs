@@ -12,5 +12,7 @@ namespace DanpheEMR.Services.Admission.DTOs
         public string DepartmentName { get; set; }
         public string DoctorName { get; set; }
         public DateTime AdmittedOn { get; set; }
+        public DateTime? DateOfBirth { get; set; }
+        public string Gender {  get; set; }
     }
 }

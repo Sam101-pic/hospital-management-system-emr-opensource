@@ -133,6 +133,15 @@ export class PHRMItemTypeManageComponent implements OnInit {
             this.CurrentItemType.ItemTypeValidator.controls[i].markAsDirty();
             this.CurrentItemType.ItemTypeValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.itemtypeList && this.itemtypeList.length) {
+            const isItemTypeAlreadyExists = this.itemtypeList.some(s => s.ItemTypeName.toLowerCase() === this.CurrentItemType.ItemTypeName.toLowerCase());
+            if (isItemTypeAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add ItemType as the Type of Item "${this.CurrentItemType.ItemTypeName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.CurrentItemType.IsValidCheck(undefined, undefined)) {
             this.CurrentItemType.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
             this.CurrentItemType.CategoryId = this.selCategory.CategoryId;
@@ -160,6 +169,15 @@ export class PHRMItemTypeManageComponent implements OnInit {
             this.CurrentItemType.ItemTypeValidator.controls[i].markAsDirty();
             this.CurrentItemType.ItemTypeValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.itemtypeList && this.itemtypeList.length) {
+            const isItemTypeAlreadyExists = this.itemtypeList.some(s => s.ItemTypeName.toLowerCase() === this.CurrentItemType.ItemTypeName.toLowerCase() && s.ItemTypeId !== this.CurrentItemType.ItemTypeId);
+            if (isItemTypeAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update ItemType as the Type of Item "${this.CurrentItemType.ItemTypeName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.CurrentItemType.IsValidCheck(undefined, undefined)) {
             this.CurrentItemType.CreatedOn = moment().format('YYYY-MM-DD');
             this.pharmacyBLService.UpdateItemType(this.CurrentItemType)
@@ -266,6 +284,7 @@ export class PHRMItemTypeManageComponent implements OnInit {
         this.selCategory = new PHRMCategoryModel();
         this.update = false;
         this.showItemTypeAddPage = false;
+        this.callbackAdd.emit();
     }
 
     AddUpdateResponseEmitter(itemtype) {

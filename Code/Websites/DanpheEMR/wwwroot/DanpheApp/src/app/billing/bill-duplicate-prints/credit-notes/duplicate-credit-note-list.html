@@ -2,7 +2,7 @@
   <div class="row">
     <div class="col-lg-12 col-sm-12">
       <danphe-grid [grid-colDefaults]="duplicateInvoiceReturnPrintGridColumns" [grid-data]="CreditNoteList"
-                   [rangeType]="dateRange" (onDateChange)="onGridDateChange($event)" [date-range-options]="'1D,1W,1M,3M'"
+                   [rangeType]="dateRange" (onDateChange)="onGridDateChange($event)" [date-settings-name]="'billing-reports'"
                    [show-CustomDate]="true" (grid-actions)="DuplicateInvoiceReturnGridActions($event)" [show-print-button]="false"
                    [NepaliDateInGridParams]="NepaliDateInGridSettings">
       </danphe-grid>

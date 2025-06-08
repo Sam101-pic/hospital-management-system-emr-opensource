@@ -1,4 +1,3 @@
-import * as moment from "moment";
 
 export class FinalDiagnosisModel {
     public FinalDiagnosisId: number = 0;
@@ -10,4 +9,5 @@ export class FinalDiagnosisModel {
     public IsActive: boolean = true;
     public IsPatientReferred: boolean;
     public ReferredBy: string = "";
+    DiseaseGroupId: number = 0;
 }

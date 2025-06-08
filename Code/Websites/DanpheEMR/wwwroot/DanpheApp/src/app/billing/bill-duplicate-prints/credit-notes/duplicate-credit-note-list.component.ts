@@ -1,15 +1,17 @@
-import { Component } from '@angular/core';
-import { BillingBLService } from '../../shared/billing.bl.service';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { BillingService } from '../../shared/billing.service';
-import * as moment from 'moment/moment';
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
-import { DanpheLoadingInterceptor } from '../../../shared/danphe-loader-intercepter/danphe-loading.services';
+import { Component } from '@angular/core';
+import * as moment from 'moment/moment';
 import { CoreService } from '../../../core/shared/core.service';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { DanpheLoadingInterceptor } from '../../../shared/danphe-loader-intercepter/danphe-loading.services';
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
+import { ENUM_DanpheHTTPResponseText } from '../../../shared/shared-enums';
+import { BillingBLService } from '../../shared/billing.bl.service';
+import { BillingService } from '../../shared/billing.service';
 
 @Component({
   templateUrl: './duplicate-credit-note-list.html',
@@ -17,7 +19,8 @@ import { RouteFromService } from '../../../shared/routefrom.service';
     provide: HTTP_INTERCEPTORS,
     useClass: DanpheLoadingInterceptor,
     multi: true,
-  }]
+  }],
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 
 // App Component class
@@ -47,9 +50,20 @@ export class BIL_DuplicatePrint_CreditNoteListComponent {
 
   GetInvoiceListForDuplicatebill() {
     this.BillingBLService.GetInvoiceReturnDetailsForDuplicatebill(this.fromDate, this.toDate)
-      .subscribe(res => {
-        this.CreditNoteList = res.Results;
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+          this.CreditNoteList = res.Results;
+          if (this.CreditNoteList && this.CreditNoteList.length > 0) {
+            this.CreditNoteList = this.GetPatientsWithConsistentAge();
+          }
+        }
       });
+  }
+  GetPatientsWithConsistentAge() {
+    return this.CreditNoteList.map(patient => {
+      patient.Age = this.coreService.CalculateAge(patient.DateOfBirth);
+      return patient;
+    });
   }
 
   DuplicateInvoiceReturnGridActions($event: GridEmitModel) {
@@ -82,4 +96,11 @@ export class BIL_DuplicatePrint_CreditNoteListComponent {
     this.selCreditNote = null;
     this.showPrintPage = false;
   }
+
+  hotkeys(event) {
+    if (event.keyCode === 27) {
+      this.ClosePrintPage();
+    }
+  }
+
 }

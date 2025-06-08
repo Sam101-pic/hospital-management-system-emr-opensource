@@ -1,12 +1,16 @@
 <div class="row">
   <div class="col-md-3">
-    <a class="btn btn-primary btn-sm m1" name="name" value="" (click)="AddNewConsumption()"><span class="glyphicon glyphicon-plus"> </span> New Patient Consumption</a>
+    <a class="btn btn-primary btn-sm m1" name="name" value="" (click)="AddNewConsumption()"><span class="glyphicon glyphicon-plus"> </span> New
+      Patient Consumption</a>
   </div>
 </div>
 <div>
   <div class="row" *ngIf="showComsumptionList">
     <div class="col-lg-12 col-sm-12">
-      <danphe-grid [grid-colDefaults]="consumptionListDetailsGridColumns" [grid-data]="consumptionListDetails" (grid-actions)="ConsumptionListGridAction($event)" [rangeType]="dateRange" (onDateChange)="onDateChange($event)" [show-CustomDate]="true" [NepaliDateInGridParams]="NepaliDateInGridSettings">
+      <danphe-grid [grid-colDefaults]="consumptionListDetailsGridColumns" [grid-data]="consumptionListDetails"
+                   (grid-actions)="ConsumptionListGridAction($event)" [rangeType]="dateRange" (onDateChange)="onDateChange($event)"
+                   [show-CustomDate]="true" [NepaliDateInGridParams]="NepaliDateInGridSettings"
+                   [date-settings-name]="'common-range-with-today'">
       </danphe-grid>
     </div>
   </div>
@@ -30,7 +34,8 @@
                   <td align="left" border="0" style="border: none !important; width:33.33%">
                     <img class="img-responsive" style="max-height:70px; width: auto;" src="../../../themes/theme-default/images/hospital-logo.PNG" />
                   </td>
-                  <td align="center" style="text-align: center; font-size: 25px; text-transform: capitalize; padding: 15px 0; border: none !important;width:33.33%">
+                  <td align="center"
+                      style="text-align: center; font-size: 25px; text-transform: capitalize; padding: 15px 0; border: none !important;width:33.33%">
                     <strong style="margin-bottom: 10px;">{{headerDetail.hospitalName}}</strong><br />
                     <!-- <br><strong style="font-size: 70%;">The Fred Hollows Intraocular Lens Laboratory</strong><br> -->
                     <strong style="font-size:15px;">{{headerDetail.address}}</strong><br />
@@ -72,7 +77,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let row of patientConsumptionList">
+                  <tr *ngFor="let row of patientConsumptionList;">
                     <td>
                       {{ row.Code }}
                     </td>
@@ -83,7 +88,7 @@
                       {{ row.Quantity }}
                     </td>
                     <td>
-                      {{row.Unit}}
+                      {{row.UOMName}}
                     </td>
                   </tr>
                 </tbody>

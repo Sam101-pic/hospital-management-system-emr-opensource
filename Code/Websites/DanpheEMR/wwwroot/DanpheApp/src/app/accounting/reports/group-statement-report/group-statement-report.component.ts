@@ -1,8 +1,10 @@
 import { ChangeDetectorRef, Component } from "@angular/core";
 import { CoreService } from "../../../core/shared/core.service";
+import { SecurityService } from "../../../security/shared/security.service";
 import { CommonFunctions } from "../../../shared/common.functions";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { Hospital_DTO } from "../../settings/shared/dto/hospitals.dto";
 import { ledgerGroupModel } from "../../settings/shared/ledgerGroup.model";
 import { AccountingService } from "../../shared/accounting.service";
 import { AccountingReportsBLService } from "../shared/accounting-reports.bl.service";
@@ -26,21 +28,39 @@ export class GroupStatementReportComponent {
   public fiscalYearId: number = 0;
   selectedLedgerGroup: any;
   btndisabled = false;
-  public ledgergroupList: Array<ledgerGroupModel> = new Array<ledgerGroupModel>();
+  public LedgerGroupList: Array<ledgerGroupModel> = new Array<ledgerGroupModel>();
   public validDate: boolean = true;
   public reportData: Array<GroupStatementReportVM> = new Array<GroupStatementReportVM>();
   public reportDataGrandTotal: GroupStatementReportVM = new GroupStatementReportVM();
   public dateRange: string = null;
+  public HospitalList: Array<Hospital_DTO> = new Array<Hospital_DTO>();
+  public SelectedHospital: number = 0;
+  public HospitalId: number = 0;
+  public AllLedgerGroups: ledgerGroupModel[] = [];
+  public ActiveHospital: number = 0;
   constructor(
     public msgBoxServ: MessageboxService,
     public coreservice: CoreService,
+    public securityService: SecurityService,
     public accReportBLServ: AccountingReportsBLService,
     public accountingService: AccountingService,
-    private changeDetector: ChangeDetectorRef
+    private changeDetector: ChangeDetectorRef, public accRptBLService: AccountingReportsBLService
   ) {
     this.showExport();
-    this.GetLedgerGroup();
+    this.AllLedgerGroups = this.accountingService.AllLedgerGroup;
     this.getCoreParameters();
+    this.CheckAndAssignHospital();
+
+  }
+  CheckAndAssignHospital() {
+    this.ActiveHospital = this.securityService.AccHospitalInfo.ActiveHospitalId;
+    this.HospitalList = this.accountingService.accCacheData.Hospitals ? this.accountingService.accCacheData.Hospitals : [];
+    if (this.HospitalList.length === 1) {
+      this.SelectedHospital = this.HospitalList[0].HospitalId;
+    } else {
+      this.SelectedHospital = this.ActiveHospital;
+    }
+    this.FilterLedgerGroup();
   }
   getCoreParameters() {
     this.accountingService.getCoreparameterValue();
@@ -71,25 +91,20 @@ export class GroupStatementReportComponent {
       this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select at least one ledger group."]);
       flag = false;
     }
+    if (!this.HospitalId) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select Account Section"]);
+      flag = false;
+    }
 
     return flag;
   }
-
-
-  //get all ledger group
-  GetLedgerGroup() {
-    if (!!this.accountingService.accCacheData.LedgerGroups && this.accountingService.accCacheData.LedgerGroups.length > 0) { //mumbai-team-june2021-danphe-accounting-cache-change
-      this.CallBackLedgerGroup(this.accountingService.accCacheData.LedgerGroups) //mumbai-team-june2021-danphe-accounting-cache-change
-    }
-  }
-
-  CallBackLedgerGroup(res) {
-    if (res) {
-      this.ledgergroupList = new Array<ledgerGroupModel>();
-      this.ledgergroupList = res.filter((lg) => lg.IsActive == true); //only isActive true ledgergroup here
-      this.ledgergroupList = this.ledgergroupList.slice(); //mumbai-team-june2021-danphe-accounting-cache-change
-    }
-  }
+  // CallBackLedgerGroup(res) {
+  //   if (res) {
+  //     this.ledgerGroupList = new Array<ledgerGroupModel>();
+  //     this.ledgerGroupList = res.filter((lg) => lg.IsActive == true && lg.HospitalId == this.SelectedHospital); //only isActive true ledgergroup here
+  //     this.ledgerGroupList = this.ledgerGroupList.slice(); //mumbai-team-june2021-danphe-accounting-cache-change
+  //   }
+  // }
   //format ledgergroup for autocomplete
   LedgerGroupListFormatter(data: any): string {
     return (
@@ -104,13 +119,15 @@ export class GroupStatementReportComponent {
   //get Group statement report details
   GetGroupStatementRpt() {
     this.btndisabled = true;
+    this.reportData = new Array<GroupStatementReportVM>();
+    this.reportDataGrandTotal = new GroupStatementReportVM();
+    this.HospitalId = this.SelectedHospital;
     if (this.checkValidation() && this.checkDateValidation()) {
       this.accReportBLServ
-        .GetGroupStatementReport(this.fromDate, this.toDate, this.fiscalYearId, this.selectedLedgerGroup.LedgerGroupId)
+        .GetGroupStatementReport(this.fromDate, this.toDate, this.fiscalYearId, this.selectedLedgerGroup.LedgerGroupId, this.HospitalId)
         .subscribe((res) => {
           if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
             this.btndisabled = false;
-            this.reportData = new Array<GroupStatementReportVM>()
             this.reportData = res.Results;
             if (this.reportData.length > 0) {
               this.IsShowReport = true;
@@ -141,7 +158,7 @@ export class GroupStatementReportComponent {
   //assign ledgergroup details , after ledgergroup autocomplete changed values
   AssignSelectedLedgerGroup() {
     if (this.selectedLedgerGroup && this.selectedLedgerGroup.LedgerGroupId > 0) {
-
+      this.LedgerGroupList;
     } else {
       this.selectedLedgerGroup = "";
     }
@@ -187,5 +204,10 @@ export class GroupStatementReportComponent {
 
   ShowReport($event) {
     this.showLedgerDetail = false;
+  }
+  FilterLedgerGroup() {
+    this.selectedLedgerGroup = null;
+    this.LedgerGroupList = this.AllLedgerGroups.filter(lg => lg.HospitalId == this.SelectedHospital);
+    this.IsShowReport = false;
   }
 }

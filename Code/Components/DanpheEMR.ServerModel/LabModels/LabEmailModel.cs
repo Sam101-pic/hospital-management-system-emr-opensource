@@ -19,6 +19,9 @@ namespace DanpheEMR.ServerModel.LabModels
         public string SenderTitle { get; set; }
         public bool SendPdf { get; set; }
         public bool SendHtml { get; set; }
+        public string SmtpServer { get; set; }
+        public string Password { get; set; }
+        public int PortNo { get; set; }
 
         public List<string> EmailList { get; set; }
     }

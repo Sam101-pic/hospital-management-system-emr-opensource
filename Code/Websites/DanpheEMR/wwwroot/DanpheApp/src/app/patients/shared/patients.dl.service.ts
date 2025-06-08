@@ -1,5 +1,8 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
+import { DanpheHTTPResponse } from '../../shared/common-models';
+import { MedicareMemberModel } from './patient-medicare-member.model';
 
 @Injectable()
 export class PatientsDLService {
@@ -10,6 +13,51 @@ export class PatientsDLService {
   constructor(_http: HttpClient) {
     this.http = _http;
   }
+  public GetSalutationList() {
+    return this.http.get<DanpheHTTPResponse>("/api/Settings/Salutation");
+  }
+  public PutMedicareDetails(medicareDetail: MedicareMemberModel) {
+    return this.http.put<DanpheHTTPResponse>("/api/PatinetMedicareRegistration/MedicareMemberDetails", medicareDetail);
+  }
+
+  public PostMedicareMemberDetails(medicareMemberDetail: MedicareMemberModel) {
+    return this.http.post<DanpheHTTPResponse>("/api/PatinetMedicareRegistration/MedicareMemberDetails", medicareMemberDetail);
+  }
+  public GetMedicareMemberDetailByPatientId(patientId: number) {
+    return this.http.get(`/api/PatinetMedicareRegistration/MedicareMemberByPatientId?PatientId=${patientId}`, this.options);
+  }
+
+  public GetMedicareDependentMemberDetailByPatientId(patientId: number) {
+    return this.http.get(`/api/PatinetMedicareRegistration/DependentMedicareMember?PatientId=${patientId}`, this.options);
+  }
+  public GetMedicareMemberDetailByMedicareNumber(medicareNo: string) {
+    return this.http.get(`/api/PatinetMedicareRegistration/MedicareMemberByMemberNo?MedicareNo=${medicareNo}`, this.options);
+  }
+
+  public PostMedicareDependentDetails(data: MedicareMemberModel) {
+    return this.http.post<DanpheHTTPResponse>("/api/PatinetMedicareRegistration/MedicareMemberDetails", data);
+  }
+
+  public GetAllDepartments() {
+    return this.http.get<DanpheHTTPResponse>("/api/PatinetMedicareRegistration/Departments");
+  }
+
+  public GetAllDesignations() {
+    return this.http.get<DanpheHTTPResponse>("/api/PatinetMedicareRegistration/Designations");
+  }
+  public GetAllMedicareTypes() {
+    return this.http.get<DanpheHTTPResponse>("/api/PatinetMedicareRegistration/MedicareTypes");
+  }
+  public GetAllMedicareInstitutes() {
+    return this.http.get<DanpheHTTPResponse>("/api/PatinetMedicareRegistration/MedicareInstitutes");
+  }
+  public GetAllInsuranceProviderList() {
+    return this.http.get<DanpheHTTPResponse>("/api/PatinetMedicareRegistration/InsuranceProviders");
+  }
+  public GetMedicarePatients() {
+    return this.http.get<DanpheHTTPResponse>("/api/PatinetMedicareRegistration/MedicarePatientList");
+  }
+
   // getting the patient
   public GetPatients(searchTxt) {
     //return this.http.get<any>("/api/Patient", this.options);
@@ -17,16 +65,16 @@ export class PatientsDLService {
   }
 
   //getting registered patients
-  public GetPatientsList(searchTxt) {
+  public GetPatientsList(searchTxt, searchUsingHospitalNo) {
     //return this.http.get<any>("/api/Patient", this.options);
-    return this.http.get<any>("/api/Patient/SearchRegisteredPatient?search=" + searchTxt, this.options);
+    return this.http.get<any>("/api/Patient/SearchRegisteredPatient?search=" + searchTxt + "&searchUsingHospitalNo=" + searchUsingHospitalNo, this.options);
   }
 
   //sud:10-Oct'21--Needed separate api for Patient search in New Visit--
   //other one was too heavy for frequently used module like new visit.
-  public GetPatientsListForNewVisit(searchTxt, searchUsingHospitalNo, searchUsingIdCardNo) {
+  public GetPatientsListForNewVisit(searchTxt, searchUsingHospitalNo, searchUsingIdCardNo, ShowIPInSearchPatient?: boolean) {
     //return this.http.get<any>("/api/Patient", this.options);
-    return this.http.get<any>("/api/Patient/SearchPatientForNewVisit?search=" + searchTxt + "&searchUsingHospitalNo=" + searchUsingHospitalNo + "&searchUsingIdCardNo=" + searchUsingIdCardNo, this.options);
+    return this.http.get<any>("/api/Patient/SearchPatientForNewVisit?search=" + searchTxt + "&searchUsingHospitalNo=" + searchUsingHospitalNo + "&searchUsingIdCardNo=" + searchUsingIdCardNo + " &ShowIPInSearchPatient=" + ShowIPInSearchPatient, this.options);
 
   }
 
@@ -221,6 +269,12 @@ export class PatientsDLService {
     catch (ex) {
       throw ex;
     }
+  }
+
+
+  GetPatientHealthCardTemplates(templateCode: string, patientId: number): Observable<DanpheHTTPResponse> {
+    //return this.http.get<DanpheHTTPResponse>(`/api/Patient/PatientHealthCardTemplate`, this.options);
+    return this.http.get<DanpheHTTPResponse>(`/api/NewClinical/Template?templateCode=${templateCode}&patientId=${patientId}`, this.options);
   }
 }
 

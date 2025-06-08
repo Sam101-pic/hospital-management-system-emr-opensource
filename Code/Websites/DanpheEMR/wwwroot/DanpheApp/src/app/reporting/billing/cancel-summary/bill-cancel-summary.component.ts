@@ -1,13 +1,12 @@
-import { Component, Directive, ViewChild } from '@angular/core';
+import { Component } from '@angular/core';
 import { ReportingService } from "../../../reporting/shared/reporting-service";
-import { DLService } from "../../../shared/dl.service"
+import { DLService } from "../../../shared/dl.service";
 
 import * as moment from 'moment/moment';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { CommonFunctions } from '../../../shared/common.functions';
 
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 
 @Component({
   templateUrl: "./bill-cancel-summary.html"
@@ -32,6 +31,8 @@ export class RPT_BIL_BillCancelSummaryComponent {
 
     this.dlService = _dlService;
     this.fromDate = this.toDate = this.TodayDate = moment().format('DD-MM-YYYY');
+    this.billCancelSummaryColumns = this.reportServ.reportGridCols.BillCancelSummaryColumns;
+
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("CreatedOn", true));
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("CancelledOn", true));
     //this.Load();
@@ -53,7 +54,6 @@ export class RPT_BIL_BillCancelSummaryComponent {
   }
   Success(res) {
     if (res.Status == "OK") {
-      this.billCancelSummaryColumns = this.reportServ.reportGridCols.BillCancelSummaryColumns;
       this.billCancelSummaryData = res.Results;
 
     }

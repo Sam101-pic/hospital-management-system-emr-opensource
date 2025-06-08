@@ -14,6 +14,7 @@ namespace DanpheEMR.ServerModel.AdmissionModels.Config
         public decimal PercentageOfBedCharges { get; set; }
         public bool UsePercentageOfBedCharges { get; set; }
         public bool IsRepeatable { get; set; }
+        public bool AllowAutoCancellation { get; set; }
         public bool IsActive { get; set; }
         public int CreatedBy { get; set; }
         public DateTime CreatedOn { get; set; }

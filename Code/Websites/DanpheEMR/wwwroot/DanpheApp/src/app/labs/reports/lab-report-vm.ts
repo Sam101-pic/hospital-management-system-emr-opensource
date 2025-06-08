@@ -27,7 +27,7 @@ export class LabReportVM {
   public ReportCreatedBy: number = null;
   public PrintedOn: string = null;
   public PrintedBy: number = null;
-  public PrintedByName: number = null;
+  public PrintedByName: string = "";
   public PrintCount: number = null;
   public HasInsurance: boolean;
   public VerifiedByList: Array<number> = [];
@@ -36,6 +36,7 @@ export class LabReportVM {
     LabResult_TemplatesVM
   >();
   public Email: string = null;
+  public BarCodeNumber: string = "";
   //sud: 21Aug'18--Implementation Pending -- handed over to Ashim
   public static AssignControlTypesToComponent(
     ipLabReportVM: LabReportVM
@@ -74,6 +75,7 @@ export class LabReportVM {
       MaxLenArray: [],
       HasOthersFields: false,
       ColonyCount: "",
+      Print: true,
     };
     var compFilteredByGrp = test.Components.filter(
       (c) => c.ResultGroup == grpNum
@@ -169,8 +171,14 @@ export class ReportLookup {
   public Specimen: string = null;
   public CountrySubDivisionName: string = null;
   public MunicipalityName: string = null;
+  public CountryName: string = null;
+  public WardNumber: string = null;
   public Email: string = null;
   public ProfilePictureName: string = null;
   public PassPortNumber: string = null;
   public WardName: string = null;
+  public PolicyNumber: string = "";
+  public Age: string = "";
+  public ReferredByName: string = "";
+  public ReferredById: number;
 }

@@ -77,6 +77,7 @@ namespace DanpheEMR.ViewModel.Procurement
         public int CurrentVerificationLevelCount { get; set; }
         public int? PONumber { get; set; }
         public IList<GRChargesDTO> OtherChargesList { get; set; }
+        public DateTime? VendorBillDate { get; set; }
     }
 
     public class GrItemsDTO

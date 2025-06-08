@@ -24,7 +24,7 @@ export class RPT_ADT_DayAndMonthWiseVisitReportComponent implements OnInit {
   MonthVisitReportColumn: Array<any> = null;
   DailyVisitReportData: Array<any> = new Array<DynamicReport>();
   MonthVisitReportData: Array<any> = new Array<DynamicReport>();
-  public summary = { tot_new: 0, tot_followup: 0, tot_all: 0 };
+  public summary = { TotalNewAppointments: 0, TotalFollowupAppointments: 0, TotalRevisitAppointments: 0, TotalReferralAppointments: 0, TotalAppointments: 0 };
   public dataLoaded: boolean = false;
 
   constructor(
@@ -46,9 +46,10 @@ export class RPT_ADT_DayAndMonthWiseVisitReportComponent implements OnInit {
   Load() {
     if (this.currentdepartmentappointment.fromDate != null && this.currentdepartmentappointment.toDate != null) {
       //reset all values to zero on button click.
-      this.summary.tot_all = this.summary.tot_new = this.summary.tot_followup = 0;
       this.DailyVisitReportData = [];
       this.MonthVisitReportData = [];
+      this.summary = { TotalNewAppointments: 0, TotalFollowupAppointments: 0, TotalRevisitAppointments: 0, TotalReferralAppointments: 0, TotalAppointments: 0 };
+      this.dataLoaded = false;
       let deptId = 0;
       if (this.currentdepartmentappointment && this.currentdepartmentappointment.departmentName && this.currentdepartmentappointment.departmentName.DepartmentId) {
         deptId = this.currentdepartmentappointment.departmentName.DepartmentId;
@@ -56,7 +57,7 @@ export class RPT_ADT_DayAndMonthWiseVisitReportComponent implements OnInit {
 
 
       this.dlService.Read("/Reporting/DayAndMonthWiseVisitReport?FromDate="
-        + this.currentdepartmentappointment.fromDate + "&ToDate=" + this.currentdepartmentappointment.toDate + "&DepartmentId=" + deptId + "&ReportType=" + this.ReportType)
+        + this.currentdepartmentappointment.fromDate + "&ToDate=" + this.currentdepartmentappointment.toDate + "&DepartmentId=" + deptId + "&ReportType=" + this.ReportType + "&IsFreeVisit=" + this.currentdepartmentappointment.IsFreeVisit)
         .map((res: DanpheHTTPResponse) => res)
         .subscribe((res: DanpheHTTPResponse) => this.Success(res),
           res => this.Error(res));
@@ -70,11 +71,19 @@ export class RPT_ADT_DayAndMonthWiseVisitReportComponent implements OnInit {
   }
   Success(res) {
     if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-
-      this.DailyVisitReportData = res.Results;
-      this.MonthVisitReportData = res.Results;
-      this.SummaryTotal();
-
+      if (res.Results && res.Results.DayMonthWiseAppointmentReport && res.Results.DayMonthWiseAppointmentReport.length) {
+        if (this.ReportType === 'Day') {
+          this.DailyVisitReportData = res.Results.DayMonthWiseAppointmentReport;
+        }
+        else if (this.ReportType === 'Month') {
+          this.MonthVisitReportData = res.Results.DayMonthWiseAppointmentReport;
+        }
+        this.summary = res.Results.DayMonthWiseAppointmentReportSummary[0];
+        this.dataLoaded = true;
+      }
+      else {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Data is Not Available Between Selected dates...Try Different Dates.`]);
+      }
     }
     else {
       this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
@@ -107,17 +116,23 @@ export class RPT_ADT_DayAndMonthWiseVisitReportComponent implements OnInit {
         CommonFunctions.SortArrayOfObjects(this.departmentList, "DepartmentName");
       });
   }
-  SummaryTotal() {
-    if (this.DailyVisitReportData && this.DailyVisitReportData.length > 0) {
-      this.DailyVisitReportData.forEach(appt => {
-        this.summary.tot_new += appt.NewTotal;
-        this.summary.tot_followup += appt.FollowupTotal;
-        this.summary.tot_all += appt.TotalVisit;
-      });
-      this.dataLoaded = true;
-    }
-    else {
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Data is Not Available Between Selected dates...Try Different Dates']);
-    }
+  // SummaryTotal() {
+  //   if (this.DailyVisitReportData && this.DailyVisitReportData.length > 0) {
+  //     this.DailyVisitReportData.forEach(appt => {
+  //       this.summary.tot_new += appt.NewTotal;
+  //       this.summary.tot_followup += appt.FollowupTotal;
+  //       this.summary.tot_all += appt.TotalVisit;
+  //     });
+  //     this.dataLoaded = true;
+  //   }
+  //   else {
+  //     this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Data is Not Available Between Selected dates...Try Different Dates']);
+  //   }
+  // }
+  OnReportTypeChange(): void {
+    this.DailyVisitReportData = [];
+    this.MonthVisitReportData = [];
+    this.summary = { TotalNewAppointments: 0, TotalFollowupAppointments: 0, TotalRevisitAppointments: 0, TotalReferralAppointments: 0, TotalAppointments: 0 };
+    this.dataLoaded = false;
   }
 }

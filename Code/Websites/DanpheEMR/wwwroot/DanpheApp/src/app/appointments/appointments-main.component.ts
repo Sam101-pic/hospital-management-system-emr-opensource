@@ -39,6 +39,7 @@ export class AppointmentsMainComponent {
     this.GetOrganizationList();
     this.GetRank();
     this.LoadBilCFGItemsVsPriceCategoryMap();
+    this.GetInsuranceMasterItems();
   }
 
   async LoadDoctorAndDeptPricesToVisitService() {
@@ -97,6 +98,7 @@ export class AppointmentsMainComponent {
     this.visitBLService.GetDepartment()
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status == "OK") {
+          this.visitService.ApptApplicableDepartmentList = null;
           this.visitService.ApptApplicableDepartmentList = res.Results;
           console.log("Department list loaded successfully");
           //  this.visitService.ApptApplicableDepartmentList =  this.coreService.Masters.Departments.filter(d => d.IsAppointmentApplicable == true && d.IsActive == true).map(d => {
@@ -177,7 +179,9 @@ export class AppointmentsMainComponent {
       console.log("Couldn't load bill items vs price Category mapping");
     });
   }
-
+  public GetInsuranceMasterItems() {
+    this.coreService.GetInsuranceMasterItems();
+  }
 }
 
 

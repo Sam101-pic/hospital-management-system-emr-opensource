@@ -27,6 +27,7 @@ import { NepaliCalendarService } from "../calendar/np/nepali-calendar.service";
 import { CommonFunctions } from "../common.functions";
 import { MessageboxService } from "../messagebox/messagebox.service";
 import { SearchService } from "../search.service";
+import { ENUM_MessageBox_Status } from "../shared-enums";
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "./NepaliColGridSettingsModel";
 import { GridEmitModel } from "./grid-emit.model";
 import { IGridFilterParameter } from "./grid-filter-parameter.interface";
@@ -89,6 +90,8 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
 
   @Input('filter-parameters')
   public filterParameters: IGridFilterParameter[] = [];
+
+  @Input('hide-grid-search-box') HideGridSearchBox: boolean = false;
 
   @Input("grid-data")
   public set rowdata(val: any) {
@@ -199,11 +202,6 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
   @Input("grid-date-range")
   public dateRange: string = '';
   public EnableEnglishCalendarOnly: boolean = false;
-
-
-
-
-
   constructor(
     public searchService: SearchService,
     public changeDetector: ChangeDetectorRef,
@@ -452,7 +450,7 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
   }
   public GetNormalDateTimeData(params) {
     if (params.value && params.value.trim() != "") {
-      return moment(params.value).format("YYYY-MM-DD hh:mm");
+      return moment(params.value).format("YYYY-MM-DD hh:mm A");
     } else {
       return "";
     }
@@ -984,7 +982,17 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
         if (this.paramExportToExcelData.ShowHeader) {
           if (this.reportFor == "pharmacy") {
             var Header = `<tr><td></td><td></td><td colspan="4" style="text-align:center;font-size:large;"><strong>${this.headerDetail.hospitalName}</strong></td></tr><br/><tr> <td></td><td></td><td colspan="4" style="text-align:center;font-size:small;"><strong>${this.headerDetail.address}</strong></td></tr><br/><tr> <td></td><td></td><td colspan="4" style="text-align:center;font-size:small;width:600px;"><strong>${this.paramExportToExcelData.HeaderTitle}</strong></td></tr><br/><tr> <td style="text-align:center;"><strong>${date}</strong></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="text-align:center;"><strong>${printByMessage}${printBy}</strong></td><td><strong>Exported On: ${printDate}</strong></td></tr><br>`
-          } else {
+          }
+          else if (this.reportFor === "ot") {
+            var Header = '<tr><td></td><td></td><td colspan="4" style="text-align:center;font-size:large;"><strong>' + this.headerDetail.hospitalName + '</strong></td></tr><br/>' +
+              '<tr> <td></td><td></td><td colspan="4" style="text-align:center;font-size:small;"><strong>' + this.headerDetail.address + '</strong></td></tr><br/>';
+            if (this.headerDetailParam.showPhoneNumber) {
+              Header += '<tr> <td></td><td></td><td colspan="4" style="text-align:center;font-size:small;">' + ' Ph No: ' + this.headerDetail.tel + '</td></tr><br/>';
+            }
+            Header += '<tr> <td></td><td></td><td colspan="4" style="text-align:center;font-size:small;width:600px;"><strong>' + this.paramExportToExcelData.HeaderTitle + '</strong></td></tr><br/>' +
+              '<tr> <td style="text-align:center;"><strong>' + date + '</strong></td><td style="text-align:center;">' + this.reportHeader + '</td><td></td><td style="text-align:center;"><strong>' + printByMessage + printBy + `</strong></td><td><strong>Exported On: ${printDate}</strong></td></tr><br>`
+          }
+          else {
             var Header = '<tr><td></td><td></td><td colspan="4" style="text-align:center;font-size:large;"><strong>' + this.headerDetail.hospitalName + '</strong></td></tr><br/>' +
               '<tr> <td></td><td></td><td colspan="4" style="text-align:center;font-size:small;"><strong>' + this.headerDetail.address + '</strong></td></tr><br/>';
             if (this.headerDetailParam.showPhoneNumber) {
@@ -1115,6 +1123,15 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
         var printSettingParameter = JSON.parse(this.coreservice.Parameters.find(p => p.ParameterGroupName == "SystemAdminReport" && p.ParameterName == "SystemAdminReportPrintSetting").ParameterValue);
         var exportToExcelSettingParameter = JSON.parse(this.coreservice.Parameters.find(p => p.ParameterGroupName == "SystemAdminReport" && p.ParameterName == "SystemAdminReportExportToExcelSetting").ParameterValue);
       }
+      else if (this.reportFor === "ot") {
+        var printSettingParameter = JSON.parse(this.coreservice.Parameters.find(p => p.ParameterGroupName === "OTReport" && p.ParameterName === "OTReportPrintSetting").ParameterValue);
+        var exportToExcelSettingParameter = JSON.parse(this.coreservice.Parameters.find(p => p.ParameterGroupName === "OTReport" && p.ParameterName === "OTReportPrintSetting").ParameterValue);
+      }
+      else if (this.reportFor === "common") {
+        var printSettingParameter = JSON.parse(this.coreservice.Parameters.find(p => p.ParameterGroupName === "Common" && p.ParameterName === "GridPrintConfigs").ParameterValue);
+        var exportToExcelSettingParameter = JSON.parse(this.coreservice.Parameters.find(p => p.ParameterGroupName === "Common" && p.ParameterName === "GridExportConfigs").ParameterValue);
+      }
+
       else {
         var printSettingParameter = JSON.parse(this.coreservice.Parameters.find(p => p.ParameterGroupName == "ReportSetting" && p.ParameterName == "PharmacyGridPrintSetting").ParameterValue);
         var exportToExcelSettingParameter = JSON.parse(this.coreservice.Parameters.find(p => p.ParameterGroupName == "ReportSetting" && p.ParameterName == "PharmacyGridExportToExcelSetting").ParameterValue);
@@ -1293,6 +1310,16 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
             if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["DoctorWiseStatisticsReport"]
             break;
           }
+          case "/Reports/BillingMain/ServiceDepartmentWiseCopaymentReport": {
+            if (!!printSettingParameter) this.paramData = printSettingParameter["ServiceDepartmentWiseCopaymentReport"];
+            if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["ServiceDepartmentWiseCopaymentReport"]
+            break;
+          }
+          case "/Reports/BillingMain/BillWiseSalesReport": {
+            if (!!printSettingParameter) this.paramData = printSettingParameter["BillWiseSalesReport"];
+            if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["BillWiseSalesReport"]
+            break;
+          }
           case "/Reports/InsBillingReports/TotalItemsBill": {
             if (!!printSettingParameter) this.paramData = printSettingParameter["InsuranceTotalItmesBillReport"];
             if (exportToExcelSettingParameter)
@@ -1317,6 +1344,11 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
           case "/Pharmacy/Report/Purchase/PurchaseOrderReport": {
             if (!!printSettingParameter) this.paramData = printSettingParameter["PurchaseOrderReport"];
             if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["PurchaseOrderReport"]
+            break;
+          }
+          case "/Reports/BillingMain/ItemWiseCopaymentReport": {
+            if (!!printSettingParameter) this.paramData = printSettingParameter["ItemWiseCopaymentReport"];
+            if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["ItemWiseCopaymentReport"]
             break;
           }
           case "/Pharmacy/Report/Purchase/ReturnToSupplierReport": {
@@ -1469,6 +1501,31 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
             if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["MaterializedSalesViewReport"]
             break;
           }
+          case "/MktReferral/Reports/MarketingReferralDetailReport": {
+            if (!!printSettingParameter) this.paramData = printSettingParameter["MarketingReferralDetailedReport"];
+            if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["MarketingReferralDetailedReport"]
+            break;
+          }
+          case "/OperationTheatre/BookingList": {
+            if (!!printSettingParameter) this.paramData = printSettingParameter["OTBookingListReport"];
+            if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["OTBookingListReport"]
+            break;
+          }
+          case "/OperationTheatre/Reports/OTSummaryReport": {
+            if (!!printSettingParameter) this.paramData = printSettingParameter["OTBookingListReport"];
+            if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["OTBookingListReport"]
+            break;
+          }
+          case "/OperationTheatre/Reports/OTFinancialReport": {
+            if (!!printSettingParameter) this.paramData = printSettingParameter["OTBookingListReport"];
+            if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["OTBookingListReport"]
+            break;
+          }
+          case "/Settings/EmployeeManage/ManageEmployee": {
+            if (!!printSettingParameter) this.paramData = printSettingParameter["EmployeeListPrintConfigs"];
+            if (!!exportToExcelSettingParameter) this.paramExportToExcelData = exportToExcelSettingParameter["EmployeeListExportConfigs"]
+            break;
+          }
           default:
             this.paramData = null;
             this.paramExportToExcelData = null;
@@ -1542,9 +1599,9 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
         this.msgBoxServ.showMessage("error", ["Error getting parameters"]);
     }
     else if (reportFor == 'billing') {
-      var customerHeaderparam = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader");
-      if (customerHeaderparam != null) {
-        var customerHeaderParamValue = customerHeaderparam.ParameterValue;
+      var customerHeaderParam = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader");
+      if (customerHeaderParam != null) {
+        var customerHeaderParamValue = customerHeaderParam.ParameterValue;
         if (customerHeaderParamValue) {
           this.headerDetail = JSON.parse(customerHeaderParamValue);
           var headerParamValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "BillingReport" && a.ParameterName == "BillingReportHeader");
@@ -1562,10 +1619,31 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
       } else
         this.msgBoxServ.showMessage("error", ["Error getting parameters"]);
     }
+
+    else if (reportFor === 'ot') {
+      var customerHeaderParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "CustomerHeader");
+      if (customerHeaderParam !== null) {
+        var customerHeaderParamValue = customerHeaderParam.ParameterValue;
+        if (customerHeaderParamValue) {
+          this.headerDetail = JSON.parse(customerHeaderParamValue);
+          var headerParamValue = this.coreService.Parameters.find(a => a.ParameterGroupName === "OTReport" && a.ParameterName === "OTReportHeader");
+          if (headerParamValue !== null) {
+            var paramValue = headerParamValue.ParameterValue;
+            if (paramValue) {
+              var headerParams = JSON.parse(paramValue);
+              this.headerDetailParam.showPANNo = headerParams.showPan;
+              this.headerDetailParam.showPhoneNumber = headerParams.showPhoneNumber;
+            }
+          }
+        }
+      } else
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Error getting parameters"]);
+    }
+
     else if (reportFor == 'lab') {
-      var customerHeaderparam = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader");
-      if (customerHeaderparam != null) {
-        var customerHeaderParamValue = customerHeaderparam.ParameterValue;
+      var customerHeaderParam = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader");
+      if (customerHeaderParam != null) {
+        var customerHeaderParamValue = customerHeaderParam.ParameterValue;
         if (customerHeaderParamValue) {
           this.headerDetail = JSON.parse(customerHeaderParamValue);
           var headerParamValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "LabReport" && a.ParameterName == "LabReportHeader");
@@ -1583,9 +1661,9 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
     }
 
     else if (reportFor == 'accounting') {
-      var customerHeaderparam = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader");
-      if (customerHeaderparam != null) {
-        var customerHeaderParamValue = customerHeaderparam.ParameterValue;
+      var customerHeaderParam = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader");
+      if (customerHeaderParam != null) {
+        var customerHeaderParamValue = customerHeaderParam.ParameterValue;
         if (customerHeaderParamValue) {
           this.headerDetail = JSON.parse(customerHeaderParamValue);
         }
@@ -1623,6 +1701,17 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
       else
         this.msgBoxServ.showMessage("error", ["Error getting parameters"]);
     }
+    else if (reportFor == 'common') {
+      var customerHeaderParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "CustomerHeader");
+      if (customerHeaderParam !== null) {
+        var customerHeaderParamValue = customerHeaderParam.ParameterValue;
+        if (customerHeaderParamValue) {
+          this.headerDetail = JSON.parse(customerHeaderParamValue);
+        }
+      } else {
+        this.msgBoxServ.showMessage("error", ["Error getting parameters"]);
+      }
+    }
     else {
       this.headerDetail = '';
       // var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "Pharmacy" && a.ParameterName == "Pharmacy BillingHeader").ParameterValue;
@@ -1652,23 +1741,26 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
     this.headerDetail.PANno ? this.headerDetail.PANno : "";
     this.headerDetail.tel ? this.headerDetail.tel : "";
 
-    var filterDescription =
-      "<div><strong>Filter Parameters</strong></div>" +
-      '<div style="display:flex;" class="border border-dark">' +
-      this.filterParameters.reduce(
-        (accumulator, current, index) => {
-          if (index % 2 == 0) accumulator += '<div>';
-          accumulator +=
-            `
+    let filterDescription = '';
+    if (this.filterParameters && this.filterParameters.length) {
+      filterDescription =
+        "<div><strong>Filter Parameters</strong></div>" +
+        '<div style="display:flex;" class="border border-dark">' +
+        this.filterParameters.reduce(
+          (accumulator, current, index) => {
+            if (index % 2 == 0) accumulator += '<div>';
+            accumulator +=
+              `
           <div class="col-md-12">
             <div class="col-md-3"><strong>${current.DisplayName}</strong></div>
             <div class="col-md-9">${current.Value ? current.Value : "All"}</div>
           </div>
           `
-          if (index % 2 != 0) accumulator += '</div>';
-          return accumulator;
-        }
-        , '') + '</div>' + '</div>'
+            if (index % 2 != 0) accumulator += '</div>';
+            return accumulator;
+          }
+          , '') + '</div>' + '</div>'
+    }
 
     if (this.showHeader) {
       var printContents =
@@ -1763,21 +1855,24 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
       this.headerDetail.tel ? this.headerDetail.tel : "";
 
 
-      var filterDescription =
-        "<tr><td><strong>Filter Parameters:</strong></td></tr>" +
-        this.filterParameters.reduce(
-          (accumulator, current, index) => {
-            if (index % 2 == 0) accumulator += '<tr>';
-            accumulator +=
-              `
+      let filterDescription = '';
+      if (this.filterParameters) {
+        filterDescription =
+          "<tr><td><strong>Filter Parameters:</strong></td></tr>" +
+          this.filterParameters.reduce(
+            (accumulator, current, index) => {
+              if (index % 2 == 0) accumulator += '<tr>';
+              accumulator +=
+                `
               <th style='text-align:center;'><strong>${current.DisplayName}</strong></th>
               <th style='text-align:center;'>${current.Value ? current.Value : "All"}</th>
               `
-            if (index % 2 != 0) accumulator += '</tr>';
-            return accumulator;
-          }
-          , '') +
-        `<tr></tr>`
+              if (index % 2 != 0) accumulator += '</tr>';
+              return accumulator;
+            }
+            , '') +
+          `<tr></tr>`
+      }
 
       if (this.showHeader) {
         var Header = '<tr><td colspan="' + collen + '" style="text-align:center;font-size:large;"><strong>' + this.headerDetail.hospitalName + '</strong></td></tr><br/>' +
@@ -1973,5 +2068,4 @@ export class DanpheGridComponent implements OnInit, AfterViewInit {
       console.log(ex);
     }
   }
-
 }

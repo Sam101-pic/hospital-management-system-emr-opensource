@@ -4,8 +4,10 @@ import {
 import { Router } from "@angular/router";
 import { CoreService } from "../../../core/shared/core.service";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { SelectedPatientDto } from "../../../shared/diagnosis/dto/selected-patient.dto";
+import { HibLiveClaimInvoiceDetails } from "../../../shared/hib-live-claim/dtos/hib-live-claim-invoice-details.dto";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_InvoiceType, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { ENUM_CreditModule, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_InvoiceType, ENUM_MessageBox_Status, ENUM_Scheme_ApiIntegrationNames } from "../../../shared/shared-enums";
 import { BillingBLService } from "../../shared/billing.bl.service";
 import { BilPrint_VM } from "../../shared/invoice-print-vms";
 
@@ -55,9 +57,16 @@ export class Bil_Print_InvoiceMain_Component implements OnInit {
 
   @Input('show-normal-bill') showNormalBill: boolean = false;
   showDischargeStatement: boolean = false;
+  @Input('invoice-from')
+  public InvoiceFrom: string = "";
 
+  @Input('allow-hib-live-claim')
+  public AllowHIBLiveClaim: boolean = false;
   public DischargePrintSettings: { ShowDischargeStatementPrint, ShowDischargeSlipPrint };
-
+  SelectedLiveClaimPatient = new SelectedPatientDto();
+  HibLiveClaimInvoiceDetail = new HibLiveClaimInvoiceDetails();
+  ShowHibLiveClaimUI: boolean = false
+  HibLiveClaimConfig = { "IsEnabled": false, "EnableManualLiveClaim": false, "EnableAutoLiveClaim": false, "EnableLiveDocumentSubmission": false };
 
   constructor(
     public changeDetectorRef: ChangeDetectorRef,
@@ -68,11 +77,18 @@ export class Bil_Print_InvoiceMain_Component implements OnInit {
     public coreService: CoreService
   ) {
     this.GetBillingHeaderParameter();
+    this.GetHibLiveClaimParameter();
+  }
+  GetHibLiveClaimParameter() {
+    const param = this.coreService.Parameters.find(p => p.ParameterGroupName === "GovInsurance" && p.ParameterName === "HIBLiveClaimConfig");
+    if (param) {
+      this.HibLiveClaimConfig = JSON.parse(param.ParameterValue);
+    }
   }
 
   ngOnInit(): void {
     if (this.fiscalYrId && this.invoiceNumber) {
-      this.invoiceType = null; //reset invoicetype .
+      this.invoiceType = null; //reset invoicetype.
 
       this.LoadInvoiceForPrint(this.invoiceNumber, this.fiscalYrId, this.inputBillingTxnId);
     }
@@ -91,6 +107,19 @@ export class Bil_Print_InvoiceMain_Component implements OnInit {
             this.invoiceInfoObj && this.invoiceInfoObj.IsInvoiceFound;
           if (this.isInvoiceFound) {
             this.invoiceType = this.invoiceInfoObj.InvoiceInfo.InvoiceType;
+            if (this.invoiceInfoObj.InvoiceInfo.ApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS && this.HibLiveClaimConfig && this.HibLiveClaimConfig.IsEnabled && this.HibLiveClaimConfig.EnableManualLiveClaim) {
+              this.SelectedLiveClaimPatient.PatientId = this.invoiceInfoObj.PatientInfo.PatientId;
+              this.SelectedLiveClaimPatient.PatientCode = this.invoiceInfoObj.PatientInfo.PatientCode;
+              this.SelectedLiveClaimPatient.PatientName = this.invoiceInfoObj.PatientInfo.ShortName;
+              this.SelectedLiveClaimPatient.PatientVisitId = this.invoiceInfoObj.VisitInfo.PatientVisitId;
+              this.SelectedLiveClaimPatient.PerformerId = this.invoiceInfoObj.VisitInfo.ConsultingDoctorId;
+
+              this.HibLiveClaimInvoiceDetail.InvoiceId = this.invoiceInfoObj.InvoiceInfo.BillingTransactionId;
+              this.HibLiveClaimInvoiceDetail.ModuleName = ENUM_CreditModule.Billing;
+              this.HibLiveClaimInvoiceDetail.ApiIntegrationName = this.invoiceInfoObj.InvoiceInfo.ApiIntegrationName;
+              this.HibLiveClaimInvoiceDetail.InvoiceFrom = this.InvoiceFrom;
+              this.ShowHibLiveClaimUI = this.AllowHIBLiveClaim;
+            }
           }
         }
       });
@@ -130,3 +159,5 @@ export class Bil_Print_InvoiceMain_Component implements OnInit {
       this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Please enter parameter values for DischargePrintSettings"]);
   }
 }
+
+

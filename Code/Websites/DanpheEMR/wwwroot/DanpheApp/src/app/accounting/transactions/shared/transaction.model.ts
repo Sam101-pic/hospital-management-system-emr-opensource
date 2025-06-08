@@ -117,6 +117,9 @@ export class TransactionViewModel {
     public ChequeNumber: string = "";
     public PayeeName: string = "";
     public FiscalYear: string = "";
+    public HasEditLog: boolean = false;
+    public LatestReason: string = "";
+    public FiscalYearId: number = 0;
     public TransactionItems: Array<{
         LedgerGroupName: string,
         LedgerName: string,

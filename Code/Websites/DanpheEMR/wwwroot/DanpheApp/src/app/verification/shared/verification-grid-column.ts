@@ -1,4 +1,5 @@
 import * as moment from "moment/moment";
+import { ENUM_InventoryPurchaseOrderVerificationStatus } from "../../shared/shared-enums";
 
 export default class VerificationGridColumns {
   static RequisitionList = [
@@ -57,11 +58,27 @@ export default class VerificationGridColumns {
       headerName: "Action",
       field: "",
       width: 120,
-      template: `<a danphe-grid-action="verify" class="grid-action">
-            Verify
-         </a>`
+      cellRenderer: VerificationGridColumns.POVerificationActionTemplate
     }
   ]
+  static POVerificationActionTemplate(params) {
+
+    if (params.data.CurrentVerificationLevelCount === params.data.MaxVerificationLevel || params.data.POStatus !== ENUM_InventoryPurchaseOrderVerificationStatus.pending) {
+      let template =
+        `<a danphe-grid-action="verify" class="grid-action" >
+        View
+        </a>`
+      return template
+    }
+    else {
+      let template =
+        `<a danphe-grid-action="verify" class="grid-action" >
+        Verify
+        </a>`
+      return template;
+    }
+
+  }
   static GRList = [
     { headerName: "GR No", field: "GoodsReceiptNo", width: 110 },
     {
@@ -83,12 +100,26 @@ export default class VerificationGridColumns {
       headerName: "Action",
       field: "",
       width: 120,
-      template: `<a danphe-grid-action="verify" class="grid-action">
-            Verify
-         </a>`
+      cellRenderer: VerificationGridColumns.GRVerificationActionTemplate
     }
   ]
 
+  static GRVerificationActionTemplate(params) {
+    if (params.data.CurrentVerificationLevelCount === params.data.MaxVerificationLevel) {
+      let template =
+        `<a danphe-grid-action="verify" class="grid-action" >
+        View
+        </a>`
+      return template
+    }
+    else {
+      let template =
+        `<a danphe-grid-action="verify" class="grid-action" >
+        Verify
+        </a>`
+      return template;
+    }
+  }
   static VerificationStatusRenderer(params) {
     if (params.data.MaxVerificationLevel) {
       return (

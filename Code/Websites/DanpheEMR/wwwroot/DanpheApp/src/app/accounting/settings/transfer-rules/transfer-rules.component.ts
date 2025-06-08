@@ -1,11 +1,11 @@
 import { Component } from "@angular/core";
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import GridColumnSettings from "../../../shared/danphe-grid/grid-column-settings.constant";
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { AccountingSettingsBLService } from "../shared/accounting-settings.bl.service";
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { AccountingService } from '../../shared/accounting.service';
+import { AccountingSettingsBLService } from "../shared/accounting-settings.bl.service";
 import { SectionModel } from "../shared/section.model";
-import { SecurityService } from "../../../security/shared/security.service";
 
 @Component({
   templateUrl: './transfer-rules.html'
@@ -20,7 +20,7 @@ export class TransferRulesComponent {
   public showGridData: boolean = false;
 
   constructor(public accountingSettingsBLService: AccountingSettingsBLService,
-    public msgBox: MessageboxService, public accountingservice: AccountingService,){
+    public msgBox: MessageboxService, public accountingservice: AccountingService,) {
     this.TransferRulesGridColumns = GridColumnSettings.TransferRules;
     this.GetSection();
   }
@@ -35,11 +35,17 @@ export class TransferRulesComponent {
         this.sectionId = defSection.SectionId;
       }
       else {
-        this.sectionId = this.sectionList[0].SectionId;
+        if (this.sectionList.length > 0) {
+          this.sectionId = this.sectionList[0].SectionId;
+        }
+        else {
+          this.msgBox.showMessage(ENUM_MessageBox_Status.Warning, ['No Section is mapped to this Account Division.']);
+          this.sectionId = 0;
+        }
       }
     }
     else {
-      this.msgBox.showMessage("error", ['No Data']);
+      this.msgBox.showMessage(ENUM_MessageBox_Status.Warning, ['No Section is mapped to this Account Division.']);
     }
   }
   loadData() {

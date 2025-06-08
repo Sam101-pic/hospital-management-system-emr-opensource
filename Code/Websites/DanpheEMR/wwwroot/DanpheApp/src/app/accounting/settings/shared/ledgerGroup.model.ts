@@ -20,6 +20,8 @@ export class ledgerGroupModel {
     public Name: string = "";
     public LedgerGroupValidator: FormGroup = null;
     public COAId: number = 0;
+    public HospitalId: number = 0;
+    public IsSystemDefault: boolean = false;
     constructor() {
         this.CreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
         var _formBuilder = new FormBuilder();

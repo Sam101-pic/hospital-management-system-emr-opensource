@@ -15,7 +15,8 @@
                   [profileList]="profileList"
                   [all-BillitmList]="allBillitmList"
                   [categoryList]="categoryList"
-                  (callback-add)="callBackItemMapping($event)">
+                  (callback-add)="callBackItemMapping($event)"
+                  [IsViewMapping]="IsViewMapping">
 </profile-item-map>
 
 <div class="popup-static portlet box portlet-fullscreen inv_modal" *ngIf="showProfileRenamePage">
@@ -117,7 +118,7 @@
                             <span></span>
                           </label>
                         </div>
-                      </div>-->  
+                      </div>-->
                       <textarea id="description" [(ngModel)]="currentProfile.Description"
                                 [ngModelOptions]="{standalone: true}"></textarea>
                     </div>

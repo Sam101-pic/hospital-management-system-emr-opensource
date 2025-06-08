@@ -174,6 +174,7 @@ export class PHRMPatientConsumptionListComponent {
         if (event.keyCode === 27) {
             //For ESC key => close the pop up
             this.ClosePrintPage();
+            this.ClosePatientConsumptionList()
         }
     }
 

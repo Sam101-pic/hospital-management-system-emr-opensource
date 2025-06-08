@@ -25,7 +25,6 @@ export class SelectPriceCategoryComponent {
 
   @Input("disable")
   dropdownDisabled: boolean = false;
-
   public allPriceCategories: Array<PriceCategory> = [];
   public enabledPriceCategories: Array<PriceCategory> = []; //{ Normal: true, EHS: true, SAARCCitizen: true, Foreigner: true, GovtInsurance: true, InsForeigner: true };
 

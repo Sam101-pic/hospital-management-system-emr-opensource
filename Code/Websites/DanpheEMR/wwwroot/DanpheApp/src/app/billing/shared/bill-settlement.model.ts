@@ -60,6 +60,7 @@ export class PatientInfoVM {
   public MembershipTypeName: string = null;
   public SSFPolicyNo: string = null;
   public PolicyNo: string = null;
+  public Age: string = null;
 }
 export class SettlementInfoVM {
   public SettlementId: number = 0;

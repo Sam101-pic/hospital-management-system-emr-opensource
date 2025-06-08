@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -21,6 +21,13 @@ namespace DanpheEMR.Core.Configuration
         public GoogleDriveConfiguration GoogleDriveFileUpload { get; set; }
         public JWTTokenConfiguration JwtTokenConfig { get; set; }
         public bool RealTimeSSFClaimBooking { get; set; }
+        public DemoEnvironment DemoEnvironment { get; set; }
+        public bool EnableFewaPay { get; set; }
+        public bool EnableDirectFonePay { get; set; }
+    }
+    public class DemoEnvironment
+    {
+        public bool IsDemoEnvironment { get; set; }
     }
     public class GoogleDriveConfiguration
     {

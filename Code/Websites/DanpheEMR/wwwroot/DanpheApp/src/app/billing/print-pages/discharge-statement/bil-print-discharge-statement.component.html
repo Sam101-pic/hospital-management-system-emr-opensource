@@ -9,7 +9,7 @@
     </div>
   </div>
   <div style="border:1px dotted;padding: 10px;" *ngIf="!IsDetailedDischarged">
-    <div
+    <div *ngIf="!PrintTemplateTypeSettings.Enable"
          style="height: 700px;
           width: 100%;
           overflow-x: hidden;
@@ -20,400 +20,367 @@
         <table style="width: 100%;">
           <thead>
             <tr>
-              <td>
+              <td colspan="6">
                 <div class="flx" [ngClass]="'ipd-invoice-header-gap-' + hospitalCode"></div>
               </td>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td>
-                <div style="position: relative;">
-                  <!-- <billing-header *ngIf="InvoiceDisplaySettings.ShowHeader"></billing-header>
-                  <div class="qr-code" style="position: absolute; top: 0; right: 0;"
-                       *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.ShowQR">
-                    <qr-code [value]="patientQRCodeInfo" [size]="90" [backgroundAlpha]="0"></qr-code>
-                  </div> -->
-
-                  <div *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType==='image'">
-                    <img src="../../../../themes/theme-default/images/customer-headers/billing-invoice-header-image.png"
-                         style="width: 100%;">
-                  </div>
-
-                  <div *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType === 'custom'">
-                    <billing-header *ngIf="InvoiceDisplaySettings.ShowHeader"></billing-header>
-                    <div class="qr-code" style="position: absolute;right: 15px;top: 20px;"
+        </table>
+        <table border="0" style="width: 100%; margin: 0 auto 5px auto; vertical-align: top !important" cellspacing="0" cellpadding="0">
+          <tr class="discharge-statement-header-image" *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType==='image'">
+            <td colspan="6">
+              <div>
+                <img src="../../../../themes/theme-default/images/customer-headers/billing-invoice-header-image.png"
+                     style="width: 100%;">
+              </div>
+            </td>
+          </tr>
+          <tr class="discharge-statement-header-custom" *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType === 'custom'">
+            <td colspan="6">
+              <div>
+                <billing-header *ngIf="InvoiceDisplaySettings.ShowHeader"></billing-header>
+                <!-- <div class="qr-code" style="position: absolute;right: 15px;top: 20px;"
                          *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.ShowQR">
                       <qr-code *ngIf="'ShowQRCode' | booleanParameter : 'Billing'" [value]="patientQRCodeInfo" [size]="90"
                                [backgroundAlpha]="0">
                       </qr-code>
-                    </div>
-                  </div>
-                </div>
-                <div class="discharge-bill-sm-holder">
-                  <div class="discharge-bill-sm-header flx justify-center text-uppercase">
-                    <span>
-                      <span *ngIf="!isInsurance">
-                        <b>
-                          Invoice | Discharge Bill
-                        </b>
-                      </span>
-                      <span *ngIf="isInsurance">
-                        <b>
-                          Health Insurance Credit Invoice | Discharge Bill
-                        </b>
-                      </span>
-                    </span>
-                    <b *ngIf="invoice.InvoiceInfo && invoice.InvoiceInfo.PrintCount > 0">
-                      | COPY ({{invoice.InvoiceInfo.PrintCount}}) OF ORIGINAL
-                    </b>
-                  </div>
-                  <div class="flx flex-col discharge-bill-description-header" style="margin-bottom: 10px; border-bottom: 1px solid;">
-                    <div class="discharge-bill-sm-row flx justify-sp-between">
-                      <div class="col-left flex-2"><span class="text-uppercase text-bold txt-label">Hospital
-                          No.&nbsp;:&nbsp;</span><span class="text-uppercase text-bold txt-val">{{invoice.PatientInfo.PatientCode}}</span>
-                      </div>
-                      <div class="col-right"><span class="text-uppercase text-bold txt-label">IP
-                          No.&nbsp;:&nbsp;</span><span class="text-uppercase text-bold txt-val">{{ipdNumber}}</span>
-                      </div>
-                    </div>
-                    <div class="discharge-bill-sm-row flx justify-sp-between">
-                      <div class="col-left flex-2"><span class="text-uppercase text-bold txt-label">Patient's
-                          Name&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">{{invoice.PatientInfo.ShortName}}</span>
-                      </div>
-                      <div class="col-right"><span class="text-uppercase text-bold txt-label">
-                          Invoice No.&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">
-                          {{invoice.InvoiceInfo.InvoiceNumFormatted}}
-                        </span>
-                      </div>
-                    </div>
-                    <div class="discharge-bill-sm-row flx justify-sp-between">
-                      <div class="col-left flex-2"><span class="text-uppercase text-bold txt-label">Age/Sex&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">{{finalAge}}</span>
-                      </div>
-                      <div class="col-right">
-                        <span class="text-uppercase text-bold txt-label">Trans.
-                          Date&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">
-                          {{invoice.DischargeInfo.StatementDate |
-                          DanpheDateTime:'format':'YYYY-MM-DD'}}&nbsp;
-                        </span>
-                      </div>
-
-
-                    </div>
-
-                    <div class="discharge-bill-sm-row flx justify-sp-between">
-                      <div class="col-left flex-2" *ngIf="invoice.PatientInfo.CountryName === CountryNepal">
-                        <span class="text-uppercase text-bold txt-label">Address&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">
-                          <span *ngIf="showMunicipality && invoice.PatientInfo.MunicipalityName">{{invoice.PatientInfo.MunicipalityName}}<span
-                                  *ngIf="invoice.PatientInfo.WardNumber">-{{invoice.PatientInfo.WardNumber}}</span>,
-                          </span>{{invoice.PatientInfo.CountrySubDivisionName}}
-                        </span> <span invoice.PatientInfo.Address>, {{invoice.PatientInfo.Address}}
-                        </span>
-                      </div>
-                      <div class="col-left flex-2" *ngIf="invoice.PatientInfo.CountryName !== CountryNepal">
-                        <span class="text-uppercase text-bold txt-label">Address&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">
-                          <span *ngIf="invoice.PatientInfo.Address">{{invoice.PatientInfo.Address}},
-                          </span><span>{{invoice.PatientInfo.CountrySubDivisionName}}, </span>{{invoice.PatientInfo.CountryName}}
-                        </span>
-                      </div>
-                      <div class="col-right">
-                        <span class="text-uppercase text-bold txt-label">Invoice
-                          Date&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">{{invoice.DischargeInfo.StatementDate
-                          | DanpheDateTime:'format':'YYYY-MM-DD'}}</span>
-                      </div>
-                    </div>
-
-                    <div class="discharge-bill-sm-row flx justify-sp-between">
-
-                      <div class="col-left flex-2">
-                        <span class="text-uppercase text-bold txt-label">CONTACT&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">{{invoice.PatientInfo.PhoneNumber}}</span>
-                      </div>
-
-                      <div class="col-right">
-                        <span class="text-uppercase text-bold txt-val">
-                          {{invoice.DischargeInfo.StatementDate | nepaliDate}}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div class="discharge-bill-sm-row flx justify-sp-between">
-
-                      <div class="col-left flex-2">
-                        <span class="text-uppercase text-bold txt-label">DOA&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">{{invoice.VisitInfo.AdmissionDate
-                          | DanpheDateTime:'format':'YYYY-MM-DD'}}
-                          {{invoice.VisitInfo.AdmissionDate | nepaliDate}}</span>
-                      </div>
-
-                      <!-- <div class="col-right">
-                        <span class="text-uppercase text-bold txt-val">
-                          ({{invoice.DischargeInfo.StatementDate | nepaliDate}})
-                        </span>
-                      </div> -->
-                    </div>
-                    <div class="discharge-bill-sm-row flx justify-sp-between">
-                      <div class="col-left flex-2"><span class="text-uppercase text-bold txt-label">DOD&nbsp;:&nbsp;</span>
-                        <span class="text-uppercase text-bold txt-val">{{invoice.VisitInfo.DischargeDate
-                          |
-                          DanpheDateTime:'format':'YYYY-MM-DD'}}
-                          {{invoice.VisitInfo.DischargeDate | nepaliDate}}</span>
-                      </div>
-                      <div class="col-right" *ngIf="invoice.InvoiceInfo && invoice.InvoiceInfo.PaymentMode">
-                        <span class="text-uppercase text-bold txt-label">
-                          Method of Payment:
-                          {{invoice.InvoiceInfo.PaymentMode}}
-                        </span>
-                      </div>
-                    </div>
-                    <div class="discharge-bill-sm-row flx justify-sp-between">
-                      <div class="col-left flex-2" *ngIf="invoice.PatientInfo.PolicyNo">
-                        <span class="text-uppercase text-bold txt-label">
-                          Policy/Member: {{invoice.PatientInfo.PolicyNo}}
-                        </span>
-                      </div>
-                      <div class="col-right" *ngIf="invoice.InvoiceInfo.ClaimCode">
-                        <span class="text-uppercase text-bold txt-label">
-                          Claim Code:{{invoice.InvoiceInfo.ClaimCode}}
-                        </span>
-                      </div>
-                    </div>
-                    <div class="discharge-bill-sm-row flx justify-sp-between">
-                      <div class="col-left flex-2">
-                        <span class="text-uppercase text-bold txt-label">
-                          Room Category&nbsp;:&nbsp;
-                        </span>
-                        <span class="text-uppercase text-bold txt-val">
-                          {{invoice.VisitInfo.WardName}}
-                        </span>
-                      </div>
-                    </div>
-                    <!-- <div *ngIf="invoice.InvoiceItems && invoice.InvoiceItems.length>0 && invoice.InvoiceItems[0].PriceCategory && invoice.InvoiceItems[0].PriceCategory.toLowerCase() === SSFPriceCategory"
-                         class="discharge-bill-sm-row flx justify-sp-between">
-                      <div class="col-left flex-2">
-
-                      </div>
-                      <div class="col-right">
-                        <span class="text-uppercase text-bold txt-label">
-                          SSF Policy No:
-                          {{invoice.PatientInfo.SSFPolicyNo}}
-                        </span>
-                      </div>
                     </div> -->
-
-                  </div>
-                  <div class="wrapper" *ngIf="invoice.InvoiceItems && invoice.InvoiceItems.length">
-                    <table class="table table-striped table-hover" style="width: 100%;border-bottom: 1px solid;">
-                      <thead>
-                        <tr>
-                          <th border="1" align="left" style="font-size:12px; width:10%;"><strong>S.N.</strong></th>
-                          <!-- <th border="1" align="left" style="font-size:12px; width:10%;"><strong>BillDate</strong></th> -->
-                          <th border="1" align="left" style="font-size:12px; width:30%;"><strong>Service Department</strong></th>
-                          <!-- <th border="1" align="left" style="font-size:12px; width:50%"><strong>Service Particular(s)</strong></th> -->
-                          <!-- <th border="1" style="text-align: right; font-size:12px; width:20%"><strong>Rate</strong></th>
-                          <th border="1" style="text-align: right; font-size:12px; width:20%"><strong>Quantity</strong></th> -->
-                          <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>SubTotal</strong></th>
-                          <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>Discount</strong></th>
-                          <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>Total</strong></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr *ngFor="let row of invoice.BillingInvoiceSummary; let i=index;">
-                          <td style="text-align:left; font-size:11px; width:10%">{{i+1}}</td>
-                          <!-- <td style="text-align:left; font-size:11px; width:10%">{{row.BillDate | nepaliDate:'format':'YYYY-MM-DD hh:mm'}}</td> -->
-                          <td style="text-align:left; font-size:11px; width:30%">{{row.GroupName}}</td>
-                          <!-- <td style="text-align:left; font-size:11px; width:50%">{{row.ItemName}}</td> -->
-                          <!-- <td style="text-align: right; font-size:11px; width:20%">{{row.Price}}</td>
-                          <td style="text-align: right; font-size:11px; width:20%">{{row.Quantity}}</td> -->
-                          <td style="text-align: right; font-size:11px; width:20%;">{{row.SubTotal | number : "1.2-2"}}</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{row.DiscountAmount | number : "1.2-2"}}</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{row.TotalAmount | number : "1.2-2"}}</td>
-                        </tr>
-                        <tr>
-                          <td colspan="2" style="text-align: right; font-size:11px; width:20%;">Total</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{BillingAmount.SubTotal | number : "1.2-2"}}</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{BillingAmount.DiscountAmount | number : "1.2-2"}}</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{BillingAmount.TotalAmount | number : "1.2-2"}}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div class="wrapper" *ngIf="invoice.PharmacyInvoiceItems && invoice.PharmacyInvoiceItems.length">
-                    <label>PHARMACY ITEMS</label>
-                    <table class="table table-striped table-hover" style="width: 100%;border-bottom: 1px solid;">
-                      <thead>
-                        <tr>
-                          <th border="1" align="left" style="font-size:12px; width:10%;"><strong>S.N.</strong></th>
-                          <!-- <th border="1" align="left" style="font-size:12px; width:10%;"><strong>BillDate</strong></th> -->
-                          <th border="1" align="left" style="font-size:12px; width:30%"><strong>Service Particular(s)</strong></th>
-                          <!-- <th border="1" style="text-align: right; font-size:12px; width:20%"><strong>Rate</strong></th>
-                          <th border="1" style="text-align: right; font-size:12px; width:20%"><strong>Quantity</strong></th> -->
-                          <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>SubTotal</strong></th>
-                          <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>Discount</strong></th>
-                          <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>Total</strong></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr *ngFor="let row of invoice.PharmacySummary; let i=index;">
-                          <td style="text-align:left; font-size:11px; width:10%">{{i+1}}</td>
-                          <!-- <td style="text-align:left; font-size:11px; width:10%">{{row.BillDate | nepaliDate:'format':'YYYY-MM-DD hh:mm'}}</td> -->
-                          <td style="text-align:left; font-size:11px; width:30%">{{row.GroupName}}</td>
-                          <!-- <td style="text-align:right; font-size:11px; width:20%">{{row.SalePrice}}</td>
-                          <td style="text-align:right; font-size:11px; width:20%">{{row.Quantity}}</td> -->
-                          <td style="text-align: right; font-size:11px; width:20%;">{{row.SubTotal | number : "1.2-2"}}</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{row.DiscountAmount | number : "1.2-2"}}</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{row.TotalAmount | number : "1.2-2"}}</td>
-                        </tr>
-                        <tr>
-                          <td colspan="2" style="text-align: right; font-size:11px; width:20%;">Total</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{PharmacyAmount.SubTotal | number : "1.2-2"}}</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{PharmacyAmount.DiscountAmount | number : "1.2-2"}}</td>
-                          <td style="text-align: right; font-size:11px; width:20%;">{{PharmacyAmount.TotalAmount | number : "1.2-2"}}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div class="wrapper" *ngIf="!invoice.InvoiceItems.length && !invoice.PharmacyInvoiceItems.length">
-                    <p style="text-align: center;">
-                      <span style="font-size: 20px;">No Items To Show</span>
-                      <br>
-                      <span style="font-size: 12px;">Note: This patient is discharged without billing Items</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+        <table border="0" style="width: 100%; margin: 0 auto;" cellspacing="0" cellpadding="0">
+          <tr>
+            <td colspan="6" style="text-align: center;">
+              <div class="discharge-bill-sm-header flx justify-center text-uppercase">
+                <span>
+                  <span *ngIf="DisplayAsStatement">
+                    <b>
+                      Discharge Statement
+                    </b>
+                  </span>
+                  <span *ngIf="!DisplayAsStatement">
+                    <b>
+                      Invoice | Discharge Bill
+                    </b>
+                  </span>
+                </span>
+                <b *ngIf="invoice.InvoiceInfo && invoice.InvoiceInfo.PrintCount > 0">
+                  | COPY ({{invoice.InvoiceInfo.PrintCount}}) OF ORIGINAL
+                </b>
+              </div>
+            </td>
+          </tr>
+          <tr style="border: 1px solid #ccc;">
+            <td colspan="6" style="padding: 5px 5px;">
+              <table style="width: 100%; margin-bottom: 0;">
+                <tr>
+                  <td colspan="3" style="text-align: left;">
+                    <p class="c_paragraphs" style="margin: 3px 0;">
+                      Hospital No:<strong>{{invoice.PatientInfo.PatientCode}}</strong></p>
+                    <p class="c_paragraphs" style="margin: 3px 0;">
+                      Patient's Name:<strong>{{invoice.PatientInfo.ShortName}}</strong></p>
+                    <p class="c_paragraphs" style="margin: 3px 0;">
+                      Age/Gender:<strong>{{finalAge}}/{{invoice.PatientInfo.Gender}}</strong>
                     </p>
-                  </div>
+                    <p class="c_paragraphs" style="margin: 3px 0;" *ngIf="invoice.PatientInfo.CountryName === CountryNepal">
+                      Address: <strong>
+                        {{CoreService.SortPatientAddress(invoice.PatientInfo)}}
+                      </strong>
+                    </p>
+                    <p class="c_paragraphs" style="margin: 3px 0;">
+                      Contact: <strong>{{invoice.PatientInfo.PhoneNumber}}</strong></p>
+                    <p class="c_paragraphs" style="margin: 3px 0;">
+                      DOA: <strong>{{invoice.VisitInfo.AdmissionDate
+                        |
+                        DanpheDateTime:'format':'YYYY-MM-DD'}}
+                        {{invoice.VisitInfo.AdmissionDate | nepaliDate}}</strong>
+                    </p>
+                    <p class="c_paragraphs" style="margin: 3px 0;">
+                      DOD: <strong>{{invoice.VisitInfo.DischargeDate
+                        | DanpheDateTime:'format':'YYYY-MM-DD'}}
+                        {{invoice.VisitInfo.DischargeDate | nepaliDate}}</strong>
+                    </p>
+                    <p class="c_paragraphs" style="margin: 3px 0;" *ngIf="invoice.PatientInfo.PolicyNo">
+                      Policy/Member: <strong>{{invoice.PatientInfo.PolicyNo}}</strong>
+                    </p>
+                    <p class="c_paragraphs" style="margin: 3px 0;" *ngIf="invoice.InvoiceInfo.ClaimCode">
+                      Claim Code: <strong>{{invoice.InvoiceInfo.ClaimCode}}</strong>
+                    </p>
+                    <p class="c_paragraphs" style="margin: 3px 0;" *ngIf="invoice.VisitInfo.WardName">
+                      Room Category: <strong>{{invoice.VisitInfo.WardName}}</strong>
+                    </p>
+                  </td>
+                  <td colspan="3" style="text-align: right;">
+                    <p class="c_paragraphs" style="margin: 3px 0;">IP No:<strong> {{ipdNumber}}</strong></p>
+                    <p class="c_paragraphs" style="margin: 3px 0;"><span *ngIf="DisplayAsStatement">Statement No:</span><span
+                            *ngIf="!DisplayAsStatement">Invoice No:</span> <strong>
+                        {{invoice.InvoiceInfo.InvoiceNumFormatted}}</strong>
+                    </p>
+                    <p class="c_paragraphs" style="margin: 3px 0;">
+                      Trans. Date:<strong> {{invoice.DischargeInfo.StatementDate | DanpheDateTime:'format':'YYYY-MM-DD'}}</strong>
+                    </p>
+                    <p class="c_paragraphs" style="margin: 3px 0;">
+                      <span *ngIf="DisplayAsStatement">Statement Date:</span> <span *ngIf="!DisplayAsStatement">Invoice Date:</span>
+                      <strong> {{invoice.DischargeInfo.StatementDate | DanpheDateTime:'format':'YYYY-MM-DD'}}</strong>
+                    </p>
+                    <p class="c_paragraphs" style="margin: 3px 0;">
+                      <strong>{{invoice.DischargeInfo.StatementDate | nepaliDate}}</strong>
+                    </p>
+                    <p class="c_paragraphs" style="margin: 3px 0;">Method of Payment: <strong>{{invoice.InvoiceInfo.PaymentMode}} </strong></p>
 
-                  <div class="flex-container discharge-bill-amount-summary" style="padding-bottom: 10px;">
-                    <div class="flex-2">
-                      <span *ngIf="invoice.InvoiceInfo.TotalAmount!=0">
-                        In Words:{{invoice.InvoiceInfo.TotalAmount | number: "1.2-2" | NumberInWords | uppercase }} ONLY</span>
-                      <span>
-                        <p *ngIf="OtherCurrencyDetail && OtherCurrencyDetail.CurrencyCode" style="padding-top:10px;">
-                          In Words ({{OtherCurrencyDetail.CurrencyCode}}):
-                          {{OtherCurrencyDetail.ConvertedAmount | number: "1.2-2" | NumberInWords |
-                          uppercase }} ONLY
-                        </p>
-                      </span>
-                      <div>
-                        <span *ngIf="invoice.InvoiceInfo.PaymentDetails!==null">
-                          PaymentDetails: {{ invoice.InvoiceInfo.PaymentDetails }}
-                        </span>
-                      </div>
-                    </div>
-                    <div class="flex-1">
-                      <div class="flx flex-col">
-                        <div style="padding-bottom: 8px;"><span class="text-uppercase">Amount:</span>
-                          {{invoice.InvoiceInfo.SubTotal | number: "1.2-2"}}</div>
+                  </td>
+                </tr>
 
-                        <div style="padding-bottom: 8px;"><span class="text-uppercase">Discount:</span>
-                          {{invoice.InvoiceInfo.DiscountAmount | number: "1.2-2"}}</div>
+              </table>
+            </td>
 
-                        <div style="padding-bottom: 8px;"
-                             *ngIf="invoice.InvoiceInfo && invoice.InvoiceInfo.PaymentMode && (invoice.InvoiceInfo.PaymentMode.toLowerCase() === creditPaymentMode && !invoice.InvoiceInfo.DepositReturnAmount) || invoice.InvoiceItems[0].IsCoPayment">
-                          <span class="text-uppercase">Credit Amount:</span>
-                          {{ (invoice.InvoiceInfo.TotalAmount - invoice.InvoiceInfo.ReceivedAmount) | number: "1.2-2"}}
-                        </div>
+          </tr>
+        </table>
+        <table class="table table-striped table-hover" style="width: 100%; margin: 0 auto;" cellspacing="0" cellpadding="0"
+               *ngIf="invoice.InvoiceItems && invoice.InvoiceItems.length">
+          <thead>
+            <tr>
+              <th border="1" align="left" style="font-size:12px; width:10%;"><strong>S.N.</strong></th>
+              <!-- <th border="1" align="left" style="font-size:12px; width:10%;"><strong>BillDate</strong></th> -->
+              <th border="1" align="left" style="font-size:12px; width:10%;">HS Code</th>
+              <th border="1" align="left" style="font-size:12px; width:30%;" colspan="2"><strong>Service Department</strong></th>
+              <!-- <th border="1" align="left" style="font-size:12px; width:50%"><strong>Service Particular(s)</strong></th> -->
+              <!-- <th border="1" style="text-align: right; font-size:12px; width:20%"><strong>Rate</strong></th>
+                          <th border="1" style="text-align: right; font-size:12px; width:20%"><strong>Quantity</strong></th> -->
+              <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>SubTotal</strong></th>
+              <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>Discount</strong></th>
+              <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>Total</strong></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of invoice.BillingInvoiceSummary; let i=index;">
+              <td style="text-align:left; font-size:11px; width:10%">{{i+1}}</td>
+              <!-- <td style="text-align:left; font-size:11px; width:10%">{{row.BillDate | nepaliDate:'format':'YYYY-MM-DD hh:mm'}}</td> -->
+              <td style="text-align:left; font-size:11px; width:10%"></td>
+              <td colspan="2" style="text-align:left; font-size:11px; width:30%">{{row.GroupName}}</td>
+              <!-- <td style="text-align:left; font-size:11px; width:50%">{{row.ItemName}}</td> -->
+              <!-- <td style="text-align: right; font-size:11px; width:20%">{{row.Price}}</td>
+                          <td style="text-align: right; font-size:11px; width:20%">{{row.Quantity}}</td> -->
+              <td style="text-align: right; font-size:11px; width:20%;">{{row.SubTotal | number : "1.2-2"}}</td>
+              <td style="text-align: right; font-size:11px; width:20%;">{{row.DiscountAmount | number : "1.2-2"}}</td>
+              <td style="text-align: right; font-size:11px; width:20%;">{{row.TotalAmount | number : "1.2-2"}}</td>
+            </tr>
+            <tr>
+              <td colspan="4" style="text-align: right; font-size:11px; width:20%;">Total</td>
+              <td style="text-align: right; font-size:11px; width:20%;">{{BillingAmount.SubTotal | number : "1.2-2"}}</td>
+              <td style="text-align: right; font-size:11px; width:20%;">{{BillingAmount.DiscountAmount | number : "1.2-2"}}</td>
+              <td style="text-align: right; font-size:11px; width:20%;">{{BillingAmount.TotalAmount | number : "1.2-2"}}</td>
+            </tr>
+            <tr *ngIf="invoice.PharmacyInvoiceItems && invoice.PharmacyInvoiceItems.length">
+              <td colspan="6">
+                <table style="width: 100%; margin: 0 auto;" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td colspan="6" style="text-align: left; padding: 5px 0;">
+                      <h3 class="c_name" style="text-align: left; ">Pharmacy Items</h3>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th border="1" align="left" style="font-size:12px; width:10%;"><strong>S.N.</strong></th>
+                    <!-- <th border="1" align="left" style="font-size:12px; width:10%;"><strong>BillDate</strong></th> -->
+                    <th border="1" align="left" style="font-size:12px; width:30%" colspan="2"><strong>Service Particular(s)</strong></th>
+                    <!-- <th border="1" style="text-align: right; font-size:12px; width:20%"><strong>Rate</strong></th>
+                                <th border="1" style="text-align: right; font-size:12px; width:20%"><strong>Quantity</strong></th> -->
+                    <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>SubTotal</strong></th>
+                    <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>Discount</strong></th>
+                    <th border="1" style="text-align: right; font-size:12px; width:20%;"><strong>Total</strong></th>
+                  </tr>
+                  <tr *ngFor="let row of invoice.PharmacySummary; let i=index;">
+                    <td style="text-align:left; font-size:11px; width:10%">{{i+1}}</td>
+                    <!-- <td style="text-align:left; font-size:11px; width:10%">{{row.BillDate | nepaliDate:'format':'YYYY-MM-DD hh:mm'}}</td> -->
+                    <td style="text-align:left; font-size:11px; width:30%" colspan="2">{{row.GroupName}}</td>
+                    <!-- <td style="text-align:right; font-size:11px; width:20%">{{row.SalePrice}}</td>
+                    <td style="text-align:right; font-size:11px; width:20%">{{row.Quantity}}</td> -->
+                    <td style="text-align: right; font-size:11px; width:20%;">{{row.SubTotal | number : "1.2-2"}}</td>
+                    <td style="text-align: right; font-size:11px; width:20%;">{{row.DiscountAmount | number : "1.2-2"}}</td>
+                    <td style="text-align: right; font-size:11px; width:20%;">{{row.TotalAmount | number : "1.2-2"}}</td>
+                  </tr>
+                  <tr>
+                    <td colspan="3" style="text-align: right; font-size:11px; width:20%;">Total</td>
+                    <td style="text-align: right; font-size:11px; width:20%;">{{PharmacyAmount.SubTotal | number : "1.2-2"}}</td>
+                    <td style="text-align: right; font-size:11px; width:20%;">{{PharmacyAmount.DiscountAmount | number : "1.2-2"}}</td>
+                    <td style="text-align: right; font-size:11px; width:20%;">{{PharmacyAmount.TotalAmount | number : "1.2-2"}}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="6" style="text-align: left; padding: 5px 0;">
 
-                        <div style="padding-bottom: 8px;"><span class="text-uppercase">Received Amount:</span>
-                          {{invoice.InvoiceInfo.ReceivedAmount | number: "1.2-2"}}</div>
-                        <div style="padding-bottom: 8px;" *ngIf="invoice.InvoiceInfo.Tender"><span class="text-uppercase">Tender:</span>
-                          {{invoice.InvoiceInfo.Tender | number: "1.2-2"}}</div>
-                        <div style="padding-bottom: 8px;" *ngIf="invoice.InvoiceInfo.Change"><span class="text-uppercase">Change/Return:</span>
-                          {{invoice.InvoiceInfo.Change | number: "1.2-2"}}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="flex-container user-summary" style="padding-top: 5px;">
-                    <div class="flex-2">
-                      <div class="flx flex-col">
-                        <div style="padding-top: 5px;" *ngIf="invoice.VisitInfo.ConsultingDoctor != null && ShowProviderName">
-                          <div class="left" style="font-size:11px;">
-                            Consulting Doctor: {{invoice.VisitInfo.ConsultingDoctor}}
-                          </div>
-                        </div>
-                        <div style="padding-bottom: 8px;">
-                          <span class="text-uppercase">User:
-                          </span>
-                          <span>{{invoice.InvoiceInfo.UserName}}</span>
-
-                        </div>
-                        <div>
-                          <span class="text-uppercase">Print Date: </span><span>{{this.invoice.InvoiceInfo.TransactionDate|
-                            DanpheDateTime:'format':'YYYY-MM-DD'}}</span>
-                        </div>
-                        <div>
-                          <span class="text-uppercase">Printed On: </span><span>{{currTime}}</span>
-                        </div>
-                      </div>
-                      <div class="flx flex-col" *ngIf="invoice.InvoiceInfo.Remarks">
-                        <div style="padding-bottom: 8px;">
-                          <span class="text-uppercase">Remarks: </span>
-                          <span>{{invoice.InvoiceInfo.Remarks}}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="flex-1">
-                      <div class="flx flex-col">
-                        <div style="padding-bottom: 8px;"><span class="text-uppercase">Grand
-                            Total:</span>
-                          {{invoice.InvoiceInfo.TotalAmount | number: "1.2-2"}}</div>
-                        <div style="padding-bottom: 8px;" *ngIf="OtherCurrencyDetail && OtherCurrencyDetail.CurrencyCode"><span
-                                class="text-uppercase">Grand Total({{OtherCurrencyDetail.CurrencyCode}}):</span>
-                          {{OtherCurrencyDetail.ConvertedAmount | number: "1.2-2"}}</div>
-                        <div *ngIf="invoice.InvoiceInfo.DepositAvailable && invoice.InvoiceInfo.PaymentMode !='credit'" style="padding-bottom: 8px;">
-                          <span class="text-uppercase">Deposit:</span>
-                          <span>
-                            {{invoice.InvoiceInfo.DepositAvailable | number:"1.2-2"}}</span>
-
-                        </div>
-                        <div *ngIf="(invoice.InvoiceInfo.TotalAmount > invoice.InvoiceInfo.DepositAvailable) && invoice.InvoiceInfo.PaymentMode !='credit'"
-                             style="padding-bottom: 8px;">
-                          <span class="text-uppercase">Paid Amount:</span>
-                          {{invoice.InvoiceInfo.TotalAmount - invoice.InvoiceInfo.DepositAvailable
-                          | number: "1.2-2"}}
-                        </div>
-
-                        <div *ngIf="invoice.InvoiceInfo.DepositReturnAmount" style="padding-bottom: 8px;">
-                          <span class="text-uppercase">To be Returned:</span>
-                          {{invoice.InvoiceInfo.DepositReturnAmount | number:
-                          "1.2-2"}}
-                        </div>
-                        <div class="flx flex-col" *ngIf="invoice.InvoiceInfo.CreditOrganizationName">
-                          <div style="padding-bottom: 8px;">
-                            <span class="text-uppercase"><b>Credit Organization: </b></span>
-                            <span>{{invoice.InvoiceInfo.CreditOrganizationName}}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-md-12" style="padding-top: 5px;" *ngIf="InvoiceFooterNoteSettings.ShowFooter">
-                    <div style="width: 100%;text-align: center;margin-top: 20px;">
-                      <b *ngIf="InvoiceFooterNoteSettings.ShowEnglish">
-                        {{InvoiceFooterNoteSettings.EnglishText}} </b> <br />
-                      <b *ngIf="InvoiceFooterNoteSettings.ShowNepali">
-                        {{InvoiceFooterNoteSettings.NepaliText}} </b>
-                    </div>
-                  </div>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="4" style="padding: 5px 0;">
+                <div class="flex-2">
+                  <p style="font-size: 14px;">In Words:{{invoice.InvoiceInfo.TotalAmount | number: "1.2-2" | NumberInWords | uppercase }} ONLY</p>
+                  <p *ngIf="OtherCurrencyDetail && OtherCurrencyDetail.CurrencyCode" style="padding-top:10px; font-size: 14px;">
+                    In Words ({{OtherCurrencyDetail.CurrencyCode}}):
+                    {{OtherCurrencyDetail.ConvertedAmount | number: "1.2-2" | NumberInWords |
+                    uppercase }} ONLY
+                  </p>
+                  <p style="font-size: 14px;">
+                    <span *ngIf="invoice.InvoiceInfo.PaymentDetails!==null && invoice.InvoiceInfo.PaymentDetails!==''">
+                      PaymentDetails: {{ invoice.InvoiceInfo.PaymentDetails }}
+                    </span>
+                  </p>
                 </div>
               </td>
+              <td colspan="4" style="padding: 5px 0; font-size: 14px;">
+                <table width="100%" [cellSpacing]="0" [cellPadding]="0">
+                  <tr>
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">Amount:</td>
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">{{invoice.InvoiceInfo.SubTotal | number:
+                      "1.2-2"}}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">Discount:</td>
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">{{invoice.InvoiceInfo.DiscountAmount | number:
+                      "1.2-2"}}</td>
+                  </tr>
+                  <tr
+                      *ngIf="invoice.InvoiceInfo && invoice.InvoiceInfo.PaymentMode && (invoice.InvoiceInfo.PaymentMode.toLowerCase() === creditPaymentMode && !invoice.InvoiceInfo.DepositReturnAmount) || invoice.InvoiceItems[0].IsCoPayment">
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">Credit Amount:</td>
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">{{ (invoice.InvoiceInfo.TotalAmount -
+                      invoice.InvoiceInfo.ReceivedAmount) | number:
+                      "1.2-2"}}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">Received Amount:</td>
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">{{invoice.InvoiceInfo.ReceivedAmount | number:
+                      "1.2-2"}}</td>
+                  </tr>
+                  <tr *ngIf="invoice.InvoiceInfo.Tender">
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">Tender:</td>
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">{{invoice.InvoiceInfo.Tender | number: "1.2-2"}}
+                    </td>
+                  </tr>
+                  <tr *ngIf="invoice.InvoiceInfo.Change">
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">Change/Return:</td>
+                    <td style="padding: 0 8px; font-size: 14px; text-align: right;">{{invoice.InvoiceInfo.Change | number: "1.2-2"}}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
             </tr>
           </tbody>
         </table>
+
+        <div *ngIf="!invoice.InvoiceItems.length && !invoice.PharmacyInvoiceItems.length">
+          <p style="text-align: center;">
+            <span style="font-size: 20px;">No Items To Show</span>
+            <br>
+            <span style="font-size: 12px;">Note: This patient is discharged without billing Items</span>
+          </p>
+        </div>
+        <!-- <div class="col-md-6"> -->
+        <table width="100%" [cellSpacing]="0" [cellPadding]="0">
+          <tr>
+            <td colspan="5" style="width: 50%;">
+              <table style="width: 100%;">
+                <tr *ngIf="invoice.VisitInfo.ConsultingDoctor != null && ShowProviderName">
+                  <td style="padding: 0 8px; font-size: 14px;">Consulting Doctor:</td>
+                  <td style="padding: 0 8px; font-size: 14px;">{{invoice.VisitInfo.ConsultingDoctor}}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 0 8px; font-size: 14px;">User:</td>
+                  <td style="padding: 0 8px; font-size: 14px;">{{invoice.InvoiceInfo.UserName}}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 0 8px; font-size: 14px;">Print Date: </td>
+                  <td style="padding: 0 8px; font-size: 14px;">{{this.invoice.InvoiceInfo.TransactionDate|
+                    DanpheDateTime:'format':'YYYY-MM-DD'}}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 0 8px; font-size: 14px;">Printed On: </td>
+                  <td style="padding: 0 8px; font-size: 14px;">{{currTime}}</td>
+                </tr>
+                <tr *ngIf="invoice.InvoiceInfo.Remarks">
+                  <td style="padding: 0 8px; font-size: 14px;">Remarks: </td>
+                  <td style="padding: 0 8px; font-size: 14px;">{{invoice.InvoiceInfo.Remarks}}</td>
+                </tr>
+              </table>
+            </td>
+            <td colspan="5" style="width: 50%;">
+              <table style="width: 100%;">
+                <tr>
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;width: 50%;">Grand Total:</td>
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;width: 50%;">{{invoice.InvoiceInfo.TotalAmount | number:
+                    "1.2-2"}}</td>
+                </tr>
+                <tr *ngIf="OtherCurrencyDetail && OtherCurrencyDetail.CurrencyCode">
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;width: 50%;">Grand
+                    Total({{OtherCurrencyDetail.CurrencyCode}}):</td>
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;width: 50%;">{{OtherCurrencyDetail.ConvertedAmount | number:
+                    "1.2-2"}}</td>
+                </tr>
+                <tr *ngIf="invoice.InvoiceInfo.DepositAvailable && invoice.InvoiceInfo.PaymentMode !='credit'">
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;width: 50%;">Deposit: </td>
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;width: 50%;">{{invoice.InvoiceInfo.DepositAvailable |
+                    number:"1.2-2"}}</td>
+                </tr>
+                <tr *ngIf="(invoice.InvoiceInfo.TotalAmount > invoice.InvoiceInfo.DepositAvailable) && invoice.InvoiceInfo.PaymentMode !='credit'">
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;width: 50%;">Paid Amount: </td>
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;width: 50%;">{{ invoice.InvoiceInfo.ToBePaid | number: "1.2-2"}}</td>
+                </tr>
+                <tr *ngIf="invoice.InvoiceInfo.DepositReturnAmount">
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;">To be Returned: </td>
+                  <td style="padding: 0 8px; text-align: right; font-size: 14px;">{{invoice.InvoiceInfo.DepositReturnAmount |
+                    number:
+                    "1.2-2"}}</td>
+                </tr>
+                <tr *ngIf="invoice.InvoiceInfo.CreditOrganizationName">
+                  <td style="padding: 0 8px; font-size: 14px; text-align: right;">Credit Organization: </td>
+                  <td style="padding: 0 8px; font-size: 14px; text-align: right;">{{invoice.InvoiceInfo.CreditOrganizationName}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+        <!-- </div> -->
+        <!-- <td></td> -->
+        <!-- <div class="col-md-6"> -->
+        <!-- <table width="100%" [cellSpacing]="0" [cellPadding]="0">
+
+        </table> -->
+        <!-- </div> -->
+
+        <table style="width: 100%; margin: 0 auto;" cellspacing="0" cellpadding="0">
+          <tr *ngIf="InvoiceFooterNoteSettings.ShowFooter">
+            <td colspan="6" style="text-align: center; padding: 25px;">
+              <b *ngIf="InvoiceFooterNoteSettings.ShowEnglish">
+                {{InvoiceFooterNoteSettings.EnglishText}} </b> <br />
+              <b *ngIf="InvoiceFooterNoteSettings.ShowNepali">
+                {{InvoiceFooterNoteSettings.NepaliText}} </b>
+            </td>
+          </tr>
+        </table>
+
       </div>
     </div>
 
-    <div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;">
+    <div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;" *ngIf="!PrintTemplateTypeSettings.Enable">
       <button class="btn green btn-success" value="" [disabled]="loading" (click)="print()" id="id_discharge_statement_print">
         <span>Print</span>&nbsp;&nbsp;
+        &nbsp;&nbsp; <i class="glyphicon glyphicon-print"></i>
+      </button>
+    </div>
+
+    <div id="id_dynamic_discharge" *ngIf="PrintTemplateTypeSettings.Enable">
+      <!--Here Dynamically the bill print discharge statement will be rendered-->
+
+    </div>
+
+    <div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;" *ngIf="PrintTemplateTypeSettings.Enable">
+      <button class="btn green btn-success" value="" [disabled]="loading" (click)="printReceipt()" id="btnPrintMyReceipt">
+        <span>Print Receipt</span>&nbsp;&nbsp;
         &nbsp;&nbsp; <i class="glyphicon glyphicon-print"></i>
       </button>
     </div>

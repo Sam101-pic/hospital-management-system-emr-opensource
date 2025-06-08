@@ -13,30 +13,30 @@ namespace DanpheEMR.ViewModel.Pharmacy
     }
     public static class GetMainStoreIncomingStockFunc
     {
-        public static GetMainStoreIncomingStockViewModel GetMainStoreIncomingStock(this PharmacyDbContext db , DateTime FromDate , DateTime ToDate)
+        public static GetMainStoreIncomingStockViewModel GetMainStoreIncomingStock(this PharmacyDbContext db, DateTime FromDate, DateTime ToDate)
         {
             var realToDate = ToDate.AddDays(1);
             var mainStoreCategory = Enums.ENUM_StoreCategory.Store;
             var mainStoreIds = db.PHRMStore.Where(s => s.Category == mainStoreCategory).Select(s => s.StoreId).ToList();
 
             var unconfirmedStock =  (from D in db.StoreDispatchItems
-                                          join S in db.PHRMStore on D.SourceStoreId equals S.StoreId
-                                          join E in db.Employees on D.CreatedBy equals E.EmployeeId
-                                          join RE in db.Employees on D.ReceivedById equals RE.EmployeeId into REG
-                                          from RELJ in REG.DefaultIfEmpty()
-                                          where mainStoreIds.Contains(D.TargetStoreId)
-                                          group new { D, S, E, RELJ } by new { D.DispatchId, D.DispatchedDate, E.FullName, D.ReceivedById } into DGrouped
-                                          select new GetMainStoreIncomingStockDto
-                                          {
-                                              DispatchId = DGrouped.Key.DispatchId,
-                                              DispatchedDate = DGrouped.Key.DispatchedDate,
-                                              DispatchedBy = DGrouped.Key.FullName,
-                                              ReceivedBy = (DGrouped.Key.ReceivedById == null) ? "Not Received" : DGrouped.FirstOrDefault().RELJ.FullName,
-                                              ReceivedOn = DGrouped.FirstOrDefault().D.ReceivedOn,
-                                              CanUserReceiveStock = DGrouped.FirstOrDefault().D.ReceivedById == null,
-                                              Status = (DGrouped.FirstOrDefault().D.ReceivedById == null) ? "pending" : "received",
-                                              TransferredFrom = DGrouped.FirstOrDefault().S.Name
-                                          }).Where(a=>a.Status=="pending").OrderByDescending(s => s.DispatchId).ToList();
+                                    join S in db.PHRMStore on D.SourceStoreId equals S.StoreId
+                                    join E in db.Employees on D.CreatedBy equals E.EmployeeId
+                                    join RE in db.Employees on D.ReceivedById equals RE.EmployeeId into REG
+                                    from RELJ in REG.DefaultIfEmpty()
+                                    where mainStoreIds.Contains(D.TargetStoreId)
+                                    group new { D, S, E, RELJ } by new { D.DispatchId, DispatchedDate = DbFunctions.TruncateTime(D.DispatchedDate), E.FullName, D.ReceivedById } into DGrouped
+                                    select new GetMainStoreIncomingStockDto
+                                    {
+                                        DispatchId = DGrouped.Key.DispatchId,
+                                        DispatchedDate = DGrouped.Key.DispatchedDate,
+                                        DispatchedBy = DGrouped.Key.FullName,
+                                        ReceivedBy = (DGrouped.Key.ReceivedById == null) ? "Not Received" : DGrouped.FirstOrDefault().RELJ.FullName,
+                                        ReceivedOn = DGrouped.FirstOrDefault().D.ReceivedOn,
+                                        CanUserReceiveStock = DGrouped.FirstOrDefault().D.ReceivedById == null,
+                                        Status = (DGrouped.FirstOrDefault().D.ReceivedById == null) ? "pending" : "received",
+                                        TransferredFrom = DGrouped.FirstOrDefault().S.Name
+                                    }).Where(a=>a.Status=="pending").OrderByDescending(s => s.DispatchId).ToList();
 
             return new GetMainStoreIncomingStockViewModel { incomingStockList = unconfirmedStock };
         }

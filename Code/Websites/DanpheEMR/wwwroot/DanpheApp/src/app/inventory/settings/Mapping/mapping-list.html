@@ -1,8 +1,9 @@
 ﻿<div>
     <input type="button" class="btn primary-btn m1" (click)="AddCurrency()" value="Add Currency" />
     <currency-add [showAddPage]="showAddPage"
-                [selectedCurrency]="selectedCurrency"
-                (callback-add)="CallBackAdd($event)"></currency-add>
+                  [selectedCurrency]="selectedCurrency"
+                  [currencyList]="currencyList"
+                  (callback-add)="CallBackAdd($event)"></currency-add>
 </div>
 <div class="row">
     <div class="col-md-12 col-xs-12 col-sm-12">
@@ -10,5 +11,3 @@
         </danphe-grid>
     </div>
 </div>
-
-

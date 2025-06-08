@@ -1,13 +1,13 @@
-import { Component, Input, Output, EventEmitter } from "@angular/core";
-import { MappedGovernmentItems } from "../../shared/map-government-items.model";
-import { GovernmentItems } from "../../shared/lab-government-items.model";
-import { LabTest } from "../../shared/lab-test.model";
-import { LabSettingsBLService } from "../shared/lab-settings.bl.service";
+import { Component, EventEmitter, Input, Output } from "@angular/core";
+import { forkJoin, Observable, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { CoreService } from "../../../../app/core/shared/core.service";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { LabTestComponent } from "../../shared/lab-component.model";
-import { CoreService } from "../../../../app/core/shared/core.service";
-import { Observable, of, forkJoin } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { GovernmentItems } from "../../shared/lab-government-items.model";
+import { LabTest } from "../../shared/lab-test.model";
+import { MappedGovernmentItems } from "../../shared/map-government-items.model";
+import { LabSettingsBLService } from "../shared/lab-settings.bl.service";
 
 @Component({
   selector: "add-government-items",
@@ -33,7 +33,7 @@ export class AddGovernmentItemsComponent {
 
   public MappedComponent: MappedGovernmentItems = new MappedGovernmentItems();
   public loading: boolean = false;
-  public disableSelectedGovReportItem:boolean = false;
+  public disableSelectedGovReportItem: boolean = false;
 
   constructor(
     public labSettingBlServ: LabSettingsBLService,
@@ -89,7 +89,7 @@ export class AddGovernmentItemsComponent {
       var govReportItem = this.allgovitems.find(
         (f) => f.ReportItemId == this.selectedItem.ReportItemId
       );
-      this.selectedGovReportItem = govReportItem.DisplayName;
+      this.selectedGovReportItem = govReportItem.TestName;
 
       var resTest = this.labtestitems.find(
         (f) => f.LabTestId == this.selectedItem.LabItemId

@@ -102,7 +102,7 @@
 <div class="col-md-12">
     <div class="icheck-inline" style="padding-top: 5px;">
         <div class="col-md-3">
-            <input type="text" class="search-textbox" [(ngModel)]="ledgerSearchKey" placeholder="type here to search consultant"
+            <input type="text" class="search-textbox" [(ngModel)]="ledgerSearchKey" placeholder="type here to search subcategory"
                    (ngModelChange)="filterSelectedLedger(ledgerSearchKey)" onclick="this.select()" />
 
         </div>
@@ -114,11 +114,11 @@
         <div class="col-md-6">
             <label class="mt-checkbox mt-checkbox-outline mapped mapped-outline" style="color: green;">
                 <input name="showpharmsuplierALLLedger" type="radio" (change)="ToggleInventorySubcategory('true')">
-                <span> </span> <b> Inventory SubStore with A/c Head </b> </label> <label *ngIf="MappedLedger>0">
+                <span> </span> <b> Inventory SubCategory with A/c Head </b> </label> <label *ngIf="MappedLedger>0">
                 ({{MappedLedger}}) </label>
             <label class="mt-checkbox mt-checkbox-outline not-mapped not-mapped-outline" style="color: red; margin-left: 20px !important;">
                 <input name="showpharmsuplierALLLedger" type="radio" (change)="ToggleInventorySubcategory('false')">
-                <span> </span> <b> Inventory SubStore without A/c Head </b> </label> <label *ngIf="NotmappedLedger>0">
+                <span> </span> <b> Inventory SubCategory without A/c Head </b> </label> <label *ngIf="NotmappedLedger>0">
                 ({{NotmappedLedger}}) </label>
         </div>
         <div class="col-md-2">
@@ -131,12 +131,12 @@
             <table class="table table-striped table-hover custom_table padLess_table" style="width: 150vw !important; ">
                 <thead style="text-align: center;">
                     <tr>
-                        <th> <label class="mt-checkbox mt-checkbox-outline" style="margin: 10px !important;">
+                        <th> <label class="mt-checkbox mt-checkbox-outline">
                                 <input id="isActive" type="checkbox" [(ngModel)]="IsSelectAll" [ngModelOptions]="{standalone: true}"
                                        (ngModelChange)="SelectAllChkOnChange()" />
                                 <span></span> </label>
                         </th>
-                        <th style="width: 10%;"> SubStore Name</th>
+                        <th style="width: 10%;"> SubCategory Name</th>
                         <th> Ledger Code </th>
                         <th style="width: 20%;"> Ledger Name </th>
                         <th *ngIf="SubLedgerAndCostCenterSetting.EnableSubLedger" style="width: 15%;"> Sub-Ledger Name </th>
@@ -156,8 +156,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr *ngFor="let led of InventorySubList; let i = index">
-                        <td style="text-align: center;">
+                    <tr *ngFor="let led of InventorySubCategoryList; let i = index">
+                        <td style="margin-left: 10px;">
                             <label [ngClass]="{'mapped': led.IsMapped==true, 'mapped-outline': led.IsMapped==true, 'not-mapped': led.IsMapped==false, 'not-mapped-outline': led.IsMapped==false}"
                                    class="mt-checkbox mt-checkbox-outline">
                                 <input id="isActive" type="checkbox" [(ngModel)]="led.IsSelected" [ngModelOptions]="{standalone: true}"

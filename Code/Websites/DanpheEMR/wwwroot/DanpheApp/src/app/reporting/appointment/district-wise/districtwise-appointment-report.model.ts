@@ -1,10 +1,8 @@
 import {
-    NgForm,
-    FormGroup,
-    FormControl,
-    Validators,
     FormBuilder,
-    ReactiveFormsModule
+    FormControl,
+    FormGroup,
+    Validators
 } from '@angular/forms';
 import * as moment from 'moment/moment';
 
@@ -18,7 +16,7 @@ export class RPT_APPT_DistrictWiseAppointmentReportModel {
     public Date: string = null;
     public DistrictName: string = null;
     public Total_Appointment: number = 0;
-   
+    public SchemeId: number = null;
     public DistrictwiseAppointmentValidator: FormGroup = null;
 
     constructor() {
@@ -71,7 +69,7 @@ export class RPT_APPT_DistrictWiseAppointmentReportModel {
             return this.DistrictwiseAppointmentValidator.controls[fieldName].dirty;
     }
 
-    public IsValid():boolean{if(this.DistrictwiseAppointmentValidator.valid){return true;}else{return false;}} public IsValidCheck(fieldName, validator): boolean {
+    public IsValid(): boolean { if (this.DistrictwiseAppointmentValidator.valid) { return true; } else { return false; } } public IsValidCheck(fieldName, validator): boolean {
         if (fieldName == undefined)
             return this.DistrictwiseAppointmentValidator.valid;
         else

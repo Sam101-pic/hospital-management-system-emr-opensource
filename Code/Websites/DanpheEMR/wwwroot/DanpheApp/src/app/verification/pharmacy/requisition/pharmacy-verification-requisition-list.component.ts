@@ -3,7 +3,7 @@ import * as moment from "moment";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_PharmacyRequisitionVerificationStatus } from "../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_PharmacyRequisitionVerificationStatus, ENUM_PHRMRequisitionStatus } from "../../../shared/shared-enums";
 import { VerificationBLService } from "../../shared/verification.bl.service";
 import { PharmacyRequisitionVerification_DTO } from "../shared/pharmacy-requisition-verification.dto";
 import { PharmacyVerificationGridColumn } from "../shared/pharmacy-verification-grid-column";
@@ -47,11 +47,11 @@ export class PharmacyVerificationRequisitionListComponent {
     public LoadRequisiitonListByStatus(): void {
         this.RequisitionFilteredList = new Array<PharmacyRequisitionVerification_DTO>();
         if (this.VerificationStatus === ENUM_PharmacyRequisitionVerificationStatus.pending) {
-            this.RequisitionFilteredList = this.RequisitionList.filter(s => s.CurrentVerificationLevelCount < s.MaxVerificationLevel && s.IsVerificationAllowed == true && s.VerificationStatus === ENUM_PharmacyRequisitionVerificationStatus.pending);
+            this.RequisitionFilteredList = this.RequisitionList.filter(s => s.CurrentVerificationLevelCount < s.MaxVerificationLevel && s.IsVerificationAllowed == true && s.VerificationStatus === ENUM_PharmacyRequisitionVerificationStatus.pending && s.RequisitionStatus !== ENUM_PHRMRequisitionStatus.Cancel);
         } else if (this.VerificationStatus == ENUM_PharmacyRequisitionVerificationStatus.approved) {
             this.RequisitionFilteredList = this.RequisitionList.filter(s => s.VerificationStatus == "approved");
         } else if (this.VerificationStatus == ENUM_PharmacyRequisitionVerificationStatus.rejected) {
-            this.RequisitionFilteredList = this.RequisitionList.filter(s => s.VerificationStatus == "rejected");
+            this.RequisitionFilteredList = this.RequisitionList.filter(s => s.VerificationStatus == "rejected" || s.RequisitionStatus === ENUM_PHRMRequisitionStatus.Cancel);
         } else {
             this.RequisitionFilteredList = this.RequisitionList;
         }

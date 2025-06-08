@@ -68,7 +68,7 @@
                     <td>
                       <label class="mt-checkbox mt-checkbox-outline">
                         <input type="checkbox" name="selectItems" [(ngModel)]="itm.IsSelected"
-                               (ngModelChange)="OnChangeItemSelect()" />
+                               (ngModelChange)="OnChangeItemSelect(i)" />
                         <span></span>
                       </label>
                     </td>
@@ -95,7 +95,7 @@
                     <td>
                       <form [formGroup]="itm.BillingTransactionItemValidator">
                         <input type="number" style="width:75px;float:left;" [(ngModel)]="itm.Quantity"
-                               (ngModelChange)="CalculateTotal(i)" onClick="this.select();" formControlName="Quantity"
+                               (ngModelChange)="IsQuantityChanged = true;CalculateTotal(i)" onClick="this.select();" formControlName="Quantity"
                                (wheel)="coreService.PreventNumberChangeOnScroll($event)" class="form-control" />
                         <div class="color-red font-sm" *ngIf="itm.IsDirty('Quantity')"
                              [hidden]="itm.IsValidCheck('Quantity','invalidNumber')">Invalid number.</div>

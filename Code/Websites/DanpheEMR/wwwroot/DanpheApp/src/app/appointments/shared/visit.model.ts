@@ -70,6 +70,7 @@ export class Visit {
   public SchemeName: string = "";
   public IsSelected: boolean = false;
   public Address: string = "";
+  public DateOfBirth: string = "";
 
   public TicketCharge: number = 0;//sud:26Mar'23--For new billingstructure-- Need to assign this from NewVisit and Followup
   public Department: Array<Department> = [];
@@ -78,6 +79,8 @@ export class Visit {
   public MaxInternalReferralDays: number = 0;
   public IsFreeVisit: boolean = false;
   public AdmissionDate: string = '';
+  public IsManualFreeFollowup: boolean = false;
+  public ApiIntegrationName: string = '';
   public IsDirty(fieldname): boolean {
     if (fieldname == undefined) {
       return this.VisitValidator.dirty;

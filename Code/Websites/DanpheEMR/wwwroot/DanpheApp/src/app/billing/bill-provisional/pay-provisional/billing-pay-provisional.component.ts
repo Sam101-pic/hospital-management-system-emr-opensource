@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
 import * as moment from 'moment/moment';
 import { CurrentVisitContextVM } from '../../../appointments/shared/current-visit-context.model';
@@ -9,9 +9,10 @@ import { CreditOrganization } from '../../../settings-new/shared/creditOrganizat
 import { CallbackService } from '../../../shared/callback.service';
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { CommonFunctions } from '../../../shared/common.functions';
+import { FewaPayService } from '../../../shared/fewa-pay/helpers/fewa-pay.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
-import { ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_BillingType, ENUM_DanpheHTTPResponses, ENUM_InvoiceType, ENUM_MessageBox_Status, ENUM_ServiceBillingContext } from '../../../shared/shared-enums';
+import { ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_BillingType, ENUM_DanpheHTTPResponses, ENUM_FewaPayMessageTypes, ENUM_FewaPayTransactionFrom, ENUM_InvoiceType, ENUM_MessageBox_Status, ENUM_POS_ResponseStatus, ENUM_ServiceBillingContext } from '../../../shared/shared-enums';
 import { BillingInvoiceBlService } from '../../shared/billing-invoice.bl.service';
 import { BillingTransactionItem } from "../../shared/billing-transaction-item.model";
 import { BillingTransaction, EmployeeCashTransaction } from '../../shared/billing-transaction.model';
@@ -22,7 +23,8 @@ import { SchemePriceCategory_DTO } from '../../shared/dto/scheme-pricecategory.d
 //import { BackButtonDisable } from "../../core/shared/backbutton-disable.service";
 
 @Component({
-  templateUrl: "./billing-pay-provisional.component.html"
+  templateUrl: "./billing-pay-provisional.component.html",
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 // App Component class
 export class BillingPayProvisionalComponent {
@@ -94,7 +96,8 @@ export class BillingPayProvisionalComponent {
   public ShowOtherCurrency: boolean = false;
   public DisplayOtherCurrencyDetail: boolean = false;
   public ShowDischargeSlip: boolean = false;
-
+  public IsInitialLoad: boolean = true;
+  loadingScreen: boolean = false;
   constructor(public billingService: BillingService,
     public routeFromService: RouteFromService,
     public router: Router,
@@ -105,7 +108,8 @@ export class BillingPayProvisionalComponent {
     public patientService: PatientService,
     public changeDetector: ChangeDetectorRef,
     public coreService: CoreService,
-    public billingInvoiceBlService: BillingInvoiceBlService) {
+    public billingInvoiceBlService: BillingInvoiceBlService,
+    private _fewaPayService: FewaPayService) {
     //this.BackButton.DisableBackButton();
     //this.currencyUnit = this.billingService.currencyUnit;
     this.model = this.billingService.getGlobalBillingTransaction();
@@ -244,50 +248,9 @@ export class BillingPayProvisionalComponent {
           }
 
           this.model.SchemeId = this.SchemePriceCategory.SchemeId;
-          if (this.billingService.IsProvisionalDischargeClearance) {
-            this.model.TransactionType = ENUM_BillingType.inpatient;
-            this.BillingBLService.PayProvisionalForProvisionalDischarge(this.model).subscribe((res: DanpheHTTPResponse) => {
-              if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
-                console.log(res);
-                this.DischargeStatementId = res.Results.DischargeStatementId;
-                this.PatientId = res.Results.PatientId;
-                this.PatientVisitId = res.Results.PatientVisitId;
-                this.ShowDischargeSlip = false;
-                this.showInvoicePrintPage = true;
-                this.loading = false;
-              } else {
-                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Something Went wrong, Cannot Clear Provisional Items!`]);
-              }
-            }, err => {
-              console.error(err);
-            });
-          } else {
-            this.BillingBLService.PayProvisional(this.model)
-              .subscribe((res: DanpheHTTPResponse) => {
-                if (res.Status == "OK") {
 
-                  this.bil_InvoiceNo = res.Results.InvoiceNo;
-                  this.bil_FiscalYrId = res.Results.FiscalYearId;
-                  this.bil_BilTxnId = res.Results.BillingTransactionId;
-                  this.loading = false;//enables the submit button once all the calls are completed
-                  this.showInvoicePrintPage = true;//sud:16May'21--To print from same page..
-
-                  //this.CallBackPostBillTxn(res.Results);
-                }
-                else if (res.ErrorMessage.match(/Deposit Amount is Invalid/g)) {
-                  this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
-                  this.router.navigate(['/Billing/ProvisionalClearance']);
-                }
-                else {
-                  this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["couldn't submit the request. please check the log for detail."], res.ErrorMessage);
-                  this.loading = false;
-                }
-              },
-                err => {
-                  this.loading = false;
-                  this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["couldn't submit the request. please check the log for detail."], err);
-                });
-          }
+          // this.ProceedToPayProvisional();
+          this.HandlePaymentTransaction();
         }
         else {
           this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Sorry..! Unable to process empty receipt."]);
@@ -302,6 +265,84 @@ export class BillingPayProvisionalComponent {
       this.loading = false;
     }
   }
+
+
+  /**This method is responsible to check whether FewaPay is applicable or not if not proceed with normal workflow else wait for the message sent by FewaPay Browser extension and decide after message is received*/
+  private HandlePaymentTransaction() {
+    if (this._fewaPayService.IsFewaPayApplicable(this.model.PaymentDetails)) {
+      this.loadingScreen = true;
+      const transactionReqString = this._fewaPayService.CreateFewaPayTransactionRequest(this.model.PaymentDetails, this.model.TotalAmount, this.model.Remarks);
+      if (transactionReqString) {
+        window.postMessage({
+          type: ENUM_FewaPayMessageTypes.PaymentInfoRequest,
+          data: transactionReqString,
+        }, "*");
+        console.log('Transaction Request is posted from Danphe.');
+      } else {
+        this.loadingScreen = false;
+        this.loading = false;
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Transaction Request cannot be created due to missing mandatory data like paymentDetails, totalAmount and remarks`]);
+      }
+
+    } else {
+      this.ProceedToPayProvisional();
+    }
+  }
+
+  private ProceedToPayProvisional() {
+    if (this.billingService.IsProvisionalDischargeClearance) {
+      this.model.TransactionType = ENUM_BillingType.inpatient;
+      this.BillingBLService.PayProvisionalForProvisionalDischarge(this.model).subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+          console.log(res);
+          this.DischargeStatementId = res.Results.DischargeStatementId;
+          this.PatientId = res.Results.PatientId;
+          this.PatientVisitId = res.Results.PatientVisitId;
+          this.ShowDischargeSlip = false;
+          this.showInvoicePrintPage = true;
+          this.loading = false;
+          this.loadingScreen = false;
+        } else {
+          this.loadingScreen = false;
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`${res.ErrorMessage}`]);
+        }
+      }, err => {
+        this.loadingScreen = false;
+        console.error(err);
+      });
+
+    } else {
+      this.BillingBLService.PayProvisional(this.model)
+        .subscribe((res: DanpheHTTPResponse) => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+
+            this.bil_InvoiceNo = res.Results.InvoiceNo;
+            this.bil_FiscalYrId = res.Results.FiscalYearId;
+            this.bil_BilTxnId = res.Results.BillingTransactionId;
+            this.loading = false; //enables the submit button once all the calls are completed
+            this.loadingScreen = false;
+            this.showInvoicePrintPage = true; //sud:16May'21--To print from same page..
+            //this.CallBackPostBillTxn(res.Results);
+          }
+          else if (res.ErrorMessage.match(/Deposit Amount is Invalid/g)) {
+            this.loadingScreen = false;
+            this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+            this.router.navigate(['/Billing/ProvisionalClearance']);
+          }
+          else {
+            this.loadingScreen = false;
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`${res.ErrorMessage}`], res.ErrorMessage);
+            this.loading = false;
+          }
+        },
+          err => {
+            this.loadingScreen = false;
+            this.loading = false;
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["couldn't submit the request. please check the log for detail."], err);
+          });
+    }
+  }
+
   AfterDischargePrint(data): void {
     if (data.Close == "close") {
       this.showInvoicePrintPage = false;
@@ -395,12 +436,12 @@ export class BillingPayProvisionalComponent {
     });
 
     this.model.SubTotal = CommonFunctions.parseAmount(calsubtotal);
-    this.model.DiscountAmount = CommonFunctions.parseAmount(totaldiscount);
+    this.model.DiscountAmount = CommonFunctions.parseAmount(totaldiscount, 4);
     this.model.TaxTotal = CommonFunctions.parseAmount(totalTax);
-    this.model.TotalAmount = CommonFunctions.parseAmount(totalamount);
+    this.model.TotalAmount = CommonFunctions.parseAmount(totalamount, 4);
     this.model.ReceivedAmount = this.SchemePriceCategory.IsCoPayment ? CommonFunctions.parseAmount(coPayCashAmount) : this.model.TotalAmount;
-    this.model.CoPaymentCreditAmount = CommonFunctions.parseAmount(coPayCreditAmount);
-    this.model.DiscountPercent = CommonFunctions.parseAmount(this.billingInvoiceBlService.CalculatePercentage(this.model.DiscountAmount, this.model.SubTotal));//CommonFunctions.parseAmount(this.model.DiscountAmount * 100 / (this.model.SubTotal));
+    this.model.CoPaymentCreditAmount = CommonFunctions.parseAmount(coPayCreditAmount, 4);
+    this.model.DiscountPercent = CommonFunctions.parseAmount(this.billingInvoiceBlService.CalculatePercentage(this.model.DiscountAmount, this.model.SubTotal), 4);//CommonFunctions.parseAmount(this.model.DiscountAmount * 100 / (this.model.SubTotal));
     this.model.Tender = this.model.ReceivedAmount;
     this.ChangeTenderAmount();
   }
@@ -745,13 +786,13 @@ export class BillingPayProvisionalComponent {
 
   // * This handles the Calculations after Discount Amount is changed at Invoice Level..
   InvoiceDiscountAmountChanged() {
-    this.model.DiscountPercent = (this.model.DiscountAmount / this.model.SubTotal) * 100;
+    this.model.DiscountPercent = CommonFunctions.parseAmount((this.model.DiscountAmount / this.model.SubTotal) * 100, 4);
     //Need to re-calculate aggregatediscounts of each item and Invoice amounts when Invoice Discount is changed.
     this.model.BillingTransactionItems.forEach(itm => {
       itm.DiscountPercentAgg = this.model.DiscountPercent ? this.model.DiscountPercent : 0;
       itm.DiscountPercent = this.model.DiscountPercent ? this.model.DiscountPercent : 0;
-      itm.DiscountAmount = itm.SubTotal * itm.DiscountPercent / 100;
-      itm.TotalAmount = itm.SubTotal - itm.DiscountAmount;
+      itm.DiscountAmount = CommonFunctions.parseAmount(itm.SubTotal * itm.DiscountPercent / 100, 4);
+      itm.TotalAmount = CommonFunctions.parseAmount(itm.SubTotal - itm.DiscountAmount);
     });
     this.ReCalculateInvoiceAmounts();
   }
@@ -828,6 +869,7 @@ export class BillingPayProvisionalComponent {
     this.changeDetector.detectChanges();
   }
 
+
   OnSchemePriceCategoryChanged($event: SchemePriceCategory_DTO): void {
     if ($event.SchemeId && $event.PriceCategoryId) {
       this.SchemePriceCategory = $event;
@@ -843,8 +885,16 @@ export class BillingPayProvisionalComponent {
         this.model.CoPayment_PaymentMode = ENUM_BillPaymentMode.credit;
       }
       this.DisableInvoiceDiscountPercent = (this.SchemePriceCategory.IsDiscountApplicable && this.SchemePriceCategory.IsDiscountEditable) ? false : true;
+      if (this.SchemePriceCategory.IsDiscountApplicable && !this.IsInitialLoad) {
+        this.model.DiscountPercent = this.SchemePriceCategory.DiscountPercent;
+        this.InvoiceDiscountOnChange();
+      } else if (!this.SchemePriceCategory.IsDiscountApplicable) {
+        this.model.DiscountPercent = 0; //! Assigning 0 as DiscountPercent if scheme is not DiscountApplicable
+        this.InvoiceDiscountOnChange();
+      }
       this.changeDetector.detectChanges();
       this.model.Remarks = this.SchemePriceCategory.SchemeName;
+      this.IsInitialLoad = false;
       this.CalculationForAll();
     }
   }
@@ -872,5 +922,38 @@ export class BillingPayProvisionalComponent {
       this.OtherCurrencyDetail = null;
     }
     this.model.OtherCurrencyDetail = JSON.stringify(this.OtherCurrencyDetail);
+  }
+
+
+  /**Below HostListener is responsible to catch the responses from FewaPay Browser Extension */
+  @HostListener('window:message', ['$event'])
+  onMessage(event: MessageEvent): void {
+    const result = this._fewaPayService.HandleEventsFromFewaPayBrowserExtension(event);
+    if (result) {
+      if (result.resultCode === ENUM_POS_ResponseStatus.Success) { //! Krishna, 10thDec'23 "000" is success status code sent from POS device.
+        // console.log(result);
+        const transactionId = 'verifyTransId' in result && result.verifyTransId;
+        if (transactionId) {
+          this.model.PaymentDetails = `${this.model.PaymentDetails}; TransactionId: ${transactionId}`;
+        }
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.model.PatientId, ENUM_FewaPayTransactionFrom.ProvisionalClearance);
+        this.ProceedToPayProvisional();
+      } else {
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.model.PatientId, ENUM_FewaPayTransactionFrom.ProvisionalClearance);
+        this.loading = false;
+        this.loadingScreen = false;
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`${result.message}`]);
+      }
+      return;
+    }
+  }
+
+
+  hotkeys(event) {
+    if (event.keyCode === 27) {
+      if (this.showInvoicePrintPage) {
+        this.CloseInvoicePrint();
+      }
+    }
   }
 }

@@ -6,6 +6,8 @@ using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.Services.Appointment.DTO;
+using DanpheEMR.Services.Patient;
+using DanpheEMR.Services.Patient.DTO;
 using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,6 +15,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using RefactorThis.GraphDiff;//for entity-update.
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -42,13 +45,16 @@ namespace DanpheEMR.Controllers
         private DanpheHTTPResponse<object> _objResponseData;
         private readonly BillingDbContext _billingDbContext;
         private readonly CoreDbContext _coreDbcontext;
-        public PatientController(IOptions<MyConfiguration> _config) : base(_config)
+        private readonly IPatientService _patientService;
+
+        public PatientController(IOptions<MyConfiguration> _config, IPatientService patientService) : base(_config)
         {
             _patientDbContext = new PatientDbContext(connString);
             _billingDbContext = new BillingDbContext(connString);
             _coreDbcontext = new CoreDbContext(connString);
             _objResponseData = new DanpheHTTPResponse<object>();
             _objResponseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;//this is for default
+            _patientService = patientService;
 
         }
 
@@ -146,7 +152,8 @@ namespace DanpheEMR.Controllers
             {
                 VaccinationDbContext vaccinationDbContext = new VaccinationDbContext(connString);
                 var ethnicGroups = await vaccinationDbContext.EthnicGroupCast
-                                        .Select(a => new {
+                                        .Select(a => new
+                                        {
                                             EthnicGroupId = a.EthnicGroupId,
                                             EthnicGroup = a.EthnicGroup,
                                             CastKeyWords = a.CastKeyWords
@@ -165,69 +172,19 @@ namespace DanpheEMR.Controllers
             return DanpheJSONConvert.SerializeObject(responseData, true);
 
         }
-
         [HttpGet]
         [Route("PatientById")]
-        public string PatientById(int patientId)
+        public async Task<IActionResult> GetPatientById(int patientId)
         {
-            //if (reqType == "getPatientByID" && patientId != 0)
-            //{
-            PatientModel returnPatient = new PatientModel();
-
-            returnPatient = (from pat in _patientDbContext.Patients
-                             where pat.PatientId == patientId
-                             select pat).Include(a => a.Addresses)
-                                .Include(a => a.Guarantor)
-                                .Include(a => a.Insurances)
-                                .Include(a => a.KinEmergencyContacts)
-                                .Include(a => a.CountrySubDivision)
-                                .Include(p => p.Admissions)
-                                .FirstOrDefault();
-
-            if (returnPatient != null && returnPatient.Addresses != null && returnPatient.Addresses.Count > 0)
+            if (patientId <= 0)
             {
-                // this is just used to show the name in the client ..
-                foreach (var add in returnPatient.Addresses)
-                {
-                    add.CountryName = _patientDbContext.Countries.Where(c => c.CountryId == add.CountryId)
-                                      .FirstOrDefault().CountryName;
-                    add.CountrySubDivisionName = _patientDbContext.CountrySubdivisions.Where(c => c.CountrySubDivisionId == add.CountrySubDivisionId)
-                                      .FirstOrDefault().CountrySubDivisionName;
-
-                }
-
+                Log.Error("Invalid Patient ID provided.");
+                return BadRequest("Invalid Patient ID provided.");
             }
-
-            if (returnPatient != null && returnPatient.Admissions != null && returnPatient.Admissions.Count > 0)
-            {
-                var activeAdmissions = returnPatient.Admissions.Where(adm => adm.AdmissionStatus != "discharged").AsEnumerable().ToList();
-                returnPatient.Admissions = activeAdmissions;
-
-                var admittedAdmission = activeAdmissions.FirstOrDefault(a => a.AdmissionStatus != "discharged");
-                if(admittedAdmission != null)
-                {
-                returnPatient.Visits = _patientDbContext.Visits.Where(a => a.PatientVisitId == admittedAdmission.PatientVisitId).ToList();
-                }
-            }
-
-            //var membershipDetails = (from pat in _patientDbContext.Patients
-            //                         join memType in _patientDbContext.Schemes
-            //                         on pat.MembershipTypeId equals memType.SchemeId
-            //                         where pat.PatientId == patientId
-            //                         select new
-            //                         {
-            //                             memType.SchemeName,
-            //                             memType.DiscountPercent
-            //                         }).FirstOrDefault();
-
-            //returnPatient.MembershipTypeName = membershipDetails.SchemeName;
-            //returnPatient.MembershipDiscountPercent = (double)membershipDetails.DiscountPercent;
-
-
-
-            _objResponseData.Results = returnPatient;
-            return DanpheJSONConvert.SerializeObject(_objResponseData, true);
+            return await InvokeHttpGetFunctionAsync(() => _patientService.GetPatientById(patientId, _patientDbContext));
         }
+
+
 
         [HttpGet]
         [Route("PatientByCode")]
@@ -250,6 +207,54 @@ namespace DanpheEMR.Controllers
                                                   .FirstOrDefault();
                 return InvokeHttpGetFunction<object>(func);
 
+            }
+        }
+
+
+        /// <summary>
+        /// Retrieves patient details based on the provided patient code.
+        /// </summary>
+        /// <param name="patientCode">The unique code assigned to the patient.</param>
+        /// <returns>
+        /// Returns a <see cref="PatientDetailByPatientCodeDTO"/> object if the patient is found.
+        /// Returns a <see cref="BadRequestResult"/> if the patient code is not provided.
+        /// Returns a <see cref="NotFoundResult"/> if no patient is found with the given code.
+        /// Returns a <see cref="StatusCodeResult"/> with status code 500 if an internal error occurs.
+        /// </returns>
+        /// <response code="200">Returns the patient details.</response>
+        /// <response code="400">Returned when the patient code is null or empty.</response>
+        /// <response code="404">Returned when no patient is found with the given patient code.</response>
+        /// <response code="500">Returned when an internal server error occurs.</response>
+        [HttpGet]
+        [Route("GetPatientByPatientCode")]
+        [ProducesResponseType(typeof(PatientDetailByPatientCodeDTO), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult> GetPatientByPatientCode(string patientCode)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(patientCode))
+                {
+                    return BadRequest($"PatientCode is required to fetch Patient Detail.");
+                }
+                else
+                {
+                    Log.Information($"Patient with PatientCode {patientCode} is requested from third party.");
+                    var patient = await _patientService.GetPatientDetailByPatientCodeAsync(patientCode, _patientDbContext);
+                    if (patient is null)
+                    {
+                        Log.Information($"Patient not found with PatientCode {patientCode}.");
+                        return NotFound($"Patient not found with PatientCode {patientCode}.");
+                    }
+                    return Ok(patient);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"An error occurred while processing your request, Exception Details: {ex.Message}");
+                return StatusCode(500, "An error occurred while processing your request.");
             }
         }
 
@@ -293,15 +298,15 @@ namespace DanpheEMR.Controllers
             //{
             Func<object> func = () => (from pat in _patientDbContext.Patients
                                            //.Include("Insurances")
-                                       //join membership in _patientDbContext.Schemes on pat.MembershipTypeId equals membership.SchemeId
-                                       //where (pat.FirstName.ToLower() == firstName.ToLower() && pat.LastName.ToLower() == lastName.ToLower())
-                                       //|| (pat.PhoneNumber == phoneNumber && pat.PhoneNumber != "0")
-                                       ////if current patient is coming from insurance, then match IMIS code of that patient
-                                       ////|| (IsInsurance ? (pat.Insurances.FirstOrDefault() != null ? pat.Insurances.FirstOrDefault().IMISCode == IMISCode : false) : false)
-                                       //|| (pat.FirstName.ToLower() == firstName.ToLower() && pat.LastName.ToLower() == lastName.ToLower()
-                                       //        && pat.PhoneNumber == phoneNumber && pat.PhoneNumber != "0")
+                                           //join membership in _patientDbContext.Schemes on pat.MembershipTypeId equals membership.SchemeId
+                                           //where (pat.FirstName.ToLower() == firstName.ToLower() && pat.LastName.ToLower() == lastName.ToLower())
+                                           //|| (pat.PhoneNumber == phoneNumber && pat.PhoneNumber != "0")
+                                           ////if current patient is coming from insurance, then match IMIS code of that patient
+                                           ////|| (IsInsurance ? (pat.Insurances.FirstOrDefault() != null ? pat.Insurances.FirstOrDefault().IMISCode == IMISCode : false) : false)
+                                           //|| (pat.FirstName.ToLower() == firstName.ToLower() && pat.LastName.ToLower() == lastName.ToLower()
+                                           //        && pat.PhoneNumber == phoneNumber && pat.PhoneNumber != "0")
 
-                                       where (pat.FirstName.ToLower() == FirstName.ToLower() && pat.LastName.ToLower() == LastName.ToLower() 
+                                       where (pat.FirstName.ToLower() == FirstName.ToLower() && pat.LastName.ToLower() == LastName.ToLower()
                                                  && pat.Age.ToLower() == Age.ToLower() && pat.Gender.ToLower() == Gender.ToLower())
                                                    || (pat.PhoneNumber == PhoneNumber && pat.PhoneNumber != "0" && pat.Gender.ToLower() == Gender.ToLower())
                                        select new
@@ -357,13 +362,13 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("PatientWithVisitInfo")]
-        public ActionResult PatientWithVisitInfo(string search,Boolean showIpPatinet = false)
+        public ActionResult PatientWithVisitInfo(string search, Boolean showIpPatinet = false)
         {
             //if (reqType == "patientsWithVisitsInfo")//pratik: 29Jan'21: need to replace existing one with SP..
             //{
 
             Func<object> func = () => DALFunctions.GetDataTableFromStoredProc("SP_Billing_PatientsListWithVisitinformation",
-                    new List<SqlParameter>() { new SqlParameter("@SearchTxt", search),new SqlParameter("@ShowInpatient",showIpPatinet) }, _patientDbContext);
+                    new List<SqlParameter>() { new SqlParameter("@SearchTxt", search), new SqlParameter("@ShowInpatient", showIpPatinet) }, _patientDbContext);
 
             return InvokeHttpGetFunction<object>(func);
         }
@@ -507,25 +512,28 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("SearchRegisteredPatient")]
-        public ActionResult SearchRegisteredPatient(string search)
+        public ActionResult SearchRegisteredPatient(string search, bool searchUsingHospitalNo)
         {
             //else if (reqType == "search-registered-patient")
             //{
             Func<object> func = () => DALFunctions.GetDataTableFromStoredProc("SP_PAT_RegisteredPatientList", new List<SqlParameter>() { new SqlParameter("@SearchTxt", search),
-                          new SqlParameter("@RowCounts", 200)}, _patientDbContext);
+                          new SqlParameter("@RowCounts", 200),
+                            new SqlParameter("@SearchUsingHospitalNo", searchUsingHospitalNo)},
+            _patientDbContext);
             return InvokeHttpGetFunction<object>(func);
         }
 
         [HttpGet]
         [Route("SearchPatientForNewVisit")]
-        public ActionResult SearchPatientForNewVisit(string search, Boolean searchUsingHospitalNo, Boolean searchUsingIdCardNo)
+        public ActionResult SearchPatientForNewVisit(string search, Boolean searchUsingHospitalNo, Boolean searchUsingIdCardNo, bool? ShowIPInSearchPatient)
         {
             //else if (reqType == "patient-search-for-new-visit")//sud:10-Oct'21--Needed new api since other one is very heavy for frequent search. 
             //{
             Func<object> func = () => DALFunctions.GetDataTableFromStoredProc("SP_APPT_PatientListForNewVisit", new List<SqlParameter>() { new SqlParameter("@SearchTxt", search),
                           new SqlParameter("@RowCounts", 200),//rowscount set to 200 by default..
                           new SqlParameter("@SearchUsingHospitalNo",searchUsingHospitalNo),
-                          new SqlParameter("@SearchUsingIdCardNo",searchUsingIdCardNo)}, _patientDbContext);
+                          new SqlParameter("@SearchUsingIdCardNo",searchUsingIdCardNo),
+                          new SqlParameter("@ShowIPInSearchPatient",ShowIPInSearchPatient)}, _patientDbContext);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -665,6 +673,22 @@ namespace DanpheEMR.Controllers
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
             Func<object> func = () => UpdateNormalPatient(str, currentUser);
             return InvokeHttpPostFunction<object>(func);
+        }
+
+        [HttpGet]
+        [Route("PatientHealthCardTemplate")]
+        public ActionResult PatientHealthCardTemplate()
+        {
+            Func<object> func = () => GetPatientHealthCardTemplate();
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        private object GetPatientHealthCardTemplate()
+        {
+            var templates = (from temp in _patientDbContext.ClinicalTemplates
+                             where temp.TemplateCode.Contains("HealthCard")
+                             select temp).ToList();
+            return templates;
         }
 
         //[HttpGet]
@@ -1950,7 +1974,7 @@ namespace DanpheEMR.Controllers
             {
                 BillStatus = billStatus != null ? billStatus.BillStatus : ENUM_BillingStatus.unpaid,// "unpaid",
                 PaidDate = billStatus != null ? billStatus.PaidDate : null,
-                BillingDate = billStatus.CreatedOn,
+                BillingDate = billStatus !=null ? billStatus.CreatedOn : default,
                 IsPrinted = CardStatus != null ? true : false,
                 PrintedOn = CardStatus != null ? CardStatus.CreatedOn : null
             };

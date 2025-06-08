@@ -1,8 +1,8 @@
-import { Component, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component } from "@angular/core";
 import { ImagingItem } from '../../../radiology/shared/imaging-item.model';
-import { SettingsBLService } from '../../shared/settings.bl.service';
-import { SettingsService } from '../../shared/settings-service';
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { SettingsService } from '../../shared/settings-service';
+import { SettingsBLService } from '../../shared/settings.bl.service';
 
 
 @Component({
@@ -71,9 +71,9 @@ export class ImagingItemListComponent {
       this.imgItemList.splice(i, 1);
     }
 
-    this.imgItemList.splice(this.index,0,$event.imgItem);
+    this.imgItemList.splice(this.index, 0, $event.imgItem);
     this.imgItemList = this.imgItemList.slice();
-
+    this.getImgItemList();
     this.changeDetector.detectChanges();
     this.showAddPage = false;
     this.selectedImgItem = null;

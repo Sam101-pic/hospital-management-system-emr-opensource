@@ -4,21 +4,20 @@ import * as moment from 'moment/moment';
 import { CoreService } from "../../core/shared/core.service";
 import { SecurityService } from "../../security/shared/security.service";
 import { SettingsBLService } from '../../settings-new/shared/settings.bl.service';
+import { DanpheHTTPResponse } from '../../shared/common-models';
 import { CommonFunctions } from '../../shared/common.functions';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from '../../shared/shared-enums';
+import { ENUM_ACCSectionName, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from '../../shared/shared-enums';
 import { CostCenterModel } from '../settings/shared/cost-center.model';
-import { FiscalYearModel } from '../settings/shared/fiscalyear.model';
 import { LedgerModel } from '../settings/shared/ledger.model';
 import { ledgerGroupModel } from '../settings/shared/ledgerGroup.model';
 import { SectionModel } from '../settings/shared/section.model';
-import { VoucherHeadModel } from "../settings/shared/voucherhead.model";
 import { AccountingBLService } from '../shared/accounting.bl.service';
 import { AccountingService } from '../shared/accounting.service';
 import { SubLedger_DTO } from './shared/DTOs/subledger-dto';
 import { TransactionItemDetailModel } from './shared/transaction-item-detail.model';
 import { TransactionItem } from './shared/transaction-item.model';
-import { TransactionModel, TransactionViewModel } from './shared/transaction.model';
+import { TransactionViewModel } from './shared/transaction.model';
 import { Voucher } from './shared/voucher';
 @Component({
   templateUrl: "./transfer-to-accounting.html"
@@ -27,13 +26,9 @@ export class TransferToAccountingComponent {
   public voucherList: Array<Voucher> = new Array<Voucher>();
   public itemList: Array<any> = new Array<any>();
   public tempItemList: Array<any> = new Array<any>();
-  public accTxnFromBilling: Array<TransactionModel> = new Array<TransactionModel>();
-  public accTxnForInv: Array<TransactionModel> = new Array<TransactionModel>();
-  public accTxnForPhrm: Array<TransactionModel> = new Array<TransactionModel>();
   public sectionList: Array<SectionModel> = [];
-  public sectionId: number = 2;//Section like 1-Inventory, 2-Billing, 3-Pharmacy (for now it's hardcoded) you can get from parameter table also
+  public sectionId: number = 0;//Section like 1-Inventory, 2-Billing, 3-Pharmacy (for now it's hardcoded) you can get from parameter table also
   public selectedSectionName: string = null;
-  public selectAll: boolean = false;
   public selectAllLedger: boolean = true;
   public loading: boolean = false;
   public saveLoading: boolean = false;
@@ -41,8 +36,6 @@ export class TransferToAccountingComponent {
   public ledgerGroupList: Array<ledgerGroupModel> = new Array<ledgerGroupModel>();
   public unavailableLedgerList: Array<LedgerModel> = new Array<LedgerModel>();
   public showUnavailableLedList: boolean = false;
-  public voucherHeadList: Array<VoucherHeadModel> = new Array<VoucherHeadModel>();
-  public selectedLedgers: Array<LedgerModel> = new Array<LedgerModel>();
   public selectedCostCenter = new CostCenterModel();
   public accTxnDetail: TransactionItemDetailModel = new TransactionItemDetailModel();
   public IsVAlidDate: boolean = false;
@@ -58,7 +51,6 @@ export class TransferToAccountingComponent {
   public crTotal: number = 0;
   public disablebutton: boolean = false;
   public ledgerMappingDetail: any;
-  public transaction: Array<TransactionViewModel> = new Array<TransactionViewModel>();
   public ShowItemsList: boolean = false;
   public manualTransfer: boolean = false;
   public loadingScreen: boolean = false;
@@ -71,14 +63,8 @@ export class TransferToAccountingComponent {
   public costCenterList = new Array<CostCenterModel>();
 
   //for get paycal year
-  public year: number;
-  public month: string;
   public syncedlist: Array<any> = new Array<any>();
-  public postitem: Array<any> = new Array<any>();
-  public showResultlist: boolean = false;
   public todaysDate: string = null;
-  public fiscalYearList: Array<FiscalYearModel> = new Array<FiscalYearModel>();
-  public selectedFiscalYear: any = null;
 
   public pendingtxnList: Array<any> = new Array<any>();
   public permissions: Array<any> = new Array<any>();
@@ -89,6 +75,7 @@ export class TransferToAccountingComponent {
     "EnableSubLedger": false,
     "EnableCostCenter": false
   };
+  public DrCrErrorMargin: number = 0.01;
 
 
   constructor(public accountingBLService: AccountingBLService,
@@ -118,6 +105,11 @@ export class TransferToAccountingComponent {
     let subLedgerParma = this.coreService.Parameters.find(a => a.ParameterGroupName === "Accounting" && a.ParameterName === "SubLedgerAndCostCenter");
     if (subLedgerParma) {
       this.subLedgerAndCostCenterSetting = JSON.parse(subLedgerParma.ParameterValue);
+    }
+
+    let drCrErrorParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Accounting" && a.ParameterName === "DrCrErrorMargin");
+    if (drCrErrorParam) {
+      this.DrCrErrorMargin = drCrErrorParam.ParameterValue;
     }
   }
   // reusable fiscalyear calendar component output method 
@@ -166,7 +158,7 @@ export class TransferToAccountingComponent {
             this.sectionId = defSection.SectionId;
           }
           else {
-            this.sectionId = this.sectionList[0].SectionId;
+            this.sectionId = this.sectionList.length > 0 ? this.sectionList[0].SectionId : 0;
           }
           this.GetChangedSection();
         }
@@ -196,7 +188,10 @@ export class TransferToAccountingComponent {
   public GetChangedSection() {
     try {
       this.clearDisplay()
-      this.selectedSectionName = this.sectionList.find(s => s.SectionId == this.sectionId).SectionName;
+      let section = this.sectionList.find(s => s.SectionId == this.sectionId);
+      if (section) {
+        this.selectedSectionName = section.SectionName;
+      }
       this.syncedlist = new Array<any>();
       this.itemList = new Array<any>();
       this.ShowItemsList = false;
@@ -225,7 +220,7 @@ export class TransferToAccountingComponent {
           if (defaultCostCenter.length > 0) {
             this.selectedCostCenter.CostCenterId = defaultCostCenter[0].CostCenterId;
           } else {
-            this.selectedCostCenter.CostCenterId = this.costCenterList[0].CostCenterId;
+            this.selectedCostCenter.CostCenterId = this.costCenterList.length > 0 ? this.costCenterList[0].CostCenterId : 0;
           }
         }
       }
@@ -301,36 +296,6 @@ export class TransferToAccountingComponent {
     }
   }
   //here common post method for all type of section pharmacy, billing, inventory
-  public PostTxnListToACC() {
-    try {
-      this.postData = (this.selectedSectionName == "Inventory") ? this.accTxnForInv : (this.selectedSectionName == "Pharmacy") ? this.accTxnForPhrm : this.accTxnFromBilling;
-      this.transactionDate = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
-      if (this.postData.length > 0) {
-        this.saveDataPopup = true;
-        for (let i = 0; i < this.postData.length; i++) {
-          for (let j = 0; j < this.postData[i].TransactionItems.length; j++) {
-            let txnItm = this.postData[i].TransactionItems[j];
-            this.transactionItem.push(txnItm);
-          }
-        }
-
-        for (let i = 0; i < this.transactionItem.length; i++) {
-          this.transactionItem[i].LedgerName = this.ledgerList.find(a => a.LedgerId == this.transactionItem[i].LedgerId).LedgerName;
-          this.transactionItem[i].LedgerGroupName = this.ledgerList.find(a => a.LedgerId == this.transactionItem[i].LedgerId).LedgerGroupName;
-        }
-        this.Calculate();
-
-      } else {
-
-        this.loading = false;
-        this.msgBoxServ.showMessage("notice", ['select item(s) and try again']);
-      }
-
-
-    } catch (ex) {
-      this.ShowCatchErrMessage(ex);
-    }
-  }
   SaveConfirm() {
     try {
       this.disablebutton = true;
@@ -347,12 +312,12 @@ export class TransferToAccountingComponent {
           }
           else if (res.Status === ENUM_DanpheHTTPResponseText.Failed) {
             this.loading = false;
-            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['There is problem, please try again']);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Exception: ${res.ErrorMessage}`]);
           }
         },
           err => {
             this.loading = false;
-            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['There is problem, please try again']);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Exception: ${err.ErrorMessage}`]);
           });
     }
     catch (ex) {
@@ -439,29 +404,35 @@ export class TransferToAccountingComponent {
     this.pendingtxnList = [];
     if (this.CheckValidDate()) {
       this.pendingtxnList = new Array<any>();
-      this.accountingBLService.LoadTxnDates(this.fromDate, this.toDate, this.sectionId)
-        .subscribe(res => {
-          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-            if (res.Results.length > 0) {
-              this.pendingtxnList = res.Results.sort((a, b) => {
-                return moment(moment(a.TransactionDate).format(ENUM_DateTimeFormat.Year_Month_Day)).diff(moment(b.TransactionDate).format(ENUM_DateTimeFormat.Year_Month_Day));
-              });
-              this.pendingtxnList.forEach(d => {
-                d["TxnEnDate"] = d.TransactionDate;
-              });
-              this.ShowItemsList = true;
+      if (this.sectionId > 0) {
+        this.loading = true;
+        this.accountingBLService.LoadTxnDates(this.fromDate, this.toDate, this.sectionId)
+          .finally(() => this.loading = false)
+          .subscribe((res: DanpheHTTPResponse) => {
+            if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+              if (res.Results.length > 0) {
+                this.pendingtxnList = res.Results.sort((a, b) => {
+                  return moment(moment(a.TransactionDate).format(ENUM_DateTimeFormat.Year_Month_Day)).diff(moment(b.TransactionDate).format(ENUM_DateTimeFormat.Year_Month_Day));
+                });
+                this.pendingtxnList.forEach(d => {
+                  d["TxnEnDate"] = d.TransactionDate;
+                });
+                this.ShowItemsList = true;
+              }
+              else {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Data is Not Available Between Selected dates...Try Different Dates'])
+                console.log(res.ErrorMessage);
+              }
             }
             else {
-              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Data is Not Available Between Selected dates...Try Different Dates'])
-              console.log(res.Errors);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Something wrong'])
+              console.log(res.ErrorMessage);
             }
-          }
-          else {
-            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Something wrong'])
-            console.log(res.Errors);
-          }
-        });
-
+          });
+      }
+      else {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Please select one section from the dropdown before loading transaction...`])
+      }
     }
   }
   Load(index) {
@@ -474,14 +445,13 @@ export class TransferToAccountingComponent {
       this.ShowItemsList = true;
       this.itemList = new Array<any>();
       this.selectedVoucherId = -1;
-      this.showResultlist = false;
-      if (this.selectedSectionName == "Inventory") {
+      if (this.selectedSectionName === ENUM_ACCSectionName.Inventory) {
         this.GetInventoryItemsForTransferToACC();
-      } else if (this.selectedSectionName == "Billing") {
+      } else if (this.selectedSectionName === ENUM_ACCSectionName.Billing) {
         this.GetBilTxnItemsForTransferToACC();
-      } else if (this.selectedSectionName == "Pharmacy") {
+      } else if (this.selectedSectionName === ENUM_ACCSectionName.Pharmacy) {
         this.GetPharmItemsForTransferToACC();
-      } else if (this.selectedSectionName == "Incentive") {
+      } else if (this.selectedSectionName === ENUM_ACCSectionName.Incentive) {
         this.GetIncentiveForTransferToACC();
       } else {
         this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["pleaes select module name"])
@@ -492,7 +462,7 @@ export class TransferToAccountingComponent {
       this.ShowItemsList = true;
 
     }
-    this.selectedDate = "";
+    //this.selectedDate = "";
     this.loadingScreen = false;
   }
 
@@ -518,10 +488,10 @@ export class TransferToAccountingComponent {
       this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Future date not allowed"]);
       return false;
     }
-    else if (moment(this.selectedDate).format(ENUM_DateTimeFormat.Year_Month_Day) == moment(this.securityService.AccHospitalInfo.TodaysDate).format(ENUM_DateTimeFormat.Year_Month_Day)) {
-      this.msgBoxServ.showMessage("warning", ["Today transfer not allowed."]);
-      return false;
-    }
+    // else if (moment(this.selectedDate).format(ENUM_DateTimeFormat.Year_Month_Day) == moment(this.securityService.AccHospitalInfo.TodaysDate).format(ENUM_DateTimeFormat.Year_Month_Day)) {
+    //   this.msgBoxServ.showMessage("warning", ["Today transfer not allowed."]);
+    //   return false;
+    // }
     else {
       return true;
     }
@@ -776,10 +746,10 @@ export class TransferToAccountingComponent {
                 this.tempItemList.push(data);
               });
             }
-            if (this.tempItemList.some(a => Math.abs((a.true.Amount - a.false.Amount)) >= 5)) {
+            if (this.tempItemList.some(a => Math.abs((a.true.Amount - a.false.Amount)) >= this.DrCrErrorMargin)) {
               this.showPostConfirmation = true;
               this.tempItemList = new Array<any>();
-              this.msgBoxServ.showMessage("warning", ["Unable to post transaction. Debit and Credit amounts are not equal for some transaction."]);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Unable to post transaction. Debit and Credit amounts are not equal for some transaction."]);
             }
             else {
               this.showPostConfirmation = false;
@@ -834,51 +804,57 @@ export class TransferToAccountingComponent {
   //Post txns to the accounting
   public SaveToAccounting(itemList) {
     try {
-      if (this.selectedCostCenter.CostCenterId) {
-        if (itemList.length > 0) {
-          //this.SetCostCenterId(this.selectedCostCenter.CostCenterId);
-          this.ShowItemsList = false;
-          this.saveLoading = true;
-          this.loadingScreen = true;
-          if (this.saveLoading) {
-            this.accountingBLService.PostTxnListToACC(itemList)
-              .finally(() => {
-                this.transactionIndex = -1;
-                this.loadingScreen = false;
-                this.loading = false;
-              })
-              .subscribe(res => {
-                //if (res.Status == "OK") {
-                //  this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['record transfered to accounting']);
-                if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-                  this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['record transfered to accounting']);
-                  //this.spliceDateList(this.selectedDate);
-                  //this.Clear();
-                  this.itemList.splice(this.transactionIndex, 1);
-                  if (this.itemList && this.itemList.length < 1) {
-                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['All the transactions are successfully posted.']);
-                    this.ClosePreview();
-                  }
+      if (moment(this.selectedDate).format(ENUM_DateTimeFormat.Year_Month_Day) == moment(this.securityService.AccHospitalInfo.TodaysDate).format(ENUM_DateTimeFormat.Year_Month_Day)) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Today transfer not allowed."]);
+        return false;
+      }
+      else {
+        if (this.selectedCostCenter.CostCenterId) {
+          if (itemList.length > 0) {
+            //this.SetCostCenterId(this.selectedCostCenter.CostCenterId);
+            this.ShowItemsList = false;
+            this.saveLoading = true;
+            this.loadingScreen = true;
+            if (this.saveLoading) {
+              this.accountingBLService.PostTxnListToACC(itemList)
+                .finally(() => {
                   this.transactionIndex = -1;
-                }
-                else {
-                  this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['There is problem, please try again']);
-                }
-                //}
-              },
-                err => {
-                  this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['There is problem, please try again']);
-                });
-          }
+                  this.loadingScreen = false;
+                  this.loading = false;
+                })
+                .subscribe(res => {
+                  //if (res.Status == "OK") {
+                  //  this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['record transfered to accounting']);
+                  if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['record transfered to accounting']);
+                    //this.spliceDateList(this.selectedDate);
+                    //this.Clear();
+                    this.itemList.splice(this.transactionIndex, 1);
+                    if (this.itemList && this.itemList.length < 1) {
+                      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['All the transactions are successfully posted.']);
+                      this.ClosePreview();
+                    }
+                    this.transactionIndex = -1;
+                  }
+                  else {
+                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Exception: ${res.ErrorMessage}`]);
+                  }
+                  //}
+                },
+                  err => {
+                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Exception: ${err.ErrorMessage}`]);
+                  });
+            }
 
-        }
-        else {
+          }
+          else {
+            this.saveLoading = false;
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Load the record first"]);
+          }
+        } else {
           this.saveLoading = false;
-          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Load the record first"]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Please select voucher head !']);
         }
-      } else {
-        this.saveLoading = false;
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Please select voucher head !']);
       }
     } catch (ex) {
       this.loadingScreen = false;

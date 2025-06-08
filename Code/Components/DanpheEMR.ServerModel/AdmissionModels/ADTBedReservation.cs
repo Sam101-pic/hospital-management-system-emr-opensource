@@ -31,5 +31,8 @@ namespace DanpheEMR.ServerModel
         public bool IsActive { get; set; }
         public bool? IsAutoCancelled { get; set; }
         public DateTime? AutoCancelledOn { get; set; }
+        public string AdmissionCase { get; set; }
+        public string CancellationRemarks { get; set; }
+        public string CareTakerInformation { get; set; }
     }
 }

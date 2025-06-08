@@ -4,9 +4,18 @@ import { Observable } from 'rxjs';
 import { AdtBedFeatureSchemePriceCategoryMap_DTO } from '../../adt/shared/DTOs/adt-bedfeature-scheme-pricecategory-map.dto';
 import { BillingPackages_DTO } from '../../billing/shared/dto/billing-packages.dto';
 import { IntakeOutputParameterListModel } from '../../clinical/shared/intake-output-parameterlist.model';
+import { ImagingItem_DTO } from '../../radiology/shared/DTOs/imaging-item.dto';
+import { RadiologyTemplateStyleDto } from '../../radiology/shared/DTOs/radiology-template-style.dto';
 import { DanpheHTTPResponse } from "../../shared/common-models";
 import { SchemeVsPriceCategoryModel } from '../billing/map-scheme-and-pricecategory/shared/MapSchemeVsPriceCategory.model';
+import { Bill_Counter } from '../billing/shared/dto/bill-counter.dto';
+import { FilterExportServiceItem_DTO } from '../billing/shared/dto/filter-export-service-item.dto';
+import { ReportGroupModel } from '../billing/shared/report-group.model';
 import { MinimumDepositAmount_DTO } from './DTOs/minimum-deposit-amount.dto';
+import { AddPrintTemplateSettings_DTO } from './DTOs/print-template-settings-new.dto';
+import { PrintTemplateSettings_DTO } from './DTOs/print-templates-settings.dto';
+import { RegistrationSticker_DTO } from './DTOs/registration-sticker.dto';
+import { Salutation } from './DTOs/Salutation.Model';
 
 @Injectable()
 export class SettingsDLService {
@@ -15,12 +24,60 @@ export class SettingsDLService {
     headers: new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' })
 
   };
+
   public jsonOptions = {
     headers: new HttpHeaders({ 'Content-Type': 'application/json' })
   };
   constructor(public http: HttpClient) { }
 
+  public PostSalutation(data: Salutation) {
+    let value = JSON.stringify(data);
+    return this.http.post<DanpheHTTPResponse>("/api/Settings/Salutation", value, this.jsonOptions);
+  }
+  public UpdateSalutation(data: Salutation) {
+    let value = JSON.stringify(data);
+    return this.http.put<DanpheHTTPResponse>("/api/Settings/Salutation", value, this.jsonOptions);
+  }
+  public PutActivateDeactivateSalutationStatus(selectedId: number) {
+    return this.http.put<DanpheHTTPResponse>('/api/Settings/activate-deactivate-salutation', selectedId, this.jsonOptions);
+  }
   //start: adt
+  public GetHospitalAccount() {
+    return this.http.get<any>("/api/FiscalYearSetting/HospitalAccount");
+  }
+  public GetInventoryFiscalYear() {
+    return this.http.get<any>("/api/FiscalYearSetting/InventoryFiscalYear");
+  }
+  public GetAccountFiscalyear() {
+    return this.http.get<any>("/api/FiscalYearSetting/AccountingFiscalYear");
+  }
+  public GetBillFiscalyear() {
+    return this.http.get<any>("/api/FiscalYearSetting/BillingFiscalYear");
+  }
+  public GetPharmacyFiscalyear() {
+    return this.http.get<any>("/api/FiscalYearSetting/PharmacyFiscalYear");
+  }
+  public AddPharmacyFiscalyear(AddPharmacyYear) {
+    return this.http.post<DanpheHTTPResponse>(`/api/FiscalYearSetting/PharmacyFiscalYear`, AddPharmacyYear, this.jsonOptions);
+  }
+  public AddINVFiscalyear(AddINVFiscalyear) {
+    return this.http.post<DanpheHTTPResponse>(`/api/FiscalYearSetting/InventoryFiscalYear`, AddINVFiscalyear, this.jsonOptions);
+  }
+  public AddAccountFiscalyear(AddAccountingYear) {
+    return this.http.post<DanpheHTTPResponse>(`/api/FiscalYearSetting/AccountingFiscalYear`, AddAccountingYear, this.jsonOptions);
+  }
+  public AddBillFiscalyear(AddBillingYear) {
+    return this.http.post<DanpheHTTPResponse>(`/api/FiscalYearSetting/BillingFiscalYear`, AddBillingYear, this.jsonOptions);
+  }
+  public AddBillingCounter(updatedValue) {
+    return this.http.post<DanpheHTTPResponse>(`/api/BillingCounter/BillingCounter`, updatedValue, this.jsonOptions);
+  }
+  public GetBillingCounter() {
+    return this.http.get<any>("/api/BillingCounter/BillingCounter");
+  }
+  public ActivateDeactivateBillingCounter(billCounter: Bill_Counter) {
+    return this.http.put<any>(`/api/BillingCounter/ChangeActiveStatus?counterId=${billCounter.CounterId}`, this.options);
+  }
   public GetBedList() {
     return this.http.get<any>("/api/ADTSettings/Beds");
   }
@@ -125,7 +182,7 @@ export class SettingsDLService {
   }
 
   public GetServiceDepartments() {
-    return this.http.get<any>("/api/BillSettings/ServiceDepartments");
+    return this.http.get<DanpheHTTPResponse>("/api/BillSettings/ServiceDepartments");
   }
 
   public GetServiceCategories() {
@@ -150,7 +207,7 @@ export class SettingsDLService {
   }
   public PostServiceDepartment(CurrentServiceDepartment) {
     let data = JSON.stringify(CurrentServiceDepartment);
-    return this.http.post<any>("/api/BillSettings/ServiceDepartment", data, this.options);
+    return this.http.post<DanpheHTTPResponse>("/api/BillSettings/ServiceDepartment", data, this.options);
   }
 
   public PutDepartment(department) {
@@ -163,7 +220,7 @@ export class SettingsDLService {
   }
   public PutStoreActiveStatus(storeId) {
     let data = JSON.stringify(storeId);
-    return this.http.put<any>("/api/Settings/ActivateDeactivatePharmacyStore", data, this.options);
+    return this.http.put<any>("/api/Settings/StoreActivation", data, this.options);
   }
   public PutServDepartment(servDepartment) {
     let data = JSON.stringify(servDepartment);
@@ -196,9 +253,50 @@ export class SettingsDLService {
       throw exception;
     }
   }
-  public PostImagingItem(imagingItem) {
-    let data = JSON.stringify(imagingItem);
-    return this.http.post<any>("/api/RadiologySettings/ImagingItem", data, this.options);
+  //get radiology settings template style
+  public GetTemplateStyleList() {
+    try {
+      return this.http.get<DanpheHTTPResponse>("/api/RadiologySettings/TemplateStyle");
+    } catch (exception) {
+      throw exception;
+    }
+  }
+  //get ActiveRadiologyTemplates
+  public GetActiveReportTemplatesList() {
+    try {
+      return this.http.get<DanpheHTTPResponse>("/api/radiology/ReportTemplates");
+    } catch (exception) {
+      throw exception;
+    }
+  }
+  //post radiology settings template style
+  PostNewTemplateStyle(newTemplateStyle: RadiologyTemplateStyleDto) {
+    try {
+      return this.http.post<DanpheHTTPResponse>("/api/RadiologySettings/TemplateStyle", newTemplateStyle, this.jsonOptions)
+    } catch (exception) {
+      throw exception;
+    }
+  }
+  //put radiology settings template style
+  PutTemplateStyle(newTemplateStyle: RadiologyTemplateStyleDto) {
+    try {
+      return this.http.put<DanpheHTTPResponse>("/api/RadiologySettings/TemplateStyle", newTemplateStyle, this.jsonOptions)
+    } catch (exception) {
+      throw exception;
+    }
+  }
+  //put radiology settings template Active Status
+  PutTemplateStyleIsActiveStatus(templateStyleId: number) {
+    try {
+      return this.http.put<DanpheHTTPResponse>("/api/RadiologySettings/ActiveStatus?TemplateStyleId=" + templateStyleId, this.jsonOptions);
+    }
+    catch (exception) {
+      throw exception;
+    }
+  }
+  public PostImagingItem(imagingItem_dto: ImagingItem_DTO) {
+    // let data = JSON.stringify(imagingItem_dto);
+    return this.http.post<any>("/api/RadiologySettings/ImagingItem", imagingItem_dto, this.jsonOptions);
   }
 
   public PostImagingType(imagingType) {
@@ -365,8 +463,8 @@ export class SettingsDLService {
     return this.http.post<any>("/api/SecuritySettings/User", data, this.options);
   }
   public PutUserPassword(user) {
-    let data = JSON.stringify(user);
-    return this.http.put<any>("/api/SecuritySettings/ResetPassword", data, this.options);
+    // let data = JSON.stringify(user);
+    return this.http.put<any>("/api/SecuritySettings/ResetPassword", user, this.jsonOptions);
   }
   public PutUserIsActive(user) {
     let data = JSON.stringify(user);
@@ -418,6 +516,9 @@ export class SettingsDLService {
   public GetServiceItemList() {
     return this.http.get<DanpheHTTPResponse>("/api/BillSettings/ServiceItemList");
   }
+  public GetServiceItemListBySchemeId(schemeId: number) {
+    return this.http.get<DanpheHTTPResponse>("/api/BillSettings/ServiceItemListBySchemeId?schemeId=" + schemeId);
+  }
 
 
   public GetReportingItemList() {
@@ -468,6 +569,10 @@ export class SettingsDLService {
 
   public GetMembershipType() {
     return this.http.get<any>("/api/BillSettings/MembershipTypes", this.options);
+  }
+
+  public GetSchemesForReport() {
+    return this.http.get<any>("/api/BillingMaster/SchemesForReport", this.options);
   }
   public PutCreditOrganization(creditOrganization) {
     let data = JSON.stringify(creditOrganization);
@@ -531,7 +636,7 @@ export class SettingsDLService {
   //GET- Lab- LabTestGroup List
   GetLabTestGroupList() {
     //calling Lab Controller api get method
-    return this.http.get<any>("/api/Lab?reqType=labTestGroupList", this.options)
+    return this.http.get<any>("/api/Lab?reqType=labTestGroupList", this.options);
   }
   //POST: Lab- LabTest Item Insert to dB
   public PostLabItem(labItem) {
@@ -587,6 +692,7 @@ export class SettingsDLService {
   public GetReactions() {
     return this.http.get<any>("/api/Settings/Reactions");
   }
+
   public PostReaction(reaction) {
     let data = JSON.stringify(reaction);
     return this.http.post<any>("/api/Settings/Reaction", data, this.options);
@@ -769,7 +875,7 @@ export class SettingsDLService {
     return this.http.post<DanpheHTTPResponse>("/api/ADTSettings/BedFeatureSchemePriceCategoryMap", bedfeatureschemepricecategoryData, this.jsonOptions);
   }
   public GetBedFeatureSchemePriceCategoryMap() {
-    return this.http.get<DanpheHTTPResponse>("/api/ADTSettings/BedFeatureSchemePriceCataegoryMap", this.jsonOptions)
+    return this.http.get<DanpheHTTPResponse>("/api/ADTSettings/BedFeatureSchemePriceCataegoryMap", this.jsonOptions);
   }
   public UpdateBedFeatureSchemePriceCategory(BedFeatureSchemePriceCategory: AdtBedFeatureSchemePriceCategoryMap_DTO) {
     return this.http.put<DanpheHTTPResponse>("/api/ADTSettings/BedFeatureSchemePriceCategoryMap", BedFeatureSchemePriceCategory, this.jsonOptions);
@@ -841,7 +947,7 @@ export class SettingsDLService {
   }
   public PostIntakeOutputVariable(data: IntakeOutputParameterListModel) {
     let value = JSON.stringify(data);
-    return this.http.post<any>("/api/Settings/PostIntakeOutputVariable", value, this.jsonOptions)
+    return this.http.post<any>("/api/Settings/PostIntakeOutputVariable", value, this.jsonOptions);
   }
   public GetIntakeOutputTypeListForGrid() {
     return this.http.get<any>("/api/Settings/IntakeOutputTypeForGrid", this.options);
@@ -852,6 +958,85 @@ export class SettingsDLService {
   }
   public PutIntakeOutputVariable(data: IntakeOutputParameterListModel) {
     let value = JSON.stringify(data);
-    return this.http.put<any>("/api/Settings/UpdateIntakeOutputVariable", value, this.jsonOptions)
+    return this.http.put<any>("/api/Settings/UpdateIntakeOutputVariable", value, this.jsonOptions);
   }
+  public GetRegistrationStickerSettingsData() {
+    return this.http.get<DanpheHTTPResponse>("/api/BillSettings/RegistrationStickerSettingsData");
+  }
+  public PostRegistrationStickerData(currentRegistrationStickerData: RegistrationSticker_DTO) {
+    return this.http.post<any>("/api/BillSettings/RegistrationStickerSettingsData", currentRegistrationStickerData, this.jsonOptions);
+  }
+  public UpdateRegistrationStickerData(currentRegistrationStickerData: RegistrationSticker_DTO) {
+    return this.http.put<any>("/api/BillSettings/RegistrationStickerSettingsData", currentRegistrationStickerData, this.jsonOptions);
+  }
+  public ActivateDeactivateRegistrationStickerStatus(registrationStickerSettingsId: number, isActive: boolean) {
+    return this.http.put<DanpheHTTPResponse>(`/api/BillSettings/ActivateDeactivateRegistrationStickerStatus?registrationStickerSettingsId=${registrationStickerSettingsId}&isActive=${isActive}`, this.jsonOptions);
+  }
+  public clinicalNoteList() {
+    return this.http.get<DanpheHTTPResponse>("/api/ClinicalSettings/ClinicalNote");
+  }
+  AddClinicalNote(clinicalNote) {
+    return this.http.post<DanpheHTTPResponse>("/api/ClinicalSettings/ClinicalNote", clinicalNote, this.jsonOptions);
+  }
+  UpdateClinicalNote(clinicalNote) {
+    return this.http.put<DanpheHTTPResponse>("/api/ClinicalSettings/ClinicalNote", clinicalNote, this.jsonOptions);
+  }
+  GenerateItemCode(itemName: string) {
+    return this.http.get<DanpheHTTPResponse>(`/api/BillSettings/GenerateItemCode?itemName=${itemName}`, this.jsonOptions);
+  }
+  SavePrintFormat(printTemplate: AddPrintTemplateSettings_DTO) {
+    return this.http.post<DanpheHTTPResponse>(`/api/Stickers/SavePrintFormat`, printTemplate, this.jsonOptions);
+  }
+  GetAllPrintTemplates() {
+    return this.http.get<DanpheHTTPResponse>(`/api/Stickers/GetAllStickerPrintTemplates`, this.jsonOptions);
+  }
+  ActivateDeactivatePrintTemplate(printTemplateId) {
+    return this.http.put<DanpheHTTPResponse>(`/api/Stickers/ActivateDeactivatePrintTemplate?printTemplateId=${printTemplateId}`, this.jsonOptions);
+  }
+
+  UpdatePrintTemplate(printTemplate: PrintTemplateSettings_DTO) {
+    return this.http.put<DanpheHTTPResponse>("/api/Stickers/UpdatePrintTemplate", printTemplate, this.jsonOptions);
+  }
+  public GetPriceCategories() {
+    return this.http.get<DanpheHTTPResponse>("/api/Settings/GetPriceCategories");
+  }
+
+  public PostReportGroup(item) {
+    return this.http.post<DanpheHTTPResponse>("/api/BillSettings/ReportGroup", item, this.jsonOptions);
+  }
+  public GetReportGroupList() {
+    return this.http.get<DanpheHTTPResponse>("/api/BillSettings/ReportGroupList");
+  }
+  public UpdateReportGroup(item) {
+    return this.http.put<DanpheHTTPResponse>("/api/BillSettings/ReportGroup", item, this.jsonOptions);
+  }
+
+  public ReportGroupActivation(reportGroup: ReportGroupModel): Observable<DanpheHTTPResponse> {
+    return this.http.put<DanpheHTTPResponse>(`/api/BillSettings/ReportGroupActivation?DynamicReportGroupId=${reportGroup.DynamicReportGroupId}`, this.jsonOptions);
+  }
+
+  public GetActiveServiceItemList() {
+    return this.http.get<DanpheHTTPResponse>("/api/BillSettings/GetActiveServiceItem");
+  }
+
+  public MapServiceItemsToReportGroup(serviceItemMappings) {
+    return this.http.put<DanpheHTTPResponse>("/api/BillSettings/ReportGroupServiceItemMap", serviceItemMappings, this.jsonOptions);
+  }
+
+  GetMappedServiceItemsByReportGroupId(selectedDynamicReportGroupId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/BillSettings/GetMappedServiceItemsByReportGroupId?selectedDynamicReportGroupId=${selectedDynamicReportGroupId}`);
+  }
+
+  GetAllLabTests() {
+    return this.http.get<DanpheHTTPResponse>(`/api/LabSetting/LabTestsOnly`, this.options);
+  }
+
+  GetAllImagingItems() {
+    return this.http.get<DanpheHTTPResponse>(`/api/Radiology/ImagingItems`, this.options);
+  }
+  public GetFilteredServiceItemList(filterItems: FilterExportServiceItem_DTO): Observable<DanpheHTTPResponse> {
+    return this.http.post<DanpheHTTPResponse>("/api/BillSettings/GetFilteredServiceItemList", filterItems);
+  }
+
 }
+

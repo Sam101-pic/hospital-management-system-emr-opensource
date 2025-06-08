@@ -4,6 +4,7 @@ import {
   Validators
 } from '@angular/forms';
 import * as moment from 'moment/moment';
+import { AddPatientVisitConsultants_DTO } from '../../shared/DTOs/add-patient-visit-consultants.dto';
 import { ENUM_DateTimeFormat } from '../../shared/shared-enums';
 export class PatientBedInfo {
   public PatientBedInfoId: number = 0;
@@ -34,6 +35,7 @@ export class PatientBedInfo {
 
   public ReceivedBy: number = null;
   public ReceivedOn: string = null;
+  public AddPatientVisitConsultants = new Array<AddPatientVisitConsultants_DTO>()
 
 
   constructor() {
@@ -44,7 +46,8 @@ export class PatientBedInfo {
       'BedFeatureId': [0, Validators.compose([Validators.required])],
       'WardId': [0, Validators.compose([Validators.required])],
       'BedId': [0, Validators.compose([Validators.required])],
-      'Remarks': ['', Validators.compose([])]
+      'Remarks': ['', Validators.compose([])],
+      'ConsultantId': [0]
     });
   }
 

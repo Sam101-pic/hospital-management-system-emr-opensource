@@ -105,7 +105,13 @@ export class AddAutoBillingItemsComponent implements OnInit {
     this.update = false;
     this.showAddPage = false;
     this.isSubmitted = false;
-    this.AutoBillingItemsValidator.reset();
+    this.AutoBillingItemsValidator.reset({
+      'BedFeatureName': '',
+      'SchemeName': '',
+      'ServiceItem': '',
+      'MinimumChargeAmount': 0,
+      'PercentageOfBedCharge': 0,
+    });
     this.callBackAdd.emit()
 
   }
@@ -216,6 +222,9 @@ export class AddAutoBillingItemsComponent implements OnInit {
       .subscribe(res => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.ServiceItemList = res.Results;
+          if (this.ServiceItemList && this.ServiceItemList.length) {
+            this.ServiceItemList = this.ServiceItemList.filter(s => s.IsActive);
+          }
         }
         else {
           this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to get Service Items, check log for details']);

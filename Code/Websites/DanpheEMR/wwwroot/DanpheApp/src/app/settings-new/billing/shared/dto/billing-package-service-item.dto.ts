@@ -29,4 +29,5 @@ export class BillingPackageServiceItem_DTO {
     public TotalAmount: number = null;
     public DiscountAmount: number = null;
     public IsErLabApplicable: boolean = false;
+    public DefaultDoctorList: string = null;
 }

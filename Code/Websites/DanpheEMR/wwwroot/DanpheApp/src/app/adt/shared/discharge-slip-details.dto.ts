@@ -1,11 +1,13 @@
 export class DischargeSlipDetails_DTO {
-    public PatientName: string = "";
-    public AgeGender: string = "";
-    public HospitalNumber: string = "";
-    public IpNumber: string = "";
-    public WardNameBedNumber: string = "";
-    public DepartmentName: string = "";
-    public DoctorName: string = "";
-    public AdmittedOn: string = "";
-    public DischargedOn: string = "";
+    PatientName: string = "";
+    AgeGender: string = "";
+    IpNumber: string = "";
+    WardNameBedNumber: string = "";
+    DepartmentName: string = "";
+    DoctorName: string = "";
+    AdmittedOn: string = "";
+    DischargedOn: string = "";
+    DateOfBirth: string = "";
+    Gender: string = "";
+    HospitalNumber: string = "";
 }

@@ -9,6 +9,7 @@ using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Serilog;
 using System;
 using System.IO;
 using System.Linq;
@@ -154,14 +155,30 @@ public class CommonController : Controller
         return Ok(DanpheJSONConvert.SerializeObject(responseData, true));
     }
 
-    protected async Task<ActionResult> InvokeHttpPostFunctionAsync<T>(Func<T> functionName, string customErrorMsg = null)
+    protected async Task<ActionResult> InvokeHttpPostFunctionAsync<T>(Func<Task<T>> functionName, string customErrorMsg = null)
     {
-        return await Task.Run(() =>
+        DanpheHTTPResponse<T> responseData = new DanpheHTTPResponse<T>();
+        try
         {
+            T result = await functionName.Invoke();
+            responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+            responseData.Results = result;
+        }
+        catch (Exception ex)
+        {
+            responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.Failed;
+            responseData.ErrorMessage = customErrorMsg ?? ex.Message;
+        }
+        return Ok(DanpheJSONConvert.SerializeObject(responseData, true));
+    }
+
+
+    protected async Task<ActionResult> InvokeHttpPostFunctionAsync_New<T>(Func<Task<T>> functionName, string customErrorMsg = null)
+    {
             DanpheHTTPResponse<T> responseData = new DanpheHTTPResponse<T>();
             try
             {
-                T result = functionName.Invoke();
+                T result = await functionName();
                 responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
                 responseData.Results = result;
             }
@@ -169,10 +186,10 @@ public class CommonController : Controller
             {
                 responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.Failed;
                 responseData.ErrorMessage = ex.Message;
+                Log.Error(ex.Message);
             }
             //we needed to serialize the final output else it's giving error (eg: in Settlement>Post)
             return Ok(DanpheJSONConvert.SerializeObject(responseData, true));
-        });
 
     }
 
@@ -231,6 +248,25 @@ public class CommonController : Controller
             }
             return Ok(responseData);
         });
+
+    }
+
+    protected async Task<ActionResult> InvokeHttpPutFunctionAsync_New<T>(Func<Task<T>> functionName, string customErrorMsg = null)
+    {
+        DanpheHTTPResponse<T> responseData = new DanpheHTTPResponse<T>();
+        try
+        {
+            T result = await functionName();
+            responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+            responseData.Results = result;
+        }
+        catch (Exception ex)
+        {
+            responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.Failed;
+            responseData.ErrorMessage = ex.Message;
+            Log.Error(ex.Message);
+        }
+        return Ok(DanpheJSONConvert.SerializeObject(responseData, true));
 
     }
 

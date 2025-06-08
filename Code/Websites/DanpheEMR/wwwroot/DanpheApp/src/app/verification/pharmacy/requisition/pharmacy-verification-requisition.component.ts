@@ -4,7 +4,7 @@ import { CoreService } from "../../../core/shared/core.service";
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_PHRMRequisitionStatus, ENUM_Requisition_VerificationStatus } from "../../../shared/shared-enums";
 import { VerificationBLService } from "../../shared/verification.bl.service";
 import { PharmacySubStoreRequisitionItemVerification_DTO } from "../shared/pharmacy-substore-requisition-item-verification.dto";
 import { PharmacySubStoreRequisitionVerification_DTO } from "../shared/pharmacy-substore-requisition-verification.dto";
@@ -66,10 +66,10 @@ export class PharmacyVerificationRequisitionComponent {
     }
 
     private CheckForVerificationApplicable() {
-        if (this.IsVerificationAllowed == true && this.Requisition.RequisitionStatus == "pending") {
+        if (this.IsVerificationAllowed == true && this.Requisition.RequisitionStatus == ENUM_PHRMRequisitionStatus.Pending) {
             this.isVerificationAllowed = true;
         }
-        else if (this.IsVerificationAllowed == false && this.Requisition.RequisitionStatus == "pending") {
+        else if (this.IsVerificationAllowed == false && this.Requisition.RequisitionStatus == ENUM_PHRMRequisitionStatus.Pending) {
             this.isVerificationAllowed = false;
             this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["You have already verified this requisition."])
         }
@@ -102,7 +102,7 @@ export class PharmacyVerificationRequisitionComponent {
     CancelItem(index) {
         if (this.isVerificationAllowed == true) {
             if (this.Requisition.RequisitionItems[index].IsActive == true) {
-                this.Requisition.RequisitionItems[index].RequisitionItemStatus = "cancel";
+                this.Requisition.RequisitionItems[index].RequisitionItemStatus = ENUM_PHRMRequisitionStatus.Cancel;
                 this.Requisition.RequisitionItems[index].IsActive = false;
                 this.Requisition.RequisitionItems[index].IsEdited = false;
             }
@@ -110,7 +110,7 @@ export class PharmacyVerificationRequisitionComponent {
                 this.messageBoxService.showMessage("Failed", ["You can not undo this item cancellation."])
             }
             else {
-                this.Requisition.RequisitionItems[index].RequisitionItemStatus = "active";
+                this.Requisition.RequisitionItems[index].RequisitionItemStatus = ENUM_PHRMRequisitionStatus.Active;
                 this.Requisition.RequisitionItems[index].IsActive = true;
             }
         } else {

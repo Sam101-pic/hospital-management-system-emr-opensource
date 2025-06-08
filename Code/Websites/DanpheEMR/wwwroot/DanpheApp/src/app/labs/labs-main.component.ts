@@ -1,12 +1,12 @@
-import { Component } from '@angular/core'
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
 //Security Service for Loading Child Route from Security Service
-import { SecurityService } from "../security/shared/security.service"
-import { LabService } from './shared/lab.service';
 import { CoreService } from '../core/shared/core.service';
-import { LabTypesModel } from './lab-selection/lab-type-selection.component';
-import { LabsBLService } from './shared/labs.bl.service';
+import { SecurityService } from "../security/shared/security.service";
 import { MessageboxService } from '../shared/messagebox/messagebox.service';
+import { LabTypesModel } from './lab-selection/lab-type-selection.component';
+import { LabService } from './shared/lab.service';
+import { LabsBLService } from './shared/labs.bl.service';
 
 
 @Component({
@@ -39,6 +39,17 @@ export class LabsMainComponent {
 
     var folderDetailObj: any = null;
     var allLabStickerFolderDetail = this.coreService.Parameters.find(a => a.ParameterGroupName.toLowerCase() == 'lab' && a.ParameterName == 'LabStickerSettings');
+    let sampleReceiveParam = this.coreService.Parameters.find(param => param.ParameterGroupName === 'LAB' && param.ParameterName === 'EnableLabSampleReceive');
+    let enableSampleReceive = false;
+    if (sampleReceiveParam) {
+      let param = sampleReceiveParam.ParameterValue;
+      if (param) {
+        enableSampleReceive = JSON.parse(param);
+      }
+    }
+    if (!enableSampleReceive) {
+      this.primaryNavItems = this.primaryNavItems.filter(nav => nav.RouterLink !== "SampleReceive");
+    }
 
     if (allLabStickerFolderDetail) {
       folderDetailObj = JSON.parse(allLabStickerFolderDetail.ParameterValue);
@@ -89,7 +100,7 @@ export class LabsMainComponent {
           this.securityService.getActiveLab().LabTypeName = null;
           this.currentLabId = 0;
           this.currentLabName = null;
-         // this.labTypes = this.coreService.GetLabTypes();
+          // this.labTypes = this.coreService.GetLabTypes();
         } else {
           this.msgBoxServ.showMessage("error", ["Couldn't deactivate current lab. Please try again later."]);
         }

@@ -38,8 +38,7 @@
 
                   </div>
                   <div class="right" style="width:31%">
-                    <p class="no-margin" style="text-align:right"> Age/Sex : {{PatientInfo.DateOfBirth | DanpheDateTime:'age'
-                      }}/{{PatientInfo.Gender}}</p>
+                    <p class="no-margin" style="text-align:right"> Age/Sex : {{PatientInfo.Age}}/{{PatientInfo.Gender}}</p>
                   </div>
                 </div>
                 <div class="col-md-12" style="padding:0px;">
@@ -201,18 +200,7 @@
                       </td>
                       <td style="text-align: right;">{{ NetAmount | number : "1.4-4"}}</td>
                     </tr>
-                    <tr>
-                      <td colspan="4" style="text-align: right;">
-                        Cash Discount:
-                      </td>
-                      <td style="text-align: right;">{{ CashDiscount | number : "1.4-4"}}</td>
-                    </tr>
-                    <tr>
-                      <td colspan="4" style="text-align: right;">
-                        Payable Amount:
-                      </td>
-                      <td style="text-align: right;">{{ PayableAmount | number : "1.4-4"}}</td>
-                    </tr>
+
                   </table>
 
                   <table style="width:100%; text-align: left; border-bottom: 1px dotted;padding-bottom: 4px;margin-bottom: 5px;" class="rect-table"
@@ -232,6 +220,7 @@
                       <td> {{dep.DepositAmount | number : "1.4-4"}} </td>
                     </tr>
                   </table>
+
                   <table style="width:100%; text-align: left; border-bottom: 1px dotted;padding-bottom: 4px;margin-bottom: 5px;" class="rect-table"
                          *ngIf="CashDiscountReturnInfo && CashDiscountReturnInfo.length">
                     <tr>
@@ -247,6 +236,32 @@
                       <td> {{ row.ReceiptNo }} </td>
                       <td> {{row.ReceiptDate | DanpheDateTime:'format':'YYYY-MM-DD'}} </td>
                       <td> {{row.CashDiscountReceived | number : "1.4-4"}} </td>
+                    </tr>
+                  </table>
+                  <table style="width:100%; text-align: left; " class="rect-table" *ngIf="SalesInfo && SalesInfo.length">
+                    <tr>
+                      <td colspan="4" style="text-align: right;">
+                        Cash Discount:
+                      </td>
+                      <td style="text-align: right;">{{ CashDiscount | number : "1.4-4"}}</td>
+                    </tr>
+                    <tr>
+                      <td colspan="4" style="text-align: right;">
+                        Grand Total:
+                      </td>
+                      <td style="text-align: right;">{{ GrandTotal | number : "1.4-4"}}</td>
+                    </tr>
+                    <tr *ngIf="PaidAmount>0">
+                      <td colspan="4" style="text-align: right;">
+                        Paid Amount:
+                      </td>
+                      <td style="text-align: right;">{{ PaidAmount | number : "1.4-4"}}</td>
+                    </tr>
+                    <tr *ngIf="DepositRefund>0">
+                      <td colspan="4" style="text-align: right;">
+                        Refund to patient:
+                      </td>
+                      <td style="text-align: right;">{{ DepositRefund | number : "1.4-4"}}</td>
                     </tr>
                   </table>
                 </div>

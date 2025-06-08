@@ -74,7 +74,6 @@ import { PHRMReturnItemsToSupplierComponent } from "./store/return-to-supplier/p
 import { PHRMStoreDetailsListComponent } from "./store/store-details/phrm-store-details-list.component";
 
 //sud:30Sept'18--to replace ng-autocomplete with danphe-autocomplete
-import { SalesReturnInvoiceViewComponent } from '../dispensary/dispensary-main/sales-main/sales-return/sales-return-invoice-view/sales-return-invoice-view.component';
 import { DispensaryRequisitionEndpoint } from '../dispensary/dispensary-main/stock-main/requisition/dispensary-requisition-endpoint';
 import { DispensaryRequisitionService } from '../dispensary/dispensary-main/stock-main/requisition/dispensary-requisition.service';
 import { TransferEndpointService } from '../dispensary/dispensary-main/stock-main/transfer-main/transfer-endpoint.service';
@@ -95,8 +94,6 @@ import { PHRMSettlementDuplicateComponent } from './duplicate-prints/settlement/
 import { PharmacyPOEndpoint } from './order/pharmacy-po.endpoint';
 import { PharmacyPOService } from './order/pharmacy-po.service';
 import { PHRMGoodsReceiptItemComponent } from './order/phrm-gr-item/phrm-gr-item.component';
-import { PHRMGoodReceiptViewComponent } from './order/phrm-gr-view/phrm-goods-receipt-view.component';
-import { PhrmGRViewNpComponent } from './order/phrm-gr-view/phrm-gr-view-np.component';
 import { PHRMGoodsReceiptComponent } from './order/phrm-gr/phrm-goods-receipt.component';
 import { PhrmPoViewNpComponent } from './order/phrm-po-view-np/phrm-po-view-np.component';
 import { PHRMPatientConsumptionModule } from './patient-consumption/phrm-patient-consumption.module';
@@ -105,9 +102,11 @@ import { PhrmRackAllocationComponent } from './rack/phrm-rack-allocation/phrm-ra
 import { PhrmRackMainComponent } from './rack/phrm-rack-main/phrm-rack-main.component';
 import { DatewisePurchaseReportComponent } from './report/datewise-purchase-report/datewise-purchase-report.component';
 import { PHRMDepositBalanceReport } from './report/deposit/phrm-deposit-balance-report.component';
+import { DoctorWisePrescriptionSalesReportComponent } from './report/doctorwise-sales-report/doctorwise-prescription-sales-report.component';
 import { ItemWisePurchaseReportComponent } from './report/item-wise-purchase-report/item-wise-purchase-report.component';
 import { ItemWiseWardSupplyReportComponent } from './report/item-wise-wardsupply-report/item-wise-wardsupply-report.component';
 import { PHRMNarcoticsDailySalesReportComponent } from './report/narcotics/phrm-narcotics-daily-sales-report.component ';
+import { NarcoticStockLedgerComponent } from './report/narcotics/phrm-narcotics-stock-ledger.component';
 import { PHRMNarcoticsStockReportComponent } from './report/narcotics/phrm-narcotics-stock-report.component';
 import { PHRMPaymentModeWiseReportComponent } from './report/payment-mode-wise-report/phrm-paymentmodewise-report.component';
 import { PHRMPurchaseReportComponent } from './report/phrm-purchase-report/phrm-purchase-report.component';
@@ -118,10 +117,12 @@ import { PHRMSalesReportComponent } from './report/phrm-sales-report/phrm-sales-
 import { PHRMSalesStatementComponent } from './report/phrm-sales-report/sales-statement/phrm-sales-statement.component';
 import { PHRMSalesSummaryComponent } from './report/phrm-sales-report/sales-summary/phrm-sales-summary.component';
 import { PHRMStockReportComponent } from './report/phrm-stock-report/phrm-stock-report.component';
+import { PHRMStockTransferSummaryReportComponent } from './report/phrm-stock-report/phrm-stock-transfer-summary-report/phrm-stock-transfer-summary-report.component';
 import { PHRMStockSummarySecondComponent } from './report/phrm-stock-report/stock-summary-second/phrm-stock-summary-second.component';
 import { StockTransfersReportComponent } from './report/phrm-stock-report/stock-transfers-report/stock-transfers-report.component';
 import { PHRMSupplierReportComponent } from './report/phrm-supplier-report/phrm-supplier-report.component';
 import { SupplierWiseStockReportComponent } from './report/phrm-supplier-report/supplierwise-stock-report/supplierwise-stock-report.component';
+import { ProvisionalSalesReportComponent } from './report/provisional-sales-report/provisional-sales-report.component';
 import { PHRMRackStockDistributionReportComponent } from './report/rack-stock/phrm-rack-stock-distribution-report.component';
 import { RankMembershipwiseSalesReportComponent } from './report/RankMembershipwiseSalesReport/RankMembershipwiseSalesReport.component';
 import { ReturnFromCustomerComponent } from './report/return-from-customer/return-from-customer.component';
@@ -139,7 +140,10 @@ import { PHRMSettlementComponent } from './sale/settlement/settlement.component'
 import { CreditOrganizationListComponent } from './setting/credit-organization/phrm-credit-organizations-list.component';
 import { PHRMDispensaryManageComponent } from "./setting/dispensary/phrm-dispensary-manage.component";
 import { PHRMUpdateExpiryDateandBatchNoComponent } from './setting/expiry-batch/phrm-update-exp-batch.component ';
+import { PHRMPackageManageAddComponent } from './setting/medicine-package/phrm-package-manage-add.component';
+import { PHRMPackageManageListComponent } from './setting/medicine-package/phrm-package-manage-list.component';
 import { PHRMStoreMainComponent } from './store/phrm-store-main.component';
+import { PHRMReturnToSupplierNewComponent } from './store/return-to-supplier-new/return-to-supplier-new.component';
 import { PHRMSalesDetailsListComponent } from './store/sales-category/phrm-sales-category-list.component';
 import { PhrmIncomingStockListComponent } from './store/store-details/incoming-stock/phrm-incoming-stock-list.component';
 import { ReceiveIncomingStock } from './store/store-details/incoming-stock/receive-incoming-stock/receive-incoming-stock.component';
@@ -277,10 +281,8 @@ import { WardRequisitionItems } from './ward-requisition/phrm-ward-requisition.c
     ItemTxnSummaryComponent,
     PHRMStockSummaryReportComponent,
     PHRMGoodsReceiptItemComponent,
-    PHRMGoodReceiptViewComponent,
     PhrmPoViewNpComponent,
     DirectDispatchComponent,
-    PhrmGRViewNpComponent,
     ReceiveIncomingStock,
     PhrmIncomingStockListComponent,
     WriteOffItemComponent,
@@ -303,7 +305,6 @@ import { WardRequisitionItems } from './ward-requisition/phrm-ward-requisition.c
     StockTransfersReportComponent,
     SupplierWisePurchaseReportComponent,
     StockLedgerReportComponent,
-    SalesReturnInvoiceViewComponent,
     SupplierWiseStockReportComponent,
     PHRMSettlementSummaryReportComponent,
     StockReconcilationComponent,
@@ -313,9 +314,14 @@ import { WardRequisitionItems } from './ward-requisition/phrm-ward-requisition.c
     PhrmRackMainComponent,
     PhrmRackAllocationComponent,
     SubstoreRequisitionDispatchMainComponent,
-    ItemWiseWardSupplyReportComponent
-
-
+    ItemWiseWardSupplyReportComponent,
+    PHRMStockTransferSummaryReportComponent,
+    PHRMPackageManageListComponent,
+    PHRMPackageManageAddComponent,
+    DoctorWisePrescriptionSalesReportComponent,
+    ProvisionalSalesReportComponent,
+    PHRMReturnToSupplierNewComponent,
+    NarcoticStockLedgerComponent
   ],
   exports: [PHRMPatientConsumptionModule],
   bootstrap: []

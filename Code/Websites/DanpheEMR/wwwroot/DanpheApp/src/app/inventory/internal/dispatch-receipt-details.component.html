@@ -76,11 +76,18 @@
                       <div class="right" style="text-align:right;">
                         <p *ngIf="requisitionDispatch.IssueNo!==null">Issue No:<b> {{requisitionDispatch.IssueNo}}</b></p>
                         <p *ngIf="requisitionDispatch.DispatchNo!==null">Dispatch No:<b> {{requisitionDispatch.DispatchNo}}</b></p>
-                        <p>Requisition Date:
+                        <p *ngIf="!requisitionDispatch.IsDirectDispatched">Requisition Date:
                           <b> {{requisitionDispatch.RequisitionDate | date:'yyyy-MM-dd'}}</b>
                           &nbsp;&nbsp;
                           <i *ngIf="requisitionDispatch.RequisitionDate">
                             {{requisitionDispatch.RequisitionDate | nepaliDate:'format':'YYYY-MM-DD'}} 
+                          </i>
+                        </p>
+                        <p *ngIf="DispatchedDate">Dispatch Date:
+                          <b> {{DispatchedDate | date:'yyyy-MM-dd'}}</b>
+                          &nbsp;&nbsp;
+                          <i>
+                            ({{DispatchedDate | nepaliDate:'format':'YYYY-MM-DD'}} BS)
                           </i>
                         </p>
                       </div>

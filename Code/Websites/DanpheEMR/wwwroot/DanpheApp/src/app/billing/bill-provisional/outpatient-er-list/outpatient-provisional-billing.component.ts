@@ -19,11 +19,13 @@ import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../s
 import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { RouteFromService } from '../../../shared/routefrom.service';
-import { ENUM_BillingType, ENUM_MessageBox_Status, ENUM_ProvisionalBillingContext } from '../../../shared/shared-enums';
+import { ENUM_BillingType, ENUM_DanpheHTTPResponses, ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status, ENUM_ProvisionalBillingContext } from '../../../shared/shared-enums';
+import { BillProvisionalOutPatientDto } from '../../shared/dto/bill-provisional-out-patient.dto';
 import { PatientBillingContextVM } from '../../shared/patient-billing-context-vm';
 
 @Component({
-  templateUrl: "./outpatient-provisional-billing.component.html"
+  templateUrl: "./outpatient-provisional-billing.component.html",
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 
 // App Component class
@@ -32,11 +34,11 @@ export class OutpatientProvisionalBillingComponent {
   public counterId: number = 0;
   //public BillingTransaction: Array<BillingTransaction> = new Array<BillingTransaction>();  //to show the credit information
   public receiptDetails: Array<BillingTransactionItem> = new Array<BillingTransactionItem>();
-  public provisionalBillsSummary: Array<any> = [];
+  public provisionalBillsSummary: Array<BillProvisionalOutPatientDto> = new Array<BillProvisionalOutPatientDto>();
   //public billingService: BillingService;
   // public showAllPatient: boolean = true;  // to show the form required to show the credit details
   public showUpdateItemsPopup: boolean = false;
-  public creditBillGridColumns: Array<any> = null;
+  public OutpatientErProvisionalClearanceGridColumns: typeof GridColumnSettings.BillingProvisionalOutPatientErClearanceGridColumns;
   //declare boolean loading variable for disable the double click event of button
   loading: boolean = false;
   //added: sud:12May'18
@@ -148,7 +150,7 @@ export class OutpatientProvisionalBillingComponent {
       this.ShowPatientProvisionalItems(data);
     }
     this.CheckAndLoadBillItemPrice();
-    this.creditBillGridColumns = GridColumnSettings.BillCreditBillSearch;
+    this.OutpatientErProvisionalClearanceGridColumns = GridColumnSettings.BillingProvisionalOutPatientErClearanceGridColumns;
     this.GetUnpaidTotalBills();
     this.SetDoctorsList();
     this.SetBillingParameters();
@@ -207,15 +209,24 @@ export class OutpatientProvisionalBillingComponent {
   GetUnpaidTotalBills() {
     this.billingBLService.GetUnpaidTotalBills()
       .subscribe((res: DanpheHTTPResponse) => {
-        if (res.Status == "OK") {
-          this.provisionalBillsSummary = res.Results;
+        if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+          const provisionalBillsSummaryList = res.Results;
+          if (provisionalBillsSummaryList && provisionalBillsSummaryList.length > 0) {
+            let updatedProvisionalBillsSummary = this.GetPatientsWithConsistentAge(provisionalBillsSummaryList);
+            this.provisionalBillsSummary = [...updatedProvisionalBillsSummary];
+          }
         }
         else {
-          this.messageBoxService.showMessage("failed", ["Not able to get provisional items."]);
+          this.messageBoxService.showMessage(ENUM_DanpheHTTPResponseText.Failed, ["Not able to get provisional items."]);
         }
       });
   }
-
+  GetPatientsWithConsistentAge(provisionalBillsSummaryList: BillProvisionalOutPatientDto[]) {
+    return provisionalBillsSummaryList.map(patient => {
+      patient.Age = this.CoreService.CalculateAge(patient.DateOfBirth);
+      return patient;
+    });
+  }
 
 
   GetPatientProvisionalItems(patientId: number, schemeId: number, printProvisional: boolean = false) {
@@ -348,6 +359,7 @@ export class OutpatientProvisionalBillingComponent {
             this.SelectedProvisionalContext.SchemeId = data.SchemeId;
             this.SelectedProvisionalContext.PriceCategoryId = data.PriceCategoryId;
             this.SelectedProvisionalContext.ProvisionalBillingContext = ENUM_ProvisionalBillingContext.Outpatient;
+            this.SelectedProvisionalContext.PatientVisitId = data.PatientVisitId;
             this.ShowProvisionalItems = true;
           } else {
             this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [`Cannot View Provisional Items`]);
@@ -720,6 +732,16 @@ export class OutpatientProvisionalBillingComponent {
   public OnProvisionalItemsCallBack($event): void {
     if ($event) {
       this.ShowProvisionalItems = false;
+      this.GetUnpaidTotalBills();
+    }
+  }
+
+  public hotkeys(event) {
+    if (event.keyCode == 27) {
+      if (this.showInvoicePrintPage) {
+        this.CloseInvoicePrint();
+      }
+
     }
   }
 

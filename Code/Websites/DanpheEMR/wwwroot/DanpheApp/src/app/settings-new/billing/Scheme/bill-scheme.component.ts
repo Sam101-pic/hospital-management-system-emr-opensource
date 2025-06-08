@@ -31,10 +31,12 @@ export class BillSchemeComponent {
 
   public isAddNewPriceCategory: boolean = true;
   public defaultPayment: Array<PaymentModes> = new Array<PaymentModes>();
-  public CreditOrganizations: Array<CreditOrganization> =
-    new Array<CreditOrganization>();
-  public priceCategoryList: Array<PriceCategory> = new Array<PriceCategory>();
+  // public CreditOrganizations: Array<CreditOrganization> =
+  //   new Array<CreditOrganization>();
+  // public priceCategoryList: Array<PriceCategory> = new Array<PriceCategory>();
 
+  @Input("credit-organizations") CreditOrganizations: CreditOrganization[];
+  @Input("price-category-list") PriceCategoryList: PriceCategory[];
   public tempCreditOrganization: Array<CreditOrganization> =
     new Array<CreditOrganization>();
   public tempdefaultPaymentlist: Array<PaymentModes> =
@@ -46,6 +48,7 @@ export class BillSchemeComponent {
   public CurrentPayment: PaymentModes = new PaymentModes();
   public CurrentCreditOrganizationModel: CreditOrganization =
     new CreditOrganization();
+  public billSchemeList: Array<BillingSchemeModel> = new Array<BillingSchemeModel>();
   DiscountSettings: any;
 
   @Input("bill-scheme-to-edit")
@@ -93,8 +96,7 @@ export class BillSchemeComponent {
     public coreService: CoreService,
     private securityService: SecurityService
   ) {
-    this.getCreditOrganizationList();
-    this.GetPriceCategory();
+    this.GetBillingSchemes();
     this.ValidFromDate = moment().format("YYYY-MM-DD");
     this.ValidToDate = moment().format("YYYY-MM-DD");
   }
@@ -110,13 +112,16 @@ export class BillSchemeComponent {
       (res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
           this.billScheme = Object.assign({}, this.billScheme, res.Results);
-          this.selectedCreditOrganization = this.CreditOrganizations.find(
-            (a) =>
-              a.OrganizationId === this.billScheme.DefaultCreditOrganizationId
-          );
-          this.selectedPriceCategory = this.priceCategoryList.find(
-            (a) => a.PriceCategoryId === this.billScheme.DefaultPriceCategoryId
-          );
+          if (this.CreditOrganizations && this.CreditOrganizations.length > 0) {
+            this.selectedCreditOrganization = this.CreditOrganizations.find(
+              (a) => a.OrganizationId === this.billScheme.DefaultCreditOrganizationId
+            );
+          }
+          if (this.PriceCategoryList && this.PriceCategoryList.length > 0) {
+            this.selectedPriceCategory = this.PriceCategoryList.find(
+              (a) => a.PriceCategoryId === this.billScheme.DefaultPriceCategoryId
+            );
+          }
           this.updateCopaymentCheckboxState();
         } else {
           this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [
@@ -156,6 +161,38 @@ export class BillSchemeComponent {
   selectedCreditOrganization: CreditOrganization = new CreditOrganization();
   selectedPriceCategory: PriceCategory = new PriceCategory();
   AddBillScheme() {
+
+    let isSystemDefault = this.billSchemeList.some(a => a.IsSystemDefault === true && a.IsActive === true);
+    if (isSystemDefault && this.billScheme.IsSystemDefault) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Default Duplicate Scheme is not allowed"]);
+      return;
+    }
+
+
+    if (this.billScheme.IsCopaymentApplicable && this.billScheme.IsBillingCoPayment) {
+      if (this.billScheme.BillCoPayCashPercent < 0 || this.billScheme.BillCoPayCashPercent > 100 || this.billScheme.BillCoPayCreditPercent < 0 || this.billScheme.BillCoPayCreditPercent > 100) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["CoPay Percentage Cannot be greater than 100 or less than 0"]);
+        return;
+      }
+      let totalBillingCoPayPercentage = this.billScheme.BillCoPayCashPercent + this.billScheme.BillCoPayCreditPercent;
+      if (totalBillingCoPayPercentage > 100 || totalBillingCoPayPercentage < 0 || (totalBillingCoPayPercentage < 100 && totalBillingCoPayPercentage > 0)) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["CoPay Percentage Cannot be greater than 100 or less than 0"]);
+        return;
+      }
+    }
+
+    if (this.billScheme.IsCopaymentApplicable && this.billScheme.IsPharmacyCoPayment) {
+      if (this.billScheme.PharmacyCoPayCashPercent < 0 || this.billScheme.PharmacyCoPayCashPercent > 100 || this.billScheme.PharmacyCoPayCreditPercent < 0 || this.billScheme.PharmacyCoPayCreditPercent > 100) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["CoPay Percentage Cannot be greater than 100 or less than 0"]);
+        return;
+      }
+      let totalPharmacyCoPayPercentage = this.billScheme.PharmacyCoPayCashPercent + this.billScheme.PharmacyCoPayCreditPercent;
+      if (totalPharmacyCoPayPercentage > 100 || totalPharmacyCoPayPercentage < 0 || (totalPharmacyCoPayPercentage < 100 && totalPharmacyCoPayPercentage > 0)) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["CoPay Percentage Cannot be greater than 100 or less than 0"]);
+        return;
+      }
+    }
+
     this.loading = true;
     for (let i in this.billScheme.SchemeValidator.controls) {
       this.billScheme.SchemeValidator.controls[i].markAsDirty();
@@ -166,6 +203,35 @@ export class BillSchemeComponent {
     if (this.billScheme.HasSubScheme !== true) {
       this.billScheme.BillingSubSchemes = new Array<BillingSubSchemeModel>();
     }
+    if (
+      this.billScheme.IpReferralCodeVisitLimit < 0 ||
+      this.billScheme.OpReferralCodeVisitLimit < 0 ||
+      this.billScheme.ErReferralCodeVisitLimit < 0 ||
+      this.billScheme.IpReferralCodeValidityPeriod < 0 ||
+      this.billScheme.OpReferralCodeValidityPeriod < 0 ||
+      this.billScheme.ErReferralCodeValidityPeriod < 0
+    ) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [
+        "Referral Code Visit Limit and Validity Period must be positive numbers.",
+      ]);
+      this.loading = false;
+      return;
+    }
+    if (
+      (this.billScheme.IpReferralCodeVisitLimit != null && !Number.isInteger(this.billScheme.IpReferralCodeVisitLimit)) ||
+      (this.billScheme.OpReferralCodeVisitLimit != null && !Number.isInteger(this.billScheme.OpReferralCodeVisitLimit)) ||
+      (this.billScheme.ErReferralCodeVisitLimit != null && !Number.isInteger(this.billScheme.ErReferralCodeVisitLimit)) ||
+      (this.billScheme.IpReferralCodeValidityPeriod != null && !Number.isInteger(this.billScheme.IpReferralCodeValidityPeriod)) ||
+      (this.billScheme.OpReferralCodeValidityPeriod != null && !Number.isInteger(this.billScheme.OpReferralCodeValidityPeriod)) ||
+      (this.billScheme.ErReferralCodeValidityPeriod != null && !Number.isInteger(this.billScheme.ErReferralCodeValidityPeriod))
+    ) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [
+        "Referral Code Visit Limit and Validity Period cannot be decimal values.",
+      ]);
+      this.loading = false;
+      return;
+    }
+
     this.settingsBLService.PostBillScheme(this.billScheme)
       .finally(() => { this.loading = false; })
       .subscribe(
@@ -175,6 +241,7 @@ export class BillSchemeComponent {
             this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, [
               "Billing Scheme  Added",
             ]);
+            this.GetBillingSchemes();
             this.billScheme = new BillingSchemeModel();
             this.loading = false;
             this.close();
@@ -203,6 +270,62 @@ export class BillSchemeComponent {
     this.messageBoxService.showMessage(status, [message]);
   }
   UpdateBillScheme() {
+    let isSystemDefault = this.billSchemeList.some(a => a.IsSystemDefault === true && a.IsActive === true && a.SchemeId !== this.billScheme.SchemeId);
+    if (isSystemDefault && this.billScheme.IsSystemDefault) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Default Duplicate Scheme is not allowed"]);
+      return;
+    }
+
+    if (this.billScheme.IsCopaymentApplicable && this.billScheme.IsBillingCoPayment) {
+      if (this.billScheme.BillCoPayCashPercent < 0 || this.billScheme.BillCoPayCashPercent > 100 || this.billScheme.BillCoPayCreditPercent < 0 || this.billScheme.BillCoPayCreditPercent > 100) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["CoPay Percentage Cannot be greater than 100 or less than 0"]);
+        return;
+      }
+      let totalBillingCoPayPercentage = this.billScheme.BillCoPayCashPercent + this.billScheme.BillCoPayCreditPercent;
+      if (totalBillingCoPayPercentage > 100 || totalBillingCoPayPercentage < 0 || (totalBillingCoPayPercentage < 100 && totalBillingCoPayPercentage > 0)) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["CoPay Percentage Cannot be greater than 100 or less than 0"]);
+        return;
+      }
+    }
+
+    if (this.billScheme.IsCopaymentApplicable && this.billScheme.IsPharmacyCoPayment) {
+      if (this.billScheme.PharmacyCoPayCashPercent < 0 || this.billScheme.PharmacyCoPayCashPercent > 100 || this.billScheme.PharmacyCoPayCreditPercent < 0 || this.billScheme.PharmacyCoPayCreditPercent > 100) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["CoPay Percentage Cannot be greater than 100 or less than 0"]);
+        return;
+      }
+      let totalPharmacyCoPayPercentage = this.billScheme.PharmacyCoPayCashPercent + this.billScheme.PharmacyCoPayCreditPercent;
+      if (totalPharmacyCoPayPercentage > 100 || totalPharmacyCoPayPercentage < 0 || (totalPharmacyCoPayPercentage < 100 && totalPharmacyCoPayPercentage > 0)) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["CoPay Percentage Cannot be greater than 100 or less than 0"]);
+        return;
+      }
+    }
+    if (
+      this.billScheme.IpReferralCodeVisitLimit < 0 ||
+      this.billScheme.OpReferralCodeVisitLimit < 0 ||
+      this.billScheme.ErReferralCodeVisitLimit < 0 ||
+      this.billScheme.IpReferralCodeValidityPeriod < 0 ||
+      this.billScheme.OpReferralCodeValidityPeriod < 0 ||
+      this.billScheme.ErReferralCodeValidityPeriod < 0
+    ) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [
+        "Referral Code Visit Limit and Validity Period must be positive numbers.",
+      ]);
+      return;
+    }
+
+    if (
+      (this.billScheme.IpReferralCodeVisitLimit != null && !Number.isInteger(this.billScheme.IpReferralCodeVisitLimit)) ||
+      (this.billScheme.OpReferralCodeVisitLimit != null && !Number.isInteger(this.billScheme.OpReferralCodeVisitLimit)) ||
+      (this.billScheme.ErReferralCodeVisitLimit != null && !Number.isInteger(this.billScheme.ErReferralCodeVisitLimit)) ||
+      (this.billScheme.IpReferralCodeValidityPeriod != null && !Number.isInteger(this.billScheme.IpReferralCodeValidityPeriod)) ||
+      (this.billScheme.OpReferralCodeValidityPeriod != null && !Number.isInteger(this.billScheme.OpReferralCodeValidityPeriod)) ||
+      (this.billScheme.ErReferralCodeValidityPeriod != null && !Number.isInteger(this.billScheme.ErReferralCodeValidityPeriod))
+    ) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [
+        "Referral Code Visit Limit and Validity Period cannot be decimal values.",
+      ]);
+      return;
+    }
     if (this.billScheme.HasSubScheme !== true) {
       this.billScheme.BillingSubSchemes = new Array<BillingSubSchemeModel>();
     }
@@ -215,6 +338,7 @@ export class BillSchemeComponent {
           this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, [
             "Updated.",
           ]);
+          this.GetBillingSchemes();
         } else {
           this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [
             "failed to update",
@@ -232,28 +356,6 @@ export class BillSchemeComponent {
       (a) =>
         a.OrganizationId == this.CurrentCreditOrganizationModel.OrganizationId
     );
-  }
-  public getCreditOrganizationList() {
-    this.settingsBLService.GetCreditOrganizationList().subscribe((res) => {
-      if (res.Status == "OK") {
-        this.CreditOrganizations = res.Results;
-      } else {
-        alert("Failed ! " + res.ErrorMessage);
-      }
-    });
-  }
-  GetPriceCategory() {
-    this.settingsBLService
-      .GetPriceCategory()
-      .subscribe((res: DanpheHTTPResponse) => {
-        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-          this.priceCategoryList = res.Results;
-        } else {
-          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [
-            "price category not available",
-          ]);
-        }
-      });
   }
 
   DiscardChanges() {
@@ -369,5 +471,25 @@ export class BillSchemeComponent {
       this.BillingSubScheme.SubSchemeName = selectedSubScheme.SubSchemeName;
       this.BillingSubScheme.SubSchemeId = selectedSubScheme.SubSchemeId
     }
+  }
+
+  GetBillingSchemes() {
+    this.settingsBLService.GetBillingSchemes().subscribe(
+      (res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.billSchemeList = res.Results;
+          this.loading = false;
+        } else {
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [
+            "Biling Scheme not available",
+          ]);
+          this.loading = false;
+        }
+      },
+      (err) => {
+        this.logError(err);
+        this.loading = false;
+      }
+    );
   }
 }

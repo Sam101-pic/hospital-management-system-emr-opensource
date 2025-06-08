@@ -3,9 +3,9 @@ import { Injectable } from "@angular/core";
 
 import { Observable } from "rxjs";
 import { ImagingItemRequisition } from "../../radiology/shared/imaging-item-requisition.model";
-import { DietType } from "./diet-type.model";
 import { DanpheHTTPResponse } from "../../shared/common-models";
 import { ConsultationRequestModel } from "./consultation-request.model";
+import { DietType } from "./diet-type.model";
 
 @Injectable()
 export class NursingDLService {
@@ -145,7 +145,7 @@ export class NursingDLService {
   }
 
   public RemoveFromFavorites(patVisitId, preferenceType: string, wardId) {
-    return this.http.delete<any>(
+    return this.http.put<DanpheHTTPResponse>(
       "/api/Nursing/RemoveFromPreference?itemId=" +
       patVisitId +
       "&preferenceType=" +
@@ -223,31 +223,31 @@ export class NursingDLService {
   }
   public AddPatientDietType(diet: DietType) {
     return this.http.post<any>("/api/Clinical/AddPatientDietType", diet, this.jsonOptions);
-    }
+  }
 
-    public GetConsultationRequestsByPatientVisitId(PatientVisitId: number): Observable<DanpheHTTPResponse> {
-        return this.http.get<DanpheHTTPResponse>(`/api/Clinical/ConsultationRequestsByPatientVisitId?PatientVisitId=${PatientVisitId}`, this.options);
-    }
+  public GetConsultationRequestsByPatientVisitId(PatientVisitId: number): Observable<DanpheHTTPResponse> {
+    return this.http.get<DanpheHTTPResponse>(`/api/Clinical/ConsultationRequestsByPatientVisitId?PatientVisitId=${PatientVisitId}`, this.options);
+  }
 
-    public GetPatientDetailsByPatientVisitIdForConsultationRequest(PatientVisitId: number): Observable<DanpheHTTPResponse> {
-        return this.http.get<DanpheHTTPResponse>(`/api/Clinical/PatientDetailsByPatientVisitIdForConsultationRequest?PatientVisitId=${PatientVisitId}`, this.options);
-    }
+  public GetPatientDetailsByPatientVisitIdForConsultationRequest(PatientVisitId: number): Observable<DanpheHTTPResponse> {
+    return this.http.get<DanpheHTTPResponse>(`/api/Clinical/PatientDetailsByPatientVisitIdForConsultationRequest?PatientVisitId=${PatientVisitId}`, this.options);
+  }
 
-    public GetAllApptDepartment(): Observable<DanpheHTTPResponse> {
-        return this.http.get<DanpheHTTPResponse>(`/api/Clinical/GetAllApptDepartment`);
-    }
+  public GetAllApptDepartment(): Observable<DanpheHTTPResponse> {
+    return this.http.get<DanpheHTTPResponse>(`/api/Clinical/GetAllApptDepartment`);
+  }
 
-    public GetAllAppointmentApplicableDoctor(): Observable<DanpheHTTPResponse> {
-        return this.http.get<DanpheHTTPResponse>(`/api/Clinical/GetAllAppointmentApplicableDoctor`);
-    }
+  public GetAllAppointmentApplicableDoctor(): Observable<DanpheHTTPResponse> {
+    return this.http.get<DanpheHTTPResponse>(`/api/Clinical/GetAllAppointmentApplicableDoctor`);
+  }
 
-    public AddNewConsultationRequest(newConsultationRequest: ConsultationRequestModel): Observable<DanpheHTTPResponse> {
-        return this.http.post<DanpheHTTPResponse>(`/api/Clinical/AddNewConsultationRequest`, newConsultationRequest, this.optionJson);
-    }
+  public AddNewConsultationRequest(newConsultationRequest: ConsultationRequestModel): Observable<DanpheHTTPResponse> {
+    return this.http.post<DanpheHTTPResponse>(`/api/Clinical/AddNewConsultationRequest`, newConsultationRequest, this.optionJson);
+  }
 
-    public ResponseConsultationRequest(responseConsultationRequest: ConsultationRequestModel): Observable<DanpheHTTPResponse> {
-        return this.http.put<DanpheHTTPResponse>(`/api/Clinical/ResponseConsultationRequest`, responseConsultationRequest, this.optionJson);
-    }
+  public ResponseConsultationRequest(responseConsultationRequest: ConsultationRequestModel): Observable<DanpheHTTPResponse> {
+    return this.http.put<DanpheHTTPResponse>(`/api/Clinical/ResponseConsultationRequest`, responseConsultationRequest, this.optionJson);
+  }
   public GetInvestigationResults(FromDate, ToDate, patientId, patientVisitId) {
     return this.http.get<any>(`/api/Nursing/InvestigationResults?fromDate=${FromDate}&toDate=${ToDate}&patientId=${patientId}&patientVisitId=${patientVisitId}`, this.options)
   }

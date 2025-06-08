@@ -206,11 +206,6 @@ namespace DanpheEMR.Controllers.Pharmacy
 
                     UpdatePharmacyInvoiceAndItems(newPharmacyTransactionList, _phrmDbcontext, settlement, currentUser);
 
-                    if (pharmacySettlement.PHRMReturnIdsCSV.Count > 0)
-                    {
-                        UpdatePharmacyInvoiceReturn(_phrmDbcontext, pharmacySettlement);
-                    }
-
                     HandleDeposits(_phrmDbcontext, currentUser, settlement);
 
                     dbTransaction.Commit();
@@ -266,22 +261,22 @@ namespace DanpheEMR.Controllers.Pharmacy
 
 
 
-            PHRMEmployeeCashTransaction empCashTransaction = new PHRMEmployeeCashTransaction()
-            {
-                TransactionType = ENUM_EMP_CashTransactinType.CollectionFromReceivable,
-                ReferenceNo = settlement.SettlementId,
-                InAmount = (decimal)settlement.PaidAmount,
-                OutAmount = 0,
-                EmployeeId = currentUser.EmployeeId,
-                TransactionDate = currentDateTime,
-                CounterID = settlement.CounterId,
-                PatientId = settlement.PatientId,
-                PaymentModeSubCategoryId = GetPaymentModeSubCategoryId(pharmacyDbContext),
-                ModuleName = ENUM_ModuleNames.Dispensary,
-                FiscalYearId = PharmacyBL.GetFiscalYear(pharmacyDbContext).FiscalYearId
-            };
+            //PHRMEmployeeCashTransaction empCashTransaction = new PHRMEmployeeCashTransaction()
+            //{
+            //    TransactionType = ENUM_EMP_CashTransactinType.CollectionFromReceivable,
+            //    ReferenceNo = settlement.SettlementId,
+            //    InAmount = (decimal)settlement.PaidAmount,
+            //    OutAmount = 0,
+            //    EmployeeId = currentUser.EmployeeId,
+            //    TransactionDate = currentDateTime,
+            //    CounterID = settlement.CounterId,
+            //    PatientId = settlement.PatientId,
+            //    PaymentModeSubCategoryId = GetPaymentModeSubCategoryId(pharmacyDbContext),
+            //    ModuleName = ENUM_ModuleNames.Dispensary,
+            //    FiscalYearId = PharmacyBL.GetFiscalYear(pharmacyDbContext).FiscalYearId
+            //};
 
-            AddEmpCashTransaction(pharmacyDbContext, empCashTransaction);
+            //AddEmpCashTransaction(pharmacyDbContext, empCashTransaction);
 
         }
 
@@ -360,8 +355,9 @@ namespace DanpheEMR.Controllers.Pharmacy
                     TransactionDate = currentDateTime,
                     CounterID = settlement.CounterId,
                     PatientId = settlement.PatientId,
-                    PaymentModeSubCategoryId = GetPaymentModeSubCategoryId(pharmacyDbContext),
-                    ModuleName = ENUM_ModuleNames.Dispensary
+                    PaymentModeSubCategoryId = GetPaymentModeSubCategoryId(pharmacyDbContext, "cash"),
+                    ModuleName = ENUM_ModuleNames.Dispensary,
+                    FiscalYearId = fiscalYearId
                 };
                 AddEmpCashTransaction(pharmacyDbContext, empCashTransaction);
             }
@@ -473,6 +469,7 @@ namespace DanpheEMR.Controllers.Pharmacy
             //Add new row to deposit table if Deposit is deducted
             if (settlement.DepositDeducted > 0)
             {
+                decimal currentDepositBalance = PharmacyBL.CurrentDepositBalance(settlement.PatientId, (decimal)settlement.DepositDeducted, 0, pharmacyDbContext);
                 VisitModel patientVisit = pharmacyDbContext.PHRMPatientVisit.Where(visit => visit.PatientId == settlement.PatientId)
                     .OrderByDescending(a => a.PatientVisitId)
                     .FirstOrDefault();
@@ -496,7 +493,9 @@ namespace DanpheEMR.Controllers.Pharmacy
                     DepositBalance = 0,
                     ReceiptNo = GetDepositReceiptNo(pharmacyDbContext),
                     PaymentMode = ENUM_BillPaymentMode.cash,
-                    VisitType = ENUM_VisitType.outpatient
+                    VisitType = ENUM_VisitType.outpatient,
+                    StoreId = settlement.StoreId,
+                    PrintCount = 0
                 };
 
                 pharmacyDbContext.BillingDepositModel.Add(depositModel);
@@ -512,7 +511,7 @@ namespace DanpheEMR.Controllers.Pharmacy
                     TransactionDate = DateTime.Now,
                     CounterID = depositModel.CounterId,
                     PatientId = settlement.PatientId,
-                    PaymentModeSubCategoryId = GetPaymentModeSubCategoryId(pharmacyDbContext),
+                    PaymentModeSubCategoryId = GetPaymentModeSubCategoryId(pharmacyDbContext, "deposit"),
                     ModuleName = ENUM_ModuleNames.Dispensary,
                     FiscalYearId = PharmacyBL.GetFiscalYear(pharmacyDbContext).FiscalYearId
 
@@ -523,6 +522,8 @@ namespace DanpheEMR.Controllers.Pharmacy
             //Add new row to Deposit table if there is refundable amount.
             if (settlement.RefundableAmount > 0)
             {
+                decimal currentDepositBalance = PharmacyBL.CurrentDepositBalance(settlement.PatientId, 0, (decimal)settlement.RefundableAmount, pharmacyDbContext);
+
                 VisitModel patientVisit = pharmacyDbContext.PHRMPatientVisit.Where(visit => visit.PatientId == settlement.PatientId)
                     .OrderByDescending(a => a.PatientVisitId)
                     .FirstOrDefault();
@@ -546,8 +547,9 @@ namespace DanpheEMR.Controllers.Pharmacy
                     DepositBalance = 0,
                     ReceiptNo = GetDepositReceiptNo(pharmacyDbContext),
                     PaymentMode = ENUM_BillPaymentMode.cash,
-                    VisitType = ENUM_VisitType.outpatient
-
+                    VisitType = ENUM_VisitType.outpatient,
+                    StoreId = settlement.StoreId,
+                    PrintCount = 0
                 };
 
                 pharmacyDbContext.BillingDepositModel.Add(depositModel);
@@ -563,7 +565,7 @@ namespace DanpheEMR.Controllers.Pharmacy
                     TransactionDate = DateTime.Now,
                     CounterID = depositModel.CounterId,
                     PatientId = settlement.PatientId,
-                    PaymentModeSubCategoryId = GetDepositPaymentModeSubCategoryId(pharmacyDbContext),
+                    PaymentModeSubCategoryId = GetPaymentModeSubCategoryId(pharmacyDbContext, "cash"),
                     ModuleName = ENUM_ModuleNames.Dispensary,
                     FiscalYearId = PharmacyBL.GetFiscalYear(pharmacyDbContext).FiscalYearId
                 };
@@ -585,7 +587,7 @@ namespace DanpheEMR.Controllers.Pharmacy
             return billItem;
         }
 
-        private void UpdatePharmacyInvoiceReturn(PharmacyDbContext pharmacyDbContext, PharmacySettlement_DTO phrmsettlement)
+ /*       private void UpdatePharmacyInvoiceReturn(PharmacyDbContext pharmacyDbContext, PharmacySettlement_DTO phrmsettlement)
         {
             PHRMInvoiceReturnModel phrmInvocieReturn = new PHRMInvoiceReturnModel();
             foreach (int stl in phrmsettlement.PHRMReturnIdsCSV)
@@ -599,11 +601,11 @@ namespace DanpheEMR.Controllers.Pharmacy
             }
             _phrmDbcontext.SaveChanges();
 
-        }
-        private int GetPaymentModeSubCategoryId(PharmacyDbContext pharmacyDbContext)
+        }*/
+        private int GetPaymentModeSubCategoryId(PharmacyDbContext pharmacyDbContext, string PaymentMode)
         {
             var paymentModeSubCategoryId = 0;
-            var paymentModes = pharmacyDbContext.PaymentModes.Where(a => a.PaymentSubCategoryName.ToLower() == "cash");
+            var paymentModes = pharmacyDbContext.PaymentModes.Where(a => a.PaymentSubCategoryName.ToLower() == PaymentMode);
             if (paymentModes != null)
             {
                 paymentModeSubCategoryId = paymentModes.Select(a => a.PaymentSubCategoryId).FirstOrDefault();
@@ -613,13 +615,10 @@ namespace DanpheEMR.Controllers.Pharmacy
 
         private int GetSettlementReceiptNo(PharmacyDbContext dbContext)
         {
-            int? currSettlmntNo = dbContext.BillingSettlementModel.Max(a => a.SettlementReceiptNo);
-            if (!currSettlmntNo.HasValue)
-            {
-                currSettlmntNo = 0;
-            }
+            int settlementReceiptNumber = (from txn in dbContext.BillingSettlementModel
+                                           select txn.SettlementReceiptNo).DefaultIfEmpty(0).Max();
 
-            return currSettlmntNo.Value + 1;
+            return settlementReceiptNumber + 1;
         }
 
         private int? GetDepositReceiptNo(PharmacyDbContext pharmacyDbContext)
@@ -782,6 +781,21 @@ namespace DanpheEMR.Controllers.Pharmacy
             {
                 throw new InvalidOperationException();
             }
+        }
+        [HttpGet]
+        [Route("PatientInfoForSettlement")]
+        public IActionResult GetPatientInfo()
+        {
+            Func<object> func = () => (from pat in _phrmDbcontext.PHRMPatient.Where(p => p.IsActive == true)
+                                       select new
+                                       {
+                                           PatientId = pat.PatientId,
+                                           PatientName = pat.ShortName,
+                                           PhoneNumber = pat.PhoneNumber,
+                                           HospitalNo = pat.PatientCode
+                                       }).ToList();
+
+            return InvokeHttpGetFunction<object>(func);
         }
     }
 }

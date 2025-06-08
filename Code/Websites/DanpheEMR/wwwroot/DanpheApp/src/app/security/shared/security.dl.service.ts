@@ -1,5 +1,5 @@
-import { Injectable, Directive } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Injectable } from '@angular/core';
 
 @Injectable()
 export class SecurityDLService {
@@ -29,7 +29,7 @@ export class SecurityDLService {
     public GetActiveBillingCounter() {
         return this.http.get<any>("/api/Security/ActiveBillingCounter", this.options);
     }
-    public GetActiveLab(){
+    public GetActiveLab() {
         return this.http.get<any>("/api/Security/ActiveLab", this.options);
     }
     public GetActivePharmacyCounter() {
@@ -46,12 +46,15 @@ export class SecurityDLService {
         return this.http.get<any>("/api/Security/ActiveAccountingHospitalInformation", this.options);
     }
     //NageshBB: 10 sep 2020
-    public GetINVHospitalInfo(){
+    public GetINVHospitalInfo() {
         return this.http.get<any>("/api/Security/InventeryHospitalInformation", this.options);
     }
+    public GetCommonHospitalInfo() {
+        return this.http.get<any>("/api/Security/CommonHospitalInfo", this.options);
+    }
 
-    public ActivateLab(labId: number, labName: string){
-        return this.http.put<any>("/api/Security/ActivateLab?labId=" +labId +"&labName=" +labName, this.options);
-      }
+    public ActivateLab(labId: number, labName: string) {
+        return this.http.put<any>("/api/Security/ActivateLab?labId=" + labId + "&labName=" + labName, this.options);
+    }
 
 }

@@ -24,9 +24,9 @@ namespace DanpheEMR.DalLayer
         }
 
         #region WARD Stock Items Report        
-        public DataTable WARDStockItemsReport(int ItemId,int StoreId)
+        public DataTable WARDStockItemsReport(int ItemId, int StoreId)
         {
-            List<SqlParameter> paramList = new List<SqlParameter>() { new SqlParameter("@ItemId", ItemId),new SqlParameter("@StoreId", StoreId) };
+            List<SqlParameter> paramList = new List<SqlParameter>() { new SqlParameter("@ItemId", ItemId), new SqlParameter("@StoreId", StoreId) };
             foreach (SqlParameter parameter in paramList)
             {
                 if (parameter.Value == null)
@@ -41,7 +41,7 @@ namespace DanpheEMR.DalLayer
         #endregion
 
         #region WARD Requisition DataTable
-        public DataTable WARDRequisitionReport(DateTime FromDate, DateTime ToDate,int StoreId)
+        public DataTable WARDRequisitionReport(DateTime FromDate, DateTime ToDate, int StoreId)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                 new SqlParameter("@FromDate", FromDate),
@@ -64,7 +64,7 @@ namespace DanpheEMR.DalLayer
         #endregion
 
         #region WARD Breakage DataTable
-        public DataTable WARDBreakageReport(DateTime FromDate, DateTime ToDate,int StoreId)
+        public DataTable WARDBreakageReport(DateTime FromDate, DateTime ToDate, int StoreId)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                 new SqlParameter("@FromDate", FromDate),
@@ -86,7 +86,7 @@ namespace DanpheEMR.DalLayer
         #endregion
 
         #region WARD Consumption DataTable
-        public DataTable WARDConsumptionReport(DateTime FromDate, DateTime ToDate,int StoreId)
+        public DataTable WARDConsumptionReport(DateTime FromDate, DateTime ToDate, int StoreId)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                 new SqlParameter("@FromDate", FromDate),
@@ -132,7 +132,7 @@ namespace DanpheEMR.DalLayer
         #endregion
 
         #region WARD Transfer DataTable
-        public DataTable WARDTransferReport(DateTime FromDate, DateTime ToDate,int StoreId)
+        public DataTable WARDTransferReport(DateTime FromDate, DateTime ToDate, int StoreId)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                  new SqlParameter("@FromDate", FromDate),
@@ -155,7 +155,7 @@ namespace DanpheEMR.DalLayer
 
         ///WARD INVENTORY REPORT
         #region WARD Inventory Requisition and Dispatch Report
-        public DataTable RequisitionDispatchReport(DateTime FromDate, DateTime ToDate,int StoreId)
+        public DataTable RequisitionDispatchReport(DateTime FromDate, DateTime ToDate, int StoreId)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                 new SqlParameter("@FromDate", FromDate),
@@ -177,7 +177,7 @@ namespace DanpheEMR.DalLayer
         #endregion
 
         #region WARD Inventory Transfer Report
-        public DataTable TransferReport(DateTime FromDate, DateTime ToDate,int StoreId)
+        public DataTable TransferReport(DateTime FromDate, DateTime ToDate, int StoreId)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                 new SqlParameter("@FromDate", FromDate),
@@ -199,22 +199,14 @@ namespace DanpheEMR.DalLayer
         #endregion
 
         #region WARD Inventory Consumption Report
-        public DataTable ConsumptionReport(DateTime FromDate, DateTime ToDate, int StoreId)
+        public DataTable ConsumptionReport(DateTime FromDate, DateTime ToDate, int StoreId, int? ConsumptionTypeId)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                 new SqlParameter("@FromDate", FromDate),
                  new SqlParameter("@ToDate", ToDate),
-                 new SqlParameter("@StoreId", StoreId)
+                 new SqlParameter("@StoreId", StoreId),
+                 new SqlParameter("@ConsumptionTypeId",ConsumptionTypeId)
             };
-
-            foreach (SqlParameter parameter in paramList)
-            {
-                if (parameter.Value == null)
-                {
-                    parameter.Value = "";
-
-                }
-            }
             DataTable stockItems = DALFunctions.GetDataTableFromStoredProc("SP_WardInv_Report_ConsumptionReport", paramList, this);
             return stockItems;
         }

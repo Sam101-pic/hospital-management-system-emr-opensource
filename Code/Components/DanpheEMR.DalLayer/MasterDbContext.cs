@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data.Entity;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Data.Entity;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.EmergencyModels;
 using DanpheEMR.ServerModel.MasterModels;
+using DanpheEMR.ServerModel.SalutationModel;
 using DanpheEMR.ServerModel.WardSupplyModels;
 
 namespace DanpheEMR.DalLayer
@@ -21,7 +17,7 @@ namespace DanpheEMR.DalLayer
         }
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
-
+            modelBuilder.Entity<SalutationsModel>().ToTable("MST_Salutations");
             modelBuilder.Entity<CountryModel>().ToTable("MST_Country");
             modelBuilder.Entity<CountrySubDivisionModel>().ToTable("MST_CountrySubDivision");
             modelBuilder.Entity<ICD10CodeModel>().ToTable("MST_ICD10");
@@ -75,10 +71,13 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<CreditOrganizationModel>().ToTable("BIL_MST_Credit_Organization");
             modelBuilder.Entity<ServerModel.WardSupplyModels.WardSubStoresMAPModel>().ToTable("NUR_MAP_WardSubStoresMap");
             modelBuilder.Entity<BillMapPriceCategoryServiceItemModel>().ToTable("BIL_MAP_PriceCategoryServiceItem");
+            modelBuilder.Entity<AgeClassificationModel>().ToTable("CORE_MST_AgeClassification");
+            modelBuilder.Entity<MasterFiscalYearModel>().ToTable("MST_FiscalYear");
+
 
         }
 
-
+        public DbSet<SalutationsModel> Salutations { get; set; }
         public DbSet<CountryModel> Country { get; set; }
         public DbSet<CountrySubDivisionModel> CountrySubDivision { get; set; }
         public DbSet<ICD10CodeModel> ICD10Code { get; set; }
@@ -123,7 +122,8 @@ namespace DanpheEMR.DalLayer
         public DbSet<CreditOrganizationModel> BillingCreditOrganization { get; set; }
         public DbSet<WardSubStoresMAPModel> WardSubStoresMapDetails { get; set; }
         public DbSet<BillMapPriceCategoryServiceItemModel> PriceCategoryServiceItems { get; set; }
-
+        public DbSet<AgeClassificationModel> AgeClassification { get; set; }  
+        public DbSet<MasterFiscalYearModel> MasterFiscalYears { get; set; }
 
     }
 }

@@ -1,11 +1,11 @@
-import { NgModule } from "@angular/core";
 import { CommonModule } from "@angular/common";
+import { NgModule } from "@angular/core";
 import { FormsModule, ReactiveFormsModule } from "@angular/forms";
 import { RouterModule } from "@angular/router";
 import { DanpheAutoCompleteModule } from "../shared/danphe-autocomplete";
 import { SharedModule } from "../shared/shared.module";
-import { PatientsBLService } from "./shared/patients.bl.service";
 import { PatientDuplicateWarningBox } from "./duplicate-warning/patient-duplicate-warning-box.component";
+import { PatientsBLService } from "./shared/patients.bl.service";
 
 @NgModule({
   providers: [
@@ -19,7 +19,7 @@ import { PatientDuplicateWarningBox } from "./duplicate-warning/patient-duplicat
     DanpheAutoCompleteModule
   ],
   declarations: [
-    PatientDuplicateWarningBox
+    PatientDuplicateWarningBox,
   ],
   exports: [
     CommonModule,

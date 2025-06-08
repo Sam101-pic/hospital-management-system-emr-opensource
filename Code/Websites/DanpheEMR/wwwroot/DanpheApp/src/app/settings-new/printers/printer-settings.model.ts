@@ -73,6 +73,11 @@ export enum ENUM_PrintingType {
   receiptDotMatrix = "receipt-dotmatrix"
 }
 
+export enum ENUM_PrintType {
+  returnInvoice= "return-invoice",
+  provisionalInvoice="provisional-invoice"
+}
+
 export enum ENUM_PrintingGroupName {
   bill_receipt = "bill-receipt",
   phrm_receipt = "phrm-receipt",

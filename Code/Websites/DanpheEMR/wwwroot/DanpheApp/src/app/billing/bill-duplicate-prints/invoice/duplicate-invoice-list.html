@@ -44,7 +44,7 @@
         <div class="modelbox-body">
           <bil-print-invoice-main [invoiceNumber]="bil_InvoiceNo" [fiscalYrId]="bil_FiscalYrId"
                                   [bil-txn-id]="bil_BilTxnId" (print-emitter)="AfterPrintCallBack($event)"
-                                  [duplicate-print]="isFromDuplicatePrints">
+                                  [duplicate-print]="isFromDuplicatePrints" [allow-hib-live-claim]="false">
           </bil-print-invoice-main>
 
         </div>

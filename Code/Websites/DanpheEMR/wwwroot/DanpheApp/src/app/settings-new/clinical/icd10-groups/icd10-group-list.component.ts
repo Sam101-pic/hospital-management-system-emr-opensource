@@ -1,8 +1,7 @@
-import { Component, ChangeDetectorRef } from "@angular/core";
-import { Reaction } from "../../shared/reaction.model";
-import { SettingsBLService } from '../../shared/settings.bl.service';
-import { SettingsService } from '../../shared/settings-service';
+import { ChangeDetectorRef, Component } from "@angular/core";
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { SettingsService } from '../../shared/settings-service';
+import { SettingsBLService } from '../../shared/settings.bl.service';
 
 @Component({
     selector: "icd10-group-list",
@@ -16,7 +15,7 @@ export class ICD10GroupListComponent {
     // public selectedID: null;
 
     constructor(public settingsServ: SettingsService, public settingBlServ: SettingsBLService, public changeDetector: ChangeDetectorRef) {
-        this.icdGroupColumns = this.settingsServ.settingsGridCols.ICD10GroupList;
+        this.icdGroupColumns = this.settingsServ.settingsGridCols.ICDGroupList;
         this.GetICDGroupList();
     }
 

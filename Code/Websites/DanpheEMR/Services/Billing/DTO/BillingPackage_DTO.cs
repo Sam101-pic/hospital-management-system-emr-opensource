@@ -17,6 +17,10 @@ namespace DanpheEMR.Services.Billing.DTO
         public int SchemeId { get; set; }
         public int PriceCategoryId { get; set; }
         public bool IsEditable { get; set; }
+        public bool IsItemLevelDiscount { get; set; }
+        public bool IsItemLoadPackage { get; set; }
+        public bool IsHealthPackage { get; set; }
+        public bool IsDiscountEditableInSales { get; set; }
         public List<BillingPackageServiceItems_DTO> BillingPackageServiceItemList{ get; set; }
 
     }

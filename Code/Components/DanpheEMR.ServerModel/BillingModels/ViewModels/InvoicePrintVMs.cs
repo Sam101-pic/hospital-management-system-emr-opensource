@@ -15,7 +15,7 @@ namespace DanpheEMR.ServerModel.BillingModels
         public string Gender { get; set; }
         public DateTime DateOfBirth { get; set; }
         public string Age { get; set; }
-
+        public string AgeFormatted { get; set; }
         public int CountryId { get; set; }
         public string CountryName { get; set; }
         public int CountrySubDivisionId { get; set; }
@@ -98,6 +98,11 @@ namespace DanpheEMR.ServerModel.BillingModels
         public decimal ReceivedAmount { get; set; }
         public string SchemeName { get; set; }
         public string OtherCurrencyDetail { get; set; }
+        public DateTime LocalDateTime { get; set; }
+        public string PrintTemplateType { get; set; }
+        public string FieldSettingParamName { get; set; }
+        public int? DischargeStatementId { get; set; }
+        public string ApiIntegrationName { get; set; }
 
         //since we're getting datatable, we need to map it to the InvoiceInfoVM by First Serialize and the DeSerialize.
         public static BilPrint_InvoiceInfoVM MapDataTableToSingleObject(DataTable invInfo)
@@ -135,11 +140,13 @@ namespace DanpheEMR.ServerModel.BillingModels
         public double TotalAmount { get; set; }
         public int? PerformerId { get; set; }
         public int? RequestedBy { get; set; }
+        public int? ReferredById { get; set; }
+        public string ReferredBy { get; set; }
         public string PerformerName { get; set; }
         public string RequestedByName { get; set; }
         public string PriceCategory { get; set; }
         public DateTime? BillDate { get; set; }
-        public bool IsCoPayment {get; set; }
+        public bool IsCoPayment { get; set; }
         public string ServiceCategoryCode { get; set; }
         public string ServiceCategoryName { get; set; }
 
@@ -172,6 +179,8 @@ namespace DanpheEMR.ServerModel.BillingModels
         public List<int?> ItemsRequestingDoctorsId { get; set; }
         public string ItemsRequestingDoctors { get; set; }
         public string DepartmentName { get; set; }
+        public string VisitType { get; set; }
+
 
         //since we're getting datatable, we need to first Serialize then again Deserialize to get a proper object.
         public static BilPrint_VisitInfoVM MapDataTableToSingleObject(DataTable dtVisInfo)

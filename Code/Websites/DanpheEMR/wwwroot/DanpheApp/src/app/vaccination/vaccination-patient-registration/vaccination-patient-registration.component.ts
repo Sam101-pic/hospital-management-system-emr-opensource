@@ -354,8 +354,8 @@ export class VaccinationPatientRegistrationComponent {
     }
 
     public updateMunicipality(event) {
-        if (event) {
-            this.model.MunicipalityId = event.data;
+        if (event && event.data) {
+            this.model.MunicipalityId = event.data.MunicipalityId;
         }
     }
 }

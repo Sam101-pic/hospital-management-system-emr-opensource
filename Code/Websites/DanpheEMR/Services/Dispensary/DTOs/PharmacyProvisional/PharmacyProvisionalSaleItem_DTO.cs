@@ -38,5 +38,9 @@ namespace DanpheEMR.Services.Dispensary.DTOs.PharmacyProvisional
         public bool IsCoPayment { get; set; }
         public decimal CoPaymentCashAmount { get; set; }
         public decimal CoPaymentCreditAmount { get; set; }
+        public string RackNo { get; set; }
+        public string ItemCode { get; set; }
+        public string HSCode { get; set; }
+        public long? ClaimCode { get; set; }
     }
 }

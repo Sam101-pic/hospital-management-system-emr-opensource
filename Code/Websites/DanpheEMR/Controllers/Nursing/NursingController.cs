@@ -1000,6 +1000,10 @@ namespace DanpheEMR.Controllers
                     SSFDbContext sSFDbContext = new SSFDbContext(connString);
                     VisitBL.UpdatePatientSchemeForFreeFollowupAndFreeReferral(_visitDbContext, sSFDbContext, refVisit, parentVisit, currentUser);
                 }
+                else if (schemeObj != null)
+                {
+                    VisitBL.UpdatePatientScheme(_visitDbContext, refVisit, currentUser);
+                }
 
 
                 //updateIsContinuedStatus in case of referral visit and followup visit

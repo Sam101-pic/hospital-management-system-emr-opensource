@@ -10,6 +10,7 @@ import { AccountingInvoiceDataModel } from '../shared/accounting-invoice-data.mo
 import { MakePayment_DTO } from '../transactions/shared/DTOs/make-payment-dto';
 import { VoucherVerify_DTO } from '../transactions/shared/DTOs/voucher-verify.DTO';
 import { LedgerModel } from "./../settings/shared/ledger.model";
+import { AddAccountTenantPost_DTO } from './DTOs/account-tenant-section-map.dto';
 import { SuspenseAccountTransaction_DTO } from './DTOs/suspense-account-transaction.dto';
 
 
@@ -126,9 +127,9 @@ export class AccountingBLService {
             throw ex;
         }
     }
-    public GetTransactionbyVoucher(voucherNumber: string, secId, fsYearId) {
+    public GetTransactionbyVoucher(voucherNumber: string, secId, fsYearId, hospitalId) {
         try {
-            return this.accountDlService.GetTransactionbyVoucher(voucherNumber, secId, fsYearId)
+            return this.accountDlService.GetTransactionbyVoucher(voucherNumber, secId, fsYearId, hospitalId)
                 .map((responseData) => {
                     return responseData;
                 });
@@ -324,9 +325,9 @@ export class AccountingBLService {
         }
     }
     //get good receipt list 
-    GetGRList(vendorId: number, sectionId: number, number: any, date: string) {
+    GetGRList(vendorId: number, sectionId: number, number: any, date: string, goodReceiptNo: number) {
         try {
-            return this.accountDlService.GetGRList(vendorId, sectionId, number, date)
+            return this.accountDlService.GetGRList(vendorId, sectionId, number, date, goodReceiptNo)
                 .map((responseData) => {
                     return responseData;
                 });
@@ -567,5 +568,25 @@ export class AccountingBLService {
         } catch (ex) {
             throw ex;
         }
+    }
+
+    public GetTenantSectionMap() {
+        return this.accountDlService.GetTenantSectionMap()
+            .map(res => { return res; });
+    }
+
+    public AddNetAccountTenant(tenantObj: AddAccountTenantPost_DTO) {
+        return this.accountDlService.AddNetAccountTenant(tenantObj)
+            .map(res => { return res; });
+    }
+
+    public DeactivateAccountTenant() {
+        return this.accountDlService.DeactivateAccountTenant()
+            .map(res => { return res; });
+    }
+    GetSupplierList() {
+        return this.accountDlService.GetSupplierList().map(res => {
+            return res;
+        })
     }
 }

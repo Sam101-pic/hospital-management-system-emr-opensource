@@ -8,6 +8,7 @@ import { BillingTransactionItem } from "../../billing/shared/billing-transaction
 import { CoreService } from "../../core/shared/core.service";
 import { SecurityService } from "../../security/shared/security.service";
 import { Department } from "../../settings-new/shared/department.model";
+import { AddPatientVisitConsultants_DTO } from "../../shared/DTOs/add-patient-visit-consultants.dto";
 import { NepaliCalendarService } from "../../shared/calendar/np/nepali-calendar.service";
 import { NepaliDate } from "../../shared/calendar/np/nepali-dates";
 import { DanpheHTTPResponse } from "../../shared/common-models";
@@ -128,7 +129,8 @@ export class TransferComponent {
   public OriginalBedFeatureList = new Array<BedFeature>();
   counter: BillingCounter = new BillingCounter();
 
-
+  public AddPatientVisitConsultants = new Array<AddPatientVisitConsultants_DTO>();
+  public SelectedConsultant: any;
   constructor(
     public admissionBLService: ADT_BLService,
     public securityService: SecurityService,
@@ -154,6 +156,7 @@ export class TransferComponent {
     }
     this.GetWards();
     this.LoadBedBilTxnItem();
+    this.LoadConsultants(this.selectedBedInfo.PatientVisitId);
     this.validDate = true;
     this.newBedInfo = new PatientBedInfo();
     if (this.isTransferRemarksCompulsory) {
@@ -177,6 +180,25 @@ export class TransferComponent {
     this.setFocusById("DepartmentName");
 
     this.GetRequestingDepartmentByVisitId();
+  }
+  LoadConsultants(patientVisitId: number) {
+    if (patientVisitId) {
+      this.admissionBLService.GetPatientVisitConsultants(patientVisitId)
+        .subscribe((res: DanpheHTTPResponse) => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            const consultants = res.Results;
+            if (consultants) {
+              this.AddPatientVisitConsultants = consultants.filter(c => !c.IsPrimaryConsultant);
+            }
+          } else {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Cannot load the consultants ${res.ErrorMessage}`]);
+          }
+        },
+          err => {
+            console.log(err.ErrorMessage);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Failed to load consultants."]);
+          });
+    }
   }
   public SchemeName: string = "";
   public PriceCategoryName: string = "";
@@ -544,6 +566,12 @@ export class TransferComponent {
           this.InitializeBedBilItem();
           this.loading = true;
 
+          if (this.AddPatientVisitConsultants && this.AddPatientVisitConsultants.length > 0) {
+            const newConsultants = this.AddPatientVisitConsultants.filter(c => c.PatientVisitConsultantId == 0 && c.IsActive);
+            if (newConsultants) {
+              this.newBedInfo.AddPatientVisitConsultants = newConsultants;
+            }
+          }
           this.admissionBLService.TransferBed(this.newBedInfo, this.selectedBedInfo.BedInformation.PatientBedInfoId, this.bedChargeBilTxnItem,
             this.requestFrom)
             .subscribe((res) => {
@@ -824,5 +852,45 @@ export class TransferComponent {
     this.counter = allCounters.find(c => c.CounterType == "NURSING");
     if (this.counter && this.counter.CounterId)
       return this.counter.CounterId;
+  }
+
+  AddConsultantDoctors(consultantId: number, isPrimaryConsultant: boolean = false, consultantName: string, department: string) {
+    if (consultantId) {
+      if (this.AddPatientVisitConsultants && this.AddPatientVisitConsultants.find(a => a.ConsultantId === consultantId)) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`This Doctor is already added as consultant`]);
+        return;
+      }
+      const consultant = new AddPatientVisitConsultants_DTO();
+      consultant.ConsultantId = consultantId;
+      consultant.IsPrimaryConsultant = isPrimaryConsultant;
+      consultant.VisitType = ENUM_VisitType.inpatient;
+      consultant.ConsultantName = consultantName;
+      consultant.DepartmentName = department;
+      consultant.IsActive = true;
+      const alreadyPrimaryConsultant = this.AddPatientVisitConsultants.some(a => a.IsPrimaryConsultant);
+      if (alreadyPrimaryConsultant && isPrimaryConsultant) {
+        const index = this.AddPatientVisitConsultants.findIndex(a => a.IsPrimaryConsultant);
+        this.AddPatientVisitConsultants.splice(index, 1);
+      }
+      this.AddPatientVisitConsultants.push(consultant);
+    }
+  }
+
+  ConsultantDoctorChanged() {
+    if (this.SelectedConsultant) {
+      const doctorId = this.SelectedConsultant.PerformerId;
+      const department = this.SelectedConsultant.DepartmentName;
+      const doctorName = this.SelectedConsultant.PerformerName;
+      this.AddConsultantDoctors(doctorId, false, doctorName, department);
+    }
+  }
+
+  RemoveConsultant(index: number) {
+    this.AddPatientVisitConsultants.splice(index, 1);
+  }
+
+  ClearConsultantInput() {
+    this.SelectedConsultant = undefined;
+    this.SelectedConsultant = null;
   }
 }

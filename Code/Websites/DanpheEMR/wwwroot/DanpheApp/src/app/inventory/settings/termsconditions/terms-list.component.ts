@@ -22,13 +22,17 @@ export class TermsListComponent {
     public allTermsLists: Array<TermsConditionsMasterModel> = new Array<TermsConditionsMasterModel>();
     public selTermslist: Array<TermsConditionsMasterModel> = new Array<TermsConditionsMasterModel>();
 
-    public termsApplicationId: number = ENUM_TermsApplication.Inventory; 
+    public TermsApplicationId: number = ENUM_TermsApplication.Inventory; 
 
     constructor(public changeDetector: ChangeDetectorRef,
         public messageBoxService: MessageboxService,
         private _route: ActivatedRoute,
         private _http: HttpClient) {
-        this.TermsGridColumns = GridColumnSettings.TermsConditionsList
+        this.TermsGridColumns = GridColumnSettings.TermsConditionsList;
+        const paramsKeys = Object.keys(_route.snapshot.params);
+        if (paramsKeys.length) {
+            this.TermsApplicationId = this._route.snapshot.params.id;
+        }
     }
     ngOnInit() {
             this.getTermsList();
@@ -37,7 +41,7 @@ export class TermsListComponent {
     /*sanjit: 18May'20 : this component is used in both inventory and pharmacy and there is no service that is shared by these two module,
     hence, I have written the api call directly here.*/
     public getTermsList() {
-        this._http.get<any>(`/api/InventorySettings/TermsListByTermsApplicationId?termsApplicationId=${this.termsApplicationId}`)
+        this._http.get<any>(`/api/InventorySettings/TermsListByTermsApplicationId?termsApplicationId=${this.TermsApplicationId}`)
             .subscribe(res => {
                 if (res.Status == "OK") {
                     this.allTermsLists = res.Results;

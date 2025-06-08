@@ -1,14 +1,11 @@
 ﻿import {
-    NgForm,
-    FormGroup,
-    FormControl,
-    Validators,
     FormBuilder,
-    ReactiveFormsModule
-} from '@angular/forms'
+    FormGroup,
+    Validators
+} from '@angular/forms';
 
 
-export class Voucher { 
+export class Voucher {
     public VoucherId: number = 0;
     public VoucherName: string = "";
     public Description: string = null;
@@ -18,8 +15,9 @@ export class Voucher {
     public ShowPayeeName: boolean = false;
     public ShowChequeNumber: boolean = false;
     public VoucherCode: string = null;
-    public ISCopyDescription:boolean=false;
+    public ISCopyDescription: boolean = false;
     public ValidatorVoucher: FormGroup = null;
+    Hosi
     constructor() {
 
         var _formBuilder = new FormBuilder();
@@ -37,10 +35,10 @@ export class Voucher {
             return this.ValidatorVoucher.controls[fieldName].dirty;
     }
 
-    public IsValid():boolean{if(this.ValidatorVoucher.valid){return true;}else{return false;}} public IsValidCheck(fieldName, validator): boolean {
+    public IsValid(): boolean { if (this.ValidatorVoucher.valid) { return true; } else { return false; } } public IsValidCheck(fieldName, validator): boolean {
         if (fieldName == undefined) {
             return this.ValidatorVoucher.valid;
-            
+
         }
 
         else

@@ -57,9 +57,8 @@
   </div>
 </div>
 
-<div class="popup-static portlet box portlet-fullscreen" *ngIf="showStockTransfer">
+<!-- <div class="popup-static portlet box portlet-fullscreen" *ngIf="showStockTransfer">
   <div class="portlet-body form">
-    <!--Model Box Body Start-->
     <div class="form-body">
       <div class="col-md-12 modelbox-div" style="width: 95%;left: 3%;right:5%; padding-bottom: 10px;">
 
@@ -165,7 +164,7 @@
       </div>
     </div>
   </div>
-</div>
+</div> -->
 
 <div *ngIf="stockReconciliationPopupOpen">
   <ward-stock-reconciliation [stock-list]="inventoryStockDetailsList" [StoreId]="CurrentStoreId" (call-back-conciliation-popup-close)="StockReconciliationPopupClose()"></ward-stock-reconciliation>

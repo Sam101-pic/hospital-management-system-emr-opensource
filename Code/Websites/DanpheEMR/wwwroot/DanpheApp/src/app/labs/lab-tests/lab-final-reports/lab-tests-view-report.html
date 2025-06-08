@@ -1,7 +1,7 @@
 <div class="wrapper">
     <div class="row" *ngIf="showReport &&templateReport!=null" style="margin-top: 2px;">
         <div>
-            <button *ngIf="!showSignatoriesEdit && templateReport.ReportId && templateReport.ValidToPrint && !verificationRequired && !hidePrintButton"
+            <button *ngIf="!showSignatoriesEdit && templateReport.ReportId && templateReport.ValidToPrint && !verificationRequired && !hidePrintButton && !showPrintButtonFromClaimScrubbing"
                     class="btn btn-primary" style="
           display: inline-block;
           float: right;
@@ -10,7 +10,7 @@
         " (click)="loading=true;Export('print')">
                 Print <i class="fa fa-print"></i>
             </button>
-            <div style="float:right;margin-right: 10px;">
+            <div style="float:right;margin-right: 10px;" *ngIf="!showReportFromClaimScrubbing" data-html2canvas-ignore="true">
                 <input type="checkbox" id="myCheckbox" name="myCheckbox" style="transform: scale(1.4); margin-bottom: 7px; margin-left:10px;"
                        [(ngModel)]="showHeader">
                 <label for="myCheckbox" style="margin-left:10px;">Show Header Image</label>
@@ -53,7 +53,7 @@
                                         <!--<img src="blackWallPaper.jpg" alt="photo"/>-->
                                         <!--Note that if the Gap in the thead is greater than 254px, then we cannot get the heading on each page-->
 
-                                        <div class="display-header">
+                                        <div *ngIf="showHeader" class="display-header">
                                             <img class="headerimage" id="headerImg"
                                                  src="../../../themes/theme-default/images/mnk-customer-header-2.jpg" alt="" />
                                         </div>
@@ -92,10 +92,7 @@
                                             <div class="flex-container flex-align-center justify-sp-around">
                                                 <div class="single-head">
                                                     <div class="left-col-data">
-                                                        <strong>Address</strong> : {{templateReport.Lookups.CountrySubDivisionName != null ?
-                                                        templateReport.Lookups.CountrySubDivisionName + ',' : '' }}
-                                                        {{templateReport.Lookups.MunicipalityName != null?
-                                                        templateReport.Lookups.MunicipalityName + ',' : '' }} {{templateReport.Lookups.Address}}
+                                                        <strong>Address</strong> : {{coreService.SortPatientAddress(templateReport.Lookups)}}
                                                     </div>
                                                 </div>
                                                 <div class="single-head">
@@ -118,11 +115,11 @@
                                                         <strong>{{ prescriberLabelInLabReport }} :
                                                         </strong><span>{{templateReport.Lookups.PrescriberName}}</span>
                                                         <div class="tooltip no-print"
-                                                             *ngIf=" allowReferredByChange && securityService.HasPermission('btn-lab-report-referredby-edit')">
+                                                             *ngIf=" allowReferredByChange && securityService.HasPermission('btn-lab-report-referredby-edit') && !showReportFromClaimScrubbing">
                                                             <span (click)="openPopUpBox()">
                                                                 <i class="fa fa-edit edit-ic"></i>
                                                             </span>
-                                                            <p class="tooltiptext ttptextdown no-print">
+                                                            <p class="tooltiptext ttptextdown no-print" data-html2canvas-ignore="true">
                                                                 Click to Change Prescriber Dr.
                                                             </p>
                                                         </div>
@@ -146,11 +143,11 @@
                                                         <strong>Lab No</strong> :
                                                         {{templateReport.Lookups.SampleCodeFormatted}}
                                                         <div class="tooltip no-print"
-                                                             *ngIf="allowLabNoChange && securityService.HasPermission('btn-lab-report-labnumber-edit')">
+                                                             *ngIf="allowLabNoChange && securityService.HasPermission('btn-lab-report-labnumber-edit') && !showReportFromClaimScrubbing">
                                                             <span (click)="ConfirmChangeRunNumber()">
                                                                 <i class="fa fa-edit edit-ic"></i>
                                                             </span>
-                                                            <p class="tooltiptext ttptextdown">
+                                                            <p class="tooltiptext ttptextdown" data-html2canvas-ignore="true">
                                                                 Click to Change Run Number.
                                                             </p>
                                                         </div>
@@ -169,10 +166,20 @@
                                                 </div>
                                             </div>
 
-                                            <div class="flex-container flex-align-center justify-sp-around">
-                                                <div *ngIf="isCovidTest && templateReport.Lookups.PassPortNumber" class="single-head">
+                                            <div class="flex-container flex-align-center justify-sp-around"
+                                                 *ngIf="LabReportDisplayParameter.ShowPolicyNumber || (isCovidTest && templateReport.Lookups.PassPortNumber && LabReportDisplayParameter.ShowPassportNo)">
+
+                                                <div class="single-head"
+                                                     *ngIf="LabReportDisplayParameter.ShowPolicyNumber && templateReport.Lookups.PolicyNumber">
                                                     <div class="left-col-data">
-                                                        <div>
+                                                        <strong>Policy No.</strong> :
+                                                        {{templateReport.Lookups.PolicyNumber}}
+                                                    </div>
+                                                </div>
+                                                <div class="single-head"
+                                                     *ngIf="LabReportDisplayParameter.ShowPassportNo && templateReport.Lookups.PassPortNumber">
+                                                    <div [ngClass]="LabReportDisplayParameter.ShowPolicyNumber ? 'right-col-data' : 'left-col-data'">
+                                                        <div [ngClass]="showBarCode ? 'right-hdrwith-barcode right-hdr':'right-hdr'">
                                                             <strong>PassPort Number</strong>
                                                             :{{templateReport.Lookups.PassPortNumber }}
                                                         </div>
@@ -211,13 +218,14 @@
                                                                         data-html2canvas-ignore="true">
                                                                     X
                                                                 </button>
-                                                                <button *ngIf="showDigitalSignature" id="showSignImage{{i}}"
+                                                                <button *ngIf="showDigitalSignature && !showReportFromClaimScrubbing"
+                                                                        id="showSignImage{{i}}"
                                                                         [style.display]="emp.Show ? 'none':'inline-block'"
                                                                         (click)="ShowHideDigitalImage(emp)" class="signature-image-show no-print">
                                                                     Show ESignature
                                                                 </button>
                                                                 <img class="labsignature-image" id="signImage{{i}}"
-                                                                     [style.display]="emp.Show ? 'inline-block':'none'"
+                                                                     [style.display]="emp.Show || showReportFromClaimScrubbing ? 'inline-block':'none'"
                                                                      src="../../../../../../fileuploads/EmployeeSignatures/{{emp.SignatoryImageName}}"
                                                                      alt="{{emp.EmployeeFullName}} Signature" />
                                                             </div>
@@ -232,7 +240,7 @@
                                                         <div class="signature-image-holder"
                                                              *ngIf="emp.SignatoryImageName && emp.SignatoryImageName.trim() != ''">
                                                             <div class="all-signature-images">
-                                                                <img class="labsignature-image"
+                                                                <img class="labsignature-image" [style.display]="emp.Show ? 'inline-block':'none'"
                                                                      src="../../../../../../fileuploads/EmployeeSignatures/{{emp.SignatoryImageName}}"
                                                                      alt="{{emp.EmployeeFullName}} Signature" />
                                                             </div>
@@ -255,13 +263,13 @@
                                                                 X
                                                             </button>
                                                             <button id="showCurrUserSignImage"
-                                                                    [style.display]="CreatedByUser.Show ? 'none':'inline-block'"
+                                                                    [style.display]="CreatedByUser.Show && !showReportFromClaimScrubbing? 'none':'inline-block'"
                                                                     (click)="ShowHideDigitalImage(CreatedByUser)"
                                                                     class="signature-image-show no-print">
                                                                 Show ESignature
                                                             </button>
                                                             <img class="labsignature-image" id="currUserSignImage"
-                                                                 [style.display]="CreatedByUser.Show ? 'inline-block':'none'"
+                                                                 [style.display]="CreatedByUser.Show || showReportFromClaimScrubbing? 'inline-block':'none'"
                                                                  src="../../../../../../fileuploads/EmployeeSignatures/{{CreatedByUser.SignatoryImageName}}"
                                                                  alt="{{CreatedByUser.FullName}} Signature" />
                                                         </div>
@@ -318,13 +326,10 @@
                                                                         <th style="width: 20%" *ngIf="tmplate.TemplateColumns.Range">
                                                                             Reference
                                                                         </th>
-                                                                        <th style="width: 30%" *ngIf="tmplate.TemplateColumns.Method">
+                                                                        <th *ngIf="tmplate.TemplateColumns.Method">
                                                                             Method
                                                                         </th>
-                                                                        <th style="width: 30%" *ngIf="!tmplate.TemplateColumns.Method">
-
-                                                                        </th>
-                                                                        <th style="width: 10%" *ngIf="tmplate.TemplateColumns.Remarks">
+                                                                        <th *ngIf="tmplate.TemplateColumns.Remarks">
                                                                             Remarks
                                                                         </th>
                                                                     </tr>
@@ -343,7 +348,8 @@
                                                                             *ngIf="res.Components.length > 1 || res.Components[0].IsNegativeResult">
                                                                             <th *ngIf="tmplate.TemplateColumns.Name">
                                                                                 <label for="{{res.ReportingName+rnum}}">
-                                                                                    <input *ngIf="!hidePrintButton" id="{{res.ReportingName+rnum}}"
+                                                                                    <input *ngIf="!hidePrintButton && !showReportFromClaimScrubbing"
+                                                                                           id="{{res.ReportingName+rnum}}"
                                                                                            class="dontShowInPrint outer-select" type="checkbox"
                                                                                            [(ngModel)]="res.Print"
                                                                                            name="showHideInPrint"
@@ -362,7 +368,6 @@
                                                                             <th *ngIf="tmplate.TemplateColumns.Unit"></th>
                                                                             <th *ngIf="tmplate.TemplateColumns.Range"></th>
                                                                             <th *ngIf="tmplate.TemplateColumns.Method"></th>
-                                                                            <th *ngIf="!tmplate.TemplateColumns.Method"></th>
                                                                             <th *ngIf="tmplate.TemplateColumns.Remarks"></th>
                                                                         </tr>
                                                                         <!--Main result data addition work goes here-->
@@ -379,7 +384,7 @@
                                                                                         *ngIf="tmplate.TemplateColumns.Name && cmp.ControlType == 'Label'"
                                                                                         [style.padding-left]="10 + cmp.IndentationCount*10 + 'px'">
                                                                                         <label for="{{cmp.ComponentName+idx}}">
-                                                                                            <input *ngIf="!hidePrintButton"
+                                                                                            <input *ngIf="!hidePrintButton && !ShowHidePrintForTestsWithoutComp && !showReportFromClaimScrubbing"
                                                                                                    id="{{cmp.ComponentName+idx}}"
                                                                                                    class="dontShowInPrint inner-select"
                                                                                                    name="showHideInPrint"
@@ -399,7 +404,7 @@
                                                                                         [style.padding-left]="10 + cmp.IndentationCount*10 + 'px'">
                                                                                         <label for="{{cmp.ComponentName+idx}}">
                                                                                             <input id="{{cmp.ComponentName+idx}}"
-                                                                                                   *ngIf="!hidePrintButton"
+                                                                                                   *ngIf="!hidePrintButton && !ShowHidePrintForTestsWithoutComp && !showReportFromClaimScrubbing"
                                                                                                    [className]="res.Components.length == 1 ? 'dontShowInPrint outer-select':'dontShowInPrint inner-select'"
                                                                                                    class="" name="showHideInPrint" type="checkbox"
                                                                                                    [(ngModel)]="cmp.Print"
@@ -458,7 +463,6 @@
                                                                                         <div class="margin-15-vr">
                                                                                             <div class="padding-7-hr">
                                                                                                 <input id="{{'interpretationTxt' + idx}}"
-                                                                                                       *ngIf="!hidePrintButton"
                                                                                                        class="dontShowInPrint outer-select"
                                                                                                        type="checkbox"
                                                                                                        [(ngModel)]="res.PrintInterpretation"
@@ -560,7 +564,7 @@
                                                                             <td colspan="3" style="padding: 0px 7px;">
                                                                                 <label for="{{tst.ReportingName+i+crindex}}">
                                                                                     <input id="{{tst.ReportingName+i+crindex}}"
-                                                                                           *ngIf="!hidePrintButton"
+                                                                                           *ngIf="!hidePrintButton && !showReportFromClaimScrubbing"
                                                                                            class="dontShowInPrint outer-select" type="checkbox"
                                                                                            [(ngModel)]="tst.Print"
                                                                                            namie="showHideInPrint"
@@ -665,7 +669,8 @@
                                                                         <tr style="text-align: left;">
                                                                             <td colspan="3">
                                                                                 <b> {{tst.ReportingName}} </b>
-                                                                                <input *ngIf="!hidePrintButton" class="dontShowInPrint outer-select"
+                                                                                <input *ngIf="!hidePrintButton && !showReportFromClaimScrubbing"
+                                                                                       class="dontShowInPrint outer-select"
                                                                                        type="checkbox" [(ngModel)]="tst.Print" name="showHideInPrint"
                                                                                        (change)="ShowHidePrintForTestsWithComp(tmplate, tst)"
                                                                                        title="unchecked test will not be printed" />
@@ -783,8 +788,9 @@
       <label style="cursor: pointer;font-weight: 700;" for="showInterPret">Show Interpretation</label>
   </div>-->
 
-        <div *ngIf="templateReport && enableEdit" style="margin-top: 10px; padding-bottom: 50px; width: 100%; float: left;">
-            <div class="lab-rpt-sign" *ngIf="showSignatoriesEdit" style="display: table;">
+        <div *ngIf="templateReport && enableEdit"
+             style="margin-top: 10px; padding-bottom: 50px; width: 100%; float: left;">
+            <div class="lab-rpt-sign" *ngIf="showSignatoriesEdit && LabSignatoryParameter.EnableSignatoriesEdit" style="display: table;">
                 <danphe-signatories ngDefaultControl [(ngModel)]="signatories" [defaultEmployeeIdList]="defaultSigEmpIdList" [displayMode]="'edit'"
                                     [departmentName]="'lab'" (isSignatureSelected)="SignatureSelection($event)">
                 </danphe-signatories>
@@ -792,7 +798,7 @@
             <div class="margin-20-tp">
                 <div class="text-center" *ngIf="showSignatoriesEdit">
                     <button class="btn green btn-success margin-7-hr" (click)="SubmitLabReport()" id="btnUpdateSignatories">
-                        Update Signatories {{ templateReport.ReportId ? '' : 'and Print'}}
+                        Save Signatories {{ templateReport.ReportId ? '' : 'and Print'}}
                         <i class="fa fa-print"></i>
                     </button>
                 </div>
@@ -807,7 +813,8 @@
                             [disabled]="loading">
                         Upload To Patient Portal <i class="fa fa-upload"></i>
                     </button>
-                    <button [disabled]="loading" *ngIf="templateReport.ValidToPrint && !verificationRequired" id="btnPrint"
+                    <button [disabled]="loading" *ngIf="templateReport.ValidToPrint && !verificationRequired && !showPrintButtonFromClaimScrubbing"
+                            id="btnPrint"
                             class="btn btn-primary margin-7-hr" (click)="loading=true;printLabReport()">
                         Print <i class="fa fa-print"></i>
                     </button>
@@ -815,13 +822,15 @@
                             class="btn btn-primary margin-7-hr" (click)="loading=true;printLabReport('preliminary')">
                         Print Preliminary Report <i class="fa fa-print"></i>
                     </button>
-                    <button [disabled]="loading" class="btn btn-cancel margin-7-hr" (click)="EditSignatories()">
+                    <button *ngIf="!showReportFromClaimScrubbing && LabSignatoryParameter.EnableSignatoriesEdit" [disabled]="loading"
+                            class="btn btn-cancel margin-7-hr" (click)="EditSignatories()">
                         Edit Signatories <i class="fa fa-edit"></i>
                     </button>
                 </div>
             </div>
         </div>
-        <div *ngIf="templateReport && !enableEdit && !hidePrintButton" style="margin-top: 10px; padding-bottom: 50px; width: 100%;">
+        <div *ngIf="templateReport && !enableEdit && !hidePrintButton"
+             style="margin-top: 10px; padding-bottom: 50px; width: 100%;">
             <div class="margin-20-tp text-center">
                 <button [disabled]="loading" *ngIf="templateReport.ValidToPrint && !verificationRequired" class="btn btn-primary margin-7-hr"
                         (click)="loading=true;printLabReport()">
@@ -887,7 +896,7 @@
 
                                 <select-referrer [selected-ref-id]="selectedRefId" [allow-external]="ExtRefSettings.EnableExternal"
                                                  [allow-free-text]="ExtRefSettings.AllowFreeText" [default-external]="ExtRefSettings.DefaultExternal"
-                                                 [display-property-name]="'LongSignature'" (on-referrer-change)="OnReferrerChanged($event)">
+                                                 [display-property-name]="'FullName'" (on-referrer-change)="OnReferrerChanged($event)">
                                 </select-referrer>
                             </div>
                         </div>

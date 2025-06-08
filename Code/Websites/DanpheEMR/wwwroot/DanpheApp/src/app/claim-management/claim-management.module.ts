@@ -18,14 +18,19 @@ import { InsuranceBillAssignClaimCodeComponent } from './bill-review/ins-bill-as
 import { InsuranceBillListComponent } from './bill-review/ins-bill-list.component';
 import { InsBillPreviewComponent } from './bill-review/ins-bill-preview.component';
 import { ClaimFormsComponent } from './claim-forms/claim-forms.component';
+import { EchsFinalBillSummaryComponent } from './claim-forms/echs-final-bill-summary/echs-final-bill-summary.component';
 import { EchsMrpDrugCertificateComponent } from './claim-forms/echs-mrp-drug-certificate/echs-mrp-drug-certificate.component';
 import { FormSelectionComponent } from './claim-forms/form-selection/form-selection.component';
 import { MedicalClaimFormComponent } from './claim-forms/medicare-claim-form/medical-claim-form.component';
 import { ClaimManagementMainComponent } from './claim-management-main.component';
 import { ClaimManagementRoutingModule } from './claim-management-routing.module';
+import { INSClaimBillingInvoiceViewComponent } from './ins-claim-billing-invoice/ins-claim-billing-invoice-view.component';
+import { INSClaimPharmacyInvoiceViewComponent } from './ins-claim-pharmacy-invoice/ins-claim-pharmacy-invoice-view.component';
 import { NewInsurancePaymentComponent } from './payment-processing/new-payment.component';
 import { PaymentProcessingComponent } from './payment-processing/payment.component';
 import { ViewPaymentComponent } from './payment-processing/view-payment/view-payment.component';
+import { ProcessedClaimsComponent } from './processed-claim/processed-claims.component';
+import { ClaimDocumentReceivedReportComponent } from './reports/claim-document-received-report/ins-claim-document-received-report.component';
 import { ReportsComponent } from './reports/reports.component';
 import { InsuranceClaimsPreviewComponent } from './scrubbing/ins-claim-preview.component';
 import { InsuranceClaimScrubbingComponent } from './scrubbing/ins-claim-scrubbing.component';
@@ -34,6 +39,7 @@ import { InsuranceProviderSelectionComponent } from './select-insurance-provider
 import { ClaimManagementBLService } from './shared/claim-management.bl.service';
 import { ClaimManagementDLService } from './shared/claim-management.dl.service';
 import { DocumentUploadComponent } from './shared/document-upload/document-upload.component';
+import { EchsFinalBillingSummaryPrintComponent } from './shared/echs-final-billing-summary-print/echs-final-billing-summary-print.component';
 import { EchsMrpDrugCertificatePrintComponent } from './shared/echs-mrp-drug-certificate-print/echs-mrp-drug-certificate-print.component';
 import { InsuranceSelectionGuardService } from './shared/insurance-provider-selection-guard';
 import { MedicalClaimFormPrintComponent } from './shared/medical-claim-form-print/medical-claim-form-print.component';
@@ -90,7 +96,13 @@ import { SsfDlService } from './ssf-claim/ssf-dl.services';
     EchsMrpDrugCertificatePrintComponent,
     MedicalClaimFormPrintComponent,
     ViewPaymentComponent,
-    SSFClaimComponent
+    SSFClaimComponent,
+    INSClaimBillingInvoiceViewComponent,
+    INSClaimPharmacyInvoiceViewComponent,
+    EchsFinalBillSummaryComponent,
+    EchsFinalBillingSummaryPrintComponent,
+    ProcessedClaimsComponent,
+    ClaimDocumentReceivedReportComponent
   ],
   bootstrap: []
 })

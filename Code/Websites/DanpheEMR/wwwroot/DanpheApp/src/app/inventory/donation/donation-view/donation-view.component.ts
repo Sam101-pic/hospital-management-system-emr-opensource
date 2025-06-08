@@ -10,7 +10,8 @@ import { DonationService } from '../donation.service';
 @Component({
   selector: 'app-donation-view',
   templateUrl: './donation-view.component.html',
-  styleUrls: ['./donation-view.component.css']
+  styleUrls: ['./donation-view.component.css'],
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class DonationViewComponent implements OnInit {
   showReceipt: boolean = false;
@@ -121,6 +122,12 @@ export class DonationViewComponent implements OnInit {
     }
     else {
       this.disableButton = true;
+    }
+  }
+
+  hotkeys(event): void {
+    if (event.keyCode === 27) {
+      this.Close();
     }
   }
 

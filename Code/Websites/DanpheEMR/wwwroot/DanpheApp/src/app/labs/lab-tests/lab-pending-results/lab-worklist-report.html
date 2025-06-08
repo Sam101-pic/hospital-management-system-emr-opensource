@@ -7,6 +7,14 @@
     flex-direction: column;
     border: none;
   }
+
+  .testContainer div {
+    border-bottom: 1px solid #e7ecf1;
+  }
+
+  .testContainer div:last-child {
+    border-bottom: none;
+  }
 </style>
 <div class="row" style="margin-bottom: 10px;">
   <div class="col-md-12 col-lg-12 col-sm-12">
@@ -96,16 +104,14 @@
           <td><span>{{res.PatientName}}</span></td>
           <td><span>{{res.PatientCode}}</span></td>
           <td><span> {{res.AgeSex}} </span></td>
-          <td style="padding-bottom: 24px;">
-            <table>
+          <td colspan="2">
+            <div class="testContainer">
               <div *ngFor="let test of res.LabTestNameCsv">
-                <tr>
-                  {{test}}
-                </tr>
+                <span style="display: flex; width: 60%;">{{ test }}</span>
+                <span style="display: flex; width: 40%;"></span>
               </div>
-            </table>
+            </div>
           </td>
-          <td></td>
         </tr>
       </ng-container>
     </tbody>

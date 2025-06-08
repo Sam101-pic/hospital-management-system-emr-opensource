@@ -1,40 +1,3 @@
-<style>
-  .printStyle {
-    border: dotted 1px;
-    margin: 10px 100px;
-  }
-
-  .print-border-top {
-    border-top: dotted 1px;
-  }
-
-  .print-border-bottom {
-    border-bottom: dotted 1px;
-  }
-
-  .print-border {
-    border: dotted 1px;
-  }
-
-  .center-style {
-    text-align: center;
-  }
-
-  .border-up-down {
-    border-top: dotted 1px;
-    border-bottom: dotted 1px;
-  }
-
-  .table-details-value {
-    margin-left: 10px;
-    text-align: center;
-  }
-
-  .img-responsive {
-    position: relative;
-    top: 14px;
-  }
-</style>
 <div id="printpage" class="row printStyle print-border">
   <div style="text-align:center;">
     <div class="col-md-12">
@@ -70,7 +33,7 @@
       <p class="text-center btm-pad border-up-down"><b> RETURN ITEMS DETAILS PRINT</b></p>
       <div class="clear"></div>
       <div class="clear footer"></div>
-      <div class="table-responsive">
+      <div>
         <table class="table table-striped table-hover table-bordered" style="background-color:initial;margin-top:10px;width:100%">
           <thead>
             <tr style="font-weight: bold;text-align:center">
@@ -93,7 +56,7 @@
               <td>{{row.ItemName}}</td>
               <td>{{row.SupplierBillNo}}</td>
               <td>{{row.ReturnQuantity}}</td>
-              <td>{{row.ItemRate | number : "1.2-2"}}</td>
+              <td>{{row.ReturnItemRate | number : "1.2-2"}}</td>
               <td>{{row.SubTotal | number: '1.2-2'}}</td>
               <td>{{row.DiscountAmount | number: '1.2-2'}}</td>
               <td>{{row.VATAmount | number: '1.2-2'}}</td>
@@ -153,3 +116,4 @@
     </a>
   </div>
 </div>
+<app-print-page *ngIf="showPrint" [print-data-header]="printDetaiils"></app-print-page>

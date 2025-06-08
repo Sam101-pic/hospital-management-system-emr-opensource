@@ -21,7 +21,8 @@
           <i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject">Incentive Patient Vs Service Report</span>
         </div>
         <div class="col-md-6">
-          <from-to-date-select (on-change)="OnDateRangeChange($event)">
+          <from-to-date-select (on-change)="OnDateRangeChange($event)"
+                               [date-settings-name]="'inctv-txns'">
           </from-to-date-select>
         </div>
         <div class="col-md-4">

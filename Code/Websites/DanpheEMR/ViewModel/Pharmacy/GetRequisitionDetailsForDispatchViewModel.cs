@@ -48,7 +48,7 @@ namespace DanpheEMR.ViewModel.Pharmacy
             foreach (var item in requisition.RequisitionItems)
             {
                 //find the available stock
-                item.AvailableStockList = await (from S in db.StoreStocks.Where(s => s.StoreId == mainStoreId && s.ItemId == item.ItemId && s.IsActive == true && s.AvailableQuantity > 0)
+                item.AvailableStockList = await (from S in db.StoreStocks.Where(s => s.StoreId == mainStoreId && s.ItemId == item.ItemId && s.IsActive == true && s.AvailableQuantity > 0 && s.StockMaster.ExpiryDate >= DateTime.Now)
                                                  group S by new { S.StockMaster.BatchNo, S.StockMaster.ExpiryDate, S.StockMaster.SalePrice, S.StockMaster.CostPrice } into SGrouped
                                                  orderby SGrouped.Key.ExpiryDate
                                                  select new AvailableStockDto

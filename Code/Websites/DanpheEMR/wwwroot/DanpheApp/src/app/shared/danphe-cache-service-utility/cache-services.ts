@@ -1,27 +1,27 @@
-import { HttpClient, HttpHeaders, HttpXhrBackend } from "@angular/common/http"
-import { map } from 'rxjs/operators';
+import { HttpClient, HttpHeaders, HttpXhrBackend } from "@angular/common/http";
 import { Injectable } from '@angular/core';
-import { resolve, reject } from "q";
+import { map } from 'rxjs/operators';
 import { ENUM_LocalStorageKeys } from "../shared-enums";
 export enum MasterType {
   Country = "country",
   ICD = "icd",
   Employee = "employee",
-  BillingCounter="BillingCounter",
-  PhrmCounter="PhrmCounter",
-  SubDivision="SubDivision",
-  AllMasters="allMasters",   // including departments,taxes,servicesDepartments.
-  COA="coa",//mumbai-team-june2021-danphe-accounting-cache-change
-  VoucherType="voucherType", //mumbai-team-june2021-danphe-accounting-cache-change
-  VoucherHead="voucherHead",//mumbai-team-june2021-danphe-accounting-cache-change
-  PrimaryGroup="primaryGroup",//mumbai-team-june2021-danphe-accounting-cache-change
-  CodeDetails="codeDetails",//mumbai-team-june2021-danphe-accounting-cache-change
-  AuditReportType="auditReportType",//mumbai-team-june2021-danphe-accounting-cache-change
-  LedgerGroups="ledgerGroups",//mumbai-team-june2021-danphe-accounting-cache-change
-  Ledgers="ledgers",//mumbai-team-june2021-danphe-accounting-cache-change
-  LedgersAll="ledgersAll",//mumbai-team-june2021-danphe-accounting-cache-change
-  SubLedgerAll ="SubLedgerAll",
-  CostCenters = "CostCenters"
+  BillingCounter = "BillingCounter",
+  PhrmCounter = "PhrmCounter",
+  SubDivision = "SubDivision",
+  AllMasters = "allMasters",   // including departments,taxes,servicesDepartments.
+  COA = "coa",//mumbai-team-june2021-danphe-accounting-cache-change
+  VoucherType = "voucherType", //mumbai-team-june2021-danphe-accounting-cache-change
+  VoucherHead = "voucherHead",//mumbai-team-june2021-danphe-accounting-cache-change
+  PrimaryGroup = "primaryGroup",//mumbai-team-june2021-danphe-accounting-cache-change
+  CodeDetails = "codeDetails",//mumbai-team-june2021-danphe-accounting-cache-change
+  AuditReportType = "auditReportType",//mumbai-team-june2021-danphe-accounting-cache-change
+  LedgerGroups = "ledgerGroups",//mumbai-team-june2021-danphe-accounting-cache-change
+  Ledgers = "ledgers",//mumbai-team-june2021-danphe-accounting-cache-change
+  LedgersAll = "ledgersAll",//mumbai-team-june2021-danphe-accounting-cache-change
+  SubLedgerAll = "SubLedgerAll",
+  CostCenters = "CostCenters",
+  Hospitals = "Hospitals"
 }
 const httpClient = new HttpClient(new HttpXhrBackend({ build: () => new XMLHttpRequest() }));
 
@@ -63,7 +63,6 @@ export class DanpheCache {
           var ICD = this.getservice(type, null);
           return ICD;
         }
-          break;
         case MasterType.Employee: {
           var Employee = this.getservice(type, null);        //get employee data from  api completed
         }
@@ -72,22 +71,18 @@ export class DanpheCache {
           var Employee = this.getservice(type, null);            //get counter data from billing api completed
           return Employee;
         }
-          break;
         case MasterType.PhrmCounter: {
           var PhrmCounter = this.getservice(type, null);          //get counter data from phamracy api completed
           return PhrmCounter;
         }
-          break;
         case MasterType.SubDivision: {
           var subdivisions = this.getservice(type, null);         //get subdivision data from settings api completed
           return subdivisions;
         }
-          break;
         case MasterType.AllMasters: {
           var subdivisions = this.getservice(type, null);         //get data from master api like departments, taxes,serivce departmens.
           return subdivisions;
         }
-          break;
       }
 
     }
@@ -131,7 +126,7 @@ export class DanpheCache {
       }
         break;
       case MasterType.BillingCounter: {
-         url = '/api/billing/BillingCounters';
+        url = '/api/billing/BillingCounters';
       }
         break;
       case MasterType.SubDivision: {
@@ -162,52 +157,46 @@ export class DanpheCache {
           var res = await this.getAccService(type, null)
           return res;
         }
-          break;
         case MasterType.VoucherHead: {
           var res = await this.getAccService(type, null)
           return res;
         }
-          break;
         case MasterType.Ledgers: {
           var res = await this.getAccService(type, null)
           return res;
         }
-          break;
         case MasterType.LedgerGroups: {
           var res = await this.getAccService(type, null)
           return res;
         }
-          break;
         case MasterType.PrimaryGroup: {
           var res = await this.getAccService(type, null)
           return res;
         }
-          break;
         case MasterType.CodeDetails: {
           var res = await this.getAccService(type, null)
           return res;
         }
-          break;
         case MasterType.COA: {
           var res = await this.getAccService(type, null)
           return res;
         }
-          break;
         case MasterType.LedgersAll: {
           var res = await this.getAccService(type, null)
           return res;
         }
-        break;
         case MasterType.SubLedgerAll: {
-          let res = await this.getAccService(type,null)
+          let res = await this.getAccService(type, null)
           return res;
         }
-        break;
         case MasterType.CostCenters: {
           let res = await this.getAccService(type, null);
           return res;
         }
-        break;
+        case MasterType.Hospitals: {
+          let res = await this.getAccService(type, null);
+          return res;
+        }
       }
 
     }
@@ -266,13 +255,17 @@ export class DanpheCache {
         url = '/api/AccountingSettings/LedgersList';
       }
         break;
-        case MasterType.SubLedgerAll: {
-          url = `/api/AccountingSettings/GetSubLedgers`;
-        }
+      case MasterType.SubLedgerAll: {
+        url = `/api/AccountingSettings/GetSubLedgers`;
+      }
         break;
-        case MasterType.CostCenters: {
-          url = `/api/AccountingSettings/CostCenters`;
-        }
+      case MasterType.CostCenters: {
+        url = `/api/AccountingSettings/CostCenters`;
+      }
+        break;
+      case MasterType.Hospitals: {
+        url = `/api/Accounting/Hospitals`;
+      }
         break;
     }
 

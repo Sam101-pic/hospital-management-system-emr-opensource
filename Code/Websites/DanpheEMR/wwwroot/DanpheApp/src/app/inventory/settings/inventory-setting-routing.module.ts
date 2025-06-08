@@ -1,20 +1,19 @@
 import { NgModule } from '@angular/core';
 import { RouterModule } from "@angular/router";
-import { VendorListComponent } from './vendors/vendor-list';
-import { ItemCategoryListComponent } from './itemcategory/item-category-list';
+import { PageNotFound } from '../../404-error/404-not-found.component';
+import { InvoiceHeaderListComponent } from '../../shared/invoice-header/invoice-header-list.component';
 import { AccountHeadListComponent } from './accounthead/account-head-list.component';
-import { PackagingTypeListComponent } from './packagingtype/packaging-type-list';
-import { UnitOfMeasurementListComponent } from './unitofmeasurement/unit-of-measurement-list';
-import { ItemListComponent } from './item/item-list';
+import { CompanyListComponent } from './company/company-list.component';
+import { ConsumptionTypeListComponent } from './consumption-type/consumption-type-list.component';
 import { CurrencyListComponent } from './currency/currency-list';
 import { InventorySettingsComponent } from './inventory-settings.component';
-import { CompanyListComponent } from './company/company-list.component';
-import { TermsListComponent } from './termsconditions/terms-list.component';
+import { ItemListComponent } from './item/item-list';
 import { ItemSubCategoryListComponent } from './itemsubcategory/item-subcategory-list';
-import { ENUM_TermsApplication } from '../../shared/shared-enums';
-import { InvoiceHeaderListComponent } from '../../shared/invoice-header/invoice-header-list.component';
-import { PageNotFound } from '../../404-error/404-not-found.component';
 import { OtherChargesListComponent } from './othercharges/other-charges-list/other-charges-list.component';
+import { PackagingTypeListComponent } from './packagingtype/packaging-type-list';
+import { TermsListComponent } from './termsconditions/terms-list.component';
+import { UnitOfMeasurementListComponent } from './unitofmeasurement/unit-of-measurement-list';
+import { VendorListComponent } from './vendors/vendor-list';
 
 @NgModule({
   imports: [
@@ -36,7 +35,8 @@ import { OtherChargesListComponent } from './othercharges/other-charges-list/oth
           { path: 'sub-category-list', component: ItemSubCategoryListComponent },
           { path: 'InvoiceHeaders/:module', component: InvoiceHeaderListComponent },
           { path: 'other-charges', component: OtherChargesListComponent },
-          { path: "**", component: PageNotFound}
+          { path: 'ConsumptionTypes', component: ConsumptionTypeListComponent },
+          { path: "**", component: PageNotFound }
         ]
       }
     ])

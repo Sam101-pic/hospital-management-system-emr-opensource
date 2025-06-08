@@ -150,6 +150,8 @@ namespace DanpheEMR.ServerModel
         [NotMapped]
         public int? ProvisionalReturnItemId { get; set; } //Krishna, 9thJuly'23, This added just to return the Property to client.
         public bool IsProvisionalDischarge { get; set; } //Krishna, 29thAug'23, This will track Provisional Discharge
+        public bool? IsBedChargeQuantityEdited { get; set; }//Krishna, 30thApril, 24, This is added to track the bed charge quantity edit, and made nullable here in order to avoid run time errors that may come after the addition of a new column
+        public DateTime? BedChargeQuantityEditedDate { get; set; }//Krishna, 30thApril, 24, This is added to track the bed charge quantity edit,
 
         public BillingTransactionItemModel()
         {

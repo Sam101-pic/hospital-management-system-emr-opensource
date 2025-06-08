@@ -1,5 +1,4 @@
-import { Injectable, Directive } from '@angular/core';
-import * as _ from 'lodash';
+import { Injectable } from '@angular/core';
 import { LabLISDLService } from './lis.dl.service';
 //import { LabVendorsModel } from '../external-labs/vendors/lab-vendors.model';
 
@@ -33,8 +32,8 @@ export class LabLISBLService {
             map(res => { return res });
     }
 
-    GetAllMachineResult(machineNumber: number, fromDate : Date, toDate : Date) {
-        return this.labLISDlServ.GetAllMachineResult(machineNumber,fromDate,toDate).
+    GetAllMachineResult(machineNumber: number, fromDate: Date, toDate: Date) {
+        return this.labLISDlServ.GetAllMachineResult(machineNumber, fromDate, toDate).
             map(res => { return res });
     }
 
@@ -59,6 +58,12 @@ export class LabLISBLService {
 
     RemoveLisMapping(id: number) {
         return this.labLISDlServ.RemoveLisMapping(id).map((res) => {
+            return res;
+        });
+    }
+
+    ActivateMapping(id: number) {
+        return this.labLISDlServ.ActivateMapping(id).map((res) => {
             return res;
         });
     }

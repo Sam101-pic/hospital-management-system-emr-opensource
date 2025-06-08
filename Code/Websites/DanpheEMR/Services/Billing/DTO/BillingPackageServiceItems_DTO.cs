@@ -11,5 +11,6 @@ namespace DanpheEMR.Services.Billing.DTO
         public double Quantity { get; set; }
         public int? PerformerId { get; set; }
         public bool IsActive { get; set; }
+        public decimal Price { get; set; }
     }
 }

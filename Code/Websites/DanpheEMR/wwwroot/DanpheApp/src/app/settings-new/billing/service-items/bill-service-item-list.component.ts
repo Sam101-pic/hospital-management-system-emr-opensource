@@ -33,6 +33,7 @@ export class BillServiceItemListComponent {
   public update: boolean;
   public ServiceCategoryList: Array<ServiceCategories> = new Array<ServiceCategories>();
   public selectedServiceCategory: ServiceCategories;
+  ShowFilterAndExport: boolean = false;
 
   constructor(public settingsBLService: SettingsBLService,
     public settingsServ: SettingsService,
@@ -44,7 +45,7 @@ export class BillServiceItemListComponent {
   ) {
 
     this.setBillItmGriColumns = new SettingsGridColumnSettings(this.coreService.taxLabel, this.securityService);
-    this.billingItemGridColumns = this.setBillItmGriColumns.BillingServiceItemList
+    this.billingItemGridColumns = this.setBillItmGriColumns.BillingServiceItemList;
     this.getServiceItemList();
     this.IntegrationNameList();
     this.GetServiceCategories();
@@ -96,7 +97,15 @@ export class BillServiceItemListComponent {
     this.changeDetector.detectChanges();
     this.showAddPage = true;
   }
+  OpenFilterExportModal() {
+    this.ShowFilterAndExport = false;
+    this.changeDetector.detectChanges();
+    this.ShowFilterAndExport = true;
+  }
 
+  GetDataFromAdd($event) {
+    this.ShowFilterAndExport = false;
+  }
   CallBackAdd($event) {
     if ($event != null) {
       let action = $event.action;
@@ -132,7 +141,7 @@ export class BillServiceItemListComponent {
       let proceed: boolean = true;
 
       if (currBillItem.IsActive) {
-        proceed = window.confirm("This item will stop to show in Billing-Search. Are you sure you want to proceed ?")
+        proceed = window.confirm("This item will stop to show in Billing-Search. Are you sure you want to proceed ?");
       }
 
       if (proceed) {

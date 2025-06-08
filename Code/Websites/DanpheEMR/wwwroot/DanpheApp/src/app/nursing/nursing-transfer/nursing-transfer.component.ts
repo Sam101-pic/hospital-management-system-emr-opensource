@@ -1,12 +1,13 @@
 import { Component } from "@angular/core";
-import { MessageboxService } from "../../shared/messagebox/messagebox.service";
-import { SecurityService } from "../../security/shared/security.service";
-import { VisitService } from "../../appointments/shared/visit.service";
-import { PatientService } from "../../patients/shared/patient.service";
-import { NursingBLService } from "../shared/nursing.bl.service";
 import { Router } from "@angular/router";
 import { ADT_BLService } from "../../adt/shared/adt.bl.service";
+import { VisitService } from "../../appointments/shared/visit.service";
+import { PatientService } from "../../patients/shared/patient.service";
+import { SecurityService } from "../../security/shared/security.service";
 import { DanpheHTTPResponse } from "../../shared/common-models";
+import { MessageboxService } from "../../shared/messagebox/messagebox.service";
+import { ENUM_DanpheHTTPResponses } from "../../shared/shared-enums";
+import { NursingBLService } from "../shared/nursing.bl.service";
 
 @Component({
   templateUrl: "./nursing-transfer.html",
@@ -55,14 +56,18 @@ export class NursingTransferComponent {
   }
 
   ngOnInit() {
+    this.LoadDepartments();
     this.GetADTPatientByPatVisitId();
   }
 
   GetADTPatientByPatVisitId() {
     this.nursingBlService.GetADTDataByVisitId(this.visitId).subscribe(
-      (res) => {
-        if (res.Status == "OK") {
-          this.selectedBedInfo = res.Results;
+      (res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+          const adtInformation = res.Results;
+          if (adtInformation && adtInformation.length === 1) {
+            this.selectedBedInfo = res.Results[0];
+          }
           this.showTransferPage = true;
         } else {
           this.msgBoxServ.showMessage("error", [res.ErrorMessage]);

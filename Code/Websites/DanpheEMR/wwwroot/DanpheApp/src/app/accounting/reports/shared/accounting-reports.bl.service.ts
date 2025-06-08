@@ -13,9 +13,9 @@ export class AccountingReportsBLService {
 
 
     //START: GET Report Data
-    public GetBalanceSheetReportData(selectedDate, fiscalYearId) {
+    public GetBalanceSheetReportData(selectedDate, fiscalYearId, hospitalId) {
         try {
-            return this.accountReportDlService.GetBalanceSheetReportData(selectedDate, fiscalYearId)
+            return this.accountReportDlService.GetBalanceSheetReportData(selectedDate, fiscalYearId, hospitalId)
                 .map((responseData) => {
                     return responseData;
                 });
@@ -24,20 +24,20 @@ export class AccountingReportsBLService {
         }
     }
 
-    public GetTrailBalanceReport(fromDate: string, toDate: string, fiscalYearId) {
-        return this.accountReportDlService.GetTrailBalanceReport(fromDate, toDate, fiscalYearId).map(res => {
+    public GetTrailBalanceReport(fromDate: string, toDate: string, fiscalYearId, hospitalId) {
+        return this.accountReportDlService.GetTrailBalanceReport(fromDate, toDate, fiscalYearId, hospitalId).map(res => {
             return res;
         });
     }
 
-    public GetGroupStatementReport(fromDate: string, toDate: string, fiscalYearId: number, ledgerGroupId: number) {
-        return this.accountReportDlService.GetGroupStatementReport(fromDate, toDate, fiscalYearId, ledgerGroupId).map(res => {
+    public GetGroupStatementReport(fromDate: string, toDate: string, fiscalYearId: number, ledgerGroupId: number, hospitalId: number) {
+        return this.accountReportDlService.GetGroupStatementReport(fromDate, toDate, fiscalYearId, ledgerGroupId, hospitalId).map(res => {
             return res;
         });
     }
 
-    public GetProfitLossReport(fromDt, toDt, fiscalYearId) {
-        return this.accountReportDlService.GetProfitLossReport(fromDt, toDt, fiscalYearId).map(res => {
+    public GetProfitLossReport(fromDt, toDt, fiscalYearId, hospitalId) {
+        return this.accountReportDlService.GetProfitLossReport(fromDt, toDt, fiscalYearId, hospitalId).map(res => {
             return res;
         });
     }
@@ -49,15 +49,15 @@ export class AccountingReportsBLService {
     //         );
     // }
 
-    public GetVoucherReport(fromDate: string, toDate: string, sectionId, fiscalYearId) {
-        return this.accountReportDlService.GetVoucherReport(fromDate, toDate, sectionId, fiscalYearId)
+    public GetVoucherReport(fromDate: string, toDate: string, sectionId, fiscalYearId, hospitalId) {
+        return this.accountReportDlService.GetVoucherReport(fromDate, toDate, sectionId, fiscalYearId, hospitalId)
             .map((responseData) => {
                 return responseData;
             });
     }
 
-    public GetSystemAuditReport(fromDate: string, toDate: string, voucherType: string, sectionId: number) {
-        return this.accountReportDlService.GetSystemAuditReport(fromDate, toDate, voucherType, sectionId)
+    public GetSystemAuditReport(fromDate: string, toDate: string, voucherType: string, sectionId: number, hospitalId: number) {
+        return this.accountReportDlService.GetSystemAuditReport(fromDate, toDate, voucherType, sectionId, hospitalId)
             .map((responseData) => {
                 return responseData;
             });
@@ -83,8 +83,8 @@ export class AccountingReportsBLService {
                 return responseData;
             });
     }
-    public GetLedgerReport(ledgerId: number, fromDate: string, toDate: string, fiscalYearId) {
-        return this.accountReportDlService.GetLedgerReport(ledgerId, fromDate, toDate, fiscalYearId)
+    public GetLedgerReport(ledgerId: number, fromDate: string, toDate: string, fiscalYearId, hospitalId) {
+        return this.accountReportDlService.GetLedgerReport(ledgerId, fromDate, toDate, fiscalYearId, hospitalId)
             .map((responseData) => {
                 return responseData;
             });
@@ -96,9 +96,9 @@ export class AccountingReportsBLService {
                 return res;
             })
     }
-    public GetCashFlowReportData(fromDt, toDt, fiscalYearId) {
+    public GetCashFlowReportData(fromDt, toDt, fiscalYearId, hospitalId) {
         try {
-            return this.accountReportDlService.GetCashFlowReportData(fromDt, toDt, fiscalYearId)
+            return this.accountReportDlService.GetCashFlowReportData(fromDt, toDt, fiscalYearId, hospitalId)
                 .map((responseData) => {
                     return responseData;
                 });
@@ -106,8 +106,8 @@ export class AccountingReportsBLService {
             throw exception;
         }
     }
-    public GetDailyTxnReport(frmDt: string, toDt: string) {
-        return this.accountReportDlService.GetDailyTxnReport(frmDt, toDt).map(res => {
+    public GetDailyTxnReport(frmDt: string, toDt: string, hospitalid: number) {
+        return this.accountReportDlService.GetDailyTxnReport(frmDt, toDt, hospitalid).map(res => {
             return res
         });
     }
@@ -137,8 +137,8 @@ export class AccountingReportsBLService {
     }
 
     //END: GET Report Data
-    public GetBankReconcillationReport(ledgerId: number, fromDate: string, toDate: string, fiscalYearId, voucherTypeId: number, status: number) {
-        return this.accountReportDlService.GetBankReconcillationReport(ledgerId, fromDate, toDate, fiscalYearId, voucherTypeId, status)
+    public GetBankReconcillationReport(ledgerId: number, fromDate: string, toDate: string, fiscalYearId, voucherTypeId: number, status: number, subLedgerId: number) {
+        return this.accountReportDlService.GetBankReconcillationReport(ledgerId, fromDate, toDate, fiscalYearId, voucherTypeId, status, subLedgerId)
             .map((responseData) => {
                 return responseData;
             });
@@ -163,15 +163,15 @@ export class AccountingReportsBLService {
             });
     }
 
-    public GetCashBankBookReport(fromDate: string, toDate: string, fiscalYearId, lederIds: Array<Number>) {
-        return this.accountReportDlService.GetCashBankBookReport(fromDate, toDate, fiscalYearId, lederIds.toString())
+    public GetCashBankBookReport(fromDate: string, toDate: string, fiscalYearId, lederIds: Array<Number>, hospitalId: number) {
+        return this.accountReportDlService.GetCashBankBookReport(fromDate, toDate, fiscalYearId, lederIds.toString(), hospitalId)
             .map(res => {
                 return res;
             })
     }
 
-    public GetDayBookReport(fromDate: string, toDate: string, fiscalYearId, ledgerId: number) {
-        return this.accountReportDlService.GetDayBookReport(fromDate, toDate, fiscalYearId, ledgerId)
+    public GetDayBookReport(fromDate: string, toDate: string, fiscalYearId, ledgerId: number, HospitalId: number) {
+        return this.accountReportDlService.GetDayBookReport(fromDate, toDate, fiscalYearId, ledgerId, HospitalId)
             .map(res => {
                 return res;
             })
@@ -190,8 +190,42 @@ export class AccountingReportsBLService {
                 return responseData;
             });
     }
-    public GetAccountHeadDetailReport() {
-        return this.accountReportDlService.GetAccountHeadDetailReport()
+    public GetAccountHeadDetailReport(hospitalId: number) {
+        return this.accountReportDlService.GetAccountHeadDetailReport(hospitalId)
             .map(res => { return res });
     }
+    public GetAllLedgerGroups() {
+        return this.accountReportDlService.GetAllLedgerGroups()
+            .map(res => { return res });
+    }
+    public GetAllLedgers() {
+        return this.accountReportDlService.GetAllLedgers()
+            .map(res => { return res });
+    }
+    public GetAllSubLedger() {
+        return this.accountReportDlService.GetAllSubLedger()
+            .map(res => { return res });
+    }
+    public GetAllCodeDetails() {
+        return this.accountReportDlService.GetAllCodeDetails()
+            .map(res => { return res });
+    }
+    public GetAllSections() {
+        return this.accountReportDlService.GetAllSections()
+            .map(res => { return res });
+    }
+    public GetAgeingReport(numberOfInterval: number, intervalDuration: number, sectionIds: string, isVendorBillWiseTxn: boolean) {
+        return this.accountReportDlService.GetAgeingReport(numberOfInterval, intervalDuration, sectionIds, isVendorBillWiseTxn)
+            .map(res => { return res });
+    }
+    public GetAgeingReportDetailView(SectionId: number, FromDate: string, ToDate: string, SupplierId: number, isVendorBillWiseTxn: boolean) {
+        return this.accountReportDlService.GetAgeingReportDetailView(SectionId, FromDate, ToDate, SupplierId, isVendorBillWiseTxn)
+            .map(res => { return res });
+    }
+    GetTransactionWiseAgeingReportView() {
+        return this.accountReportDlService.GetTransactionWiseAgeingReportView().map(res => {
+            return res;
+        });
+    }
+
 }

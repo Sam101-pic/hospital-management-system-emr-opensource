@@ -1,7 +1,7 @@
-import { Component } from '@angular/core'
+import { Component } from '@angular/core';
 import { SecurityService } from '../../security/shared/security.service';
 @Component({
-    templateUrl: "./emp-settings-main.html"
+  templateUrl: "./emp-settings-main.html"
 })
 export class EmpSettingsMainComponent {
   validRoutes: any;

@@ -11,6 +11,7 @@ import { SecurityService } from "../../security/shared/security.service";
 import { CallbackService } from "../../shared/callback.service";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
 import { RouteFromService } from "../../shared/routefrom.service";
+import { ENUM_VitalVerbalScale, ENUM_VitalsEyeScale, ENUM_VitalsMotorScale } from "../../shared/shared-enums";
 import { DoctorsBLService } from "../shared/doctors.bl.service";
 
 @Component({
@@ -178,7 +179,65 @@ export class PatientOverviewComponent {
       this.CreateChart();
     }
   }
+  MapVitalData(currentPatient) {
 
+    this.currentPatient.Vitals.forEach((vitals) => {
+      if (vitals.Eyes) {
+        vitals.Eyes = this.MapEyeScale(vitals.Eyes);
+      }
+      if (vitals.Motor) {
+        vitals.Motor = this.MapMotorScale(vitals.Motor);
+      }
+      if (vitals.Verbal) {
+        vitals.Verbal = this.MapVerbalScale(vitals.Verbal);
+      }
+    });
+  }
+  MapEyeScale(value: string): string {
+    switch (value) {
+      case ENUM_VitalsEyeScale.Scale1:
+        return "1";
+      case ENUM_VitalsEyeScale.Scale2:
+        return "2";
+      case ENUM_VitalsEyeScale.Scale3:
+        return "3";
+      case ENUM_VitalsEyeScale.Scale4:
+        return "4";
+      default:
+    }
+  }
+  MapMotorScale(value: string): string {
+    switch (value) {
+      case ENUM_VitalsMotorScale.Scale1:
+        return "1";
+      case ENUM_VitalsMotorScale.Scale2:
+        return "2";
+      case ENUM_VitalsMotorScale.Scale3:
+        return "3";
+      case ENUM_VitalsMotorScale.Scale4:
+        return "4";
+      case ENUM_VitalsMotorScale.Scale5:
+        return "5";
+      case ENUM_VitalsMotorScale.Scale6:
+        return "6";
+      default:
+    }
+  }
+  MapVerbalScale(value: string): string {
+    switch (value) {
+      case ENUM_VitalVerbalScale.Scale1:
+        return "1";
+      case ENUM_VitalVerbalScale.Scale2:
+        return "2";
+      case ENUM_VitalVerbalScale.Scale3:
+        return "3";
+      case ENUM_VitalVerbalScale.Scale4:
+        return "4";
+      case ENUM_VitalVerbalScale.Scale5:
+        return "5";
+      default:
+    }
+  }
   CreateChart() {
     var Date: Array<any> = new Array<any>();
     var BMI: Array<any> = new Array<any>();
@@ -325,6 +384,7 @@ export class PatientOverviewComponent {
       //pat.ImagingReports = retPatient.ImagingReports;
       pat.ImagingItemRequisitions = retPatient.ImagingItemRequisitions;
       this.currentPatient = this.patientservice.getGlobal();
+      this.MapVitalData(this.currentPatient);
 
       this.currentPatient["MedAllergy"] = retPatient.Allergies.filter(
         (a) => a.AllergyType == "Medication"

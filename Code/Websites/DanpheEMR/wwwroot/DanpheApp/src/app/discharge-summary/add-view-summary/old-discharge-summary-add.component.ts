@@ -20,6 +20,7 @@ import { SettingsBLService } from "../../settings-new/shared/settings.bl.service
 import { CommonFunctions } from "../../shared/common.functions";
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { ENUM_MessageBox_Status } from "../../shared/shared-enums";
+import { TempDischargeTemplate } from "../add/discharge-summary-add.component";
 import { DischargeSummaryBLService } from '../shared/discharge-summary.bl.service';
 
 @Component({
@@ -41,7 +42,7 @@ import { DischargeSummaryBLService } from '../shared/discharge-summary.bl.servic
   templateUrl: './old-discharge-summary-add.html',
 })
 export class OldDischargeSummaryAddComponent {
-  public CurrentDischargeSummary: DischargeSummary = new DischargeSummary();
+  public CurrentDischargeSummary: TempDischargeTemplate = new TempDischargeTemplate();
 
   @Input("selectedDischarge")
   public selectedDischarge: any;
@@ -589,7 +590,7 @@ export class OldDischargeSummaryAddComponent {
   GetDischargeSummary(res) {
     if (res.Status == 'OK') {
       if (res.Results) {
-        this.CurrentDischargeSummary = new DischargeSummary();
+        this.CurrentDischargeSummary = new TempDischargeTemplate();
         this.CurrentDischargeSummary = Object.assign(this.CurrentDischargeSummary, res.Results.DischargeSummary);
         if (this.CurrentDischargeSummary.DischargeConditionId) {
           this.FilteredDischargeConditions = this.dischargeCondition.filter(a => a.DischargeTypeId == this.CurrentDischargeSummary.DischargeConditionId);
@@ -697,7 +698,7 @@ export class OldDischargeSummaryAddComponent {
       }
       else {
         this.update = false;
-        this.CurrentDischargeSummary = new DischargeSummary();
+        this.CurrentDischargeSummary = new TempDischargeTemplate();
         this.CurrentDischargeSummary.PatientVisitId = this.selectedDischarge.PatientVisitId;
         this.CurrentDischargeSummary.PatientId = this.selectedDischarge.patientId;
         this.CurrentDischargeSummary.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;

@@ -10,6 +10,8 @@ import { NursingBLService } from "../shared/nursing.bl.service";
 import * as moment from "moment/moment";
 import { ADT_DLService } from "../../adt/shared/adt.dl.service";
 import { Ward } from "../../adt/shared/ward.model";
+import { ClinicalPatientService } from "../../clinical-new/shared/clinical-patient.service";
+import { PatientDetails_DTO } from "../../clinical-new/shared/dto/patient-cln-detail.dto";
 import { CoreService } from "../../core/shared/core.service";
 import { InPatientVM } from "../../labs/shared/InPatientVM";
 import { PHRMPatientConsumption_DTO } from "../../pharmacy/patient-consumption/shared/phrm-patient-consumption.dto";
@@ -23,7 +25,7 @@ import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../shar
 import GridColumnSettings from "../../shared/danphe-grid/grid-column-settings.constant";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
 import { APIsByType } from "../../shared/search.service";
-import { ENUM_DanpheHTTPResponses } from "../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_EscapeKey } from "../../shared/shared-enums";
 import { NursingDLService } from "../shared/nursing.dl.service";
 
 
@@ -37,6 +39,7 @@ import { NursingDLService } from "../shared/nursing.dl.service";
       }
     `,
   ],
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class NursingInPatientComponent {
   public Timer: any;
@@ -139,7 +142,8 @@ export class NursingInPatientComponent {
     public coreService: CoreService,
     public securityService: SecurityService,
     public admissionBLService: ADT_DLService,
-    public pharmacyBLService: PharmacyBLService
+    public pharmacyBLService: PharmacyBLService,
+    private _selectedPatientService: ClinicalPatientService,
   ) {
     this.fromDate = moment().format("YYYY-MM-DD");
     this.toDate = moment().format("YYYY-MM-DD");
@@ -169,7 +173,7 @@ export class NursingInPatientComponent {
     this.patientConsumptionListColumn = GridColumnSettings.PatientConsumptionListColumn;
     this.WardId = this.securityService.getActiveWard().WardId;
 
-    this.GetStoreAssociatedWithWard(this.WardId)
+    this.GetStoreAssociatedWithWard(this.WardId);
   }
   ngOnDestroy() {
     clearInterval(this.Timer);
@@ -218,7 +222,7 @@ export class NursingInPatientComponent {
                       (a) => a.PatientVisitId == this.FavoritePatientIds[i]
                     )
                   );
-                  this.FavoritePatients = favpat.filter(a => a.IsPoliceCase == true)
+                  this.FavoritePatients = favpat.filter(a => a.IsPoliceCase == true);
                 } else {
                   this.FavoritePatients = this.FavoritePatients.concat(
                     this.ipdList.filter(
@@ -324,9 +328,7 @@ export class NursingInPatientComponent {
       case "patient-overview":
         {
           if ($event.Data) {
-            this.SetPatDataToGlobal($event.Data);
-            this.routeFromSrv.RouteFrom = "nursing";
-            this.router.navigate(["/Nursing/PatientOverviewMain"]);
+            this.RouteToNewPatientOverview($event.Data);
           }
         }
         break;
@@ -335,7 +337,12 @@ export class NursingInPatientComponent {
         {
           if ($event.Data) {
             this.SetPatDataToGlobal($event.Data);
+            const updatedPatient = new PatientDetails_DTO();
+            updatedPatient.PatientId = $event.Data.PatientId;
+            updatedPatient.PatientVisitId = $event.Data.PatientVisitId;
+            this._selectedPatientService.SelectedPatient = updatedPatient;
             this.showVitalsList = true;
+
           }
         }
         break;
@@ -484,6 +491,30 @@ export class NursingInPatientComponent {
     }
   }
 
+
+  ConcatenateBedDetails(bedFeature: string, bedCode: string): string {
+    return `${bedFeature} /${bedCode}`;
+  }
+  RouteToNewPatientOverview(data) {
+    let currPatient = this._selectedPatientService.GetGlobal();
+    currPatient.PatientId = data.PatientId;
+    currPatient.PatientCode = data.PatientCode;
+    currPatient.Address = data.Address;
+    currPatient.VisitType = data.VisitType;
+    currPatient.PatientVisitId = data.PatientVisitId;
+    currPatient.Age = data.Age;
+    currPatient.AdmittedDate = data.AdmittedDate;
+    currPatient.Name = data.Name;
+    currPatient.PhoneNumber = data.PhoneNumber;
+    currPatient.AdmittingDoctorName = data.AdmittingDoctorName;
+    currPatient.DepartmentName = data.DepartmentName;
+    currPatient.WardId = data.BedInformation.WardId;
+    currPatient.BedId = data.BedInformation.BedId;
+    currPatient.WardBed = this.ConcatenateBedDetails(data.BedInformation.BedFeature, data.BedInformation.BedCode);
+    this._selectedPatientService.SelectedPatient = currPatient;
+    this.router.navigate(['/Nursing/Clinical-Overview']);
+  }
+
   //Place Nursing order against patient
   public SetPatDataToGlobal(data): void {
     this.globalPatient = this.patientService.CreateNewGlobal();
@@ -546,6 +577,11 @@ export class NursingInPatientComponent {
     this.showReceiveNote = false;
   }
 
+  public hotkeys(event: KeyboardEvent) {
+    if (event.key === ENUM_EscapeKey.EscapeKey) {
+      this.showVitalsList = false;
+    }
+  }
   public ReceiveNoteCallback(data) {
     if (data) {
       this.ClosePopUp();
@@ -636,7 +672,7 @@ export class NursingInPatientComponent {
         }
       case "view": {
         if ($event.Data != null) {
-          this.GetConsumptionsOfPatient($event.Data.PatientId, $event.Data.PatientVisitId, this.StoreIds)
+          this.GetConsumptionsOfPatient($event.Data.PatientId, $event.Data.PatientVisitId, this.StoreIds);
           this.showPatientConsumptionList = true;
         }
         break;
@@ -656,7 +692,7 @@ export class NursingInPatientComponent {
     },
       err => {
         this.msgBoxServ.showMessage(ENUM_DanpheHTTPResponses.Failed, ['Failed to get patient consumption list']);
-      })
+      });
   }
 
   ClosePrintPage() {
@@ -667,7 +703,7 @@ export class NursingInPatientComponent {
 
   GetPatientConsumptionList() {
     if (this.WardSubStoreMapList && this.WardSubStoreMapList.length) {
-      let StoreIds = this.WardSubStoreMapList.map(a => a.StoreId).toString()
+      let StoreIds = this.WardSubStoreMapList.map(a => a.StoreId).toString();
 
       this.pharmacyBLService.GetPatientConsumptionsOfNursingWard(StoreIds).subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
@@ -718,7 +754,7 @@ export class NursingInPatientComponent {
       if (res.Status === ENUM_DanpheHTTPResponses.OK) {
         this.WardSubStoreMapList = res.Results;
       }
-    })
+    });
   }
   public ShowDietSheet(): void {
     this.showDietSheet = true;
@@ -785,7 +821,7 @@ export class NursingGridColSetting {
     {
       headerName: "Actions",
       field: "",
-      width: 250,
+      width: 400,
       cellRenderer: this.GetNursingActionsByPermission,
     },
   ];
@@ -910,14 +946,14 @@ export class NursingGridColSetting {
     let policeCase = params.data.IsPoliceCase;
     if (policeCase == true) {
       let template =
-        `<span style="color:red; font-weight:bold;">&nbsp;&nbsp;&nbsp; YES &nbsp;&nbsp;&nbsp;</span>`
-      return template
+        `<span style="color:red; font-weight:bold;">&nbsp;&nbsp;&nbsp; YES &nbsp;&nbsp;&nbsp;</span>`;
+      return template;
     } else {
       let template =
         `
                     <span>&nbsp;&nbsp;&nbsp; NO &nbsp;&nbsp;&nbsp;</span>
-                `
-      return template
+                `;
+      return template;
     }
   }
 }

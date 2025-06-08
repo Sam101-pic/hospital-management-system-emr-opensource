@@ -1,12 +1,11 @@
-﻿import { Component, ChangeDetectorRef, Input, Output, EventEmitter, OnInit } from '@angular/core';
-import { TermsConditionsMasterModel } from '../../shared/terms-conditions-master.model';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { SecurityService } from '../../../security/shared/security.service';
-import { HttpClient } from '@angular/common/http';
+﻿import { HttpClient } from '@angular/common/http';
+import { ChangeDetectorRef, Component, EventEmitter, Input, OnInit, Output, Renderer2 } from '@angular/core';
 import * as _ from 'lodash';
 import * as moment from 'moment';
-import { ENUM_TermsApplication } from '../../../shared/shared-enums';
-import { Renderer2 } from '@angular/core';
+import { SecurityService } from '../../../security/shared/security.service';
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status, ENUM_TermsApplication } from '../../../shared/shared-enums';
+import { TermsConditionsMasterModel } from '../../shared/terms-conditions-master.model';
 
 @Component({
     selector: 'terms-add',
@@ -18,6 +17,8 @@ export class TermsAddComponent implements OnInit {
     public showTermPage: boolean = false;
     @Input("selected-list")
     public selectedTerms: TermsConditionsMasterModel;
+    @Input("allTermsLists")
+    public AllTermsLists = new Array<TermsConditionsMasterModel>();
     @Input("TermsApplicationId")
     public TermsApplicationId: number = ENUM_TermsApplication.Inventory;
     public update: boolean = false;
@@ -71,20 +72,31 @@ export class TermsAddComponent implements OnInit {
             this.CurrentTermsModel.TermsValidators.controls[i].markAsDirty();
             this.CurrentTermsModel.TermsValidators.controls[i].updateValueAndValidity();
         }
-        if (this.CurrentTermsModel.IsValidCheck(undefined, undefined)) {
-            if (!this.CurrentTermsModel.Text) {
-                this.msgBoxServ.showMessage('Error', ["Fill the text area"]);
+
+        if (this.AllTermsLists && this.AllTermsLists.length) {
+            const isShortNameAlreadyExists = this.AllTermsLists.some(a => a.ShortName.toLowerCase() === this.CurrentTermsModel.ShortName.toLowerCase());
+            if (isShortNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Terms And Condition as the Short Name "${this.CurrentTermsModel.ShortName}" already exists!`]);
                 return;
             }
+        }
+
+        if (this.CurrentTermsModel.IsValidCheck(undefined, undefined)) {
+            if (this.areAllRequiredFieldsFilled()) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please Fill all the required Fields"]);
+                return;
+            }
+            this.CurrentTermsModel.Text = this.CurrentTermsModel.Text.trim();
+            this.CurrentTermsModel.ShortName = this.CurrentTermsModel.ShortName.trim();
+            this.CurrentTermsModel.Type = this.CurrentTermsModel.Type.trim();
             this.loading = true;
-            //this.CurrentTermsModel.TermsApplicationEnumId = this.TermsApplicationId;//needs revision..
-            this.CurrentTermsModel.TermsApplicationEnumId = ENUM_TermsApplication.Inventory;
+            this.CurrentTermsModel.TermsApplicationEnumId = this.TermsApplicationId;
             var temp = _.omit(this.CurrentTermsModel, ['TermsValidators']);
             temp = JSON.stringify(temp);
             /*sanjit: 18May'20 : this component is used in both inventory and pharmacy and 
                 there is no service that is shared by these two module,
                 hence, I have written the api call directly here.*/
-            this._http.post<any>("/api/InventorySettings/InventoryTerm", temp)
+            this._http.post<any>("/api/InventorySettings/InventoryTerm", temp).finally(() => this.loading = false)
                 .subscribe(
                     res => {
                         if (res.Status == "OK") {
@@ -92,7 +104,6 @@ export class TermsAddComponent implements OnInit {
                             this.CurrentTermsModel = new TermsConditionsMasterModel();
                             this.CallBackAddTerms(res);
                             this.showTermPage = false;
-                            this.loading = false;
                         }
                     },
                     err => {
@@ -107,7 +118,23 @@ export class TermsAddComponent implements OnInit {
             this.CurrentTermsModel.TermsValidators.controls[i].markAsDirty();
             this.CurrentTermsModel.TermsValidators.controls[i].updateValueAndValidity();
         }
+
+        if (this.AllTermsLists && this.AllTermsLists.length) {
+            const isShortNameAlreadyExists = this.AllTermsLists.some(a => a.ShortName.toLowerCase() === this.CurrentTermsModel.ShortName.toLowerCase() && a.TermsId !== this.CurrentTermsModel.TermsId);
+            if (isShortNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Terms And Condition as the Short Name "${this.CurrentTermsModel.ShortName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.CurrentTermsModel.IsValidCheck(undefined, undefined)) {
+            if (this.areAllRequiredFieldsFilled()) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please Fill all the required Fields"]);
+                return;
+            }
+            this.CurrentTermsModel.Text = this.CurrentTermsModel.Text.trim();
+            this.CurrentTermsModel.ShortName = this.CurrentTermsModel.ShortName.trim();
+            this.CurrentTermsModel.Type = this.CurrentTermsModel.Type.trim();
             this.loading = true;
             if (this.CurrentTermsModel.CreatedOn)
                 this.CurrentTermsModel.CreatedOn = moment(this.CurrentTermsModel.CreatedOn).format("YYYY-MM-DD HH:mm")
@@ -116,7 +143,7 @@ export class TermsAddComponent implements OnInit {
             /*sanjit: 18May'20 : this component is used in both inventory and pharmacy and 
                 there is no service that is shared by these two module,
                 hence, I have written the api call directly here.*/
-            this._http.put<any>("/api/InventorySettings/InventoryTerm", temp)
+            this._http.put<any>("/api/InventorySettings/InventoryTerm", temp).finally(() => this.loading = false)
                 .subscribe(
                     res => {
                         if (res.Status == "OK") {
@@ -124,7 +151,6 @@ export class TermsAddComponent implements OnInit {
                             this.CurrentTermsModel = new TermsConditionsMasterModel();
                             this.CallBackAddTerms(res);
                             this.showTermPage = false;
-                            this.loading = false;
                         }
                     },
                     err => {
@@ -151,5 +177,23 @@ export class TermsAddComponent implements OnInit {
         window.setTimeout(function () {
             document.getElementById(IdToBeFocused).focus();
         }, 20);
+    }
+    isEmpty(value: string): boolean {
+        return !value;
+    }
+
+    isEmptyOrWhitespace(value: string): boolean {
+        return value && !value.trim();
+    }
+
+    areAllRequiredFieldsFilled(): boolean {
+        return (
+            this.isEmpty(this.CurrentTermsModel.Text) ||
+            this.isEmpty(this.CurrentTermsModel.ShortName) ||
+            this.isEmpty(this.CurrentTermsModel.Type) ||
+            this.isEmptyOrWhitespace(this.CurrentTermsModel.Text) ||
+            this.isEmptyOrWhitespace(this.CurrentTermsModel.ShortName) ||
+            this.isEmptyOrWhitespace(this.CurrentTermsModel.Type)
+        );
     }
 }

@@ -29,5 +29,6 @@ namespace DanpheEMR.Services.WardSupply.Inventory.Requisition.DTOs
         public string ItemCategory { get; internal set; }
         public bool IsActive { get; set; }
         public string CancelledByName { get; set; }
+        public string Specification { get; set; }
     }
 }

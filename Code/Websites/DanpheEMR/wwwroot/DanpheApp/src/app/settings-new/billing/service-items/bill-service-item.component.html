@@ -18,7 +18,7 @@
                   <div class="form-group col-md-6">
                     <label class="control-label col-md-4">Service Department<sup>*</sup><b>:</b> </label>
                     <div class="col-md-8">
-                      <div class="div-relative">
+                      <div class="div-relative" *ngIf="srvdeptList && srvdeptList.length">
                         <input id="ServiceDepartmentName" (keyup.enter)="GoToNextInput('ItemName')" danphe-auto-complete
                                [(ngModel)]="selectedSrvDept" class="form-control" [list-formatter]="ServiceDeptListFormatter"
                                [source]="srvdeptList" placeholder="Enter Department Name"
@@ -86,6 +86,8 @@
                         <input type="text" name="" class="form-control" maxlength="10"
                                [(ngModel)]="CurrentBillingItem.ItemCode" id="ItemCode" formControlName="ItemCode"
                                placeholder="Item Code" />
+                        <a *ngIf="!generateItemCodeClicked" (click)="GenerateItemCodeAutomatically()">Generate ItemCode Automatically</a>
+                        <span *ngIf="generateItemCodeClicked">Generating Please wait!!!</span>
                         <span class="color-red font-sm"
                               [hidden]="CurrentBillingItem.IsValidCheck('ItemCode','required') || !(CurrentBillingItem.IsDirty('ItemCode'))">
                           Item Code Is required </span>
@@ -133,6 +135,26 @@
                               [hidden]="CurrentBillingItem.IsValidCheck('IntegrationName','required') || !(CurrentBillingItem.IsDirty('IntegrationName'))">
                           IntegrationName is required. </span>
 
+                        <div *ngIf="ShowLabTestSelection">
+                          <input id="id_inp_settings_lab_tests" danphe-auto-complete
+                                 [(ngModel)]="SelectedLabTest" class="form-control" [list-formatter]="LabTestFormatter"
+                                 [ngModelOptions]="{standalone: true}"
+                                 [source]="LabTests" placeholder="Select LabTest"
+                                 [min-chars]="1"
+                                 display-property-name="LabTestName" value-property-name=null onClick="this.select();"
+                                 (valueChanged)="OnLabTestSelected()" max-num-list="10" />
+                        </div>
+
+                        <div *ngIf="ShowImagingItemSelection">
+                          <input id="id_inp_settings_imaging_items" danphe-auto-complete
+                                 [(ngModel)]="SelectedImagingItem" class="form-control" [list-formatter]="ImagingItemFormatter"
+                                 [ngModelOptions]="{standalone: true}"
+                                 [source]="ImagingMasterItems" placeholder="Select Imaging Item"
+                                 [min-chars]="1"
+                                 display-property-name="ImagingItemName" value-property-name=null onClick="this.select();"
+                                 (valueChanged)="OnImagingItemSelected()" max-num-list="10" />
+                        </div>
+
                       </div>
                     </div>
                   </div>
@@ -174,15 +196,32 @@
 
                       <div class="form-group">
                         <label class="control-label col-md-4" for="IsOT">Is OT ?<b>:</b> </label>
-                        <div class="col-md-8">
+                        <div class="col-md-1">
                           <div class="input-group">
-                            <div class="icheck-inline">
+                            <div class="icheck-inline" style="margin: 0px;">
                               <label class="mt-checkbox mt-checkbox-outline">
                                 <input id="IsOT" name="IsOT" type="checkbox"
                                        value="" [(ngModel)]="CurrentBillingItem.IsOT"
                                        [ngModelOptions]="{standalone: true}">
                                 <span></span>
                               </label>
+                            </div>
+                          </div>
+                        </div>
+                        <div *ngIf="CurrentBillingItem.IsOT" class="col-md-6">
+                          <div class="input-group" style="display: flex; justify-content: flex-end;">
+                            <label>OT Type<sup>*</sup> : </label>
+                            <div class="icheck-inline" style="margin: 0px 0px 0px 10px;">
+                              <label class="mt-checkbox mt-checkbox-outline">
+                                <input name="OTCategories[0].CategoryName" type="radio" [value]="OTCategories[0].CategoryValue"
+                                       [(ngModel)]="SelectedOTCategory"
+                                       [ngModelOptions]="{standalone: true}">
+                                <span></span> {{ OTCategories[0].CategoryName }} </label>
+                              <label class="mt-checkbox mt-checkbox-outline">
+                                <input name="OTCategories[0].CategoryName" type="radio" [value]="OTCategories[1].CategoryValue"
+                                       [(ngModel)]="SelectedOTCategory"
+                                       [ngModelOptions]="{standalone: true}">
+                                <span></span> {{ OTCategories[1].CategoryName }} </label>
                             </div>
                           </div>
                         </div>
@@ -305,13 +344,45 @@
                           </div>
                         </div>
                       </div>
+                      <div class="form-group">
+                        <label class="control-label col-md-4" for=" IsIncentiveApplicable ">
+                          Incentive Applicable ?<b>:</b>
+                        </label>
+                        <div class="col-md-8">
+                          <div class="input-group">
+                            <div class="icheck-inline">
+                              <label class="mt-checkbox mt-checkbox-outline">
+                                <input id=" IsIncentiveApplicable " name=" IsIncentiveApplicable " type="checkbox" value=""
+                                       [(ngModel)]="CurrentBillingItem.IsIncentiveApplicable"
+                                       [ngModelOptions]="{standalone: true}">
+                                <span></span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="control-label col-md-4" for=" IsInsurancePackage ">
+                          <strong>Is Insurance Package ?</strong><b>:</b>
+                        </label>
+                        <div class="col-md-8">
+                          <div class="input-group">
+                            <div class="icheck-inline">
+                              <label class="mt-checkbox mt-checkbox-outline">
+                                <input id="IsInsurancePackage" name=" IsInsurancePackage " type="checkbox" value=""
+                                       [(ngModel)]="CurrentBillingItem.IsInsurancePackage"
+                                       [ngModelOptions]="{standalone: true}">
+                                <span></span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 </div>
-
-
-
-
                 <div class="col-md-12">
                   <div
                        style="background-color: #ebf0fb;margin-bottom: 10px;border: 1px solid;border-radius: 5px !important;padding: 15px;border: 1px solid #d9dee8;">
@@ -327,9 +398,12 @@
                           <th>Legal Name</th>
                           <th>Price Changed Allowed ?</th>
                           <th>Zero Price Allowed ?</th>
-                          <th>Incentive Applicable?</th>
+                          <!-- <th>Incentive Applicable?</th> -->
                           <th>Discount Applicable ?</th>
                           <th>Has Additional Bill Items?</th>
+                          <th>Is Capping Enabled?</th>
+                          <th>Capping Limit Days</th>
+                          <th>Capping Quantity</th>
                           <th *ngIf="update">Action</th>
                         </tr>
                         <tr *ngFor="let row of BillItemsPriceCatMap; let i=index;">
@@ -342,7 +416,6 @@
                               <span style="padding: 5px;">{{ row.PriceCategoryName }}</span>
                             </div>
 
-
                           </td>
 
                           <td>
@@ -350,7 +423,11 @@
                                    [(ngModel)]="row.Price" style="zoom: 1; width:90px"
                                    [ngModelOptions]="{standalone: true}"
                                    (wheel)="coreService.PreventNumberChangeOnScroll($event)" onClick="this.select();"
+                                   min="0"
                                    [disabled]="!row.IsSelected">
+                            <div *ngIf="row.Price < 0" class="error-message">
+                              Price cannot be negative. Please enter a valid amount.
+                            </div>
                           </td>
 
                           <td>
@@ -377,12 +454,12 @@
                           <td>
 
                             <input type="checkbox" id="{{'id_custom_zero_price_allowed_field'+i}}"
-                                   style="zoom: 1.5;margin-top: -4px;" [(ngModel)]="row.IsZeroPriceAllowed"
+                                   style="zoom: 1.5;margin-top: -4px;" [(ngModel)]="row.IsZeroPriceAllowed" onClick="this.select();"
                                    [ngModelOptions]="{standalone: true}" [disabled]="!row.IsSelected">
 
                           </td>
 
-                          <td>
+                          <!-- <td>
 
                             <input type="checkbox" id="{{'id_custom_incentive_applicable'+i}}"
                                    [(ngModel)]="row.IsIncentiveApplicable" [ngModelOptions]="{standalone: true}"
@@ -390,7 +467,7 @@
                                    onClick="this.select();"
                                    [disabled]="!row.IsSelected">
 
-                          </td>
+                          </td> -->
 
                           <td>
 
@@ -405,6 +482,24 @@
                           <td>
                             <input type="checkbox" id="{{'id_has_additional_bill_items_field'+i}}"
                                    style="zoom: 1.5;margin-top: -4px;" [(ngModel)]="row.HasAdditionalBillingItems"
+                                   [ngModelOptions]="{standalone: true}" onClick="this.select();"
+                                   [disabled]="!row.IsSelected">
+                          </td>
+                          <td>
+                            <input type="checkbox" id="{{'id_is_capping_enabled'+i}}"
+                                   style="zoom: 1.5;margin-top: -4px;" [(ngModel)]="row.IsCappingEnabled"
+                                   [ngModelOptions]="{standalone: true}" onClick="this.select();"
+                                   [disabled]="!row.IsSelected">
+                          </td>
+                          <td>
+                            <input type="number" id="{{'id_capping_limiyt_days'+i}}"
+                                   style="zoom: 1; width:90px" [(ngModel)]="row.CappingLimitDays"
+                                   [ngModelOptions]="{standalone: true}" onClick="this.select();"
+                                   [disabled]="!row.IsSelected">
+                          </td>
+                          <td>
+                            <input type="number" id="{{'id_capping_quantity'+i}}"
+                                   style="zoom: 1; width:90px" [(ngModel)]="row.CappingQuantity"
                                    [ngModelOptions]="{standalone: true}" onClick="this.select();"
                                    [disabled]="!row.IsSelected">
                           </td>

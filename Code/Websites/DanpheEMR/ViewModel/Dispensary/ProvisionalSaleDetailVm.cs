@@ -45,5 +45,9 @@ namespace DanpheEMR.ViewModel.Dispensary
         public int? PatientVisitId { get; set; }
         public int? PriceCategoryId { get; set; }
         public int? ReceiptNo { get; set; }
+        public bool IsPharmacySalePriceEditable { get; internal set; }
+        public decimal PreviousSalePrice { get; set; }
+        public int? BillServiceItemId { get; set; }
+        public long? ClaimCode { get; set; }
     }
 }

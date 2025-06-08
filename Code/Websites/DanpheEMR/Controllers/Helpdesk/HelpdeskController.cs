@@ -116,9 +116,8 @@ namespace DanpheEMR.Controllers.HelpDesk
            // if (reqType == "get-allbeds-with-patientsinfo")
            Func<object> func = () => DALFunctions.GetDataTableFromStoredProc("SP_ADT_AllBedsWithPatientsInfo", _helpdeskDbContext);
             return InvokeHttpGetFunction(func);
-        }
-
-
+        } 
+ 
        /* // GET: api/values
         [HttpGet]
         public string Get(string reqType, string status)

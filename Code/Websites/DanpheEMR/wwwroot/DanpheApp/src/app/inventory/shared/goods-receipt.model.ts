@@ -1,12 +1,12 @@
 import {
-  FormGroup,
-  FormControl,
-  Validators,
   FormBuilder,
-} from '@angular/forms'
-import { GoodsReceiptItems } from "./goods-receipt-item.model"
-import { ENUM_GRItemCategory } from "../../shared/shared-enums";
+  FormControl,
+  FormGroup,
+  Validators,
+} from '@angular/forms';
 import * as moment from 'moment/moment';
+import { ENUM_GRItemCategory } from "../../shared/shared-enums";
+import { GoodsReceiptItems } from "./goods-receipt-item.model";
 export class GoodsReceipt {
   public GoodsReceiptValidator: FormGroup = null;
   public VendorName: string = "";
@@ -38,6 +38,7 @@ export class GoodsReceipt {
   GRCharges: any[] = [];
   canGRDispatch: boolean = false;
   IsQuantityAvailableToDispatchFromGR: boolean;
+  IsReceived: boolean = false;
   constructor() {
 
     var _formBuilder = new FormBuilder();

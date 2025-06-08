@@ -35,66 +35,66 @@
   </div>
   <div class="col-md-12 col-xs-12 col-sm-12">
 
-    <div class="row" style="background: #bcbcbc; padding-top: 0px;">
-      <div class="col-md-5 col-xs-12">
-        <div class="form-group">
-
-          <label class="control-label" style="margin-left: 5px;">Select Fiscal Year<b class="color-red"> *</b><b
+    <div class="row" style="background: #dadada; padding-top: 0px;">
+      <div class="col-md-12 col-xs-12">
+        <div class="form-group col-md-8 col-xs-8 col-sm-8">
+          <label class="control-label col-md-3" style="margin-top: 10px;">Select Fiscal Year<b class="color-red"> *</b><b
                style="float:right;">:</b></label>
-          <div>
+          <div class="col-md-9">
             <fiscal-year-calendar [showSingleDatePicker]="false" [showAllFiscalYear]="true"
                                   (fiscalYearDate)="selectDate($event)"> </fiscal-year-calendar>
             <!-- <danphe-date-picker [(ngModel)]="fromDate" [ngModelOptions]="{standalone: true}" ngDefaultControl>
                 </danphe-date-picker> -->
           </div>
         </div>
-      </div>
-      <div class="col-md-2 col-xs-12" style="padding: 5px 5px !important;margin-top:8px">
-        <label class="control-label no-padding">Cost Center :</label><br>
-        <div>
-          <div>
-            <select [(ngModel)]="selectedCostCenter" class="form-control" id="id_select_costCenterId_ledgerReport">
-              <option value="-2" selected="selected">All</option>
-              <option *ngFor="let costCenter of costCenters" value="{{costCenter.CostCenterId}}">{{ costCenter.CostCenterName }}</option>
+        <div class="col-md-4">
+          <label class=" col-md-5" style="margin-top: 20px;">Account Section <b class="color-red"> *</b>:</label><br>
+          <div class="col-md-7">
+            <select [(ngModel)]="SelectedHospital" class="form-control" (ngModelChange)="FilterLedger()">
+              <option *ngFor="let h of HospitalList" [ngValue]="h.HospitalId">{{ h.HospitalLongName }}</option>
             </select>
           </div>
         </div>
       </div>
-      <div class="col-md-2 col-xs-12" style="padding: 5px 5px !important;margin-top:8px">
-        <label class="control-label no-padding">Select Group :</label><br>
-        <div>
-          <div class="div-relative">
-            <input danphe-auto-complete class="col-md-11 form-control" [(ngModel)]="selectedLedgerGroup" [source]="ledgergroupList"
-                   placeholder="select ledger group" display-property-name="LedgerGroupName"
-                   value-property-name="LedgerGroupName" (focusout)="AssignSelectedLedgerGroup()"
-                   [list-formatter]="LedgerGroupListFormatter" max-num-list="20" onclick="this.select()"
-                   style="background-color: azure;" [ngModelOptions]="{standalone: true}" />
-          </div>
+
+      <div class="col-md-3 col-xs-12">
+        <label class=" col-md-5" style="margin-top: 20px;">Cost Center :</label><br>
+        <div class="col-md-7">
+          <select [(ngModel)]="selectedCostCenter" class="form-control" id="id_select_costCenterId_ledgerReport">
+            <option value="-2" selected="selected">All</option>
+            <option *ngFor="let costCenter of costCenters" value="{{costCenter.CostCenterId}}">{{ costCenter.CostCenterName }}</option>
+          </select>
         </div>
       </div>
-      <div class="col-md-2 col-xs-12" style="padding: 5px 5px !important;">
-        <label class="control-label"> <b>Select Ledger</b> <b class="color-red"> *</b></label>
-        <div style="margin-top: 5px;">
-          <!-- <span *ngIf="selLedger" style="float: left !important; margin-top: 5px;
-              margin-right: 5px;">{{selLedger.Code}}</span> -->
-          <div>
-            <danphe-multiselect
-                                [ddl-data]="filteredLedgerList"
-                                [placeholder-text]="'Ledger Name'"
-                                [value-property-name]="'LedgerId'"
-                                (selected-items-list)="OnLedgerSelected($event)"
-                                [display-property-name]="'LedgerName'"
-                                [single-selection]="false">
-            </danphe-multiselect>
-            <!-- <input danphe-auto-complete [(ngModel)]="selLedger" [source]="ledgerList" placeholder="Ledger Name"
+      <div class="col-md-3 col-xs-12">
+        <label class=" col-md-5" style="margin-top: 20px;">Select Group :</label><br>
+        <div class="autocomplete-item col-md-7">
+          <input danphe-auto-complete class="col-md-11 form-control" [(ngModel)]="selectedLedgerGroup" [source]="ledgergroupList"
+                 placeholder="select ledger group" display-property-name="LedgerGroupName"
+                 value-property-name="LedgerGroupName" (focusout)="AssignSelectedLedgerGroup()"
+                 [list-formatter]="LedgerGroupListFormatter" max-num-list="20" onclick="this.select()"
+                 style="background-color: azure;" [ngModelOptions]="{standalone: true}" />
+        </div>
+      </div>
+      <div class="col-md-4 col-xs-12">
+        <label class="control-label col-md-4" style="margin-top: 20px;"> <b>Select Ledger</b> <b class="color-red"> *</b>:</label>
+        <div class="form-group col-md-8" style="margin-top: 10px;">
+          <danphe-multiselect
+                              [ddl-data]="filteredLedgerList"
+                              [placeholder-text]="'Ledger Name'"
+                              [value-property-name]="'LedgerId'"
+                              (selected-items-list)="OnLedgerSelected($event)"
+                              [display-property-name]="'LedgerName'"
+                              [single-selection]="false">
+          </danphe-multiselect>
+          <!-- <input danphe-auto-complete [(ngModel)]="selLedger" [source]="ledgerList" placeholder="Ledger Name"
               display-property-name="LedgerName" value-property-name="LedgerName" [list-formatter]="LedgerListFormatter"
               max-num-list="15" [grid-sort]="'LedgerName'" onClick="this.select();"
               style="background-color: azure; height: 30px; width: 90% !important;" /> -->
-          </div>
         </div>
       </div>
-      <div class="col-md-1 col-xs-12" style="float: right;">
-        <div class="form-group mt10">
+      <div class="col-md-2 col-xs-12" style="float: right;">
+        <div class="form-group">
           <br>
           <button class="btn green btn-success" type="button" (click)="GetTxnList()" [disabled]="clicked">
             <i class="fa fa-refresh"></i>
@@ -124,7 +124,7 @@
           <table style="width:100% !important;" class="hidden-print">
             <tr>
               <td style="text-align: left;">
-                Printed On: &nbsp; {{todayDate}}  {{todayDate | nepaliDate:'format':'YYYY-MM-DD'}} 
+                Printed On: &nbsp; {{todayDate}} {{todayDate | nepaliDate:'format':'YYYY-MM-DD'}}
               </td>
               <td style="text-align: right;">
                 For the period (AD): &nbsp; {{ fromDate }} To {{ toDate }}
@@ -181,7 +181,9 @@
                 </div> -->
                 <table *ngIf="viewMode == 'detail'" class="table_data" style="width:100%;" border="1">
                   <tr>
-                    Ledger: {{row.LedgerName}} <span>({{row.Code}})</span>
+                    <th>
+                      Ledger: {{row.LedgerName}} <span>({{row.Code}})</span>
+                    </th>
                   </tr>
                   <tr style="background-color: #599be0; color:white;">
                     <th>
@@ -206,6 +208,7 @@
                         Particular(s)
                       </th>
                     </span>
+                    <th style="width: 200px;">Narration</th>
                     <th style="width: 200px;">Description</th>
                     <th>Debit</th>
                     <th>Credit</th>
@@ -213,6 +216,7 @@
                     <th class="hidden-print" *ngIf="actionView">Action</th>
                   </tr>
                   <tr>
+                    <th></th>
                     <th></th>
                     <th></th>
                     <th></th>
@@ -288,6 +292,7 @@
                       <!-- <td><span *ngIf="txnItm.TransactionItems && txnItm.TransactionItems.length >0">
                             {{txnItm.TransactionItems[0].Description}}</span></td>
                         <td> -->
+                      <td>{{txnItm.Narration}}</td>
                       <td class="tr">
                         {{txnItm.Description}}</td>
                       <td>
@@ -420,11 +425,12 @@
   </div>
 </div>
 <!-- <voucher-edit-reusable [voucherNumber]="voucherNumber" (callback-ledger)="CallBackledger($event)" ></voucher-edit-reusable> -->
-<transaction-view [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId" (callback-close)="OnPopupClose($event)">
+<transaction-view [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId" (callback-close)="OnPopupClose($event)"
+                  [HospitalId]="SelectedHospital">
 </transaction-view>
 
 <ledger-report-reusable *ngIf="viewDetailPopUp" [showLedgerDetail]="viewDetailPopUp" [FiscalYearId]="fiscalYearId" [fromDate]="fromDate"
-                        [toDate]="toDate" [ledgerCode]="ledgerCode" [ledgerId]="ledgerId" [ledgerName]="ledgerName"
+                        [toDate]="toDate" [ledgerCode]="ledgerCode" [ledgerId]="ledgerId" [ledgerName]="ledgerName" [HospitalId]="SelectedHospital"
                         (callback-add)="Close()"></ledger-report-reusable>
 
 <app-print-page *ngIf="showPrint" [print-data]="printDetaiils"></app-print-page>

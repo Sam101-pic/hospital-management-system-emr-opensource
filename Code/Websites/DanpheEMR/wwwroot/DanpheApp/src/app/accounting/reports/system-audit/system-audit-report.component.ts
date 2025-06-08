@@ -1,14 +1,15 @@
 import { Component } from "@angular/core";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { AccountingReportsBLService } from "../shared/accounting-reports.bl.service";
-import * as moment from "moment/moment";
 import { CoreService } from "../../../core/shared/core.service";
-import { AccountingService } from "../../shared/accounting.service";
 import { SecurityService } from "../../../security/shared/security.service";
-import GridColumnSettings from "../../../shared/danphe-grid/grid-column-settings.constant";
-import { SectionModel } from "../../settings/shared/section.model";
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { SettingsBLService } from "../../../settings-new/shared/settings.bl.service";
+import GridColumnSettings from "../../../shared/danphe-grid/grid-column-settings.constant";
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { Hospital_DTO } from "../../settings/shared/dto/hospitals.dto";
+import { SectionModel } from "../../settings/shared/section.model";
+import { AccountingService } from "../../shared/accounting.service";
+import { AccountingReportsBLService } from "../shared/accounting-reports.bl.service";
 
 @Component({
   selector: "my-app",
@@ -19,7 +20,7 @@ export class SystemAuditReportComponent {
   public toDate: string = null;
   public fiscalyearList: any;
   public voucherType: string = "";
-  btndisabled=false;
+  btndisabled = false;
   public editvoucherGridColumns: Array<any> = null;
   public backDateEntryGridColumns: Array<any> = null;
   public voucherReversalGridColumns: Array<any> = null;
@@ -36,6 +37,12 @@ export class SystemAuditReportComponent {
   public reverseTxnDetailObj: Array<any> = new Array<any>();
   public permissions: Array<any> = new Array<any>();
   public applicationList: Array<any> = new Array<any>();
+  public HospitalList: Array<Hospital_DTO> = new Array<Hospital_DTO>();
+  public SelectedHospital: number = 0;
+  public HospitalId: number = 0;
+  public ActiveHospital: number = 0;
+  public AllSections: Array<SectionModel> = new Array<SectionModel>();
+
   constructor(
     public msgBoxServ: MessageboxService,
     public coreservice: CoreService,
@@ -50,6 +57,17 @@ export class SystemAuditReportComponent {
       GridColumnSettings.VoucherReversalLogReport;
     this.GetSection();
     this.GetFiscalYearList();
+    this.CheckAndAssignHospital();
+    this.AllSections = this.accountingService.AllSections;
+  }
+  CheckAndAssignHospital() {
+    this.ActiveHospital = this.securityService.AccHospitalInfo.ActiveHospitalId;
+    this.HospitalList = this.accountingService.accCacheData.Hospitals ? this.accountingService.accCacheData.Hospitals : [];
+    if (this.HospitalList.length === 1) {
+      this.SelectedHospital = this.HospitalList[0].HospitalId;
+    } else {
+      this.SelectedHospital = this.ActiveHospital;
+    }
   }
   public GetFiscalYearList() {
     if (!!this.accountingService.accCacheData.FiscalYearList && this.accountingService.accCacheData.FiscalYearList.length > 0) {//mumbai-team-june2021-danphe-accounting-cache-change
@@ -71,13 +89,17 @@ export class SystemAuditReportComponent {
   checkDateValidation() {
     if (this.sectionId > 0) {
       if (!this.validDate) {
-        this.msgBoxServ.showMessage("error", ["Select proper date."]);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["Select proper date."]);
+        return false;
+      }
+      if (!this.HospitalId) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["Please, Select Account Section."]);
         return false;
       } else {
         return true;
       }
     } else {
-      this.msgBoxServ.showMessage("error", ["seslect module and try again."]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["select module and try again."]);
       return false;
     }
     // var frmdate = moment(this.fromDate, "YYYY-MM-DD");
@@ -130,49 +152,49 @@ export class SystemAuditReportComponent {
         this.showeditvoucherlog = false;
         this.showbackdateEntrylog = true;
       }
-      this.Load(this.voucherType);
-    } catch (ex) {}
+    } catch (ex) { }
   }
   public GetChangedSection() {
     try {
       this.sectionId = this.sectionList.find(
         (s) => s.SectionId == this.sectionId
       ).SectionId;
-    } catch (ex) {}
+    } catch (ex) { }
   }
   public GetSection() {
     this.settingsBLService.GetApplicationList()
-    .subscribe(res => {
-      if (res.Status == 'OK') {
-        this.applicationList = res.Results;
-        let sectionApplication = this.applicationList.filter(a => a.ApplicationCode == "ACC-Section" && a.ApplicationName == "Accounts-Sections")[0];
-        if (sectionApplication != null || sectionApplication != undefined) {
-          this.permissions = this.securityService.UserPermissions.filter(p => p.ApplicationId == sectionApplication.ApplicationId);
-        }
-        let sList = this.accountingService.accCacheData.Sections; //mumbai-team-june2021-danphe-accounting-cache-change
-        sList.forEach(s => {
-          let sname = s.SectionName.toLowerCase();
-          let pp = this.permissions.filter(f => f.PermissionName.includes(sname))[0];
-          if (pp != null || pp != undefined) {
-            this.sectionList.push(s);
-            this.sectionList = this.sectionList.slice(); //mumbai-team-june2021-danphe-accounting-cache-change
+      .subscribe(res => {
+        if (res.Status == 'OK') {
+          this.applicationList = res.Results;
+          let sectionApplication = this.applicationList.filter(a => a.ApplicationCode == "ACC-Section" && a.ApplicationName == "Accounts-Sections")[0];
+          if (sectionApplication != null || sectionApplication != undefined) {
+            this.permissions = this.securityService.UserPermissions.filter(p => p.ApplicationId == sectionApplication.ApplicationId);
           }
-        })
-        let defSection = this.sectionList.find(s => s.IsDefault == true);
-        if (defSection) {
-          this.sectionId = defSection.SectionId;
+          let sList = this.accountingService.accCacheData.Sections; //mumbai-team-june2021-danphe-accounting-cache-change
+          sList.forEach(s => {
+            let sname = s.SectionName.toLowerCase();
+            let pp = this.permissions.filter(f => f.PermissionName.includes(sname))[0];
+            if (pp != null || pp != undefined) {
+              this.sectionList.push(s);
+              this.sectionList = this.sectionList.slice(); //mumbai-team-june2021-danphe-accounting-cache-change
+            }
+          })
+          let defSection = this.sectionList.find(s => s.IsDefault == true);
+          if (defSection) {
+            this.sectionId = defSection.SectionId;
+          }
+          else {
+            this.sectionId = this.sectionList[0].SectionId;
+          }
         }
-        else {
-          this.sectionId = this.sectionList[0].SectionId;
-        }
-      }
 
-    });
+      });
 
 
-}
+  }
   Load(type) {
-    this.btndisabled=true;
+    this.btndisabled = true;
+    this.HospitalId = this.SelectedHospital;
     try {
       if (this.voucherType !== "") {
         let getvouchertype = type == "" ? this.voucherType : type;
@@ -183,25 +205,30 @@ export class SystemAuditReportComponent {
               this.fromDate,
               this.toDate,
               this.voucherType,
-              this.sectionId
+              this.sectionId,
+              this.HospitalId
             )
             .subscribe((res) => {
               if (res.Status == "OK" && res.Results.length) {
-                this.btndisabled=false;
+                this.btndisabled = false;
                 this.logsResults = res.Results;
               } else {
-                this.btndisabled=false;
+                this.btndisabled = false;
                 this.msgBoxServ.showMessage("notice", ["No record found."]);
               }
             });
         }
+        else {
+          this.btndisabled = false;
+
+        }
       } else {
-        this.btndisabled=false;
+        this.btndisabled = false;
         this.msgBoxServ.showMessage("error", [
           "Please select first Audit report type",
         ]);
       }
-    } catch (ex) {}
+    } catch (ex) { }
   }
   ReverseTransactionGridActions($event: GridEmitModel) {
     switch ($event.Action) {
@@ -249,8 +276,13 @@ export class SystemAuditReportComponent {
     }
   }
   Close() {
-     this.reverseTxnDetailObj= new Array<any>();
-     this.showReversedTxnDetails=false;
-}
-
+    this.reverseTxnDetailObj = new Array<any>();
+    this.showReversedTxnDetails = false;
+  }
+  OnHospitalChange() {
+    this.logsResults = [];
+    let sectionIdForManualVoucher = 4;
+    this.sectionList = this.AllSections.filter(a => a.HospitalId === this.SelectedHospital || a.SectionId === sectionIdForManualVoucher);
+    this.sectionId = this.sectionList.length > 0 ? this.sectionList[0].SectionId : this.sectionId;
+  }
 }

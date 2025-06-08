@@ -1,11 +1,10 @@
-import { Component, Directive, ViewChild, ChangeDetectorRef } from '@angular/core';
-import { ReportingService } from "../../shared/reporting-service";
-import { DLService } from "../../../shared/dl.service";
 import { HttpClient } from '@angular/common/http';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import * as moment from 'moment/moment';
 import { CoreService } from '../../../core/shared/core.service';
-import { GridEmitModel } from '../../../shared/danphe-grid/grid-emit.model';
+import { DLService } from "../../../shared/dl.service";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ReportingService } from "../../shared/reporting-service";
 
 import { RPT_BIL_BilDocMainModel } from './bill-doc-main.model';
 

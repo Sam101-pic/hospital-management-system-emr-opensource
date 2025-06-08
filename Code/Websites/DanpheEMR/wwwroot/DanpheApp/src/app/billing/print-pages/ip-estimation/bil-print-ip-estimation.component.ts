@@ -12,10 +12,10 @@ import { ENUM_Country, ENUM_DanpheHTTPResponseText, ENUM_MembershipTypeName } fr
 import { DischargeBillVM } from "../../ip-billing/shared/discharge-bill.view.models";
 import { BillingTransactionItem } from "../../shared/billing-transaction-item.model";
 import { BillingBLService } from "../../shared/billing.bl.service";
-import { BillingService } from "../../shared/billing.service";
 import { PharmacyBillItemVM } from "../../shared/discharge-bill.view.model";
 import { BillTransactionItemsEstimation_DTO } from "../../shared/dto/bill-transaction-items-estimation.dto";
 import { BilPrintBillingSummaryVM } from "../../shared/invoice-print-vms";
+import { PrintTemplateType } from "../../shared/print-template-type.model";
 
 @Component({
   selector: "bil-print-ip-estimation",
@@ -43,6 +43,9 @@ export class BIL_Print_IP_Estimation {
 
   @Input('estimated-discountPercent')
   public estimatedDiscountPercent: number = 0;
+
+  @Input('estimated-discountAmount')
+  public estimatedDiscountAmount: number = 0;
 
   public showReturnWaterMark: boolean = false;
   public checkouttimeparameter: string;//sud:8Feb2019--its format example is: 13:00 (string)
@@ -92,41 +95,44 @@ export class BIL_Print_IP_Estimation {
   currDate: string = null;
   public IsDetailedEstimation: boolean = false;
   public IpBillingSummary = new Array<BilPrintBillingSummaryVM>();
+  public PrintTemplateSettings = new PrintTemplateType();
 
-  constructor(public dlService: DLService,
-    public msgBoxServ: MessageboxService,
-    public billingBLService: BillingBLService,
-    public nepaliCalendarServ: NepaliCalendarService,
-    public CoreService: CoreService,
-    public securityService: SecurityService,
-    public billingServ: BillingService, public changeDetector: ChangeDetectorRef) {
+  constructor(
+    private _dlService: DLService,
+    private _messageBoxService: MessageboxService,
+    private _billingBLService: BillingBLService,
+    private _nepaliCalendarService: NepaliCalendarService,
+    public coreService: CoreService,
+    private _securityService: SecurityService,
+    private _changeDetector: ChangeDetectorRef
+  ) {
     this.currTime = moment().format("HH:mm").toString();
     this.currDate = moment().format("YYYY-MM-DD").toString();
     this.setCheckOutParameter();
-    this.ServiceDepartmentIdFromParametes = this.CoreService.Parameters.find(p => p.ParameterGroupName === "ADT" && p.ParameterName === "Bed_Charges_SevDeptId").ParameterValue;
+    this.ServiceDepartmentIdFromParametes = this.coreService.Parameters.find(p => p.ParameterGroupName === "ADT" && p.ParameterName === "Bed_Charges_SevDeptId").ParameterValue;
     this.SetAutoBedAndAutoBillItemParameters();
-    this.InvoiceDisplaySettings = this.CoreService.GetInvoiceDisplaySettings();
-    this.InvoiceFooterNoteSettings = this.CoreService.GetInvoiceFooterNoteSettings();
-    this.currentUserName = this.securityService.loggedInUser.UserName;
-    this.hospitalCode = this.CoreService.GetHospitalCode();
+    this.InvoiceDisplaySettings = this.coreService.GetInvoiceDisplaySettings();
+    this.InvoiceFooterNoteSettings = this.coreService.GetInvoiceFooterNoteSettings();
+    this.currentUserName = this._securityService.loggedInUser.UserName;
+    this.hospitalCode = this.coreService.GetHospitalCode();
     if (!this.hospitalCode) {
       this.hospitalCode = "default";
     }
-    this.showMunicipality = this.CoreService.ShowMunicipality().ShowMunicipality;
+    this.showMunicipality = this.coreService.ShowMunicipality().ShowMunicipality;
   }
 
   //this is the expected format of the autobed parameter..
   public autoBedBillParam = { DoAutoAddBillingItems: false, DoAutoAddBedItem: false, ItemList: [] };
   //sud"7-Oct-2020: This parameter value will be used for bed duration calculation
   SetAutoBedAndAutoBillItemParameters() {
-    var param = this.CoreService.Parameters.find(p => p.ParameterGroupName === "ADT" && p.ParameterName === "AutoAddBillingItems");
+    var param = this.coreService.Parameters.find(p => p.ParameterGroupName === "ADT" && p.ParameterName === "AutoAddBillingItems");
     if (param && param.ParameterValue) {
       this.autoBedBillParam = JSON.parse(param.ParameterValue);
     }
   }
 
   setCheckOutParameter() {
-    var param = this.CoreService.Parameters.find(p => p.ParameterGroupName === "ADT" && p.ParameterName === "CheckoutTime");
+    var param = this.coreService.Parameters.find(p => p.ParameterGroupName === "ADT" && p.ParameterName === "CheckoutTime");
     if (param) {
       this.checkouttimeparameter = param.ParameterValue;
     }
@@ -142,11 +148,13 @@ export class BIL_Print_IP_Estimation {
   }
 
   public ResultFromServer: any; //will give a type later;
+  public DynamicPrintTemplate: string = "";
   public GetEstimateBillDetails() {
-    this.billingBLService.GetEstimateBillDetails(this.patientId, this.ipVisitId)
+    this._billingBLService.GetEstimateBillDetails(this.patientId, this.ipVisitId)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
           this.ResultFromServer = res.Results;
+          this.ReadReceiptPrintDisplaySettingParameter();
           this.dischargeBill.PatientDetail = res.Results.PatientDetail;
           this.dischargeBill.AdmissionDetail = res.Results.AdmissionInfo;
           this.billItems = res.Results.BillItems;
@@ -157,9 +165,11 @@ export class BIL_Print_IP_Estimation {
           this.GroupItems_New();
           this.setQRValues();
           this.CalculateEstimationAmounts();
+
+          this.RenderDynamicPrintTemplate();
         }
         else {
-          this.msgBoxServ.showMessage("failed", ["Unable to get ADT and deposit details"]);
+          this._messageBoxService.showMessage("failed", ["Unable to get ADT and deposit details"]);
           console.log(res.ErrorMessage);
         }
       });
@@ -169,6 +179,51 @@ export class BIL_Print_IP_Estimation {
 
   }
 
+  // ngAfterViewInit() {
+  //   this.RenderDynamicPrintTemplate();
+  // }
+  RenderDynamicPrintTemplate() {
+    const html = document.getElementById("id_ip_estimation_print_detailed");
+    if (html) {
+      let dynamicReceiptElement = document.createElement('div');
+      dynamicReceiptElement.innerHTML = this.ResultFromServer.EstimationBillDetails;
+      this.DynamicPrintTemplate = this.ResultFromServer.EstimationBillDetails;
+      document.getElementById('id_ip_estimation_print_detailed').appendChild(dynamicReceiptElement);
+      this._changeDetector.detectChanges();
+    }
+  }
+  ReadReceiptPrintDisplaySettingParameter() {
+    let currParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "UseDynamicInvoicePrint");
+    if (currParam && currParam.ParameterValue) {
+      const paramValue = JSON.parse(currParam.ParameterValue) as Array<PrintTemplateType>;
+
+      if (paramValue && this.ResultFromServer) {
+        this.PrintTemplateSettings = paramValue.find(p => JSON.parse(this.ResultFromServer.PrintTemplateTypes).includes(p.PrintType));
+        //!Manual Change Detection is done here in order to reflect the changes of dynamic print receipts, if not done, the dom element is not rendered and will face issues in rendering the receipt.
+        this._changeDetector.detectChanges();
+      }
+    }
+  }
+
+  PrintDynamicPrint() {
+    //Open 'Browser Print' if printer not found or selected printing type is Browser.
+    if (!this.selectedPrinter || this.selectedPrinter.PrintingType === ENUM_PrintingType.browser) {
+      this.GenerateDynamicInvoicePrintBrowser(this.DynamicPrintTemplate);
+    }
+  }
+
+  GenerateDynamicInvoicePrintBrowser(dataToPrint: string) {
+    let iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.contentWindow.document.open();
+    iframe.contentWindow.document.write(dataToPrint);
+    iframe.contentWindow.document.close();
+
+    setTimeout(function () {
+      document.body.removeChild(iframe);
+    }, 500);
+
+  }
   CalculateEstimationAmounts() {
     let subTotal = 0;
     let discountAmount = 0;
@@ -176,13 +231,31 @@ export class BIL_Print_IP_Estimation {
     if (this.billItems.length) {
 
       this.billingTotal.SubTotal = this.billItems.reduce((acc, item) => acc + item.SubTotal, 0);
-      this.billingTotal.DiscountAmount = this.billItems.reduce((acc, item) => acc + item.DiscountAmount, 0);
-      this.billingTotal.TotalAmount = this.billItems.reduce((acc, item) => acc + item.TotalAmount, 0);
+      if (!this.IsDischarged) {
+        this.billItems.forEach(item => {
+          if (item.DiscountAmount === 0) {
+            item.DiscountAmount = this.estimatedDiscountPercent > 0 ? ((this.estimatedDiscountPercent / 100) * item.SubTotal) : 0;
+          }
+        });
+      }
 
-
+      if (this.IsDischarged) {
+        this.billingTotal.DiscountAmount = this.billItems.reduce((acc, item) => acc + item.DiscountAmount, 0);
+        this.billingTotal.TotalAmount = this.billItems.reduce((acc, item) => acc + item.TotalAmount, 0);
+      } else {
+        this.billingTotal.DiscountAmount = this.estimatedDiscountAmount > 0 ? this.estimatedDiscountAmount : this.billItems.reduce((acc, item) => acc + item.DiscountAmount, 0);
+        this.billingTotal.TotalAmount = this.billingTotal.SubTotal - this.billingTotal.DiscountAmount;;
+      }
       subTotal += this.billItems.reduce((acc, item) => acc + item.SubTotal, 0);
-      discountAmount += this.billItems.reduce((acc, item) => acc + item.DiscountAmount, 0);
+      if (this.estimatedDiscountAmount > 0 && !this.IsDischarged) {
+        discountAmount = this.estimatedDiscountAmount;
+      } else {
+        discountAmount += this.billItems.reduce((acc, item) => acc + item.DiscountAmount, 0);
+      }
       totalAmount += this.billItems.reduce((acc, item) => acc + item.TotalAmount, 0);
+      if (!this.IsDischarged) {
+        totalAmount = subTotal - discountAmount;
+      }
     }
     if (this.pharmacyBillingItems.length) {
 
@@ -200,11 +273,44 @@ export class BIL_Print_IP_Estimation {
     this.dischargeBill.SubTotal = subTotal;
     this.dischargeBill.DiscountAmount = discountAmount
     this.dischargeBill.TotalAmount = totalAmount;
+
+    if (!this.IsDischarged || this.IsProvisionalDischarge) {
+      if (this.DepositBalance > 0 && this.dischargeBill.TotalAmount >= this.DepositBalance) {
+        this.dischargeBill.ToBePaid = this.dischargeBill.TotalAmount - this.DepositBalance;
+        this.dischargeBill.DepositBalance = 0;
+      }
+
+      if (this.DepositBalance > 0 && this.dischargeBill.TotalAmount < this.DepositBalance) {
+        this.dischargeBill.ToBePaid = 0;
+        this.dischargeBill.DepositBalance = this.DepositBalance; //Calculation is done in the html
+      }
+    }
+
+
+    if (this.dischargeBill.BillingTransactionDetail.DepositUsed > 0) {
+      this.dischargeBill.ToBePaid = this.dischargeBill.TotalAmount - this.dischargeBill.DepositBalance;
+    } else {
+      this.dischargeBill.ToBePaid = this.dischargeBill.TotalAmount;
+    }
+
+    if (!this.IsDischarged) {
+      this.IpBillingSummary.forEach(item => {
+        let matchingItems = this.billItems.filter(a => a.ServiceDepartmentName.toLowerCase() === item.GroupName.toLowerCase());
+        if (matchingItems && matchingItems.length > 0) {
+          item.DiscountAmount = matchingItems.reduce((sum, itm) => sum + itm.DiscountAmount, 0);
+        }
+      });
+    }
   }
 
   SwitchEstimationView($event) {
     if ($event) {
       this.IsDetailedEstimation = !this.IsDetailedEstimation;
+      if (!this.IsDetailedEstimation) {
+        this.ReadReceiptPrintDisplaySettingParameter();
+        this._changeDetector.detectChanges();
+        this.RenderDynamicPrintTemplate();
+      }
     }
   }
   // public GetADTNDepositDetails() {
@@ -341,21 +447,21 @@ export class BIL_Print_IP_Estimation {
     if (!this.selectedPrinter || this.selectedPrinter.PrintingType === ENUM_PrintingType.browser) {
       this.browserPrintContentObj = document.getElementById("divEstimationBillPrintPage");
       this.openBrowserPrintWindow = true;
-      this.changeDetector.detectChanges();
+      this._changeDetector.detectChanges();
       //this.router.navigate(['/Billing/SearchPatient']);
       this.closeEstimationeBill.emit({ close: true });
     }
     else if (this.selectedPrinter.PrintingType === ENUM_PrintingType.dotmatrix) {
       //-----qz-tray start----->
-      this.CoreService.QzTrayObject.websocket.connect()
+      this.coreService.QzTrayObject.websocket.connect()
         .then(() => {
-          return this.CoreService.QzTrayObject.printers.find();
+          return this.coreService.QzTrayObject.printers.find();
         })
         .then(() => {
-          var config = this.CoreService.QzTrayObject.configs.create(this.selectedPrinter.PrinterName);
+          var config = this.coreService.QzTrayObject.configs.create(this.selectedPrinter.PrinterName);
 
           let dataToPrint = this.MakeReceipt();
-          return this.CoreService.QzTrayObject.print(config, CommonFunctions.GetEpsonPrintDataForPage(dataToPrint, this.selectedPrinter.mh, this.selectedPrinter.ml, this.selectedPrinter.ModelName));
+          return this.coreService.QzTrayObject.print(config, CommonFunctions.GetEpsonPrintDataForPage(dataToPrint, this.selectedPrinter.mh, this.selectedPrinter.ml, this.selectedPrinter.ModelName));
 
         })
         .catch(function (e) {
@@ -363,14 +469,14 @@ export class BIL_Print_IP_Estimation {
         })
         .finally(() => {
           // this.router.navigate(['/Billing/SearchPatient']);
-          return this.CoreService.QzTrayObject.websocket.disconnect();
+          return this.coreService.QzTrayObject.websocket.disconnect();
 
         });
       //-----qz-tray end----->
       this.closeEstimationeBill.emit({ close: true });
     }
     else {
-      this.msgBoxServ.showMessage('error', ["Printer Not Supported."]);
+      this._messageBoxService.showMessage('error', ["Printer Not Supported."]);
       return;
     }
 
@@ -403,10 +509,10 @@ export class BIL_Print_IP_Estimation {
 
     let addressValue: string = "";
     if (this.dischargeBill.PatientDetail.CountryName === ENUM_Country.Nepal) {
-      addressValue = ((this.showMunicipality && this.dischargeBill.PatientDetail.MunicipalityName) ? this.dischargeBill.PatientDetail.MunicipalityName + (this.dischargeBill.PatientDetail.WardNumber ? "-" + this.dischargeBill.PatientDetail.WardNumber : "") + ", " : "") + this.dischargeBill.PatientDetail.CountrySubDivision;
+      addressValue = ((this.showMunicipality && this.dischargeBill.PatientDetail.MunicipalityName) ? this.dischargeBill.PatientDetail.MunicipalityName + (this.dischargeBill.PatientDetail.WardNumber ? "-" + this.dischargeBill.PatientDetail.WardNumber : "") + ", " : "") + this.dischargeBill.PatientDetail.CountrySubDivisionName;
     }
     else {
-      addressValue = (this.dischargeBill.PatientDetail.Address ? this.dischargeBill.PatientDetail.Address + ", " : "") + this.dischargeBill.PatientDetail.CountrySubDivision + ", " + this.dischargeBill.PatientDetail.CountryName;
+      addressValue = (this.dischargeBill.PatientDetail.Address ? this.dischargeBill.PatientDetail.Address + ", " : "") + this.dischargeBill.PatientDetail.CountrySubDivisionName + ", " + this.dischargeBill.PatientDetail.CountryName;
     }
 
     headerStr += CommonFunctions.GetTextCenterAligned(invHdrTxt + duplicatePrintString, horizontalCols) + this.nline;
@@ -499,7 +605,7 @@ export class BIL_Print_IP_Estimation {
 
 
   LoadPatientBillingSummary(patientId: number, patientVisitId: number) {
-    this.dlService.Read("/api/IpBilling/InpatientPendingBillItems?patientId=" + this.patientId + "&ipVisitId=" + this.ipVisitId)
+    this._dlService.Read("/api/IpBilling/InpatientPendingBillItems?patientId=" + this.patientId + "&ipVisitId=" + this.ipVisitId)
       .map(res => res)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
@@ -509,7 +615,7 @@ export class BIL_Print_IP_Estimation {
           // this.filteredPendingItems = res.Results.PendingBillItems;
         }
         else {
-          this.msgBoxServ.showMessage("failed", [" Unable to get bill summary."]);
+          this._messageBoxService.showMessage("failed", [" Unable to get bill summary."]);
           console.log(res.ErrorMessage);
         }
       });
@@ -657,7 +763,7 @@ export class BIL_Print_IP_Estimation {
 
 
   GetLocalDate(engDate: string): string {
-    let npDate = this.nepaliCalendarServ.ConvertEngToNepDateString(engDate);
+    let npDate = this._nepaliCalendarService.ConvertEngToNepDateString(engDate);
     return npDate + " BS";
   }
 

@@ -35,5 +35,10 @@ namespace DanpheEMR.ViewModel.Pharmacy
         public decimal FreeQuantity { get; set; }
         public string UOMName { get; set; }
         public float TotalQuantity { get; set; }
+        public decimal? PackingQty { get; set; }
+        public decimal? StripRate { get; set; }
+        public Boolean? IsPacking { get; set; }
+        public string PackingName { get; set; }
+        public int? PackingTypeId { get; set; }
     }
 }

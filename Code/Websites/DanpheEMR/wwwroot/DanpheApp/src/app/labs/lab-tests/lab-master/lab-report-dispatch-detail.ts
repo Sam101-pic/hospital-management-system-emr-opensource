@@ -1,28 +1,25 @@
-import { Component, ChangeDetectorRef, AfterViewInit, ElementRef, ViewChild, OnInit, Input, Output,SecurityContext } from "@angular/core";
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
-import 'rxjs/Rx';
-import { Observable } from 'rxjs/Observable';
-import { PatientService } from "../../../patients/shared/patient.service";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { LabsBLService } from "../../shared/labs.bl.service";
-import { LabMasterModel, Requisition } from "../../shared/labMasterData.model";
-import { CommonFunctions } from "../../../shared/common.functions";
-import { LabPendingResultVM } from "../../shared/lab-view.models";
-import * as moment from 'moment/moment';
-import { CoreService } from "../../../core/shared/core.service";
-import { DanpheHTTPResponse } from '../../../shared/common-models';
-import { DanpheCache, MasterType } from '../../../shared/danphe-cache-service-utility/cache-services';
-import { LabTestFinalReportModel, LabTestsInFinalReportModel } from '../../shared/lab-finalreport.VM';
-import { LabTestRequisition } from "../../shared/lab-requisition.model";
-import { LabReportVM } from "../../reports/lab-report-vm";
-import { LabComponentModel } from "../../shared/lab-component-json.model";
-import { Subscription } from "rxjs/Rx";
-import { SecurityService } from "../../../security/shared/security.service";
-import { CoreCFGLabEmailSettingsModel } from "../../shared/CoreCFGLabEmailSettings.model";
-import { LabEmailModel, AttachmentModel } from "../../shared/lab-email.model";
+import { ChangeDetectorRef, Component, Input, SecurityContext } from "@angular/core";
+import { DomSanitizer } from '@angular/platform-browser';
 import html2canvas from "html2canvas";
 import * as jsPDF from "jspdf";
-import { DomSanitizer } from '@angular/platform-browser';
+import * as moment from 'moment/moment';
+import 'rxjs/Rx';
+import { Subscription } from "rxjs/Rx";
+import { CoreService } from "../../../core/shared/core.service";
+import { PatientService } from "../../../patients/shared/patient.service";
+import { SecurityService } from "../../../security/shared/security.service";
+import { CommonEmailSetting_DTO } from "../../../shared/DTOs/common-email-setting.dto";
+import { AttachmentModel, CommonEmailModel } from "../../../shared/DTOs/common-email_DTO";
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { CommonFunctions } from "../../../shared/common.functions";
+import { DanpheCache, MasterType } from '../../../shared/danphe-cache-service-utility/cache-services';
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { LabReportVM } from "../../reports/lab-report-vm";
+import { LabComponentModel } from "../../shared/lab-component-json.model";
+import { LabTestFinalReportModel } from '../../shared/lab-finalreport.VM';
+import { LabTestRequisition } from "../../shared/lab-requisition.model";
+import { LabsBLService } from "../../shared/labs.bl.service";
 @Component({
   selector: 'lab-report-dispatch-detail',
   templateUrl: "./lab-report-dispatch-detail.html",
@@ -73,6 +70,7 @@ export class LabReportDispatchDetailComponent {
   public requisitions: Array<LabTestRequisition>;
   public resultsToAdd: Array<LabTestRequisition>;
   public resultsAdded: Array<LabTestRequisition>;
+  public PendingSample: Array<LabTestRequisition>;
   public allEmployee: Array<any>;
 
   public reportSelected: Array<LabTestFinalReportModel> = new Array<LabTestFinalReportModel>();
@@ -84,15 +82,15 @@ export class LabReportDispatchDetailComponent {
   public loggedInUserId: any;
 
   public showEmailDataBox: boolean = false;
-  public emailSettings: CoreCFGLabEmailSettingsModel = new CoreCFGLabEmailSettingsModel();
-  public labEmail: LabEmailModel = null;
-  public report: LabReportVM= new LabReportVM();
+  public emailSettings: CommonEmailSetting_DTO = new CommonEmailSetting_DTO();
+  public labEmail: CommonEmailModel = new CommonEmailModel();
+  public report: LabReportVM = new LabReportVM();
   public showImagingReport: boolean = false;
-  public patName :string=null
-  public Email:string=null
-public test:string=null
-  public docName:string=null
-  public doc:any;
+  public patName: string = null
+  public Email: string = null
+  public test: string = null
+  public docName: string = null
+  public doc: any;
   constructor(public patientService: PatientService, public coreService: CoreService,
     public msgBoxService: MessageboxService, public securityService: SecurityService,
     public changeDetector: ChangeDetectorRef,
@@ -102,7 +100,16 @@ public test:string=null
     this.showRangeInRangeDescription = this.coreService.EnableRangeInRangeDescriptionStep();
     this.labReportFormat = this.coreService.GetLabReportFormat();
     this.loggedInUserId = this.securityService.GetLoggedInUser().EmployeeId;
-    this.emailSettings = this.coreService.GetLabEmailSettings();
+    let emailSettings = this.coreService.GetCommonEmailSettings();
+    if (emailSettings) {
+      let labSetting = emailSettings.find(a => a.UsedBy === "Laboratory");
+      if (labSetting && labSetting.SenderEmail) {
+        this.emailSettings = labSetting;
+      }
+      else {
+        this.emailSettings = emailSettings.find(a => a.UsedBy === "Common");
+      }
+    }
     this.showCustomHeader = this.emailSettings.DisplayHeader;
   }
 
@@ -122,12 +129,12 @@ public test:string=null
 
     this.reportListSubscription = this.labBLService.GetFinalReportsInReportDispatchByPatId(this.patientId, this.fromDate, this.toDate, this.catagoryList)
       .subscribe((res: DanpheHTTPResponse) => {
-        if (res.Status == "OK" && res.Results) {
+        if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
           this.reportSelected = res.Results;
           this.AssignEmployeeNamesToRespectiveField();
         }
         else {
-          this.msgBoxService.showMessage("failed", ["Unable to get finalized test list of selected patient"]);
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Unable to get finalized test list of selected patient"]);
           this.coreService.loading = false;
           console.log(res.ErrorMessage);
         }
@@ -187,7 +194,7 @@ public test:string=null
       this.LoadLabReports();
     } else {
       this.coreService.loading = false;
-      this.msgBoxService.showMessage("error", ["No Test Selected."]);
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ["No Test Selected."]);
     }
 
   }
@@ -204,7 +211,7 @@ public test:string=null
           //below below should be called only when 
         }
         else {
-          this.msgBoxService.showMessage("failed", ["Unable to get lab reports."]);
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Unable to get lab reports."]);
           this.coreService.loading = false;
           console.log(res.ErrorMessage);
         }
@@ -391,14 +398,23 @@ public test:string=null
     if (this.showPendingTests) {
       this.loading = true;
       this.labBLService.GetTestListSummaryByPatientId(this.reportSelected[0].PatientId, this.fromDate, this.toDate, this.catagoryList)
+        .finally(() => this.loading = false)
         .subscribe(res => {
-          if (res.Status == "OK") {
+          if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
             this.requisitions = res.Results.Requisitions;
             this.resultsToAdd = res.Results.ResultsToAdd;
             this.resultsAdded = res.Results.ResultsAdded;
             this.allEmployee = res.Results.Employee;
+            this.PendingSample = res.Results.SamplePending;
 
             this.resultsToAdd.forEach(r => {
+              let p = r.SampleCreatedBy.toString();
+              if (this.allEmployee[p]) {
+                r["SampleCollectedBy"] = this.allEmployee[p];
+              }
+            });
+
+            this.PendingSample.forEach(r => {
               let p = r.SampleCreatedBy.toString();
               if (this.allEmployee[p]) {
                 r["SampleCollectedBy"] = this.allEmployee[p];
@@ -413,12 +429,9 @@ public test:string=null
                 r["ResultEnteredBy"] = this.allEmployee[resAddedBy];
               }
             });
-
-            this.loading = false;
           }
           else {
-            this.msgBoxService.showMessage("failed", ["Please try again Later !!"]);
-            this.loading = false;
+            this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Please try again Later !!"]);
           }
         });
     }
@@ -441,18 +454,18 @@ public test:string=null
       this.labBLService
         .UpdateIsPrintedFlag(0, allSelectedReqIds)
         .subscribe((res) => {
-          if (res.Status == "OK") {
+          if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
             this.print();
             this.updatePrintStatus(allSelectedReqIds);
           } else {
-            this.msgBoxService.showMessage("failed", [
+            this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, [
               "Error In Updating Print Informations in Report Table",
             ]);
             this.loading = false;
           }
         }, err => { console.log(err.ErrorMessage); this.loading = false; });
     } else {
-      this.msgBoxService.showMessage("error", ["Cannot print the report."]);
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Cannot print the report."]);
       this.loading = false;
     }
   }
@@ -468,6 +481,14 @@ public test:string=null
         }
       });
     });
+    this.changeDetector.detectChanges();
+    this.templateReport.forEach(itm => {
+      itm.PrintCount += 1;
+      itm.PrintedBy = this.loggedInUserId;
+      itm.PrintedByName = emp ? (emp.FirstName + " " + emp.LastName) : '';
+
+    });
+    this.changeDetector.detectChanges();
   }
 
   print() {
@@ -512,97 +533,97 @@ public test:string=null
   public Close() {
     this.showReport = false;
   }
- 
+
   ProcessSendingData() {
     this.loading = false;
-    this.labEmail = new LabEmailModel();
+    this.labEmail = new CommonEmailModel();
     let allSelectedReqIds = [];
     this.templateReport.forEach(rep => {
-     
-      
-    this.patName =  rep.Lookups.PatientName ,
-    this.Email = rep.Email
-       });
-   
-    this.docName =  this.patName +"-" +moment().format("YYMMDDHHmm") +".pdf";
-              var dom = document.getElementById("all-lab-reports");
-              dom.style.border = "none";
-               html2canvas(dom, {
-                useCORS: true,
-                allowTaint: true,
-                 scrollY: 0 
-                }).then((canvas) => 
-                {
-                 const image = { type: 'jpeg', quality: 2 };
-                 const margin = [0.5, 0.5]; 
-                 var imgWidth = 8.5;
-                 var pageHeight = 11;
-                 var innerPageWidth = imgWidth - margin[0] * 2; 
-                 var innerPageHeight = pageHeight - margin[1] * 2; 
-                 var pxFullHeight = canvas.height; 
-                 var pxPageHeight = Math.floor(canvas.width * (pageHeight / imgWidth)); 
-                 var nPages = Math.ceil(pxFullHeight / pxPageHeight); 
-                 var pageHeight = innerPageHeight; 
-                 var pageCanvas = document.createElement('canvas'); 
-                 var pageCtx = pageCanvas.getContext('2d');
-                  pageCanvas.width = canvas.width; 
-                  pageCanvas.height = pxPageHeight; 
-                  var pdf = new jsPDF('p', 'in', 'a4'); 
-                  for (var page = 0; page < nPages; page++)
-                   { 
-                      if (page === nPages - 1 && pxFullHeight % pxPageHeight !== 0) 
-                      {
-                         pageCanvas.height = pxFullHeight % pxPageHeight;
-                         pageHeight = (pageCanvas.height * innerPageWidth) / pageCanvas.width;
-                      }
-                         var w = pageCanvas.width; 
-                         var h = pageCanvas.height;
-                          pageCtx.fillStyle = 'white';
-                           pageCtx.fillRect(0, 0, w, h); 
-                           pageCtx.drawImage(canvas, 5, page * pxPageHeight, w, h, 0, 0, w, h);
-                          if (page > 0) 
-                          pdf.addPage();
-                           var imgData = pageCanvas.toDataURL('image/' + image.type, image.quality); 
-                           pdf.addImage(imgData, image.type, margin[1], margin[0], innerPageWidth, pageHeight);
-                    } 
-                    var binary = pdf.output();
-                    this.labEmail.PdfBase64 = btoa(binary);
-               
-              });
-    this.labEmail.AttachmentFileName = this.patName + "-" + moment().format("YYMMDDHHmm") +'.pdf';       
+
+
+      this.patName = rep.Lookups.PatientName,
+        this.Email = rep.Email
+    });
+
+    this.docName = this.patName + "-" + moment().format("YYMMDDHHmm") + ".pdf";
+    var dom = document.getElementById("all-lab-reports");
+    dom.style.border = "none";
+    html2canvas(dom, {
+      useCORS: true,
+      allowTaint: true,
+      scrollY: 0
+    }).then((canvas) => {
+      const image = { type: 'jpeg', quality: 2 };
+      const margin = [0.5, 0.5];
+      var imgWidth = 8.5;
+      var pageHeight = 11;
+      var innerPageWidth = imgWidth - margin[0] * 2;
+      var innerPageHeight = pageHeight - margin[1] * 2;
+      var pxFullHeight = canvas.height;
+      var pxPageHeight = Math.floor(canvas.width * (pageHeight / imgWidth));
+      var nPages = Math.ceil(pxFullHeight / pxPageHeight);
+      var pageHeight = innerPageHeight;
+      var pageCanvas = document.createElement('canvas');
+      var pageCtx = pageCanvas.getContext('2d');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = pxPageHeight;
+      var pdf = new jsPDF('p', 'in', 'a4');
+      for (var page = 0; page < nPages; page++) {
+        if (page === nPages - 1 && pxFullHeight % pxPageHeight !== 0) {
+          pageCanvas.height = pxFullHeight % pxPageHeight;
+          pageHeight = (pageCanvas.height * innerPageWidth) / pageCanvas.width;
+        }
+        var w = pageCanvas.width;
+        var h = pageCanvas.height;
+        pageCtx.fillStyle = 'white';
+        pageCtx.fillRect(0, 0, w, h);
+        pageCtx.drawImage(canvas, 5, page * pxPageHeight, w, h, 0, 0, w, h);
+        if (page > 0)
+          pdf.addPage();
+        var imgData = pageCanvas.toDataURL('image/' + image.type, image.quality);
+        pdf.addImage(imgData, image.type, margin[1], margin[0], innerPageWidth, pageHeight);
+      }
+      var binary = pdf.output();
+      this.labEmail.PdfBase64 = btoa(binary);
+
+    });
+    this.labEmail.AttachmentFileName = this.patName + "-" + moment().format("YYMMDDHHmm") + '.pdf';
     this.labEmail.EmailAddress = this.Email
     this.labEmail.SendHtml = this.emailSettings.TextContent;
     this.labEmail.SendPdf = this.emailSettings.PdfContent;
-    this.labEmail.SenderTitle = this.emailSettings.SenderTitle;
+    //this.labEmail.SenderTitle = this.emailSettings.SenderTitle;
     this.labEmail.SenderEmailAddress = this.emailSettings.SenderEmail;
     this.labEmail.Subject = 'Report of ' + this.patName;
-    this.labEmail.SenderEmailAddress = this.emailSettings.SenderEmail;
-  
-    this.LoadEmailAttachments_Images();
+    this.labEmail.SmtpServer = this.emailSettings.SmtpServer;
+    this.labEmail.PortNo = this.emailSettings.PortNo;
+    this.labEmail.Password = this.emailSettings.Password;
+    this.labEmail.EmailApiKey = this.emailSettings.EmailApiKey;
+
+    //this.LoadEmailAttachments_Images();
   }
 
   public LoadEmailAttachments_Images() {
     if (this.report.Templates) {
       let albumTemp = [];
       let count: number = 1;
-     this.templateReport.forEach(rep => {
-   
-     this.patName = rep.Lookups.PatientName
-    });
+      this.templateReport.forEach(rep => {
+
+        this.patName = rep.Lookups.PatientName
+      });
       let todayDate = moment().format("YYYYMMDD_HHmmss");
-          let pdf: AttachmentModel = new AttachmentModel();
-          //we've to send only the base64 content. dataUri format includes the string: data:image/png.. in its value so we're replacing it with empty string.
-          //ll be used to show preview on email box.
-          pdf.ImageName = this.patName + "_" + todayDate + "_" + count.toString();
-          pdf.IsSelected = true;
-          ////everytime count increases, re-assign to preview image count.
-          count++;
-          albumTemp.push(pdf);
-    this.labEmail.ImageAttachments_Preview = albumTemp;
-    this.email_previewpdf_Count = this.labEmail.ImageAttachments_Preview.length;
- 
+      let pdf: AttachmentModel = new AttachmentModel();
+      //we've to send only the base64 content. dataUri format includes the string: data:image/png.. in its value so we're replacing it with empty string.
+      //ll be used to show preview on email box.
+      pdf.ImageName = this.patName + "_" + todayDate + "_" + count.toString();
+      pdf.IsSelected = true;
+      ////everytime count increases, re-assign to preview image count.
+      count++;
+      albumTemp.push(pdf);
+      this.labEmail.ImageAttachments_Preview = albumTemp;
+      this.email_previewpdf_Count = this.labEmail.ImageAttachments_Preview.length;
+
     }
- 
+
   }
   public email_showpdfPreview: boolean = false;
   public email_previewpdf_Src: string = null;
@@ -617,19 +638,19 @@ public test:string=null
       //we have to take only text content, image won't be sent.
       //var itemDiv = document.getElementById("lab-report-main").innerHTML;
       var itemDiv = document.getElementById("single-lab-report").innerHTML;
-       let data = this.sanitizer.sanitize(SecurityContext.HTML, itemDiv);
+      let data = this.sanitizer.sanitize(SecurityContext.HTML, itemDiv);
 
       this.labEmail.HtmlContent = data;
     }
 
-  //});
+    //});
     if (this.labEmail && (this.labEmail.SendHtml || this.labEmail.SendPdf)) {
       this.labEmail.EmailList = new Array<string>();
-      for (var valCtrls in this.labEmail.LabEmailValidator.controls) {
-        this.labEmail.LabEmailValidator.controls[valCtrls].markAsDirty();
-        this.labEmail.LabEmailValidator.controls[valCtrls].updateValueAndValidity();
+      for (var valCtrls in this.labEmail.EmailValidator.controls) {
+        this.labEmail.EmailValidator.controls[valCtrls].markAsDirty();
+        this.labEmail.EmailValidator.controls[valCtrls].updateValueAndValidity();
       }
-    
+
       if (this.labEmail.IsValidCheck(undefined, undefined)) {
 
         var emailList = this.labEmail.EmailAddress.split(";");
@@ -649,38 +670,38 @@ public test:string=null
           //console.log(this.radEmail);
           //remove unselected images before sending.
           this.labEmail.ImageAttachments = this.labEmail.ImageAttachments_Preview.filter(a => a.IsSelected == true);
-        
+
           if (this.labEmail.ImageAttachments.length > 5) {
-            this.msgBoxService.showMessage("error", ["Cannot attach more than 5 images, please remove some and send again."]);
+            this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Cannot attach more than 5 images, please remove some and send again."]);
             this.loading = false;
             return;
           }
-        
+
           this.labBLService.sendEmail(this.labEmail)
             .subscribe(res => {
-              if (res.Status == "OK") {
-                this.msgBoxService.showMessage('success', ['Email sent successfuly.']);
+              if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                this.msgBoxService.showMessage(ENUM_MessageBox_Status.Success, ['Email sent successfuly.']);
                 this.loading = false;
                 this.CloseSendEmailPopUp();
               } else {
-                this.msgBoxService.showMessage('failed', ['Email could not be sent, please try later.']);
+                this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Email could not be sent, please try later.']);
                 this.loading = false;
               }
             });
-        
-      }
-      else {
-          this.msgBoxService.showMessage('error', ['Invalid EmailAddress entered, Please correct it.']);
+
+        }
+        else {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Invalid EmailAddress entered, Please correct it.']);
           this.loading = false;
         }
       } else {
         this.loading = false;
       }
     } else {
-      this.msgBoxService.showMessage('failed', ['Email Sending Parameter has all the types of Email to send made False.']);
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Email Sending Parameter has all the types of Email to send made False.']);
       this.loading = false;
     }
-  
+
   }
 
   public ValidateEmail(email): boolean {

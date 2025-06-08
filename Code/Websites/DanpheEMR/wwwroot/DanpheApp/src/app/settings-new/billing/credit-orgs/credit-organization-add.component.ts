@@ -22,6 +22,8 @@ export class CreditOrganizationAddComponent {
     @Output("callback-add")
     callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
     public update: boolean = false;
+    public creditOrganizationList: Array<CreditOrganization> = new Array<CreditOrganization>();
+
 
     constructor(
         public settingsBLService: SettingsBLService,
@@ -29,6 +31,7 @@ export class CreditOrganizationAddComponent {
         public msgBoxServ: MessageboxService,
         public changeDetector: ChangeDetectorRef) {
 
+        this.getCreditOrganizationList();
     }
     @Input("showAddPage")
     public set value(val: boolean) {
@@ -37,8 +40,6 @@ export class CreditOrganizationAddComponent {
             this.update = true;
             this.CurrentCreditOrganization = new CreditOrganization();
             this.CurrentCreditOrganization = Object.assign(this.CurrentCreditOrganization, this.selectedItem);
-            this.CurrentCreditOrganization.ModifiedBy = this.securityService.GetLoggedInUser().EmployeeId;
-            this.CurrentCreditOrganization.ModifiedOn = moment().format('YYYY-MM-DD HH:mm');
         }
         else {
             this.CurrentCreditOrganization = new CreditOrganization();
@@ -50,7 +51,12 @@ export class CreditOrganizationAddComponent {
     }
 
     Add() {
-        for (var i in this.CurrentCreditOrganization.CreditOrganizationValidator.controls) {
+        let isDefaultExists = this.creditOrganizationList.some(a => a.IsDefault === true && a.IsActive === true);
+        if (isDefaultExists && this.CurrentCreditOrganization.IsDefault) {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Default Credit Organization cannot be Duplicate"]);
+            return;
+        }
+        for (let i in this.CurrentCreditOrganization.CreditOrganizationValidator.controls) {
             this.CurrentCreditOrganization.CreditOrganizationValidator.controls[i].markAsDirty();
             this.CurrentCreditOrganization.CreditOrganizationValidator.controls[i].updateValueAndValidity();
         }
@@ -61,6 +67,7 @@ export class CreditOrganizationAddComponent {
                         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
                             this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Credit Organization Detail Added."]);
                             this.CallBackAddUpdate(res)
+                            this.getCreditOrganizationList();
                             this.CurrentCreditOrganization = new CreditOrganization();
                         }
                         else {
@@ -77,7 +84,14 @@ export class CreditOrganizationAddComponent {
     }
 
     Update() {
-        for (var i in this.CurrentCreditOrganization.CreditOrganizationValidator.controls) {
+        let isDefaultExists = this.creditOrganizationList.some(a => a.IsDefault === true && a.IsActive === true);
+        if (isDefaultExists && this.CurrentCreditOrganization.IsDefault) {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Default Credit Organization cannot be Duplicate"]);
+            this.callbackAdd.emit();
+            this.getCreditOrganizationList();
+            return;
+        }
+        for (let i in this.CurrentCreditOrganization.CreditOrganizationValidator.controls) {
             this.CurrentCreditOrganization.CreditOrganizationValidator.controls[i].markAsDirty();
             this.CurrentCreditOrganization.CreditOrganizationValidator.controls[i].updateValueAndValidity();
         }
@@ -88,6 +102,7 @@ export class CreditOrganizationAddComponent {
                         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
                             this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Credit Organization Detail Updated."]);
                             this.CallBackAddUpdate(res)
+                            this.getCreditOrganizationList();
                             this.CurrentCreditOrganization = new CreditOrganization();
                         }
                         else {
@@ -140,6 +155,18 @@ export class CreditOrganizationAddComponent {
         if (event.keyCode == 27) { // For ESCAPE_KEY =>close pop up
             this.Close();
         }
+    }
+    public getCreditOrganizationList() {
+        this.settingsBLService.GetCreditOrganizationList()
+            .subscribe(res => {
+                if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                    this.creditOrganizationList = res.Results;
+                }
+                else {
+                    alert("Failed ! " + res.ErrorMessage);
+                }
+
+            });
     }
 
 }

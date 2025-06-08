@@ -7,6 +7,9 @@ using System.Data.SqlClient;
 using DanpheEMR.Security;
 using Audit.EntityFramework;
 using DanpheEMR.ServerModel.BillingModels;
+using DanpheEMR.ServerModel.PatientModels;
+using DanpheEMR.ServerModel.ClaimManagementModels;
+using DanpheEMR.ServerModel.InsuranceModels;
 
 namespace DanpheEMR.DalLayer
 {
@@ -23,7 +26,7 @@ namespace DanpheEMR.DalLayer
         public DbSet<InsuranceModel> Insurances { get; set; }
         public DbSet<BillingSchemeModel> Schemes { get; set; }
         //public DbSet<PatientMembershipModel> PatientMemberships { get; set; }
-       
+
         public DbSet<AdmissionModel> Admissions { get; set; }
         public DbSet<VisitModel> Visit { get; set; }
         public DbSet<DepartmentModel> Departments { get; set; }
@@ -35,8 +38,8 @@ namespace DanpheEMR.DalLayer
         public DbSet<PatientBedInfo> PatientBedInfos { get; set; }
         public DbSet<BillSettlementModel> BillSettlements { get; set; }
         public DbSet<InsuranceProviderModel> InsuranceProviders { get; set; }
-        public DbSet<BillServiceItemModel> BillItemPrice { get; set; } 
-        public DbSet<ServiceDepartmentModel> ServiceDepartment { get; set; } 
+        public DbSet<BillServiceItemModel> BillItemPrice { get; set; }
+        public DbSet<ServiceDepartmentModel> ServiceDepartment { get; set; }
         public DbSet<BillingTransactionItemModel> BillingTransactionItems { get; set; }
         public DbSet<BillingTransactionModel> BillingTransactions { get; set; }
         public DbSet<PatientInsurancePackageTransactionModel> PatientInsurancePackageTransactions { get; set; }
@@ -54,11 +57,17 @@ namespace DanpheEMR.DalLayer
         public DbSet<BedFeature> BedFeatures { get; set; }
         public DbSet<LabVendorsModel> LabVendors { get; set; }
         public DbSet<LabTestModel> LabTests { get; set; }
-        public DbSet<IRDLogModel> IRDLog { get; set; } 
+        public DbSet<IRDLogModel> IRDLog { get; set; }
         public DbSet<InsuranceBalanceHistoryModel> InsuranceBalanceHistories { get; set; }
         public DbSet<RadiologyImagingTypeModel> RadiologyImagingTypes { get; set; } //Krishna: 2nd'Jan 22
         public DbSet<RadiologyImagingItemModel> RadiologyImagingItems { get; set; } //Krishna: 2nd'Jan 22
         public DbSet<BillMapPriceCategoryServiceItemModel> BillPriceCategoryServiceItems { get; set; }
+        public DbSet<PatientSchemeMapModel> PatientSchemeMaps { get; set; }
+        public DbSet<InsuranceClaim> InsuranceClaim { get; set; }
+        public DbSet<InsuranceClaimAPIResponse> insuranceClaimAPIResponses { get; set; }
+        public DbSet<INS_ClaimDocResponseDetails> InsuranceClaimDocResponseDetails { get; set; }
+
+
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
 
@@ -81,7 +90,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<WardModel>().ToTable("ADT_MST_Ward");
             modelBuilder.Entity<BedModel>().ToTable("ADT_Bed");
             modelBuilder.Entity<InsuranceProviderModel>().ToTable("INS_CFG_InsuranceProviders");
-            modelBuilder.Entity<BillServiceItemModel>().ToTable("BIL_MST_ServiceItem"); 
+            modelBuilder.Entity<BillServiceItemModel>().ToTable("BIL_MST_ServiceItem");
             modelBuilder.Entity<ServiceDepartmentModel>().ToTable("BIL_MST_ServiceDepartment");
             modelBuilder.Entity<BillSettlementModel>().ToTable("BIL_TXN_Settlements");
             // Patient and visit mappings
@@ -128,7 +137,10 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<RadiologyImagingTypeModel>().ToTable("RAD_MST_ImagingType");
             modelBuilder.Entity<RadiologyImagingItemModel>().ToTable("RAD_MST_ImagingItem");
             modelBuilder.Entity<BillMapPriceCategoryServiceItemModel>().ToTable("BIL_MAP_PriceCategoryServiceItem");
-
+            modelBuilder.Entity<PatientSchemeMapModel>().ToTable("PAT_MAP_PatientSchemes");
+            modelBuilder.Entity<InsuranceClaim>().ToTable("INS_TXN_InsuranceClaim");
+            modelBuilder.Entity<InsuranceClaimAPIResponse>().ToTable("INS_LOG_ClaimApiResponse");
+            modelBuilder.Entity<INS_ClaimDocResponseDetails>().ToTable("INS_ClaimDocResponseDetails");
         }
     }
 }

@@ -1,4 +1,5 @@
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import * as moment from 'moment';
 import { PharmacyWardRequisitionVerifier_DTO } from '../phrm-substore-requisition-add/shared/phrm-ward-requisition-verifier.dto';
 import { PHRMSubStoreRequisitionItems } from './phrm-substore-requisition-items.model';
 
@@ -6,7 +7,7 @@ export class PHRMSubStoreRequisition {
     public RequisitionId: number = 0;
     public RequistionNo: number = 0;
     public StoreId: number = 0;
-    public RequisitionDate: string = "";
+    public RequisitionDate: string = moment().format('YYYY-MM-DD');
     public RequisitionStatus: string = "";
     public CreatedBy: number = 0;
     public CreatedOn: string = "";
@@ -21,6 +22,7 @@ export class PHRMSubStoreRequisition {
 
         var _formBuilder = new FormBuilder();
         this.RequisitionValidator = _formBuilder.group({
+            'RequisitionDate': ['', Validators.compose([Validators.required])]
         });
     }
 
@@ -39,5 +41,4 @@ export class PHRMSubStoreRequisition {
         else
             return !(this.RequisitionValidator.hasError(validator, fieldName));
     }
-
 }

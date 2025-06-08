@@ -26,7 +26,10 @@ namespace DanpheEMR.ServerModel.BillingModels
         public bool IsZeroPriceAllowed { get; set; } //sud:27Mar'23-- Is this column required here ??
         //public bool IsIncentiveApplicable { get; set; }
         public bool HasAdditionalBillingItems { get; set; }
-       
+        public bool IsCappingEnabled { get; set; }
+        public int CappingLimitDays { get; set; }
+        public int CappingQuantity { get; set; }
+
         //public int ItemId { get; set; }//Krishna: 16thFeb'23, This column is temporary, Need to handle its impact and remove after that
         //Below Columns are not needed further need to remove these columns later
         //public bool IsCoPayment { get; set; } //Krishna: 8thDec'22

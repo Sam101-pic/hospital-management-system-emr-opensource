@@ -90,6 +90,14 @@ export class PHRMInvoiceModel {
     public ReferenceInvoiceNo: string | number = null;
     public SchemeId: number = 0;
     public SchemeDiscountPercentage: number = 0; //18May'23 Rohit : To handle scheme discount.
+    InvoiceNo: number = null;
+    SalesAmount: number = 0;
+    ReturnAmount: number = 0;
+    DepositReturnAmount: number = 0;
+    CreditTotal: number = 0;
+    IsCappingApplicable: boolean = false;
+    IsSalesForPrescription: boolean = false;
+    PrescriptionId: number = 0;
 
     //Constructor of class
     constructor() {

@@ -1,5 +1,6 @@
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { StoreVerificationMapModel } from '../../settings-new/shared/store-role-map.model';
+import { ENUM_DispensaryType } from '../../shared/shared-enums';
 
 
 export class StoreBillHeader {
@@ -25,14 +26,14 @@ export class PHRMStoreModel extends StoreBillHeader {
   public ModifiedOn: string = "";
   public IsActive: boolean = true;
   public Category: string;
-  public SubCategory: string;
+  public SubCategory: string = ENUM_DispensaryType.normal;
   public StoreVerificationMapList: Array<StoreVerificationMapModel> = new Array<StoreVerificationMapModel>();
   public StoreValidator: FormGroup = null;
   public UseSeparateInvoiceHeader: boolean = false;
   public PrintInvoiceHeaderInDotMatrix: boolean = false;
   AvailablePaymentModes: PaymentModeSettings[] = [];
   DefaultPaymentMode: string;
-
+  IsDefault: boolean = false;
   // Receipt Variables
   INV_GRGroupId: number;
   INV_POGroupId: number;
@@ -41,6 +42,7 @@ export class PHRMStoreModel extends StoreBillHeader {
   INV_RFQGroupId: number;
   INV_ReceiptDisplayName: string;
   INV_ReceiptNoCode: string;
+
   constructor() {
     super();
     var _formBuilder = new FormBuilder();

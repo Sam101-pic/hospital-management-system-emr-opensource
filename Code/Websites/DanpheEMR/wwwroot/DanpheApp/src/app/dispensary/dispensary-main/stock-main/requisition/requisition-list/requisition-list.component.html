@@ -34,7 +34,8 @@
     <div class="col-lg-12 col-sm-12">
       <danphe-grid [grid-colDefaults]="requisitionGridColumns" [grid-data]="filterRequisitionList" [rangeType]="dateRange" [show-CustomDate]="true"
                    [NepaliDateInGridParams]="RequisitionNepaliDateInGridSettings" (onDateChange)="onDateChange($event)"
-                   (grid-actions)="RequisitionGridAction($event)"></danphe-grid>
+                   (grid-actions)="RequisitionGridAction($event)"
+                   [date-settings-name]="'common-range-with-today'"></danphe-grid>
     </div>
   </div>
 </div>
@@ -105,6 +106,7 @@
                 <div class="left" style="text-align:left;">
                   <p>Dispatch Id :<b> {{innerDispatchdetails.DispatchId}}</b></p>
                   <p>Requisition No:<b> {{innerDispatchdetails.RequisitionNo}}</b></p>
+                  <p>Dispatch To:<b> {{innerDispatchdetails.TargetStore}}</b></p>
                 </div>
                 <div class="right" style="text-align:right;">
                   <p>Dispatch Date:<b> {{innerDispatchdetails.CreatedOn | date}}</b>&nbsp;
@@ -114,6 +116,8 @@
                   <p>Requisition Date:<b> {{requisitionDate | date}}</b>
                     <i *ngIf="requisitionDate">{{requisitionDate | nepaliDate:'format':'YYYY-MM-DD'}}</i>
                   </p>
+                  <p>Dispatch From:<b> {{innerDispatchdetails.SourceStore}}</b></p>
+
 
                 </div>
                 <div class="clear"></div>
@@ -151,12 +155,12 @@
                   </table>
                 </div>
                 <hr />
-                <div class="col-md-12">
+                <div class="col-md-12" style="display: flex;">
                   <div style="text-align: left" class="col-md-4">Requested
                     By:&nbsp;<b>{{innerDispatchdetails.CreatedByName}}</b></div>
-                  <div *ngIf="receivedby!=null" style="text-align: left" class="col-md-4">Received
+                  <div *ngIf="receivedby!=null" style="text-align: center" class="col-md-4">Received
                     By:&nbsp;<b>{{innerDispatchdetails.ReceivedBy}}</b></div>
-                  <div style="text-align: left" class="col-md-4">Dispatched
+                  <div style="text-align: right" class="col-md-4">Dispatched
                     By:&nbsp;<b>{{innerDispatchdetails.DispatchedByName}}</b></div>
                 </div>
                 <div style="float:right">
@@ -167,7 +171,7 @@
             </div>
           </div>
 
-          <div class="row center-style">
+          <div class="row center-style" style="margin-top: 20px;">
             <div class="col-md-12 col-xs-12 ">
               <a (click)="print()" class="btn btn-default" style="position: absolute;top: -31px; right: 1px;">
                 Print

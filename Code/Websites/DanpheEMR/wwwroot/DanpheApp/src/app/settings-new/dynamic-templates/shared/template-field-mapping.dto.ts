@@ -2,7 +2,8 @@ export class TemplateFieldMapping_DTO {
     public TemplateId: number = null;
     public FieldMasterId: number = null;
     public FieldName: string = null;
-    public DisplayLabel: string = null;
+    public DisplayLabelAtForm: string = '';
+    public DisplayLabelAtPrint: string = '';
     public IsMandatory: boolean = false;
     public EnterSequence: number = null;
     public IsActive: boolean = false;

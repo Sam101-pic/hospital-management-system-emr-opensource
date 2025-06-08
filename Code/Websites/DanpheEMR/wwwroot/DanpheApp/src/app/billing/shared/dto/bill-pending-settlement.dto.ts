@@ -8,4 +8,5 @@ export class BillingPendingSettlement_DTO {
     public ProvisionalTotal: number = 0;
     public DepositBalance: number = 0;
     public LastTxnDate: string = '';
+    public Age: string = '';
 }

@@ -127,6 +127,13 @@ export class PHRMCategoryManageComponent implements OnInit {
             this.CurrentCategory.CategoryValidator.controls[i].markAsDirty();
             this.CurrentCategory.CategoryValidator.controls[i].updateValueAndValidity();
         }
+        if (this.categoryList && this.categoryList.length) {
+            const isCategoryNameAlreadyExists = this.categoryList.some(a => a.CategoryName.toLowerCase() === this.CurrentCategory.CategoryName.toLowerCase());
+            if (isCategoryNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add category as the Category Name "${this.CurrentCategory.CategoryName}" already exists!`]);
+                return;
+            }
+        }
         if (this.CurrentCategory.IsValidCheck(undefined, undefined)) {
             this.CurrentCategory.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
             this.CurrentCategory.CreatedOn = moment().format('YYYY-MM-DD');
@@ -153,6 +160,15 @@ export class PHRMCategoryManageComponent implements OnInit {
             this.CurrentCategory.CategoryValidator.controls[i].markAsDirty();
             this.CurrentCategory.CategoryValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.categoryList && this.categoryList.length) {
+            const isCategoryNameAlreadyExists = this.categoryList.some(a => a.CategoryName.toLowerCase() === this.CurrentCategory.CategoryName.toLowerCase() && a.CategoryId !== this.CurrentCategory.CategoryId);
+            if (isCategoryNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update category as the Category Name "${this.CurrentCategory.CategoryName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.CurrentCategory.IsValidCheck(undefined, undefined)) {
             this.CurrentCategory.CreatedOn = moment().format('YYYY-MM-DD');
             this.pharmacyBLService.UpdateCategory(this.CurrentCategory)

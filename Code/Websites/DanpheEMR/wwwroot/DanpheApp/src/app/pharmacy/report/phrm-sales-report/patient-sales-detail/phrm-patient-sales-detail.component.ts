@@ -160,7 +160,7 @@ export class PHRMPatientSalesDetailComponent implements OnInit {
             this.PatientSalesDetailData = res.Results;
             this.grandTotal.totalSales = this.PatientSalesDetailData.reduce((a, b) => a + (b.Type == 'Sale' ? b.TotalAmount : 0), 0);
             this.grandTotal.totalRefund = this.PatientSalesDetailData.reduce((a, b) => a + (b.Type == 'Sales Refund' ? b.TotalAmount : 0), 0);
-            this.grandTotal.totalNetSales = this.grandTotal.totalSales - this.grandTotal.totalRefund;
+            this.grandTotal.totalNetSales = this.grandTotal.totalSales + this.grandTotal.totalRefund;
             this.changeDetector.detectChanges();
             this.footerContent = document.getElementById("print_summary").innerHTML;
           }

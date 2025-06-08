@@ -13,6 +13,7 @@ using DanpheEMR.Services.Verification.DTOs.Pharmacy;
 using DanpheEMR.Services.WardSupply.Pharmacy.Requisiton;
 using DanpheEMR.Utilities;
 using DanpheEMR.ViewModel.Substore;
+using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
@@ -22,10 +23,12 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Entity;
+using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using static Syncfusion.XlsIO.Parser.Biff_Records.MsoDrawing.MsofbtDgg;
 
 namespace DanpheEMR.Controllers
 {
@@ -146,7 +149,7 @@ namespace DanpheEMR.Controllers
                                         {
                                             RequisitionNo = wardReq.RequisitionNo,
                                             CreatedBy = emp.FullName,
-                                            Date = wardReq.CreatedOn,
+                                            Date = wardReq.RequisitionDate,
                                             Status = wardReq.RequisitionStatus,
                                             RequisitionId = wardReq.RequisitionId,
                                             IsNewDispatchAvailable = DGrouped.Any(d => d.ReceivedById == null),
@@ -785,96 +788,18 @@ namespace DanpheEMR.Controllers
         [HttpGet("GetInventoryItemsByStoreId/{StoreId}")]
         public IActionResult GetInventoryItemsByStoreId(int StoreId)
         {
-
-            //var inTxns = new string[] { ENUM_INV_StockTransactionType.PurchaseItem, ENUM_INV_StockTransactionType.OpeningItem, ENUM_INV_StockTransactionType.StockManageItem };
-
-            Func<object> func = () => (from wardstock in _wardSupplyDbContext.StoreStocks.Include(s => s.StockMaster)
-                                           //let firstInTxn = _wardSupplyDbContext.StockTransactions.FirstOrDefault(a => a.StockId == wardstock.StockId && a.InQty > 0 && inTxns.Contains(a.TransactionType))
-                                       join item in _wardSupplyDbContext.INVItemMaster on wardstock.ItemId equals item.ItemId
-                                       join uom in _wardSupplyDbContext.UnitOfMeasurementMaster on item.UnitOfMeasurementId equals uom.UOMId
-                                       //join mainStore in _wardSupplyDbContext.StoreModel on firstInTxn.StoreId equals mainStore.StoreId
-                                       join subcategory in _wardSupplyDbContext.ItemSubCategory on item.SubCategoryId equals subcategory.SubCategoryId
-                                       where wardstock.StoreId == StoreId && wardstock.AvailableQuantity > 0
-                                       group new { wardstock, item, uom, subcategory } by new { item.ItemId, item.ItemName, item.ItemType, /*mainStore.StoreId, mainStore.Name,*/ item.Description, subcategory.SubCategoryName, subcategory.SubCategoryId } into t
-                                       select new
-                                       {
-                                           ItemId = t.Key.ItemId,
-                                           StockId = t.Select(a => a.wardstock.StockId).FirstOrDefault(),
-                                           ItemName = t.Key.ItemName.Trim(),
-                                           Description = t.Key.Description,
-                                           AvailableQuantity = t.Sum(a => a.wardstock.AvailableQuantity),
-                                           MinimumQuantity = t.Select(a => a.item.MinStockQuantity).FirstOrDefault(),
-                                           ExpiryDate = t.Select(a => a.wardstock.StockMaster.ExpiryDate).FirstOrDefault(),
-                                           Code = t.Select(a => a.item.Code).FirstOrDefault(),
-                                           UOMName = t.Select(a => a.uom.UOMName).FirstOrDefault(),
-                                           IsColdStorageApplicable = t.Select(a => a.item.IsColdStorageApplicable).FirstOrDefault(),
-                                           MRP = t.Select(a => a.wardstock.StockMaster.MRP).FirstOrDefault(),
-                                           BatchNo = t.Select(a => a.wardstock.StockMaster.BatchNo).FirstOrDefault(),
-                                           ItemType = t.Key.ItemType,
-                                           //StoreId = t.Key.StoreId,
-                                           //StoreName = t.Key.Name,
-                                           ItemRate = t.Select(s => s.wardstock.StockMaster.CostPrice).FirstOrDefault(),
-                                           SubCategoryName = t.Key.SubCategoryName,
-                                           SubCategoryId = t.Key.SubCategoryId
-
-                                       }).OrderBy(a => a.ItemName).ToList();
-
+            Func<object> func = () => WardSupplyBL.GetSubStoreInventoryStocks(StoreId, _inventoryDbContext);
             return InvokeHttpGetFunction(func);
-
         }
 
         [HttpGet("GetInventorySubStoreItemsByStoreIdForReturn/{StoreId}")]
         public async Task<IActionResult> GetInventorySubStoreItemsByStoreIdForReturn(int StoreId)
         {
-            //List<string> inTransactionType = new List<string>() { ENUM_INV_StockTransactionType.OpeningItem, ENUM_INV_StockTransactionType.PurchaseItem };
-
-            Func<object> func = () => (from S in _inventoryDbContext.StoreStocks.Include(s => s.StockMaster)
-                                           // let storeIdOfInventoryThatPurchasedTheItem = _inventoryDbContext.StockTransactions.Where(t => t.StockId == S.StockId && inTransactionType.Contains(t.TransactionType)).Select(s => s.StoreId).FirstOrDefault()
-                                       join I in _inventoryDbContext.Items on S.ItemId equals I.ItemId
-                                       join C in _inventoryDbContext.ItemCategoryMaster on I.ItemCategoryId equals C.ItemCategoryId
-                                       join U in _inventoryDbContext.UnitOfMeasurementMaster on I.UnitOfMeasurementId equals U.UOMId into UJ
-                                       from ULJ in UJ.DefaultIfEmpty()
-                                       where S.StoreId == StoreId && S.IsActive == true && S.AvailableQuantity > 0 //stktxn.TransactionType.Contains(transactionType) 
-                                       group new { S, I, C, ULJ } by new
-                                       {
-                                           S.ItemId,
-                                           I.ItemName,
-                                           S.StockMaster.ExpiryDate,
-                                           I.Description,
-                                           S.StockId,
-                                           //StoreId = storeIdOfInventoryThatPurchasedTheItem,
-                                           S.IsActive,
-                                           S.StockMaster.BatchNo,
-                                           C.ItemCategoryName,
-                                           I.Code,
-                                           I.IsFixedAssets
-                                       } into SG
-                                       select new
-                                       {
-                                           StockId = SG.Key.StockId,
-                                           //StoreId = SG.Key.StoreId,
-                                           ItemId = SG.Key.ItemId,
-                                           IsActive = SG.Key.IsActive,
-                                           ItemName = SG.Key.ItemName,
-                                           Description = SG.Key.Description,
-                                           ExpiryDate = SG.Key.ExpiryDate,
-                                           ItemCategory = SG.Key.ItemCategoryName,
-                                           ItemCode = SG.Key.Code,
-                                           ItemUOM = SG.FirstOrDefault().ULJ == null ? "N/A" : SG.Select(s => s.ULJ.UOMName).FirstOrDefault(),
-                                           BatchNo = SG.Key.BatchNo,
-                                           AvailableQuantity = SG.Sum(s => s.S.AvailableQuantity),
-                                           IsFixedAsset = SG.Key.IsFixedAssets,
-                                           BarCodeList = (from fixedAssetStock in _inventoryDbContext.FixedAssetStock
-                                                          where fixedAssetStock.ItemId == SG.Key.ItemId && fixedAssetStock.IsActive == true && (fixedAssetStock.SubStoreId == StoreId)
-                                                          select new BarCodeNumberDTO
-                                                          {
-                                                              BarCodeNumber = fixedAssetStock.BarCodeNumber,
-                                                              StockId = fixedAssetStock.FixedAssetStockId
-                                                          }).ToList()
-                                       }).ToList();
+            Func<object> func = () => WardSupplyBL.GetSubStoreInventoryStocks(StoreId, _inventoryDbContext);
             return InvokeHttpGetFunction(func);
 
         }
+
         [HttpGet("GetInventoryItemsForPatConsumptionByStoreId/{StoreId}")]
         public IActionResult GetInventoryItemsForPatConsumptionByStoreId(int StoreId)
         {
@@ -886,7 +811,7 @@ namespace DanpheEMR.Controllers
                                        select new
                                        {
                                            ItemId = t.Key.ItemId,
-                                           StockId = t.Select(a => a.wardstock.StockId).FirstOrDefault(),
+                                           //StockId = t.Select(a => a.wardstock.StockId).FirstOrDefault(),
                                            ItemName = t.Key.ItemName,
                                            Description = t.Key.Description,
                                            Quantity = t.Sum(a => a.wardstock.AvailableQuantity),
@@ -896,6 +821,7 @@ namespace DanpheEMR.Controllers
                                            UOMName = t.Select(a => a.uom.UOMName).FirstOrDefault(),
                                            IsColdStorageApplicable = t.Select(a => a.item.IsColdStorageApplicable).FirstOrDefault(),
                                            MRP = t.Select(a => a.wardstock.StockMaster.MRP).FirstOrDefault(),
+                                           CostPrice = t.Select(a => a.wardstock.StockMaster.CostPrice).FirstOrDefault(),
                                            BatchNo = t.Select(a => a.wardstock.StockMaster.BatchNo).FirstOrDefault(),
                                            ItemType = t.Key.ItemType
                                        }).ToList();
@@ -932,15 +858,17 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
         }
 
-        [HttpGet("GetInventoryConsumptionList/{StoreId}/{FromDate}/{ToDate}")]
-        public IActionResult GetInventoryConsumptionList(int StoreId, DateTime FromDate, DateTime ToDate)
+        [HttpGet("GetInventoryConsumptionList")]
+        public IActionResult GetInventoryConsumptionList(int StoreId, DateTime FromDate, DateTime ToDate, int? ConsumptionTypeId)
         {
             ToDate = ToDate.AddDays(1);
             Func<object> func = () => (from consump in _wardSupplyDbContext.WARDInventoryConsumptionModel
                                        join emp in _wardSupplyDbContext.Employees on consump.CreatedBy equals emp.EmployeeId
                                        join itmmst in _wardSupplyDbContext.INVItemMaster on consump.ItemId equals itmmst.ItemId
                                        join uom in _wardSupplyDbContext.UnitOfMeasurementMaster on itmmst.UnitOfMeasurementId equals uom.UOMId
-                                       where consump.StoreId == StoreId && consump.ConsumptionReceiptId == null
+                                       join conType in _wardSupplyDbContext.ConsumptionTypes on consump.ConsumptionTypeId equals conType.ConsumptionTypeId into consumption
+                                       from cons in consumption.DefaultIfEmpty()
+                                       where consump.StoreId == StoreId && consump.ConsumptionReceiptId == null && (consump.ConsumptionTypeId == ConsumptionTypeId || ConsumptionTypeId == null)
                                        select new
                                        {
                                            ConsumptionDate = consump.ConsumptionDate,
@@ -948,7 +876,8 @@ namespace DanpheEMR.Controllers
                                            Quantity = consump.Quantity,
                                            Unit = uom.UOMName,
                                            UsedBy = emp.FullName,
-                                           Remark = consump.Remark
+                                           Remark = consump.Remark,
+                                           ConsumptionTypeName = cons.ConsumptionTypeName
                                        }).Where(c => c.ConsumptionDate >= FromDate && c.ConsumptionDate < ToDate)
                                        .OrderByDescending(c => c.ConsumptionDate)
                                        .ToList();
@@ -1199,14 +1128,14 @@ namespace DanpheEMR.Controllers
 
         }
 
-        [HttpGet("ConsumptionReport/{FromDate}/{ToDate}/{StoreId}")]
-        public string ConsumptionReport(DateTime FromDate, DateTime ToDate, int StoreId)
+        [HttpGet("Inventory/Reports/ConsumptionReport")]
+        public string ConsumptionReport(DateTime FromDate, DateTime ToDate, int StoreId, int? ConsumptionTypeId)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
             {
                 WardReportingDbContext wardreportingDbContext = new WardReportingDbContext(connString);
-                DataTable dtResult = wardreportingDbContext.ConsumptionReport(FromDate, ToDate, StoreId);
+                DataTable dtResult = wardreportingDbContext.ConsumptionReport(FromDate, ToDate, StoreId, ConsumptionTypeId);
                 responseData.Status = "OK";
                 responseData.Results = dtResult;
             }
@@ -1270,7 +1199,12 @@ namespace DanpheEMR.Controllers
                 Requisition.MaxVerificationLevel = VerifierList == null ? 0 : VerifierList.Count;
                 Requisition.NewDispatchAvailable = InventoryBL.CheckIfNewDispatchAvailable(inventoryDbContext, Requisition.RequisitionId);
                 Requisition.isVerificationAllowed = InventoryBL.IsUserAllowedToSeeRequisition(inventoryDbContext, user, Requisition, VerifierList);
+                var DispatchList = inventoryDbContext.Dispatch.Where(d => d.RequisitionId == Requisition.RequisitionId).ToList();
+                if (DispatchList.Count > 0)
+                {
+                    Requisition.IsReceived = DispatchList.All(d => d.ReceivedBy != null);
 
+                }
                 if (Requisition.VerificationId != null)
                 {
                     Requisition.CurrentVerificationLevelCount = VerificationBL.GetNumberOfVerificationDone(inventoryDbContext, Requisition.VerificationId ?? 0);
@@ -1419,11 +1353,23 @@ namespace DanpheEMR.Controllers
                     {
                         foreach (var consumption in consumptionItems)
                         {
+                            var stock = _wardSupplyDbContext.StoreStocks
+                            .Where(s => s.IsActive && s.ItemId == consumption.ItemId && s.StoreId == consumption.StoreId && s.CostPrice == consumption.CostPrice && s.AvailableQuantity > 0)
+                             .GroupBy(s => new { s.StoreId, s.ItemId, s.CostPrice })
+                            .Select(g => new
+                            {
+                                AvailableQuantity = g.Sum(s => s.AvailableQuantity)
+                            }).FirstOrDefault();
+
+                            if (stock is null)
+                            {
+                                throw new InvalidDataException($"Stock is not Available for Item: {consumption.ItemName}");
+                            }
                             consumption.Quantity = consumption.ConsumeQuantity;
                             consumption.CreatedOn = DateTime.Now;
                             _wardSupplyDbContext.WARDInventoryConsumptionModel.Add(consumption);
                             _wardSupplyDbContext.SaveChanges();
-                            WardSupplyBL.UpdateWardStockForConsumption(_wardSupplyDbContext, currentUser, consumption);
+                            WardSupplyBL.UpdateWardStockFromInventoryConsumption(_wardSupplyDbContext, currentUser, consumption);
                         }
                         transaction.Commit();
                     }
@@ -1939,7 +1885,7 @@ namespace DanpheEMR.Controllers
                 {
                     item.ReturnAssets.ForEach(returningAsset =>
                     {
-                        returningAsset.Asset = fixedAssets.FirstOrDefault(a => a.FixedAssetStockId == returningAsset.FixedAssetStockId);
+                        returningAsset.Asset = fixedAssets.Find(a => a.FixedAssetStockId == returningAsset.FixedAssetStockId);
                         returningAsset.Asset.Return(returnModel.TargetStoreId, currentUser.EmployeeId, currentDateTime);
                     });
                 }
@@ -1961,26 +1907,30 @@ namespace DanpheEMR.Controllers
 
 
                 //Find the stock to be decreased for each returned item 
-                var currentSubstoreStockList = wardSupplyDbContext.StoreStocks.Include(a => a.StockMaster).Where(s => s.ItemId == item.ItemId && s.StoreId == ReturnFromClient.SourceStoreId && s.AvailableQuantity > 0 && s.StockMaster.BatchNo == item.BatchNo && s.StockMaster.ExpiryDate == item.ExpiryDate && s.IsActive).ToList();
+                var currentSubstoreStockList = wardSupplyDbContext.StoreStocks.Include(a => a.StockMaster).Where(s => s.ItemId == item.ItemId && s.CostPrice == item.CostPrice && s.StoreId == ReturnFromClient.SourceStoreId && s.AvailableQuantity > 0 && s.StockMaster.BatchNo == item.BatchNo && s.StockMaster.ExpiryDate == item.ExpiryDate && s.IsActive).ToList();
                 // If no stock found, stop the process
-                if (currentSubstoreStockList == null) throw new InvalidOperationException($"Stock is not available for ItemId = {item.ItemId}, BatchNo ={item.BatchNo}");
+                if (currentSubstoreStockList.Count == 0) throw new InvalidOperationException($"Stock is not available for ItemId = {item.ItemId}, BatchNo ={item.BatchNo}");
                 // If total available quantity is less than the required/ returned quantity, then stop the process
-                if (currentSubstoreStockList.Sum(s => s.AvailableQuantity) < item.ReturnQuantity) throw new InvalidOperationException($"Stock is not available for ItemId = {item.ItemId}, BatchNo ={item.BatchNo}");
+                var currentStoreStockAvailableQty = currentSubstoreStockList.Sum(s => s.AvailableQuantity);
+                if (currentStoreStockAvailableQty < item.ReturnQuantity) throw new InvalidOperationException($"Stock is not available for ItemId = {item.ItemId}, BatchNo ={item.BatchNo}");
 
                 var totalReturningQty = item.ReturnQuantity;
 
                 foreach (var subStoreStock in currentSubstoreStockList)
                 {
                     //Find stock in Main Stocks
-                    var mainStoreStock = wardSupplyDbContext.StoreStocks.Include(s => s.StockMaster).FirstOrDefault(s => s.StockId == subStoreStock.StockId && s.StoreId == ReturnFromClient.TargetStoreId);
+                    var mainStoreStock = wardSupplyDbContext.StoreStocks
+                                                            .Include(s => s.StockMaster)
+                                                            .FirstOrDefault(s => s.ItemId == subStoreStock.ItemId && s.StockMaster.CostPrice == subStoreStock.CostPrice && s.StockMaster.BatchNo == item.BatchNo && s.StockMaster.ExpiryDate == item.ExpiryDate && s.IsActive && s.StoreId == ReturnFromClient.TargetStoreId);
 
                     if (subStoreStock.AvailableQuantity < totalReturningQty)
                     {
+                        double actualReturningQuantity = subStoreStock.AvailableQuantity;
                         totalReturningQty -= subStoreStock.AvailableQuantity;
 
                         //Decrease Stock From Current Sub Store
                         subStoreStock.DecreaseStock(
-                                quantity: subStoreStock.AvailableQuantity,
+                                quantity: actualReturningQuantity,
                                 transactionType: ENUM_INV_StockTransactionType.ReturnedItem,
                                 transactionDate: ReturnFromClient.ReturnDate ?? currentDateTime,
                                 currentDate: currentDateTime,
@@ -2008,7 +1958,7 @@ namespace DanpheEMR.Controllers
                         {
                             //Increase Stock TO Main Store
                             mainStoreStock.AddStock(
-                                quantity: subStoreStock.AvailableQuantity,
+                                quantity: actualReturningQuantity,
                                 transactionType: ENUM_INV_StockTransactionType.ReturnedItemReceivingSide,
                                 transactionDate: ReturnFromClient.ReturnDate ?? currentDateTime,
                                 currentDate: currentDateTime,
@@ -2018,7 +1968,6 @@ namespace DanpheEMR.Controllers
                                 needConfirmation: true
                                 );
                         }
-                        wardSupplyDbContext.SaveChanges();
                     }
                     else
                     {
@@ -2064,10 +2013,10 @@ namespace DanpheEMR.Controllers
                         }
                         totalReturningQty = 0;
                     }
-                    wardSupplyDbContext.SaveChanges();
                     if (totalReturningQty == 0)
                         break;
                 }
+                wardSupplyDbContext.SaveChanges();
             }
         }
 
@@ -2180,9 +2129,13 @@ namespace DanpheEMR.Controllers
         [HttpPut("UpdateRequisition")]
         public IActionResult UpdateRequisition([FromBody] InventoryRequisition_DTO requisitionDTO)
         {
+            Func<object> func = () => UpdateRequisitionDetail(requisitionDTO);
+            return InvokeHttpPostFunction(func);
+        }
+        private object UpdateRequisitionDetail(InventoryRequisition_DTO requisitionDTO)
+        {
             RequisitionModel requisition = JsonConvert.DeserializeObject<RequisitionModel>(DanpheJSONConvert.SerializeObject(requisitionDTO));
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             WardSupplyDbContext dbContext = new WardSupplyDbContext(connString);
             using (var dbContextTransaction = dbContext.Database.BeginTransaction())
             {
@@ -2194,6 +2147,16 @@ namespace DanpheEMR.Controllers
                     requisition.ModifiedOn = DateTime.Now;
                     requisition.ModifiedBy = currentUser.EmployeeId;
                     requisition.VerifierIds = SerializeVerifiers(requisitionDTO.VerifierList);
+
+                    if (requisition.VerifierIds != "[]" && requisition.IsVerificationEnabled)
+                    {
+                        requisition.RequisitionStatus = ENUM_InventoryRequisitionStatus.Pending;
+                    }
+                    else
+                    {
+                        requisition.RequisitionStatus = ENUM_InventoryRequisitionStatus.Active;
+                        requisition.VerifierIds = null;
+                    }
 
                     //update each item and add the new item against that requisition in INV_TXN_RequisitionItems table.
                     requisition.RequisitionItems.ForEach(item =>
@@ -2230,6 +2193,34 @@ namespace DanpheEMR.Controllers
                         else //new items wont have requisitionItemId
                         {
                             //for adding new reqitm
+                            var preventDuplicateItemRequisition = dbContext.CfgParameters.Where(a => a.ParameterGroupName == "Inventory" && a.ParameterName == "SubstorePreventDuplicateItemRequisition").Select(a => a.ParameterValue).FirstOrDefault();
+                            Boolean IsPreventDuplicateItemRequisition = (preventDuplicateItemRequisition == "true") ? true : false;
+
+                            if (IsPreventDuplicateItemRequisition)
+                            {
+                                var RequisitionItems = (from itm in dbContext.RequisitionItems.Where(i => i.PendingQuantity > 0 && i.ReceivedQuantity != i.Quantity && i.RequisitionItemStatus != ENUM_InventoryRequisitionStatus.Cancelled && i.RequisitionItemStatus != ENUM_InventoryRequisitionStatus.Withdrawn)
+                                                        join req in dbContext.Requisitions.Where(i => i.RequestFromStoreId == requisition.RequestFromStoreId) on itm.RequisitionId equals req.RequisitionId
+                                                        select new
+                                                        {
+                                                            itm.ItemId
+                                                        }).ToList();
+                                var dispatchItemsFromDb = dbContext.DispatchItems.Where(d => d.ReceivedById == null && d.TargetStoreId == requisition.RequestFromStoreId).ToList();
+                                List<String> ItemsNotReceivedList = new List<String>();
+
+                                Boolean IsItemAlreadyRequested = RequisitionItems.Any(r => r.ItemId == item.ItemId);
+                                Boolean IsItemNotReceived = dispatchItemsFromDb.Any(d => d.ItemId == item.ItemId);
+                                if (IsItemAlreadyRequested || IsItemNotReceived)
+                                {
+                                    String ItemName = dbContext.INVItemMaster.Where(itm => itm.ItemId == item.ItemId && itm.IsActive == true).FirstOrDefault().ItemName;
+                                    ItemsNotReceivedList.Add(ItemName);
+                                }
+                                if (ItemsNotReceivedList.Count() > 0)
+                                {
+                                    string concatenatedResult = String.Join(", ", ItemsNotReceivedList);
+                                    throw new Exception("Active Requisitions exist for items : " + concatenatedResult + " .Please Remove these items from requisition to proceed");
+                                }
+                            }
+
                             item.CreatedOn = DateTime.Now;
                             item.CreatedBy = currentUser.EmployeeId;
                             item.RequisitionId = reqId;
@@ -2242,7 +2233,10 @@ namespace DanpheEMR.Controllers
                             dbContext.SaveChanges();
                         }
                     });
-
+                    if (!requisition.IsVerificationEnabled)
+                    {
+                        requisition.RequisitionStatus = "active";
+                    }
                     dbContext.Requisitions.Attach(requisition);
                     dbContext.Entry(requisition).Property(a => a.RequisitionDate).IsModified = true;
                     dbContext.Entry(requisition).Property(a => a.IssueNo).IsModified = true;
@@ -2252,10 +2246,11 @@ namespace DanpheEMR.Controllers
                     dbContext.Entry(requisition).Property(a => a.RequestToStoreId).IsModified = true;
                     dbContext.Entry(requisition).Property(a => a.VerifierIds).IsModified = true;
                     dbContext.Entry(requisition).Property(a => a.Remarks).IsModified = true;
+                    dbContext.Entry(requisition).Property(a => a.IsVerificationEnabled).IsModified = true;
+                    dbContext.Entry(requisition).Property(a => a.RequisitionStatus).IsModified = true;
                     dbContext.SaveChanges();
                     dbContextTransaction.Commit();
-                    responseData.Status = "OK";
-                    responseData.Results = requisition.RequisitionId;
+                    return requisition.RequisitionId;
                 }
 
                 catch (Exception ex)
@@ -2264,7 +2259,6 @@ namespace DanpheEMR.Controllers
                     throw ex;
                 }
             }
-            return Ok(responseData);
         }
 
         private static string SerializeVerifiers(List<Verifier_DTO> verifiers)
@@ -2642,10 +2636,9 @@ namespace DanpheEMR.Controllers
         {
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             WardSupplyDbContext wardSupplyDbContext = new WardSupplyDbContext(connString);
-            var totalStock = (from wardstock in wardSupplyDbContext.StoreStock.Include(s => s.StockMaster)
+            var totalStock = (from wardstock in wardSupplyDbContext.StoreStock.Include(s => s.StockMaster).Where(s => s.StoreId == StoreId && s.AvailableQuantity > 0)
                               join item in wardSupplyDbContext.PHRMItemMaster on wardstock.ItemId equals item.ItemId
                               join generic in wardSupplyDbContext.PHRMGenericMaster on item.GenericId equals generic.GenericId
-                              where wardstock.StoreId == StoreId
                               group new { wardstock, item, generic } by new { wardstock.ItemId, wardstock.StockId, wardstock.StockMaster.BatchNo, wardstock.StockMaster.SalePrice, wardstock.StockMaster.ExpiryDate } into x
                               select new
                               {
@@ -2658,7 +2651,6 @@ namespace DanpheEMR.Controllers
                                   AvailableQuantity = x.Sum(a => a.wardstock.AvailableQuantity),
                                   ExpiryDate = x.Key.ExpiryDate,
                                   SalePrice = Math.Round(x.Key.SalePrice, 2),
-                                  //StockType = x.Select(a => a.wardstock.StockType).FirstOrDefault()
                               }).ToList();
 
             responseData.Status = (totalStock == null) ? ENUM_DanpheHttpResponseText.Failed : ENUM_DanpheHttpResponseText.OK;
@@ -2675,5 +2667,19 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
         }
 
+
+        [HttpGet("BarCodeOfCapitalItemByItemIdAndSubStoreId")]
+        public async Task<IActionResult> GetBarCodeOfCapitalItemByItemId(int SubStoreId, int ItemId)
+        {
+            Func<object> func = () => WardSupplyBL.GetBarCodeOfCapitalItemByItemId(SubStoreId, ItemId, _inventoryDbContext);
+            return InvokeHttpGetFunction(func);
+
+        }
+        [HttpGet("WardInventoryReturnReport")]
+        public IActionResult ReturnReport(DateTime FromDate, DateTime ToDate, int SourceStoreId, int? TargetStoreId, string ItemCategory, int? ItemId)
+        {
+            Func<object> func = () => WardSupplyBL.GetReturnReportData(FromDate, ToDate, SourceStoreId, TargetStoreId, ItemCategory, ItemId, _inventoryDbContext);
+            return InvokeHttpGetFunction(func);
+        }
     }
 }

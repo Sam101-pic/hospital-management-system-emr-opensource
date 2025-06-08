@@ -12,12 +12,8 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using DanpheEMR.Utilities;
 using Newtonsoft.Json;
-using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Http.Features;
 using DanpheEMR.CommonTypes;
 using DanpheEMR.Core.Caching;
-using DanpheEMR.Core.Caching;
-using System.Xml;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel.LabModels;
 using DanpheEMR.Enums;
@@ -28,6 +24,18 @@ using System.Net;
 using System.IO;
 using DanpheEMR.Services;
 using System.Web;
+using System.Net.Http.Headers;
+using System.Net.Http;
+using System.Text;
+using DanpheEMR.Services.Lab.DTOs;
+using System.Collections.Specialized;
+using Microsoft.AspNetCore.Http;
+using DanpheEMR.Services.Shared.DTOs;
+using DanpheEMR.Services.Lab;
+using DanpheEMR.Controllers.Lab.DTO;
+using Microsoft.SqlServer.Server;
+using Microsoft.Extensions.Logging.Console.Internal;
+
 namespace DanpheEMR.Controllers
 {
 
@@ -36,26 +44,28 @@ namespace DanpheEMR.Controllers
         //private bool docPatPortalSync = false;
         private List<LabRunNumberSettingsModel> LabRunNumberSettings = new List<LabRunNumberSettingsModel>();
         private GoogleDriveFileUploadService GoogleDriveFileUpload;
-        private string CovidReportFileUploadPath;
-        private string CovidReportUrlComonPath;
+        private string LabReportFileUploadPath;
+        private string LabReportUrlComonPath;
         public IEmailService _emailService;
         private readonly LabDbContext _labDbContext;
         private readonly CoreDbContext _coreDbContext;
         private readonly MasterDbContext _masterDbContext;
         private readonly BillingDbContext _billingDbContext;
+        private readonly ILabService _labService;
 
-        public LabController(IOptions<MyConfiguration> _config, IEmailService emailService) : base(_config)
+        public LabController(IOptions<MyConfiguration> _config, IEmailService emailService, ILabService labService) : base(_config)
         {
             //docPatPortalSync = _config.Value.DanphePatientPortalSync;           
             GoogleDriveFileUpload = new GoogleDriveFileUploadService(_config);
-            CovidReportFileUploadPath = _config.Value.GoogleDriveFileUpload.UploadFileBasePath;
-            CovidReportUrlComonPath = _config.Value.GoogleDriveFileUpload.FileUrlCommon;
+            LabReportFileUploadPath = _config.Value.GoogleDriveFileUpload.UploadFileBasePath;
+            LabReportUrlComonPath = _config.Value.GoogleDriveFileUpload.FileUrlCommon;
             _emailService = emailService;
             _labDbContext = new LabDbContext(connString);
             _coreDbContext = new CoreDbContext(connString);
             _masterDbContext = new MasterDbContext(connString);
             _billingDbContext = new BillingDbContext(connString);
             this.LabRunNumberSettings = (List<LabRunNumberSettingsModel>)DanpheCache.GetMasterData(MasterDataEnum.LabRunNumberSettings);
+            _labService = labService;
         }
 
         #region Start HTTP GET APIs
@@ -76,7 +86,7 @@ namespace DanpheEMR.Controllers
         {
             //if (reqType == "testListSummaryByPatientId")
             //{
-            Func<object> func = () => GetPatientNotFinalizedTests(categoryIdList,patientId,FromDate,ToDate);
+            Func<object> func = () => GetPatientNotFinalizedTests(categoryIdList, patientId, FromDate, ToDate);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -87,11 +97,9 @@ namespace DanpheEMR.Controllers
             //else if (reqType == "labRequisition")//!=null not needed for string.
             //{
             var activeLab = HttpContext.Session.Get<string>("activeLabName");
-            Func<object> func = () => GetLabRequisition(activeLab, FromDate, ToDate);
+            Func<object> func = () => _labService.GetSampleCollectionList(FromDate, ToDate, activeLab, _labDbContext);
             return InvokeHttpGetFunction<object>(func);
         }
-
-  
 
         [HttpGet]
         [Route("Requisition/PatientSamplePending")]
@@ -100,7 +108,7 @@ namespace DanpheEMR.Controllers
             //else if (reqType == "LabSamplesWithCodeByPatientId")
             //{
             var activeLab = HttpContext.Session.Get<string>("activeLabName");
-            Func<object> func = () => GetPatientSamplePending(activeLab , hasInsurance, requisitionId, patientId, wardName, visitType,runNumberType);
+            Func<object> func = () => GetPatientSamplePending(activeLab, hasInsurance, requisitionId, patientId, wardName, visitType, runNumberType);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -144,7 +152,7 @@ namespace DanpheEMR.Controllers
             //else if (reqType == "pendingLabResults")
             //{
             var activeLab = HttpContext.Session.Get<string>("activeLabName");
-            Func<object> func = () => GetPendingLabResults(categoryIdList, activeLab, FromDate, ToDate);
+            Func<object> func = () => _labService.GetPendingLabResult(FromDate, ToDate, categoryIdList, activeLab, _labDbContext);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -155,7 +163,7 @@ namespace DanpheEMR.Controllers
             //else if (reqType == "pending-reports")
             //{
             var activeLab = HttpContext.Session.Get<string>("activeLabName");
-            Func<object> func = () => GetPendingLabReport(categoryIdList, activeLab, FromDate, ToDate);
+            Func<object> func = () => _labService.GetPendingReports(FromDate, ToDate, categoryIdList, activeLab, _labDbContext);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -176,14 +184,18 @@ namespace DanpheEMR.Controllers
         {
             //else if (reqType == "patientListForReportDispatch")
             //{
-            List<string> selCategoryList = DanpheJSONConvert.DeserializeObject<List<string>>(categoryIdList);
-            List<SqlParameter> paramList = new List<SqlParameter>() {
-                        new SqlParameter("@StartDate", FromDate),
-                        new SqlParameter("@EndDate", ToDate),
-                        new SqlParameter("@CategoryList", String.Join(",",selCategoryList))
-                };
+            //List<string> selCategoryList = DanpheJSONConvert.DeserializeObject<List<string>>(categoryIdList);
+            //List<SqlParameter> paramList = new List<SqlParameter>() {
+            //            new SqlParameter("@StartDate", FromDate),
+            //            new SqlParameter("@EndDate", ToDate),
+            //            new SqlParameter("@CategoryList", String.Join(",",selCategoryList))
+            //    };
 
-            Func<object> func = () => DALFunctions.GetDataTableFromStoredProc("SP_LAB_GetPatientListForReportDispatch", paramList, _labDbContext);
+            //Func<object> func = () => DALFunctions.GetDataTableFromStoredProc("SP_LAB_GetPatientListForReportDispatch", paramList, _labDbContext);
+            //return InvokeHttpGetFunction<object>(func);
+
+            var activeLab = HttpContext.Session.Get<string>("activeLabName");
+            Func<object> func = () => _labService.GetPatientsForReportDispatch(FromDate, ToDate, categoryIdList, activeLab, _labDbContext);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -205,14 +217,14 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction<object>(func);
         }
 
-       [HttpGet]
+        [HttpGet]
         [Route("LabDataByBarcodeNumber")]
         public ActionResult LabDataByBarcodeNumber(int barCodeNumber)
         {
             //else if (reqType == "allLabDataFromBarCodeNumber")
             //{
             var selectedLab = HttpContext.Session.Get<string>(ENUM_SessionVariables.ActiveLabType);
-            Func<object> func = () => GetLabDataByBarcodeNumber(barCodeNumber,selectedLab);
+            Func<object> func = () => GetLabDataByBarcodeNumber(barCodeNumber, selectedLab);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -263,8 +275,8 @@ namespace DanpheEMR.Controllers
             //else if (reqType == "all-report-templates")
             //{
             Func<object> func = () => (from report in _labDbContext.LabReportTemplates
-                                                       where report.IsActive == true && report.TemplateType == ENUM_LabTemplateType.html// "html"
-                                                       select report).ToList();
+                                       where report.IsActive == true && report.TemplateType == ENUM_LabTemplateType.html// "html"
+                                       select report).ToList();
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -275,26 +287,26 @@ namespace DanpheEMR.Controllers
             //else if (reqType == "viewReport-visit")
             //{
             Func<object> func = () => (from req in _labDbContext.Requisitions
-                              join tst in _labDbContext.LabTests on req.LabTestId equals tst.LabTestId
-                              join temp in _labDbContext.LabReportTemplates on tst.ReportTemplateId equals temp.ReportTemplateID
-                              where req.PatientVisitId == patientVisitId && tst.ReportTemplateId == temp.ReportTemplateID
-                              select new
-                              {
-                                  TemplateName = temp.ReportTemplateShortName,
-                                  Components = (from res in _labDbContext.LabTestComponentResults
-                                                where req.RequisitionId == req.RequisitionId
-                                                select new
-                                                {
-                                                    Component = res.ComponentName,
-                                                    Value = res.Value,
-                                                    Unit = res.Unit,
-                                                    Range = res.Range,
-                                                    Remarks = res.Remarks,
-                                                    CreatedOn = res.CreatedOn,
-                                                    RequisitionId = res.RequisitionId,
-                                                    IsAbnormal = res.IsAbnormal
-                                                }).ToList()
-                              }).FirstOrDefault();
+                                       join tst in _labDbContext.LabTests on req.LabTestId equals tst.LabTestId
+                                       join temp in _labDbContext.LabReportTemplates on tst.ReportTemplateId equals temp.ReportTemplateID
+                                       where req.PatientVisitId == patientVisitId && tst.ReportTemplateId == temp.ReportTemplateID
+                                       select new
+                                       {
+                                           TemplateName = temp.ReportTemplateShortName,
+                                           Components = (from res in _labDbContext.LabTestComponentResults
+                                                         where req.RequisitionId == req.RequisitionId && res.IsActive == true
+                                                         select new
+                                                         {
+                                                             Component = res.ComponentName,
+                                                             Value = res.Value,
+                                                             Unit = res.Unit,
+                                                             Range = res.Range,
+                                                             Remarks = res.Remarks,
+                                                             CreatedOn = res.CreatedOn,
+                                                             RequisitionId = res.RequisitionId,
+                                                             IsAbnormal = res.IsAbnormal
+                                                         }).ToList()
+                                       }).FirstOrDefault();
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -305,9 +317,9 @@ namespace DanpheEMR.Controllers
             //else if (reqType == "visit-requisitions")
             //{
             Func<object> func = () => (from req in _labDbContext.Requisitions
-                            where req.PatientVisitId == patientVisitId
-                            && req.PatientId == patientId
-                            select req
+                                       where req.PatientVisitId == patientVisitId
+                                       && req.PatientId == patientId
+                                       select req
                                 )
                                 .GroupBy(x => x.LabTestId)
                                 .Select(g => new
@@ -319,7 +331,7 @@ namespace DanpheEMR.Controllers
                                 {
                                     TestId = x.Key,
                                     TestName = x.LatestRequisition.LabTestName,
-                                    labComponents = _labDbContext.LabTestComponentResults.Where(a => a.RequisitionId == x.LatestRequisition.RequisitionId).ToList()
+                                    labComponents = _labDbContext.LabTestComponentResults.Where(a => a.RequisitionId == x.LatestRequisition.RequisitionId && a.IsActive == true).ToList()
                                 })
                                 .ToList();
             return InvokeHttpGetFunction<object>(func);
@@ -333,29 +345,29 @@ namespace DanpheEMR.Controllers
             //else if (reqType == "viewReport-patient")
             //{
             Func<object> func = () => (from req in _labDbContext.Requisitions
-                              join tst in _labDbContext.LabTests on req.LabTestId equals tst.LabTestId
-                              join temp in _labDbContext.LabReportTemplates on tst.ReportTemplateId
-                              equals temp.ReportTemplateID
-                              where req.PatientId == patientId && tst.ReportTemplateId == temp.ReportTemplateID
-                              select new
-                              {
-                                  TemplateName = temp.ReportTemplateShortName,
-                                  Components = (from res in _labDbContext.LabTestComponentResults
-                                                where res.RequisitionId == req.RequisitionId
-                                                select new
-                                                {
-                                                    Date = req.OrderDateTime,
-                                                    Component = res.ComponentName,
-                                                    Value = res.Value,
-                                                    Unit = res.Unit,
-                                                    Range = res.Range,
-                                                    Remarks = res.Remarks,
-                                                    CreatedOn = res.CreatedOn,
-                                                    RequisitionId = res.RequisitionId,
-                                                    IsAbnormal = res.IsAbnormal
+                                       join tst in _labDbContext.LabTests on req.LabTestId equals tst.LabTestId
+                                       join temp in _labDbContext.LabReportTemplates on tst.ReportTemplateId
+                                       equals temp.ReportTemplateID
+                                       where req.PatientId == patientId && tst.ReportTemplateId == temp.ReportTemplateID
+                                       select new
+                                       {
+                                           TemplateName = temp.ReportTemplateShortName,
+                                           Components = (from res in _labDbContext.LabTestComponentResults
+                                                         where res.RequisitionId == req.RequisitionId && res.IsActive == true
+                                                         select new
+                                                         {
+                                                             Date = req.OrderDateTime,
+                                                             Component = res.ComponentName,
+                                                             Value = res.Value,
+                                                             Unit = res.Unit,
+                                                             Range = res.Range,
+                                                             Remarks = res.Remarks,
+                                                             CreatedOn = res.CreatedOn,
+                                                             RequisitionId = res.RequisitionId,
+                                                             IsAbnormal = res.IsAbnormal
 
-                                                }).ToList()
-                              }).ToList();
+                                                         }).ToList()
+                                       }).ToList();
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -386,7 +398,8 @@ namespace DanpheEMR.Controllers
         {
             //else if (reqType == "labRequisitionFromRequisitionIdList")
             //{
-            Func<object> func = () => {
+            Func<object> func = () =>
+            {
                 List<Int64> reqIdList = DanpheJSONConvert.DeserializeObject<List<Int64>>(requisitionIdList);
                 List<LabRequisitionModel> allReq = new List<LabRequisitionModel>();
                 allReq = _labDbContext.Requisitions.Where(req => reqIdList.Contains(req.RequisitionId)).ToList();
@@ -397,7 +410,7 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("RequisitionsForExternalLab")]
-        public ActionResult GetReqiusitionsForExternalLab(string LabTestCSV, DateTime FromDate, DateTime ToDate,string PatientName, string HospitalNo, int VendorId, string ExternalLabStatus)
+        public ActionResult GetReqiusitionsForExternalLab(string LabTestCSV, DateTime FromDate, DateTime ToDate, string PatientName, string HospitalNo, int VendorId, string ExternalLabStatus)
         {
             //else if (reqType == "allTestListForExternalLabs")
             //{
@@ -461,8 +474,9 @@ namespace DanpheEMR.Controllers
         {
             //else if (reqType == "get-lab-types")
             //{
-            Func<object> func = () => (from type in _labDbContext.LabTypes where type.IsActive == true
-                                              select type).ToList();
+            Func<object> func = () => (from type in _labDbContext.LabTypes
+                                       where type.IsActive == true
+                                       select type).ToList();
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -545,6 +559,190 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction<object>(func);
         }
 
+        /// <summary>
+        /// Load all the lab tests between from/to date range that are ready to send SMS/upload to google drive or telemedicine
+        /// </summary>
+        /// <param name="fromLabReportVerificationDate">Starting Date</param>
+        /// <param name="toLabReportVerificationDate">End Date</param>
+        /// <returns>This returns a datatable of lab tests that are ready to either uploaded or send SMS alert to patients</returns>
+        [HttpGet]
+        [Route("PatientsForLabReportSMS")]
+        public DanpheHTTPResponse<object> PatientsForLabReportSMS(DateTime fromLabReportVerificationDate, DateTime toLabReportVerificationDate)
+        {
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+            try
+            {
+                LabDbContext labDbContext = new LabDbContext(connString);
+                List<SqlParameter> paramList = new List<SqlParameter>() {
+                        new SqlParameter("@FromLabReportVerificationDate", fromLabReportVerificationDate),
+                        new SqlParameter("@ToLabReportVerificationDate", toLabReportVerificationDate)
+                    };
+                DataTable dt = DALFunctions.GetDataTableFromStoredProc("SP_LAB_PatientListForLabReportSMS", paramList, labDbContext);
+                responseData.Results = dt;
+                responseData.Status = ENUM_DanpheHttpResponseText.OK;
+            }
+            catch (Exception ex)
+            {
+                responseData.Status = ENUM_DanpheHttpResponseText.Failed;
+                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
+            }
+            return responseData;
+        }
+
+        [HttpPost]
+        [Route("SendLabReportSMS")]
+        public async Task<DanpheHTTPResponse<object>> SendLabReportSMS([FromBody] LabReportSendSMS_DTO labReportSendSMS_DTO)
+        {
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+            LabDbContext labDbContext = new LabDbContext(connString);
+            try
+            {
+                if (labReportSendSMS_DTO != null)
+                {
+                    var MaxPhoneNumCountInSingleBatch = 100;
+                    MaxPhoneNumCountInSingleBatch = labReportSendSMS_DTO.MaxPhoneNumCountInSingleBatch > 0 ? labReportSendSMS_DTO.MaxPhoneNumCountInSingleBatch : MaxPhoneNumCountInSingleBatch;
+                    for (int i = 0, j = 0; i < labReportSendSMS_DTO.PatientInfo.Count(); i = i + MaxPhoneNumCountInSingleBatch, j++)
+                    {
+                        var phoneNumbers = string.Join(",", labReportSendSMS_DTO.PatientInfo.Skip(j * MaxPhoneNumCountInSingleBatch).Take(MaxPhoneNumCountInSingleBatch).Select(a => a.PhoneNumber));
+                        var requisitions = labReportSendSMS_DTO.PatientInfo.Skip(j * MaxPhoneNumCountInSingleBatch).Take(MaxPhoneNumCountInSingleBatch).SelectMany(a => a.LabRequisitions).Distinct().ToList();
+                        var requsitionsCSV = string.Join(",", requisitions);
+                        var response = await this.SendLabReportBulkSMS(phoneNumbers, labReportSendSMS_DTO.SMSText, requsitionsCSV, labDbContext);
+                        responseData.Status = response ? ENUM_DanpheHttpResponseText.OK : ENUM_DanpheHttpResponseText.Failed;
+                    }
+                }
+                else
+                {
+                    responseData.Status = ENUM_DanpheHttpResponseText.Failed;
+                }
+            }
+            catch (Exception ex)
+            {
+                responseData.Status = ENUM_DanpheHttpResponseText.Failed;
+                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
+            }
+            return responseData;
+        }
+        private async Task<bool> SendLabReportBulkSMS(string phoneNumbers, string payLoad, string requsitionsCSV, LabDbContext labDbContext)
+        {
+            try
+            {
+                var message = HttpUtility.UrlEncode(payLoad);
+                var smsParamList = labDbContext.AdminParameters.Where(p => (p.ParameterGroupName.ToLower() == "lab") && ((p.ParameterName == "SmsParameter") || (p.ParameterName == "LabSmsProviderName"))).Select(d => new { d.ParameterValue, d.ParameterName }).ToList();
+                var providerName = smsParamList.Where(s => s.ParameterName == "LabSmsProviderName").Select(d => d.ParameterValue).FirstOrDefault() ?? "Sparrow";
+                var smsParam = smsParamList.Where(s => s.ParameterName == "SmsParameter").Select(d => d.ParameterValue).FirstOrDefault() ?? "[]";
+                var smsParamObj = JsonConvert.DeserializeObject<List<dynamic>>(smsParam);
+                var selectedProviderDetail = smsParamObj.Where(p => p["SmsProvider"] == providerName).FirstOrDefault();
+                if (selectedProviderDetail != null)
+                {
+                    string key = selectedProviderDetail["Token"];
+
+                    if (providerName == ENUM_SMSProviderNames.LumbiniTech)
+                    {
+                        string url = selectedProviderDetail["Url"];
+                        url = url.Replace("SMSKEY", key);
+                        url = url.Replace("SMSPHONENUMBER", phoneNumbers);
+                        url = url.Replace("SMSMESSAGE", message);
+                        using (var client = new HttpClient())
+                        {
+                            HttpResponseMessage result = await client.GetAsync(url);
+                            if (result.IsSuccessStatusCode)
+                            {
+                                List<SqlParameter> paramList = new List<SqlParameter>() { new SqlParameter("@RequistionIds", requsitionsCSV) };
+                                DataSet dts = DALFunctions.GetDatasetFromStoredProc("SP_LAB_Update_Test_SmsStatus", paramList, labDbContext);
+                                labDbContext.SaveChanges();
+                                return true; ;
+                            }
+                            else
+                            {
+                                throw new Exception("Server Error: Unable to Send SMS...");
+                            }
+                        }
+                    }
+                    else if (providerName == ENUM_SMSProviderNames.ShivaJiTech)
+                    {
+                        string url = selectedProviderDetail["Url"];
+                        LabSendSMS_DTO requestBody = new LabSendSMS_DTO(payLoad, phoneNumbers);
+                        using (var client = new HttpClient())
+                        {
+                            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
+                            var jsonContent = JsonConvert.SerializeObject(requestBody);
+                            StringContent content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                            HttpResponseMessage result = await client.PostAsync(url, content);
+                            if (result.IsSuccessStatusCode)
+                            {
+                                List<SqlParameter> paramList = new List<SqlParameter>() { new SqlParameter("@RequistionIds", requsitionsCSV) };
+                                DataSet dts = DALFunctions.GetDatasetFromStoredProc("SP_LAB_Update_Test_SmsStatus", paramList, labDbContext);
+                                labDbContext.SaveChanges();
+                                return true; ;
+                            }
+                            else
+                            {
+                                throw new Exception("Server Error: Unable to Send SMS...");
+                            }
+                        }
+                    }
+                    else if (providerName == ENUM_SMSProviderNames.Sparrow)
+                    {
+
+                        string url = selectedProviderDetail["Url"];
+                        string from = selectedProviderDetail["SenderIdentifier"];
+
+                        using (var client = new WebClient())
+                        {
+                            {
+                                var values = new NameValueCollection();
+                                values["from"] = from;
+                                values["token"] = key;
+                                values["to"] = phoneNumbers;
+                                values["text"] = payLoad;
+                                var response = client.UploadValues(url, HttpMethods.Post, values);
+                                var responseString = Encoding.Default.GetString(response);
+                                SparrowMessageResponse_DTO responseSms = DanpheJSONConvert.DeserializeObject<SparrowMessageResponse_DTO>(responseString);
+                                if (responseSms.response_code == StatusCodes.Status200OK)
+                                {
+                                    List<SqlParameter> paramList = new List<SqlParameter>() { new SqlParameter("@RequistionIds", requsitionsCSV) };
+                                    DataSet dts = DALFunctions.GetDatasetFromStoredProc("SP_LAB_Update_Test_SmsStatus", paramList, labDbContext);
+                                    labDbContext.SaveChanges();
+                                    return true; ;
+                                }
+                                else
+                                {
+                                    throw new Exception("Server Error: Unable to Send SMS...");
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+        [HttpGet]
+        [Route("SampleReceive")]
+        public ActionResult SampleReceivePendingList(DateTime FromDate, DateTime ToDate, string CategoryList)
+        {
+            var activeLab = HttpContext.Session.Get<string>(ENUM_SessionVariables.ActiveLabType);
+            Func<object> func = () => GetSampleReceivePendingList(CategoryList, activeLab, FromDate, ToDate);
+            return InvokeHttpGetFunction<object>(func);
+        }
+        [HttpGet]
+        [Route("SampleItemsByRequisitionId")]
+        public async Task<IActionResult> SampleItemsByRequisitionId([FromQuery] string requisitionIds)
+        {
+            var activeLab = HttpContext.Session.Get<string>(ENUM_SessionVariables.ActiveLabType);
+            Func<object> func = () => GetSampleItemsByRequisitionId(requisitionIds, activeLab);
+            return InvokeHttpGetFunction<object>(func);
+        }
         #endregion
 
         #region Start HTTP POST APIs
@@ -562,7 +760,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpPostFunction<object>(func);
         }
 
- 
+
 
         [HttpPost]
         [Route("Requisitions")]
@@ -584,7 +782,7 @@ namespace DanpheEMR.Controllers
             //{
             string ipStr = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
-            Func<object> func = () => LabReportAdd(currentUser,ipStr);
+            Func<object> func = () => LabReportAdd(currentUser, ipStr);
             return InvokeHttpPostFunction<object>(func);
         }
 
@@ -612,6 +810,19 @@ namespace DanpheEMR.Controllers
             return InvokeHttpPostFunction<object>(func);
         }
 
+        [HttpPost]
+        [Route("Notification/UploadLabReportToGoogleDrive")]
+        public ActionResult UploadLabReportToGoogleDrive()
+        {
+            //else if (reqType == "sendCovidPdfReport")
+            //{
+            string ipStr = this.ReadPostData();
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+            Func<object> func = () => UploadToGoogleDrive(ipStr, currentUser);
+            return InvokeHttpPostFunction<object>(func);
+        }
+
+
         [HttpPut]
         [Route("GenerateSampleCodeAutomatic")]
         public ActionResult GenerateSampleCodeAutomatic()
@@ -621,7 +832,7 @@ namespace DanpheEMR.Controllers
             string ipStr = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
             var activeLabTypeName = HttpContext.Session.Get<string>(ENUM_SessionVariables.ActiveLabType);
-            Func<object> func = () => GenerateSampleCodeAutomatic(ipStr, currentUser,activeLabTypeName);
+            Func<object> func = () => GenerateSampleCodeAutomatic(ipStr, currentUser, activeLabTypeName);
             return InvokeHttpPostFunction<object>(func);
         }
 
@@ -636,7 +847,7 @@ namespace DanpheEMR.Controllers
             int noOfPrints = Convert.ToInt32(this.ReadQueryStringData("numOfCopies"));
             string FolderPath = this.ReadQueryStringData("filePath");
             string PrinterName = this.ReadQueryStringData("PrinterName");
-            Func<object> func = () => LabStickerSave(ipStr, currentUser,PrinterName,noOfPrints,FolderPath);
+            Func<object> func = () => LabStickerSave(ipStr, currentUser, PrinterName, noOfPrints, FolderPath);
             return InvokeHttpPostFunction<object>(func);
         }
 
@@ -653,9 +864,14 @@ namespace DanpheEMR.Controllers
         }
         #endregion
 
-        
+
 
         #region Start HTTP PUT APIs
+        /// <summary>
+        /// Updates the Upload Status of the Requisitions
+        /// </summary>
+        /// <param name="requisitionIdList">list of requisitions as CSV</param>
+        /// <returns>It returns the list of requisitions whose upload status is updated.</returns>
         [Route("updateFileUploadStatus")]
         [HttpPut]
         public IActionResult updateFileUploadStatus(string requisitionIdList)
@@ -671,24 +887,30 @@ namespace DanpheEMR.Controllers
                 model.ForEach((singleModel) =>
                 {
                     singleModel.IsFileUploadedToTeleMedicine = true;
-                    singleModel.ModifiedBy = currentUser.UserId;
+                    singleModel.IsFileUploaded = true;
+                    singleModel.ModifiedBy = currentUser.EmployeeId;
                     singleModel.ModifiedOn = DateTime.Now;
-                    singleModel.UploadedByToTeleMedicine = currentUser.UserId;
+                    singleModel.UploadedByToTeleMedicine = currentUser.EmployeeId;
                     singleModel.UploadedOnToTeleMedicine = DateTime.Now;
+                    singleModel.UploadedOn = DateTime.Now;
+                    singleModel.UploadedBy = currentUser.EmployeeId;
                     labDbContext.Entry(singleModel).Property(a => a.ModifiedBy).IsModified = true;
                     labDbContext.Entry(singleModel).Property(a => a.ModifiedOn).IsModified = true;
                     labDbContext.Entry(singleModel).Property(a => a.IsFileUploadedToTeleMedicine).IsModified = true;
                     labDbContext.Entry(singleModel).Property(a => a.UploadedByToTeleMedicine).IsModified = true;
                     labDbContext.Entry(singleModel).Property(a => a.UploadedOnToTeleMedicine).IsModified = true;
+                    labDbContext.Entry(singleModel).Property(a => a.IsFileUploaded).IsModified = true;
+                    labDbContext.Entry(singleModel).Property(a => a.UploadedBy).IsModified = true;
+                    labDbContext.Entry(singleModel).Property(a => a.UploadedOn).IsModified = true;
                     labDbContext.SaveChanges();
                 });
                 responseData.Results = model;
-                responseData.Status = "OK";
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
                 return Ok(responseData);
             }
             catch (Exception ex)
             {
-                responseData.Status = "Failed";
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.Failed;
                 responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
                 return BadRequest(responseData);
             }
@@ -743,7 +965,7 @@ namespace DanpheEMR.Controllers
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
             int? RunNumber = ToInt(this.ReadQueryStringData("RunNumber"));
             var activeLabTypeName = HttpContext.Session.Get<string>(ENUM_SessionVariables.ActiveLabType);
-            Func<object> func = () => UpdateSampleCodeOfRequisition(str, SampleDate, runNumberType, patVisitType, RunNumber, currentUser,activeLabTypeName);
+            Func<object> func = () => UpdateSampleCodeOfRequisition(str, SampleDate, runNumberType, patVisitType, RunNumber, currentUser, activeLabTypeName);
             return InvokeHttpPutFunction<object>(func);
         }
 
@@ -756,11 +978,11 @@ namespace DanpheEMR.Controllers
             string str = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
             string billstatus = this.ReadQueryStringData("billstatus");
-            Func<object> func = () => UpdateBillStatus(str,billstatus, currentUser);
+            Func<object> func = () => UpdateBillStatus(str, billstatus, currentUser);
             return InvokeHttpPutFunction<object>(func);
         }
 
- 
+
         [HttpPut]
         [Route("ComponentResults")]
         public ActionResult PutComponentResults()
@@ -817,7 +1039,7 @@ namespace DanpheEMR.Controllers
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
             string labReqIdList = this.ReadQueryStringData("requisitionIdList");
             int? PrintedReportId = ToInt(this.ReadQueryStringData("reportId"));
-            Func<object> func = () => UpdatePrintedFlag(labReqIdList,PrintedReportId, currentUser);
+            Func<object> func = () => UpdatePrintedFlag(labReqIdList, PrintedReportId, currentUser);
             return InvokeHttpPutFunction<object>(func);
         }
 
@@ -829,8 +1051,9 @@ namespace DanpheEMR.Controllers
             //{
             string str = this.ReadPostData();
             int prescriberId = Convert.ToInt32(this.ReadQueryStringData("id"));
+            string updateMode = Convert.ToString(this.ReadQueryStringData("updateMode"));
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
-            Func<object> func = () => UpdateDoctor(str, prescriberId, currentUser);
+            Func<object> func = () => UpdateDoctor(str, updateMode, prescriberId, currentUser);
             return InvokeHttpPutFunction<object>(func);
         }
 
@@ -871,7 +1094,7 @@ namespace DanpheEMR.Controllers
             //{
             string str = this.ReadPostData();
             int reqId = Convert.ToInt32(this.ReadQueryStringData("requisitionid"));
-            Func<object> func = () => UpdateTestWithSamePrice(reqId,str);
+            Func<object> func = () => UpdateTestWithSamePrice(reqId, str);
             return InvokeHttpPutFunction<object>(func);
         }
 
@@ -916,13 +1139,13 @@ namespace DanpheEMR.Controllers
 
         [HttpPut]
         [Route("UndoSampleCode")]
-        public ActionResult UndoSampleCode()
+        public ActionResult UndoSampleCodes([FromQuery] string undoFromPageAction)
         {
             //else if (reqType == "undo-samplecode")
             //{
             string str = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
-            Func<object> func = () => UndoSampleCode(str, currentUser);
+            Func<object> func = () => UndoSampleCode(str, currentUser, undoFromPageAction);
             return InvokeHttpPutFunction<object>(func);
         }
 
@@ -1006,12 +1229,42 @@ namespace DanpheEMR.Controllers
                     {
                         requisition.ExternalLabSampleStatus = externalLabStatus.SelectedExternalLabStatusType;
                     }
-                    
+
                 }
                 _labDbContext.SaveChanges();
                 return Ok(ENUM_Danphe_HTTP_ResponseStatus.OK);
             };
-             return InvokeHttpPutFunction<object>(func);
+            return InvokeHttpPutFunction<object>(func);
+        }
+
+        [HttpPut]
+        [Route("SampleReceive")]
+        public ActionResult ReceiveSample([FromBody] List<Int64> CategoryList)
+        {
+            var activeLab = HttpContext.Session.Get<string>(ENUM_SessionVariables.ActiveLabType);
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+            Func<object> func = () => ReceiveSampleInLab(CategoryList, currentUser);
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        [HttpPut]
+        [Route("FinalReport/Undo")]
+        public ActionResult UndoFinalReport([FromBody] List<Int64> RequisitionIdList)
+        {
+            var activeLab = HttpContext.Session.Get<string>(ENUM_SessionVariables.ActiveLabType);
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => FinalReportUndo(RequisitionIdList, currentUser);
+            return InvokeHttpPutFunction<object>(func);
+        }
+
+        [HttpPut]
+        [Route("PendingReport/Undo")]
+        public ActionResult UndoPendingReport([FromBody] List<Int64> RequisitionIdList)
+        {
+            var activeLab = HttpContext.Session.Get<string>(ENUM_SessionVariables.ActiveLabType);
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => PendingReportUndo(RequisitionIdList, currentUser);
+            return InvokeHttpPutFunction<object>(func);
         }
         #endregion
 
@@ -1025,7 +1278,7 @@ namespace DanpheEMR.Controllers
                                join test in labDbContext.LabTests on req.LabTestId equals test.LabTestId
                                join pat in labDbContext.Patients on req.PatientId equals pat.PatientId
                                join txn in labDbContext.LabTestComponentResults on req.RequisitionId equals txn.RequisitionId
-                               where req.RequisitionId == reqId //&& test.LabTestName == "idsList"
+                               where req.RequisitionId == reqId && txn.IsActive == true //&& test.LabTestName == "idsList" 
                                select new
                                {
                                    RetuisitionId = req.RequisitionId,
@@ -1034,11 +1287,11 @@ namespace DanpheEMR.Controllers
                                    PhoneNumber = pat.PhoneNumber,
                                    Result = txn.Value,
                                    SampleCollectedOn = req.SampleCollectedOnDateTime.Value,
-                                   CovidFileId = req.GoogleFileIdForCovid
+                                   CovidFileId = req.GoogleFileId
                                }).FirstOrDefault();
             if (patientData != null)
             {
-                var fileUrl = CovidReportUrlComonPath.Replace("GGLFILEUPLOADID", patientData.CovidFileId);
+                var fileUrl = LabReportUrlComonPath.Replace("GGLFILEUPLOADID", patientData.CovidFileId);
                 data.Message = "Dear " + patientData.PatientName + ", " + "Your COVID-19 Report is " + patientData.Result + "." + "\n" + "Sample collected on " + patientData.SampleCollectedOn.ToString("M/d/yyyy")
                     + (!string.IsNullOrWhiteSpace(patientData.CovidFileId) ? ("\n" + fileUrl) : "");
                 data.PhoneNumber = patientData.PhoneNumber;
@@ -1188,7 +1441,7 @@ namespace DanpheEMR.Controllers
 
         //Anish: 30 Aug 2019 : SampleCode Logic Rendered from Format setting table present in the Cache
         private string GetSampleCodeFormatted(int? sampleCode, DateTime sampleCreatedOn,
-            string visitType, string RunNumberType,string labType, bool isUnderInsurance = false)
+            string visitType, string RunNumberType, string labType, bool isUnderInsurance = false)
         {
             visitType = visitType.ToLower();
             RunNumberType = RunNumberType.ToLower();
@@ -1659,7 +1912,8 @@ namespace DanpheEMR.Controllers
                                           req.BarCodeNumber,
                                           req.WardName,
                                           req.HasInsurance,
-                                          req.LabReportId
+                                          req.LabReportId,
+                                          req.IsPreVerified,
                                       } into grp
                                       select new LabPendingResultVM
                                       {
@@ -1687,31 +1941,11 @@ namespace DanpheEMR.Controllers
                                                        LabTestId = g.req.LabTestId,
                                                        TestName = g.req.LabTestName,
                                                        BillingStatus = g.req.BillingStatus,
-                                                       LabReportId = g.req.LabReportId
-                                                   }).Distinct().ToList()
-                                          //Tests = (from requisition in labDbContext.Requisitions
-                                          //         join test in labDbContext.LabTests on requisition.LabTestId equals test.LabTestId
-                                          //         where requisition.PatientId == grp.Key.patient.PatientId
-                                          //          && requisition.RequisitionId == grp.Key.req.RequisitionId
-                                          //          && requisition.BarCodeNumber == grp.Key.BarCodeNumber
-                                          //          && requisition.WardName == grp.Key.WardName
-                                          //          && requisition.RunNumberType == grp.Key.RunNumberType
-                                          //          && requisition.HasInsurance == grp.Key.HasInsurance
-                                          //          && requisition.BillingStatus.ToLower() != ENUM_BillingStatus.cancel //"cancel" 
-                                          //          && requisition.BillingStatus.ToLower() != ENUM_BillingStatus.returned //"returned"
-                                          //          && requisition.OrderStatus.ToLower() == ENUM_LabOrderStatus.ResultAdded// "result-added"
-                                          //                                                                                 //group requisition by new { test } into g
-                                          //         select new LabPendingResultVM.LabTestDetail
-                                          //         {
-                                          //             RequisitionId = requisition.RequisitionId,
-                                          //             LabTestId = requisition.LabTestId,
-                                          //             TestName = requisition.LabTestName,
-                                          //             BillingStatus = requisition.BillingStatus,
-                                          //             LabReportId = requisition.LabReportId
-                                          //             //RequisitionId = g.Select(a => a.RequisitionId).FirstOrDefault(),
-                                          //             //LabTestId = g.Key.test.LabTestId,
-                                          //             //TestName = g.Key.test.LabTestName
-                                          //         }).ToList()
+                                                       LabReportId = g.req.LabReportId,
+                                                       IsVerified = g.req.IsVerified,
+                                                       IsPreVerified = g.req.IsPreVerified,
+                                                   }).Distinct().ToList(),
+                                          VerificationStatus = grp.Key.IsPreVerified ? ENUM_LabVerificationStatus.PreVerified : ENUM_LabVerificationStatus.Pending,
                                       }).ToList();
 
             return htmlPendingReports;
@@ -1771,7 +2005,8 @@ namespace DanpheEMR.Controllers
                                             req.WardName,
                                             req.LabReportId,
                                             req.SampleCodeFormatted,
-                                            req.HasInsurance
+                                            req.HasInsurance,
+                                            req.IsPreVerified,
                                         } into grp
                                         select new LabPendingResultVM
                                         {
@@ -1800,35 +2035,11 @@ namespace DanpheEMR.Controllers
                                                          TestName = g.req.LabTestName,
                                                          BillingStatus = g.req.BillingStatus,
                                                          LabReportId = g.req.LabReportId,
-                                                         CovidFileUrl = !string.IsNullOrEmpty(g.req.GoogleFileIdForCovid) ? CovidReportUrlComonPath.Replace("GGLFILEUPLOADID", g.req.GoogleFileIdForCovid) : ""
-                                                     }).Distinct().ToList()
-                                            //Tests = (from requisition in labDbContext.Requisitions
-                                            //         join test in labDbContext.LabTests on requisition.LabTestId equals test.LabTestId
-                                            //         join template in labDbContext.LabReportTemplates on requisition.ReportTemplateId equals template.ReportTemplateID
-                                            //         where requisition.PatientId == grp.Key.patient.PatientId
-                                            //        && requisition.SampleCode == grp.Key.SampleCode
-                                            //        && requisition.VisitType == grp.Key.VisitType
-                                            //        && requisition.WardName == grp.Key.WardName
-                                            //        && requisition.BarCodeNumber == grp.Key.BarCodeNumber
-                                            //        && requisition.RunNumberType == grp.Key.RunNumberType
-                                            //        && requisition.LabReportId == grp.Key.LabReportId
-                                            //        && requisition.HasInsurance == grp.Key.HasInsurance
-                                            //        && DbFunctions.TruncateTime(requisition.SampleCreatedOn).Value == grp.Key.Value
-                                            //        && requisition.OrderStatus.ToLower() == ENUM_LabOrderStatus.ResultAdded // "result-added"
-                                            //        && requisition.BillingStatus.ToLower() != ENUM_BillingStatus.cancel //"cancel" 
-                                            //        && requisition.BillingStatus.ToLower() != ENUM_BillingStatus.returned //"returned"
-                                            //        && (template.TemplateType.ToLower() == ENUM_LabTemplateType.normal // "normal" 
-                                            //        || template.TemplateType.ToLower() == ENUM_LabTemplateType.culture // "culture"
-                                            //        )
-                                            //         // group new { requisition }   by new { requisition, test } into g
-                                            //         select new LabPendingResultVM.LabTestDetail
-                                            //         {
-                                            //             RequisitionId = requisition.RequisitionId,
-                                            //             LabTestId = requisition.LabTestId,
-                                            //             TestName = requisition.LabTestName,
-                                            //             BillingStatus = requisition.BillingStatus,
-                                            //             LabReportId = requisition.LabReportId
-                                            //         }).Distinct().ToList()
+                                                         CovidFileUrl = !string.IsNullOrEmpty(g.req.GoogleFileId) ? LabReportUrlComonPath.Replace("GGLFILEUPLOADID", g.req.GoogleFileId) : "",
+                                                         IsVerified = g.req.IsVerified,
+                                                         IsPreVerified = g.req.IsPreVerified,
+                                                     }).Distinct().ToList(),
+                                            VerificationStatus = grp.Key.IsPreVerified ? ENUM_LabVerificationStatus.PreVerified : ENUM_LabVerificationStatus.Pending,
                                         }).ToList();
 
             return normalPendingReports;
@@ -1895,7 +2106,9 @@ namespace DanpheEMR.Controllers
                                repData.ReportGeneratedBy,
                                repData.ReportGeneratedById,
                                repData.AllowOutpatientWithProvisional,
-                               repData.BillingStatus
+                               repData.BillingStatus,
+                           
+
                            } into grp
                            let isValidToPrintReport = (grp.Key.VisitType.ToLower() == "inpatient") ? true : (grp.Key.AllowOutpatientWithProvisional ? true : (grp.Key.VisitType.ToLower() == "emergency" ? true : false))
                            select new FinalLabReportListVM
@@ -1921,6 +2134,8 @@ namespace DanpheEMR.Controllers
                                LabRequisitionIdCSV = string.Join(",", grp.Select(g => g.RequisitionId).Distinct()),
                                AllowOutpatientWithProvisional = grp.Key.AllowOutpatientWithProvisional,
                                IsValidToPrint = (grp.Key.BillingStatus == "provisional") ? isValidToPrintReport : true,
+                
+
                                Tests = (from g in grp
                                         select new FinalLabReportListVM.FinalReportListLabTestDetail
                                         {
@@ -2319,7 +2534,12 @@ namespace DanpheEMR.Controllers
             {
                 try
                 {
-
+                    Boolean IsSampleReceiveEnabled = false;
+                    var SampleReceiveParam = labDbContext.AdminParameters.Where(param => param.ParameterGroupName == "LAB" && param.ParameterName == "EnableLabSampleReceive").FirstOrDefault();
+                    if (SampleReceiveParam != null)
+                    {
+                        IsSampleReceiveEnabled = DanpheJSONConvert.DeserializeObject<Boolean>(SampleReceiveParam.ParameterValue);
+                    }
                     //List<LabRunNumberSettingsModel> allLabRunNumberSettings = (List<LabRunNumberSettingsModel>)DanpheCache.GetMasterData(MasterDataEnum.LabRunNumberSettings);
                     var requisitionid = labTests[0].RequisitionId;
                     var allReqList = labTests.Select(s => s.RequisitionId).ToList();
@@ -2401,7 +2621,7 @@ namespace DanpheEMR.Controllers
                         }
                     }
 
-                    string formattedSampleCode = GetSampleCodeFormatted(sampleNum, labTests[0].SampleCreatedOn ?? default(DateTime), visitType, RunNumberType,labType);
+                    string formattedSampleCode = GetSampleCodeFormatted(sampleNum, labTests[0].SampleCreatedOn ?? default(DateTime), visitType, RunNumberType, labType);
                     var sampleCollectedDateTime = System.DateTime.Now;
                     DataTable storedProcdureParam = new DataTable();
                     storedProcdureParam.Columns.Add("RequisitionId", typeof(long));
@@ -2419,14 +2639,14 @@ namespace DanpheEMR.Controllers
                             dbRequisition.SampleCreatedBy = currentUser.EmployeeId;
                             dbRequisition.BarCodeNumber = existingBarCodeNum != null ? existingBarCodeNum : newBarCodeNumber;
                             dbRequisition.SampleCollectedOnDateTime = sampleCollectedDateTime;
-                            if(test.ExternalLabSampleStatus.Length > 0)
+                            if (test.ExternalLabSampleStatus.Length > 0)
                             {
                                 dbRequisition.ExternalLabSampleStatus = test.ExternalLabSampleStatus;
                             }
                         }
                         dbRequisition.LabTestSpecimen = test.Specimen;
-                        dbRequisition.ResultingVendorId = (int)((bool) test.IsOutsourceTest ? test.DefaultOutsourceVendorId : dbRequisition.ResultingVendorId);
-                        dbRequisition.OrderStatus = (bool) test.IsOutsourceTest ? ENUM_LabOrderStatus.ReportGenerated : ENUM_LabOrderStatus.Pending;
+                        dbRequisition.ResultingVendorId = (int)((bool)test.IsOutsourceTest ? test.DefaultOutsourceVendorId : dbRequisition.ResultingVendorId);
+                        dbRequisition.OrderStatus = (bool)test.IsOutsourceTest ? ENUM_LabOrderStatus.ReportGenerated : (IsSampleReceiveEnabled ? ENUM_LabOrderStatus.SamplePending : ENUM_LabOrderStatus.Pending);
                         storedProcdureParam.Rows.Add(dbRequisition.RequisitionId, dbRequisition.OrderStatus);
                     }
                     LabBarCodeNum = existingBarCodeNum != null ? existingBarCodeNum : newBarCodeNumber;
@@ -2636,20 +2856,22 @@ namespace DanpheEMR.Controllers
                                      }).ToList();
 
 
-            var requisitions = allreqByPatientId.Where(req => (req.OrderStatus == "active")).ToList();
-            var resultsToAdd = allreqByPatientId.Where(req => (req.OrderStatus == "pending")).ToList();
-            var resultsAdded = allreqByPatientId.Where(req => (req.OrderStatus == "result-added")).ToList();
+            var requisitions = allreqByPatientId.Where(req => (req.OrderStatus == ENUM_LabOrderStatus.Active)).ToList();
+            var resultsToAdd = allreqByPatientId.Where(req => (req.OrderStatus == ENUM_LabOrderStatus.Pending)).ToList();
+            var resultsAdded = allreqByPatientId.Where(req => (req.OrderStatus == ENUM_LabOrderStatus.ResultAdded)).ToList();
+            var samplePending = allreqByPatientId.Where(req => (req.OrderStatus == ENUM_LabOrderStatus.SamplePending)).ToList();
 
-             return new
+            return new
             {
                 Requisitions = requisitions,
                 ResultsToAdd = resultsToAdd,
                 ResultsAdded = resultsAdded,
+                SamplePending = samplePending,
                 Employee = allEmployee
             };
         }
 
-        private object GetLabRequisition(string activeLab,DateTime FromDate, DateTime ToDate)
+        private object GetLabRequisition(string activeLab, DateTime FromDate, DateTime ToDate)
         {
             var selectedLab = String.IsNullOrEmpty(activeLab) ? "" : activeLab;
             //FromDate,ToDate
@@ -2688,7 +2910,7 @@ namespace DanpheEMR.Controllers
                                   //show only paid and unpaid requisitions in the list.
                                   //show only IsActive=True and IsActive=NULL requests, Hide IsActive=False. -- sud: 15Sept'18
                                   //if IsActive has value then it should be true, if it's null then its true by default. 
-                                  where ((req.IsActive == true ) && req.OrderStatus.ToLower() == ENUM_LabOrderStatus.Active //"active"
+                                  where ((req.IsActive == true) && req.OrderStatus.ToLower() == ENUM_LabOrderStatus.Active //"active"
                                   && (req.BillingStatus.ToLower() != ENUM_BillingStatus.cancel)// "cancel") 
                                   && (req.BillingStatus.ToLower() != ENUM_BillingStatus.returned) // "returned")
                                   && (req.RunNumberType.ToLower() == ENUM_LabRunNumType.normal) // "normal")
@@ -2793,8 +3015,8 @@ namespace DanpheEMR.Controllers
                 result = (from req in _labDbContext.Requisitions
                           join pat in _labDbContext.Patients on req.PatientId equals pat.PatientId
                           join labTest in _labDbContext.LabTests on req.LabTestId equals labTest.LabTestId
-                          //show only IsActive=True and IsActive=NULL requests, Hide IsActive=False. -- sud: 15Sept'18
-                          //if IsActive has value then it should be true, if it's null then its true by default. 
+                              //show only IsActive=True and IsActive=NULL requests, Hide IsActive=False. -- sud: 15Sept'18
+                              //if IsActive has value then it should be true, if it's null then its true by default. 
                           where req.PatientId == patientId && (req.IsActive == true) &&
                           (wardName == "null" ? req.WardName == null : req.WardName == wardName) &&
                           (req.BillingStatus.ToLower() != ENUM_BillingStatus.cancel) // "cancel") 
@@ -2895,7 +3117,7 @@ namespace DanpheEMR.Controllers
             }
         }
 
-        private object CheckIsSampleCodeValid(DateTime SampleDate, int? SampleCode, string runNumberType, string visitType,string labType, bool? hasInsurance)
+        private object CheckIsSampleCodeValid(DateTime SampleDate, int? SampleCode, string runNumberType, string visitType, string labType, bool? hasInsurance)
         {
             SampleDate = (SampleDate != null) ? SampleDate : DateTime.Now;
             var sampleCode = SampleCode;
@@ -3463,7 +3685,7 @@ namespace DanpheEMR.Controllers
 
             if (allBarCode != null && allBarCode.Count == 1)
             {
-                LabReportVM labReport = DanpheEMR.Labs.LabsBL.GetLabReportVMForReqIds(_labDbContext, reqIdList, CovidReportUrlComonPath);
+                LabReportVM labReport = DanpheEMR.Labs.LabsBL.GetLabReportVMForReqIds(_labDbContext, reqIdList, LabReportUrlComonPath);
                 //labReport.Lookups.SampleCodeFormatted = GetSampleCodeFormatted(labReport.Lookups.SampleCode, labReport.Lookups.SampleDate ?? default(DateTime), labReport.Lookups.VisitType, labReport.Lookups.RunNumberType);
 
                 labReport.ValidToPrint = true;
@@ -3491,7 +3713,7 @@ namespace DanpheEMR.Controllers
                                           select requisition.BarCodeNumber).Distinct().ToList();
                         if (allBarCode != null && allBarCode.Count == 1)
                         {
-                            LabReportVM labReport = DanpheEMR.Labs.LabsBL.GetLabReportVMForReqIds(_labDbContext, reqList, CovidReportUrlComonPath);
+                            LabReportVM labReport = DanpheEMR.Labs.LabsBL.GetLabReportVMForReqIds(_labDbContext, reqList, LabReportUrlComonPath);
                             labReport.ValidToPrint = true;
                             labReport.BarCodeNumber = allBarCode[0];
                             multipleReports.Add(labReport);
@@ -3788,7 +4010,7 @@ namespace DanpheEMR.Controllers
         private object LabReportAdd(RbacUser currentUser, string ipStr)
         {
             var requiredParam = (from param in _labDbContext.AdminParameters
-                                 where (param.ParameterName == "CovidTestName" || param.ParameterName == "EnableCovidReportPDFUploadToGoogle" || param.ParameterName == "AllowLabReportToPrintOnProvisional")
+                                 where (param.ParameterName == "CovidTestName" || param.ParameterName == "EnableCovidReportPDFUploadToGoogle" || param.ParameterName == "AllowLabReportToPrintOnProvisional" || param.ParameterName == "LabReportUploadConfig")
                                  && (param.ParameterGroupName.ToLower() == "common" || param.ParameterGroupName.ToLower() == "lab")
                                  select param).ToList();
 
@@ -3801,6 +4023,14 @@ namespace DanpheEMR.Controllers
                                                where param.ParameterName == "EnableCovidReportPDFUploadToGoogle"
                                                && param.ParameterGroupName.ToLower() == "lab"
                                                select param.ParameterValue).FirstOrDefault();
+
+            string labRptUploadConfigParam = (from param in requiredParam
+                                              where param.ParameterGroupName == "LAB"
+                                              && param.ParameterName == "LabReportUploadConfig"
+                                              select param.ParameterValue).FirstOrDefault();
+
+            LabReportUploadConfigParamDTO labReportUploadConfigParam = JsonConvert.DeserializeObject<LabReportUploadConfigParamDTO>(labRptUploadConfigParam);
+
 
             string covidTestName = "";
             if (covidParameter != null)
@@ -3835,7 +4065,7 @@ namespace DanpheEMR.Controllers
                     {
                         foreach (var componentId in labReport.ComponentIdList)
                         {
-                            LabTestComponentResult component = _labDbContext.LabTestComponentResults.Where(cmp => cmp.TestComponentResultId == componentId).FirstOrDefault();
+                            LabTestComponentResult component = _labDbContext.LabTestComponentResults.Where(cmp => cmp.TestComponentResultId == componentId && cmp.IsActive == true).FirstOrDefault();
                             reqIdList.Add(component.RequisitionId);
                             component.LabReportId = labReport.LabReportId;
                             _labDbContext.Entry(component).Property(a => a.LabReportId).IsModified = true;
@@ -3859,21 +4089,34 @@ namespace DanpheEMR.Controllers
                             }
                             requisitionItem.LabReportId = labReport.LabReportId;
 
-                            //for covidtest create empty report in google drive
-                            if (requisitionItem.LabTestName == covidTestName)
+                            //create a blank report in google drive and update it later when actual pdf of lab report is generated.
+                            if (labReportUploadConfigParam != null && labReportUploadConfigParam.EnableFileUpload == true && labReportUploadConfigParam.UseGoogleDriveUpload == true)
                             {
-                                if ((covidReportUploadEnabled != null) && (covidReportUploadEnabled == "true" || covidReportUploadEnabled == "1"))
+                                var fileName = "LabReports_" + requisitionItem.RequisitionId + "_" + DateTime.Now.ToString("yyyyMMdd-HHMMss") + ".pdf";
+                                var retData = GoogleDriveFileUpload.UploadNewFile(fileName);
+                                if (!string.IsNullOrEmpty(retData.FileId))
                                 {
-                                    var fileName = "LabCovidReports_" + requisitionItem.RequisitionId + "_" + DateTime.Now.ToString("yyyyMMdd-HHMMss") + ".pdf";
-                                    var retData = GoogleDriveFileUpload.UploadNewFile(fileName);
-                                    if (!string.IsNullOrEmpty(retData.FileId))
-                                    {
-                                        requisitionItem.CovidFileName = fileName;
-                                        requisitionItem.GoogleFileIdForCovid = retData.FileId;
-                                        labReport.CovidFileUrl = CovidReportUrlComonPath.Replace("GGLFILEUPLOADID", retData.FileId);
-                                    }
+                                    requisitionItem.UploadedReportFileName = fileName;
+                                    requisitionItem.GoogleFileId = retData.FileId;
+                                    labReport.CovidFileUrl = LabReportUrlComonPath.Replace("GGLFILEUPLOADID", retData.FileId);
                                 }
                             }
+
+                            //for covidtest create empty report in google drive
+                            //if (requisitionItem.LabTestName == covidTestName)
+                            //{
+                            //    if ((covidReportUploadEnabled != null) && (covidReportUploadEnabled == "true" || covidReportUploadEnabled == "1"))
+                            //    {
+                            //        var fileName = "LabCovidReports_" + requisitionItem.RequisitionId + "_" + DateTime.Now.ToString("yyyyMMdd-HHMMss") + ".pdf";
+                            //        var retData = GoogleDriveFileUpload.UploadNewFile(fileName);
+                            //        if (!string.IsNullOrEmpty(retData.FileId))
+                            //        {
+                            //            requisitionItem.CovidFileName = fileName;
+                            //            requisitionItem.GoogleFileIdForCovid = retData.FileId;
+                            //            labReport.CovidFileUrl = CovidReportUrlComonPath.Replace("GGLFILEUPLOADID", retData.FileId);
+                            //        }
+                            //    }
+                            //}
 
                             //give provisional billing for outpatiient to print
                             if (parameterData != null && (parameterData.ToLower() == "true" || parameterData == "1"))
@@ -3923,7 +4166,7 @@ namespace DanpheEMR.Controllers
 
                     labReport.ValidToPrint = IsValidToPrint;
 
-                    return  labReport;
+                    return labReport;
                 }
                 catch (Exception ex)
                 {
@@ -4022,7 +4265,7 @@ namespace DanpheEMR.Controllers
 
         private object UploadCovidReportToGoogleDrive(string PostStr, RbacUser currentUser)
         {
-            var folderPath = CovidReportFileUploadPath;
+            var folderPath = LabReportFileUploadPath;
             byte[] data = Convert.FromBase64String(PostStr);
             long reqId = 0;
             var reqIdStr = this.ReadQueryStringData("requisitionId");
@@ -4042,19 +4285,19 @@ namespace DanpheEMR.Controllers
                         // var retData = GoogleDriveFileUpload.UploadNewFile(fileName);
                         Boolean isSuccess = false;
                         var fileName = "LabCovidReports_" + currReq.RequisitionId + "_" + DateTime.Now.ToString("yyyyMMdd-HHMMss") + ".pdf";
-                        if (!string.IsNullOrWhiteSpace(currReq.GoogleFileIdForCovid))
+                        if (!string.IsNullOrWhiteSpace(currReq.GoogleFileId))
                         {
                             //if (!System.IO.File.Exists(folderPath + '\\' + currReq.CovidFileName)){}
-                            System.IO.File.WriteAllBytes(folderPath + '\\' + currReq.CovidFileName, data);
-                            var retData = GoogleDriveFileUpload.UpdateFileById(currReq.GoogleFileIdForCovid, currReq.CovidFileName, newMimeType: "application/pdf");
+                            System.IO.File.WriteAllBytes(folderPath + '\\' + currReq.UploadedReportFileName, data);
+                            var retData = GoogleDriveFileUpload.UpdateFileById(currReq.GoogleFileId, currReq.UploadedReportFileName, newMimeType: "application/pdf");
                             isSuccess = true;
                         }
                         else
                         {
                             System.IO.File.WriteAllBytes(folderPath + '\\' + fileName, data);
                             var retData = GoogleDriveFileUpload.UploadNewFile(fileName);
-                            currReq.GoogleFileIdForCovid = retData.FileId;
-                            currReq.CovidFileName = fileName;
+                            currReq.GoogleFileId = retData.FileId;
+                            currReq.UploadedReportFileName = fileName;
                             _labDbContext.SaveChanges();
                             var retDataNew = GoogleDriveFileUpload.UpdateFileById(retData.FileId, fileName, newMimeType: "application/pdf");
                             isSuccess = true;
@@ -4086,7 +4329,98 @@ namespace DanpheEMR.Controllers
             }
         }
 
-        private object GenerateSampleCodeAutomatic(string str, RbacUser currentUser,string labType)
+
+        private async Task<object> UploadToGoogleDrive(string postStr, RbacUser currentUser)
+        {
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+            var folderPath = LabReportFileUploadPath;
+            byte[] data = Convert.FromBase64String(postStr);
+            long reqId = 0;
+            var reqIdStr = this.ReadQueryStringData("requisitionId");
+            reqId = Convert.ToInt64(reqIdStr);
+            try
+            {
+                if (folderPath != null)
+                {
+                    if (!System.IO.Directory.Exists(folderPath))
+                    {
+                        System.IO.Directory.CreateDirectory(folderPath);
+                    }
+
+                    var currReq = _labDbContext.Requisitions.Where(r => r.RequisitionId == reqId).FirstOrDefault();
+                    if (currReq != null)
+                    {
+                        Boolean isSuccess = false;
+                        var fileName = "LabReports_" + currReq.RequisitionId + "_" + DateTime.Now.ToString("yyyyMMdd-HHMMss") + ".pdf";
+                        if (!string.IsNullOrWhiteSpace(currReq.GoogleFileId))
+                        {
+                            System.IO.File.WriteAllBytes(folderPath + '\\' + currReq.UploadedReportFileName, data);
+                            var retData = GoogleDriveFileUpload.UpdateFileById(currReq.GoogleFileId, currReq.UploadedReportFileName, newMimeType: "application/pdf");
+                            isSuccess = true;
+                        }
+                        else
+                        {
+                            System.IO.File.WriteAllBytes(folderPath + '\\' + fileName, data);
+                            var retData = GoogleDriveFileUpload.UploadNewFile(fileName);
+                            currReq.GoogleFileId = retData.FileId;
+                            currReq.UploadedReportFileName = fileName;
+                            _labDbContext.SaveChanges();
+                            var retDataNew = GoogleDriveFileUpload.UpdateFileById(retData.FileId, fileName, newMimeType: "application/pdf");
+                            isSuccess = true;
+                        }
+
+                        if (isSuccess)
+                        {
+                            currReq.IsFileUploaded = true;
+                            currReq.UploadedBy = currentUser.EmployeeId;
+                            currReq.UploadedOn = System.DateTime.Now;
+                            _labDbContext.Entry(currReq).Property(a => a.IsFileUploaded).IsModified = true;
+                            _labDbContext.Entry(currReq).Property(a => a.UploadedBy).IsModified = true;
+                            _labDbContext.Entry(currReq).Property(a => a.UploadedOn).IsModified = true;
+                            _labDbContext.SaveChanges();
+
+                            var param = _labDbContext.AdminParameters.FirstOrDefault(p => p.ParameterGroupName == "LAB" && p.ParameterName == "LabGeneralReportSMSSettings");
+                            var labReportUploadConfigParam = _labDbContext.AdminParameters.FirstOrDefault(p => p.ParameterGroupName == "LAB" && p.ParameterName == "LabReportUploadConfig");
+                            if (param != null && labReportUploadConfigParam != null)
+                            {
+                                LabGeneralReportSMSConfigDTO labGeneralReportSMSConfig = JsonConvert.DeserializeObject<LabGeneralReportSMSConfigDTO>(param.ParameterValue);
+                                LabReportUploadConfigParamDTO labReportUploadConfig = JsonConvert.DeserializeObject<LabReportUploadConfigParamDTO>(labReportUploadConfigParam.ParameterValue);
+                                if (labGeneralReportSMSConfig != null && labReportUploadConfig.EnableAutoSMS)
+                                {
+                                    var googleFileLink = LabReportUrlComonPath.Replace("GGLFILEUPLOADID", currReq.GoogleFileId);
+                                    string smsText = labGeneralReportSMSConfig.SmsText.Replace("{report_link}", googleFileLink);
+                                    string phoneNumber = _labDbContext.Patients.FirstOrDefault(p => p.PatientId == currReq.PatientId).PhoneNumber;
+                                    var response = await this.SendLabReportBulkSMS(phoneNumber.ToString(), smsText, currReq.RequisitionId.ToString(), _labDbContext);
+                                    if (response == true)
+                                    {
+                                        responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+                                        responseData.Results = "File Uploaded and SMS Sent Successfully";
+                                    }
+                                    else
+                                    {
+                                        responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+                                        responseData.Results = "File Uploaded Successfully but Could not send SMS";
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                    else
+                    {
+                        throw new Exception("Cannot find the test");
+                    }
+
+                }
+                return responseData;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        private object GenerateSampleCodeAutomatic(string str, RbacUser currentUser, string labType)
         {
             //string str = this.ReadPostData();
             List<PatientLabSampleVM> labTests = DanpheJSONConvert.DeserializeObject<List<PatientLabSampleVM>>(str);//this will come from client side--after parsing.
@@ -4121,7 +4455,7 @@ namespace DanpheEMR.Controllers
                         }
                         if (sampleDetail.SampleNumber.HasValue && (sampleDetail.SampleNumber > 0))
                         {
-                            var data = UpdateSampleCode(_labDbContext, labTests, currentUser,labType);
+                            var data = UpdateSampleCode(_labDbContext, labTests, currentUser, labType);
                             return new
                             {
                                 LatestSampleData = latestSample,
@@ -4152,7 +4486,7 @@ namespace DanpheEMR.Controllers
             }
         }
 
-        private object LabStickerSave(string ipStr, RbacUser currentUser,string PrinterName, int noOfPrints, string FolderPath)
+        private object LabStickerSave(string ipStr, RbacUser currentUser, string PrinterName, int noOfPrints, string FolderPath)
         {
             //ipDataString is input (HTML string)
             if (ipStr.Length > 0)
@@ -4200,11 +4534,11 @@ namespace DanpheEMR.Controllers
 
         private object SendLabReportEmailToPatient(string str, RbacUser currentUser)
         {
-            LabEmailModel EmailModel = JsonConvert.DeserializeObject<LabEmailModel>(str);
-            var apiKey = (from param in _masterDbContext.CFGParameters
-                          where param.ParameterGroupName.ToLower() == "common" && param.ParameterName == "APIKeyOfEmailSendGrid"
-                          select param.ParameterValue
-                          ).FirstOrDefault();
+            CommonEmail_DTO EmailModel = JsonConvert.DeserializeObject<CommonEmail_DTO>(str);
+            //var apiKey = (from param in _masterDbContext.CFGParameters
+            //              where param.ParameterGroupName.ToLower() == "common" && param.ParameterName == "APIKeyOfEmailSendGrid"
+            //              select param.ParameterValue
+            //              ).FirstOrDefault();
 
             if (!EmailModel.SendPdf)
             {
@@ -4220,7 +4554,7 @@ namespace DanpheEMR.Controllers
             Task<string> response = _emailService.SendEmail(EmailModel.SenderEmailAddress, EmailModel.EmailList,
                 EmailModel.SenderTitle, EmailModel.Subject, EmailModel.PlainContent,
                 EmailModel.HtmlContent, EmailModel.PdfBase64, EmailModel.AttachmentFileName,
-                EmailModel.ImageAttachments, apiKey);
+                EmailModel.ImageAttachments, EmailModel.EmailApiKey, EmailModel.SmtpServer, EmailModel.Password, EmailModel.PortNo);
 
             response.Wait();
 
@@ -4247,7 +4581,7 @@ namespace DanpheEMR.Controllers
 
         }
 
-        private object UpdateSampleCodeOfRequisition(string str, DateTime? SampleDate, string runNumberType, string patVisitType, int? RunNumber,RbacUser currentUser, string labType)
+        private object UpdateSampleCodeOfRequisition(string str, DateTime? SampleDate, string runNumberType, string patVisitType, int? RunNumber, RbacUser currentUser, string labType)
         {
             List<Int64> reqIdList = DanpheJSONConvert.DeserializeObject<List<Int64>>(str);
             Int64? existingBarCodeNum = null;
@@ -4353,7 +4687,7 @@ namespace DanpheEMR.Controllers
                     }
 
                     dbRequisition.SampleCode = RunNumber;
-                    dbRequisition.SampleCodeFormatted = GetSampleCodeFormatted(RunNumber, SampleDate.Value, patVisitType, runNumberType,labType);
+                    dbRequisition.SampleCodeFormatted = GetSampleCodeFormatted(RunNumber, SampleDate.Value, patVisitType, runNumberType, labType);
                     dbRequisition.SampleCreatedOn = SampleDate;
                     dbRequisition.SampleCollectedOnDateTime = System.DateTime.Now;
                     dbRequisition.SampleCreatedBy = currentUser.EmployeeId;
@@ -4411,7 +4745,7 @@ namespace DanpheEMR.Controllers
                 //labDbContext.Entry(dbrequisition).State = EntityState.Modified;
             }
             _labDbContext.SaveChanges();
-            return  Ok("lab Billing Status  updated successfully.");
+            return Ok("lab Billing Status  updated successfully.");
         }
 
         private object EditLabTestResult(string specimenDataModel, string str, RbacUser currentUser)
@@ -4458,7 +4792,7 @@ namespace DanpheEMR.Controllers
                     foreach (var labtestres in compsToUpdate)
                     {
                         LabTestComponentResult TestComp = _labDbContext.LabTestComponentResults
-                                             .Where(a => a.TestComponentResultId == labtestres.TestComponentResultId)
+                                             .Where(a => a.TestComponentResultId == labtestres.TestComponentResultId && a.IsActive == true)
                                               .FirstOrDefault<LabTestComponentResult>();
 
 
@@ -4586,7 +4920,7 @@ namespace DanpheEMR.Controllers
 
         }
 
-        private object UpdateDoctor(string str, int prescriberId, RbacUser currentUser)
+        private object UpdateDoctor(string str, string updateMode, int prescriberId, RbacUser currentUser)
         {
             //update doctor name for here.. 
             List<Int32> reqList = DanpheJSONConvert.DeserializeObject<List<Int32>>(str);
@@ -4602,14 +4936,24 @@ namespace DanpheEMR.Controllers
                 LabRequisitionModel labReq = _labDbContext.Requisitions
                                      .Where(a => a.RequisitionId == req)
                                       .FirstOrDefault<LabRequisitionModel>();
+                BillingTransactionItemModel biltxn = _labDbContext.BillingTransactionItems
+                                     .Where(a => a.RequisitionId == req)
+                                      .FirstOrDefault<BillingTransactionItemModel>();
 
                 BillingTransactionItemModel billItm = _labDbContext.BillingTransactionItems
                                                       .Where(a => a.BillingTransactionItemId == labReq.BillingTransactionItemId)
                                                       .FirstOrDefault();
 
                 //labDbContext.Requisitions.Attach(labReq);
-                labReq.PrescriberName = prescriberDoctorName;
-                labReq.PrescriberId = prescriberDocId;
+                if (updateMode == "prescriber")
+                {                 
+                        labReq.PrescriberName = prescriberDoctorName;
+                        labReq.PrescriberId = prescriberDocId;                   
+                }
+                else if (updateMode == "referrer")
+                {                 
+                        billItm.ReferredById = prescriberDocId;
+                }
                 labReq.ModifiedBy = currentUser.EmployeeId;
                 labReq.ModifiedOn = DateTime.Now;
 
@@ -4617,6 +4961,7 @@ namespace DanpheEMR.Controllers
                 _labDbContext.Entry(labReq).Property(a => a.PrescriberName).IsModified = true;
                 _labDbContext.Entry(labReq).Property(a => a.ModifiedOn).IsModified = true;
                 _labDbContext.Entry(labReq).Property(a => a.ModifiedBy).IsModified = true;
+                _labDbContext.Entry(billItm).Property(a => a.ReferredById).IsModified = true;
 
 
                 billItm.PrescriberId = prescriberDocId;
@@ -4778,7 +5123,7 @@ namespace DanpheEMR.Controllers
             }
         }
 
-        private object UndoSampleCode(string str, RbacUser currentUser)
+        private object UndoSampleCode(string str, RbacUser currentUser, string undoFromPageAction)
         {
             List<Int64> RequisitionIds = (DanpheJSONConvert.DeserializeObject<List<Int64>>(str));
 
@@ -4786,6 +5131,14 @@ namespace DanpheEMR.Controllers
             {
                 using (var trans = new TransactionScope())
                 {
+                    var enableLabSampleReceiveValue = _labDbContext.AdminParameters
+                        .Where(param => param.ParameterGroupName.ToLower() == "lab" && param.ParameterName == "EnableLabSampleReceive")
+                        .Select(a => a.ParameterValue)
+                        .FirstOrDefault();
+
+                    bool enableLabSampleReceive = !string.IsNullOrEmpty(enableLabSampleReceiveValue) &&
+                                                   enableLabSampleReceiveValue.ToLower() == "true";
+
                     //int newPrintId = printid + 1;
                     DataTable storedProcdureParam = new DataTable();
                     storedProcdureParam.Columns.Add("RequisitionId", typeof(long));
@@ -4802,12 +5155,23 @@ namespace DanpheEMR.Controllers
                                 reqResult.SampleCode = null;
                                 reqResult.SampleCreatedBy = null;
                                 reqResult.SampleCreatedOn = null;
-                                reqResult.OrderStatus = ENUM_LabOrderStatus.Active; //"active";
+                                // Default OrderStatus and BarCodeNumber for "sample-receive" and "external-lab"
+                                if (undoFromPageAction == ENUM_LabPageAction.SampleReceive || undoFromPageAction == ENUM_LabPageAction.ExternalLab)
+                                {
+                                    reqResult.OrderStatus = ENUM_LabOrderStatus.Active;
+                                    reqResult.BarCodeNumber = null;
+                                }
+                                else
+                                {
+                                    // Handle other pages
+                                    reqResult.OrderStatus = enableLabSampleReceive ? ENUM_LabOrderStatus.SamplePending : ENUM_LabOrderStatus.Active;
+                                    reqResult.BarCodeNumber = enableLabSampleReceive ? reqResult.BarCodeNumber : null;
+                                }
                                 reqResult.ModifiedBy = currentUser.EmployeeId;
                                 reqResult.ModifiedOn = DateTime.Now;
                                 reqResult.LabTestSpecimen = null;
                                 reqResult.LabTestSpecimenSource = null;
-                                reqResult.BarCodeNumber = null;
+                                reqResult.ExternalLabSampleStatus = null;
 
                                 _labDbContext.Entry(reqResult).Property(a => a.SampleCode).IsModified = true;
                                 _labDbContext.Entry(reqResult).Property(a => a.SampleCreatedBy).IsModified = true;
@@ -4818,11 +5182,11 @@ namespace DanpheEMR.Controllers
                                 _labDbContext.Entry(reqResult).Property(a => a.LabTestSpecimen).IsModified = true;
                                 _labDbContext.Entry(reqResult).Property(a => a.LabTestSpecimenSource).IsModified = true;
                                 _labDbContext.Entry(reqResult).Property(a => a.BarCodeNumber).IsModified = true;
+                                _labDbContext.Entry(reqResult).Property(a => a.ExternalLabSampleStatus).IsModified = true;
 
                                 storedProcdureParam.Rows.Add(reqResult.RequisitionId, reqResult.OrderStatus);
                             }
                         }
-
                     }
                     _labDbContext.SaveChanges();
 
@@ -4869,7 +5233,7 @@ namespace DanpheEMR.Controllers
 
                             foreach (var componentId in labReport.ComponentIdList)
                             {
-                                LabTestComponentResult component = _labDbContext.LabTestComponentResults.Where(cmp => cmp.TestComponentResultId == componentId).FirstOrDefault();
+                                LabTestComponentResult component = _labDbContext.LabTestComponentResults.Where(cmp => cmp.TestComponentResultId == componentId && cmp.IsActive == true).FirstOrDefault();
                                 reqIdList.Add(component.RequisitionId);
                             }
 
@@ -4880,17 +5244,23 @@ namespace DanpheEMR.Controllers
                             {
                                 LabRequisitionModel requisitionItem = _labDbContext.Requisitions.Where(val => val.RequisitionId == reqId).FirstOrDefault();
 
-                                requisitionItem.OrderStatus = ENUM_LabOrderStatus.ReportGenerated; //"report-generated";
-                                requisitionItem.VerifiedBy = currentUser.EmployeeId;
-                                requisitionItem.VerifiedOn = DateTime.Now;
-                                requisitionItem.IsVerified = true;
+                                if (labReport.PreVerificationEnabled && requisitionItem.IsPreVerified == false)
+                                {
+                                    requisitionItem.PreVerifiedBy = currentUser.EmployeeId;
+                                    requisitionItem.PreVerifiedOn = DateTime.Now;
+                                    requisitionItem.IsPreVerified = true;
+                                }
+                                else
+                                {
+                                    requisitionItem.OrderStatus = ENUM_LabOrderStatus.ReportGenerated; //"report-generated";
+                                    requisitionItem.VerifiedBy = currentUser.EmployeeId;
+                                    requisitionItem.VerifiedOn = DateTime.Now;
+                                    requisitionItem.IsVerified = true;
+                                }
 
-                                _labDbContext.Entry(requisitionItem).Property(a => a.OrderStatus).IsModified = true;
-                                _labDbContext.Entry(requisitionItem).Property(a => a.VerifiedBy).IsModified = true;
-                                _labDbContext.Entry(requisitionItem).Property(a => a.VerifiedOn).IsModified = true;
-                                _labDbContext.Entry(requisitionItem).Property(a => a.IsVerified).IsModified = true;
-                                _labDbContext.SaveChanges();
+                                _labDbContext.Entry(requisitionItem).State = EntityState.Modified;
                             }
+                            _labDbContext.SaveChanges();
                             verifyTransaction.Commit();
                         }
                     }
@@ -4928,14 +5298,14 @@ namespace DanpheEMR.Controllers
 
         private object TransferToLab(int requisitionId, string labType)
         {
-           // var requisitionId = Convert.ToInt32(this.ReadQueryStringData("reqId"));
+            // var requisitionId = Convert.ToInt32(this.ReadQueryStringData("reqId"));
             //var labType = this.ReadQueryStringData("labTypeName");
 
             LabRequisitionModel labRequest = (from req in _labDbContext.Requisitions
                                               where req.RequisitionId == requisitionId
                                               select req).FirstOrDefault();
             BillingTransactionItemModel billingItem = (from bil in _labDbContext.BillingTransactionItems
-                                                       where bil.RequisitionId == requisitionId
+                                                       where bil.BillingTransactionItemId == labRequest.BillingTransactionItemId
                                                        select bil).FirstOrDefault();
 
             using (var dbContextTransaction = _labDbContext.Database.BeginTransaction())
@@ -5015,10 +5385,292 @@ namespace DanpheEMR.Controllers
             DataTable dt = DALFunctions.GetDataTableFromStoredProc("SP_LAB_GetLabWorkList", paramList, _labDbContext);
             return dt;
         }
+
+        private object GetSampleReceivePendingList(string categoryIdList, string activeLab, DateTime FromDate, DateTime ToDate)
+        {
+            string selCategoryList = categoryIdList.Substring(1, categoryIdList.Length - 2);
+            List<LabPendingResultVM> results = new List<LabPendingResultVM>();
+            var selectedLab = String.IsNullOrEmpty(activeLab) ? "" : activeLab;
+            var dVendorId = (from vendor in _labDbContext.LabVendors
+                             where vendor.IsDefault == true
+                             select vendor.LabVendorId).FirstOrDefault();
+            List<SqlParameter> paramList = new List<SqlParameter>() {
+                        new SqlParameter("@FromDate", FromDate),
+                        new SqlParameter("@ToDate", ToDate),
+                        new SqlParameter("@LabTypeName", activeLab),
+                        new SqlParameter("@CategoryIds", selCategoryList),
+                        new SqlParameter("@DefaultVendorId", dVendorId)
+                    };
+            DataTable dt = DALFunctions.GetDataTableFromStoredProc("SP_LAB_GetPatientListForSampleReceive", paramList, _labDbContext);
+            return dt;
+        }
+        private object GetSampleItemsByRequisitionId(string requisitionIds, string activeLab)
+        {
+            // Parse the comma-separated requisition IDs into a list of long
+            var requisitionIdList = requisitionIds
+                .Split(',')
+                .Select(long.Parse)
+                .ToList();
+
+            // Fetch the sample items
+            var sampleItemsQuery = from req in _labDbContext.Requisitions
+                                   join pat in _labDbContext.Patients on req.PatientId equals pat.PatientId
+                                   join labTest in _labDbContext.LabTests on req.LabTestId equals labTest.LabTestId
+                                   where requisitionIdList.Contains(req.RequisitionId)
+                                   select new
+                                   {
+                                       req.PatientId,
+                                       PatientName = pat.FirstName + " " +
+                                                     (string.IsNullOrEmpty(pat.MiddleName) ? "" : pat.MiddleName + " ") +
+                                                     pat.LastName,
+                                       req.OrderStatus,
+                                       labTest.LabTestSpecimen,
+                                       req.RequisitionId,
+                                       req.LabTestName,
+                                       req.SampleCode,
+                                       req.OrderDateTime,
+                                       req.SampleCreatedOn,
+                                       req.RunNumberType,
+                                       req.PrescriberName,
+                                       req.HasInsurance,
+                                       labTest.IsOutsourceTest,
+                                       pat.PhoneNumber,
+                                       req.SampleCodeFormatted,
+                                       req.BarCodeNumber
+                                   };
+
+            // Execute the query and return the results
+            return sampleItemsQuery.ToList();
+        }
+
+
+
+        private object ReceiveSampleInLab(List<Int64> RequisitionIdList, RbacUser currentUser)
+        {
+            DataTable storedProcdureParam = new DataTable();
+            storedProcdureParam.Columns.Add("RequisitionId", typeof(long));
+            storedProcdureParam.Columns.Add("OrderStatus", typeof(string));
+            using (var dbContextTransaction = _labDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+
+                    foreach (Int64 reqId in RequisitionIdList)
+                    {
+                        List<LabRequisitionModel> listTestReq = _labDbContext.Requisitions
+                                                 .Where(a => a.RequisitionId == reqId)
+                                                 .ToList<LabRequisitionModel>();
+                        if (listTestReq != null)
+                        {
+                            foreach (var reqResult in listTestReq)
+                            {
+                                reqResult.OrderStatus = ENUM_LabOrderStatus.Pending;
+                                reqResult.SampleReceivedOn = DateTime.Now;
+                                reqResult.ModifiedBy = currentUser.EmployeeId;
+                                reqResult.ModifiedOn = DateTime.Now;
+                                _labDbContext.Entry(reqResult).State = EntityState.Modified;
+                                storedProcdureParam.Rows.Add(reqResult.RequisitionId, reqResult.OrderStatus);
+                            }
+                        }
+                    }
+                    _labDbContext.SaveChanges();
+                    dbContextTransaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    throw ex;
+                }
+            }
+            List<SqlParameter> paramList = new List<SqlParameter>(){
+                                                    new SqlParameter("@RequisitionId_OrderStatus", storedProcdureParam),
+                                                };
+            DataTable statusUpdated = DALFunctions.GetDataTableFromStoredProc("SP_Bill_OrderStatusUpdate", paramList, _labDbContext);
+            return true;
+        }
+
+        private object FinalReportUndo(List<Int64> RequisitionIdList, RbacUser currentUser)
+        {
+            DataTable storedProcdureParam = new DataTable();
+            storedProcdureParam.Columns.Add("RequisitionId", typeof(long));
+            storedProcdureParam.Columns.Add("OrderStatus", typeof(string));
+            using (var dbContextTransaction = _labDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    var verificationParameter = _labDbContext.AdminParameters.Where(param => param.ParameterGroupName.ToLower() == "lab" && param.ParameterName == "LabReportVerificationNeededB4Print").Select(a => a.ParameterValue).FirstOrDefault();
+                    var verificationObj = DanpheJSONConvert.DeserializeObject<VerificationCoreCFGModel>(verificationParameter);
+
+                    bool verificationEnabled = verificationObj.EnableVerificationStep;
+                    bool preVerificationEnabled = verificationObj.EnablePreVerification;
+
+                    foreach (Int64 reqId in RequisitionIdList)
+                    {
+                        LabRequisitionModel requisition = _labDbContext.Requisitions
+                                                 .Where(a => a.RequisitionId == reqId).FirstOrDefault();
+                        if (requisition != null)
+                        {
+                            LabReportModel report = _labDbContext.LabReports.Find(requisition.LabReportId);
+                            if (report != null)
+                            {
+                                var signature = report.Signatories;
+                                List<LabSignatories_DTO> signatureList = DanpheJSONConvert.DeserializeObject<List<LabSignatories_DTO>>(signature);
+                                LabSignatories_DTO signatureToRemove = signatureList.Find(a => a.EmployeeId == (verificationEnabled ? requisition.VerifiedBy : requisition.ResultAddedBy));
+                                if (signatureToRemove != null)
+                                {
+                                    signatureList.Remove(signatureToRemove);
+                                }
+                                report.ModifiedBy = currentUser.EmployeeId;
+                                report.ModifiedOn = DateTime.Now;
+                                report.Signatories = DanpheJSONConvert.SerializeObject(signatureList);
+                                _labDbContext.Entry(report).State = EntityState.Modified;
+                            }
+
+                            if (!verificationEnabled)
+                            {
+                                List<LabTestComponentResult> results = _labDbContext.LabTestComponentResults.Where(res => res.RequisitionId == requisition.RequisitionId && res.IsActive == true).ToList();
+                                results.ForEach(res =>
+                                {
+                                    res.LabReportId = null;
+                                    res.IsActive = false;
+                                    res.ModifiedBy = currentUser.EmployeeId;
+                                    res.ModifiedOn = DateTime.Now;
+                                    _labDbContext.Entry(res).State = EntityState.Modified;
+                                });
+                                requisition.LabReportId = null;
+                                requisition.ResultAddedBy = null;
+                                requisition.ResultAddedOn = null;
+                                requisition.PrintedBy = null;
+                                requisition.PrintCount = null;
+                            }
+                            requisition.OrderStatus = verificationEnabled ? ENUM_LabOrderStatus.ResultAdded : ENUM_LabOrderStatus.Pending;
+                            requisition.IsVerified = false;
+                            requisition.VerifiedBy = null;
+                            requisition.VerifiedOn = null;
+                            requisition.ModifiedOn = DateTime.Now;
+                            requisition.ModifiedBy = currentUser.EmployeeId;
+                            _labDbContext.Entry(requisition).State = EntityState.Modified;
+                            storedProcdureParam.Rows.Add(requisition.RequisitionId, requisition.OrderStatus);
+
+                            LabStatusTransitionLogModel statusLog = new LabStatusTransitionLogModel();
+                            statusLog.RequisitionId = requisition.RequisitionId;
+                            statusLog.LabReportId = requisition.LabReportId;
+                            statusLog.PreviousStatus = ENUM_LabOrderStatus.ReportGenerated;
+                            statusLog.CurrentStatus = verificationEnabled ? preVerificationEnabled ? $"{ENUM_LabOrderStatus.ResultAdded} (Pre-Verified.)" : $"{ENUM_LabOrderStatus.ResultAdded} (Verified.)" : ENUM_LabOrderStatus.Pending;
+                            statusLog.CreatedBy = currentUser.EmployeeId;
+                            statusLog.CreatedOn = DateTime.Now;
+                            statusLog.IsActive = true;
+                            _labDbContext.LabStatusTransitionLog.Add(statusLog);
+                        }
+                    }
+                    _labDbContext.SaveChanges();
+                    dbContextTransaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    throw ex;
+                }
+            }
+            List<SqlParameter> paramList = new List<SqlParameter>(){
+                                                    new SqlParameter("@RequisitionId_OrderStatus", storedProcdureParam),
+                                                };
+            DataTable statusUpdated = DALFunctions.GetDataTableFromStoredProc("SP_Bill_OrderStatusUpdate", paramList, _labDbContext);
+            return true;
+        }
+
+        private object PendingReportUndo(List<Int64> RequisitionIdList, RbacUser currentUser)
+        {
+            DataTable storedProcdureParam = new DataTable();
+            storedProcdureParam.Columns.Add("RequisitionId", typeof(long));
+            storedProcdureParam.Columns.Add("OrderStatus", typeof(string));
+            using (var dbContextTransaction = _labDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    var verificationParameter = _labDbContext.AdminParameters.Where(param => param.ParameterGroupName.ToLower() == "lab" && param.ParameterName == "LabReportVerificationNeededB4Print").Select(a => a.ParameterValue).FirstOrDefault();
+                    var verificationObj = DanpheJSONConvert.DeserializeObject<VerificationCoreCFGModel>(verificationParameter);
+
+                    bool verificationEnabled = verificationObj.EnableVerificationStep;
+                    bool preVerificationEnabled = verificationObj.EnablePreVerification;
+
+                    foreach (Int64 reqId in RequisitionIdList)
+                    {
+                        LabRequisitionModel requisition = _labDbContext.Requisitions
+                                                 .Where(a => a.RequisitionId == reqId).FirstOrDefault();
+                        if (requisition != null)
+                        {
+                            LabReportModel report = _labDbContext.LabReports.Find(requisition.LabReportId);
+                            if (report != null)
+                            {
+                                var signature = report.Signatories;
+                                List<LabSignatories_DTO> signatureList = DanpheJSONConvert.DeserializeObject<List<LabSignatories_DTO>>(signature);
+                                LabSignatories_DTO signatureToRemove = signatureList.Find(a => a.EmployeeId == requisition.PreVerifiedBy);
+                                if (signatureToRemove != null)
+                                {
+                                    signatureList.Remove(signatureToRemove);
+                                }
+                                report.ModifiedBy = currentUser.EmployeeId;
+                                report.ModifiedOn = DateTime.Now;
+                                report.Signatories = DanpheJSONConvert.SerializeObject(signatureList);
+                                _labDbContext.Entry(report).State = EntityState.Modified;
+                            }
+
+                            LabStatusTransitionLogModel statusLog = new LabStatusTransitionLogModel();
+                            statusLog.RequisitionId = requisition.RequisitionId;
+                            statusLog.LabReportId = requisition.LabReportId;
+                            statusLog.PreviousStatus = requisition.LabReportId != null ? requisition.IsPreVerified ? $"{ENUM_LabOrderStatus.ResultAdded} (Pre-Verified.)" : $"{ENUM_LabOrderStatus.ResultAdded} (Verified.)" : $"{ENUM_LabOrderStatus.ResultAdded} (Verified.)";
+                            statusLog.CurrentStatus = requisition.LabReportId != null ? requisition.IsPreVerified ? $"{ENUM_LabOrderStatus.ResultAdded} (Verified.)" : $"{ENUM_LabOrderStatus.Pending}" : $"{ENUM_LabOrderStatus.Pending}";
+                            statusLog.CreatedBy = currentUser.EmployeeId;
+                            statusLog.CreatedOn = DateTime.Now;
+                            statusLog.IsActive = true;
+                            _labDbContext.LabStatusTransitionLog.Add(statusLog);
+
+                            if (!requisition.IsPreVerified)
+                            {
+                                requisition.OrderStatus = ENUM_LabOrderStatus.Pending;
+                                List<LabTestComponentResult> results = _labDbContext.LabTestComponentResults.Where(res => res.RequisitionId == requisition.RequisitionId && res.IsActive == true).ToList();
+                                results.ForEach(res =>
+                                {
+                                    res.LabReportId = null;
+                                    res.IsActive = false;
+                                    res.ModifiedBy = currentUser.EmployeeId;
+                                    res.ModifiedOn = DateTime.Now;
+                                    _labDbContext.Entry(res).State = EntityState.Modified;
+                                });
+                                requisition.LabReportId = null;
+                                requisition.ResultAddedBy = null;
+                                requisition.ResultAddedOn = null;
+                                requisition.PrintedBy = null;
+                                requisition.PrintCount = null;
+                            }
+                            requisition.IsPreVerified = false;
+                            requisition.PreVerifiedOn = null;
+                            requisition.PreVerifiedBy = null;
+                            requisition.ModifiedOn = DateTime.Now;
+                            requisition.ModifiedBy = currentUser.EmployeeId;
+                            _labDbContext.Entry(requisition).State = EntityState.Modified;
+                            storedProcdureParam.Rows.Add(requisition.RequisitionId, requisition.OrderStatus);
+                        }
+                    }
+                    _labDbContext.SaveChanges();
+                    dbContextTransaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    throw ex;
+                }
+            }
+            List<SqlParameter> paramList = new List<SqlParameter>(){
+                                                    new SqlParameter("@RequisitionId_OrderStatus", storedProcdureParam),
+                                                };
+            DataTable statusUpdated = DALFunctions.GetDataTableFromStoredProc("SP_Bill_OrderStatusUpdate", paramList, _labDbContext);
+            return true;
+        }
+
+
     }
-
-
-
 }
 
 

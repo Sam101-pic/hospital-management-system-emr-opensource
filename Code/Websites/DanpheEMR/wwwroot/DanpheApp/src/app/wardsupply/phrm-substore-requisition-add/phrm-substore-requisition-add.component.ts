@@ -7,8 +7,9 @@ import { PharmacyService } from '../../pharmacy/shared/pharmacy.service';
 import { SecurityService } from '../../security/shared/security.service';
 import { DanpheHTTPResponse } from '../../shared/common-models';
 import { GridEmitModel } from '../../shared/danphe-grid/grid-emit.model';
+import { GeneralFieldLabels } from '../../shared/DTOs/general-field-label.dto';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../shared/shared-enums';
+import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_PharmacyRequisitionVerificationStatus } from '../../shared/shared-enums';
 import { PHRMSubStoreItemMasterModel } from '../shared/phrm-substore-item-master.model';
 import { PHRMSubStoreRequisitionItems } from '../shared/phrm-substore-requisition-items.model';
 import { PHRMSubStoreRequisition } from '../shared/phrm-substore-requisition.model';
@@ -16,7 +17,6 @@ import WARDGridColumns from '../shared/ward-grid-cloumns';
 import { WardSupplyBLService } from '../shared/wardsupply.bl.service';
 import { PHRMSubStoreRequisitionDispatchToReceive_DTO } from './shared/phrm-substore-requisition-dispatch-to-receive.dto';
 import { PharmacyWardRequisitionVerifier_DTO } from './shared/phrm-ward-requisition-verifier.dto';
-import { GeneralFieldLabels } from '../../shared/DTOs/general-field-label.dto';
 @Component({
   selector: 'app-requisition-add',
   templateUrl: './phrm-substore-requisition-add.component.html',
@@ -49,8 +49,10 @@ export class PHRMSubStoreRequisitionAddComponent implements OnInit {
   PHRMSubStoreRequisitionDispatchToReceive: PHRMSubStoreRequisitionDispatchToReceive_DTO = new PHRMSubStoreRequisitionDispatchToReceive_DTO();
   IsVerificationActivated: boolean = false;
   VerifierList: PharmacyWardRequisitionVerifier_DTO[] = [];
-
+  AllowPreviousFiscalYear: boolean = false;
   public GeneralFieldLabel = new GeneralFieldLabels();
+  public ShowCheckBox: boolean = true;
+  public HasPermission: boolean = false;
   constructor(
     public phrmBLService: PharmacyBLService,
     public phrmService: PharmacyService,
@@ -69,6 +71,12 @@ export class PHRMSubStoreRequisitionAddComponent implements OnInit {
   }
   ngOnInit(): void {
     this.setFocusById(`itemName${0}`);
+    if (this.securityService.HasPermission('btn-wardsupply-pharmacy-requisition-verification')) {
+      this.HasPermission = true;
+    }
+    else {
+      this.HasPermission = false;
+    }
   }
   AddRowRequest(): void {
     for (var i = 0; i < this.requisition.RequisitionItems.length; i++) {
@@ -121,12 +129,18 @@ export class PHRMSubStoreRequisitionAddComponent implements OnInit {
   AddRequisition(): void {
     var CheckIsValid = true;
     var errorMessages: string[] = [];
+    if (this.requisition.IsVerificationEnabled && this.requisition.VerifierList.some(v => !v.Name)) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Please provide verification info or you can uncheck verification!"]);
+      return;
+    }
+
     if (this.requisition.IsValidCheck(undefined, undefined) == false) {
       for (var a in this.requisition.RequisitionValidator.controls) {
         this.requisition.RequisitionValidator.controls[a].markAsDirty();
         this.requisition.RequisitionValidator.controls[a].updateValueAndValidity();
       }
       CheckIsValid = false;
+      errorMessages.push("Invalid Requisition Date");
     }
 
     for (var i = 0; i < this.requisition.RequisitionItems.length; i++) {
@@ -189,11 +203,15 @@ export class PHRMSubStoreRequisitionAddComponent implements OnInit {
 
   }
   GetRequisitionDetailView(requisitionId): void {
+    this.ShowCheckBox = true;
     this.wardsupplyBLService.GetRequisitionDetailView(requisitionId).subscribe(res => {
       if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
         this.requisitionToView = res.Results.requisition;
         this.showAddRequisitionPage = false;
         this.showRequisitionDetails = true;
+        if (this.requisitionToView.VerificationStatus === ENUM_PharmacyRequisitionVerificationStatus.approved) {
+          this.ShowCheckBox = false;
+        }
       }
     }
     );
@@ -323,6 +341,7 @@ export class PHRMSubStoreRequisitionAddComponent implements OnInit {
   CreateRequisition(): void {
     this.showAddRequisitionPage = true;
     this.AddRowRequest();
+    this.SetDefaultVerifier();
   }
   Close(): void {
     this.showAddRequisitionPage = false;
@@ -330,7 +349,10 @@ export class PHRMSubStoreRequisitionAddComponent implements OnInit {
     this.showDispatchedItemReceivePage = false;
     // this.requisition.RequisitionItems = [];
     this.requisition.RequisitionItems = [];
+    this.requisition = new PHRMSubStoreRequisition();
     this.GetAllRequisitionByStoreId();
+    this.cancelRemarks = '';
+    this.showCancelButton = false;
 
   }
   GetPharmacyBillingHeaderParameter(): void {
@@ -426,6 +448,9 @@ export class PHRMSubStoreRequisitionAddComponent implements OnInit {
     if (typeof $event == "object") {
       this.requisition.VerifierList[index] = $event;
     }
+    else if (typeof $event == "string") {
+      this.requisition.VerifierList[index].Name = '';
+    }
   }
 
   CheckIfDeleteVerifierAllowed() {
@@ -506,6 +531,7 @@ export class GetSubStoreRequisitionViewDto {
   DispatchedBy: string;
   ReceivedBy: string;
   RequestedStoreName: string;
+  VerificationStatus: string;
   RequisitionItems: GetSubStoreRequisitionItemViewDto[] = [];
 
 }
@@ -518,6 +544,7 @@ export class GetSubStoreRequisitionItemViewDto {
   ReceivedQuantity: number;
   PendingQuantity: number;
   RequestedItemStatus: string;
+  DispatchedQuantity: number = 0;
   Remarks: string;
   //for cancel selected item
   IsSelected: boolean;

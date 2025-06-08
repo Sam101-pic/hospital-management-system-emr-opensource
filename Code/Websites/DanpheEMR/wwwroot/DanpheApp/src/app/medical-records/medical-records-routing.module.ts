@@ -15,6 +15,7 @@ import { HospitalMortalityComponent } from './mr-reports/government/hospital-mor
 import { InpatientMorbidityReportComponent } from './mr-reports/government/inpatient-morbidity/mr-inpatient-morbidity-report';
 import { GovInpatientOutcomeReportComponent } from './mr-reports/government/inpatient-outcome/gov-inpatient-outcome-report.component';
 import { GovLaboratoryServicesReportComponent } from './mr-reports/government/lab-services/gov-laboratory-services.component';
+import { NonCommunicableDiseaseReportComponent } from './mr-reports/government/non-communicable-disease/non-communicable-disease-report';
 import { OutpatientMorbidityReportComponent } from './mr-reports/government/outpatient-morbidity/mr-outpatient-morbidity-report';
 import { GovSummaryReportComponent } from './mr-reports/government/summary/govt-summary-report.component';
 import { OutpatientServicesReportComponent } from './mr-reports/mr-outpatient-services-report';
@@ -50,6 +51,8 @@ import { MROutpatientListComponent } from './outpatient-list/outpatient-list.com
               { path: 'HospitalMortalityReport', component: HospitalMortalityComponent, canActivate: [AuthGuardService, ResetPatientcontextGuard] },
               { path: 'EmergencyPatientMorbidityReport', component: EmergencyPatientMorbidityReportComponent, canActivate: [AuthGuardService, ResetPatientcontextGuard] },
               { path: 'EthnicGroupStatisticsReport', component: EthnicGroupStatisticsReportComponent, canActivate: [AuthGuardService, ResetPatientcontextGuard] },
+              { path: 'NonCommunicableDiseaseReport', component: NonCommunicableDiseaseReportComponent, canActivate: [AuthGuardService, ResetPatientcontextGuard] },
+
               { path: "**", component: PageNotFound }
             ]
           },

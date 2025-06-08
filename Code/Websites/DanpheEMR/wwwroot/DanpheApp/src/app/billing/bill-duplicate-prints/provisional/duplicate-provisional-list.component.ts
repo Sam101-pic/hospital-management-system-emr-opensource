@@ -3,16 +3,17 @@ import { Component } from '@angular/core';
 import { BillingBLService } from '../../shared/billing.bl.service';
 
 
-import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 
 import { CoreService } from '../../../core/shared/core.service';
+import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { BillingReceiptModel } from '../../shared/billing-receipt.model';
 
 @Component({
-  templateUrl: './duplicate-provisional-list.html'
+  templateUrl: './duplicate-provisional-list.html',
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 
 // App Component class
@@ -21,7 +22,7 @@ export class BIL_DuplicatePrint_ProvisionalListComponent {
   public showReceipt: boolean = false;
   public provisionalInvoiceList: Array<any> = new Array<any>();
   //public doctorsList: Array<any> = [];
-  public duplicateProvisionalBillGridColumns: Array<any> = null;
+  public duplicateProvisionalBillGridColumns: typeof GridColumnSettings.DuplicateProvisionalReceiptList;
   public fromDate: string = null;
   public toDate: string = null;
   public dateRange: string = null;
@@ -85,7 +86,7 @@ export class BIL_DuplicatePrint_ProvisionalListComponent {
           if (data) {
             this.currentData = data;
             this.ProvisionalFiscalYearId = this.currentData.ProvisionalFiscalYearId;
-            this.ProvisionalReceiptNumber = this.currentData.ProvisionalReceiptNo;
+            this.ProvisionalReceiptNumber = this.currentData.ProvisionalReceiptNo ? this.currentData.ProvisionalReceiptNo.substring(3, this.currentData.ProvisionalReceiptNo.length) : null;
             this.showReceipt = true;
           }
           //this.GetByReceiptNoFiscalYear(data.ProvisionalReceiptNo, data.FiscalYearId);
@@ -125,4 +126,12 @@ export class BIL_DuplicatePrint_ProvisionalListComponent {
       this.showReceipt = false;
     }
   }
+
+
+  hotkeys(event) {
+    if (event.keyCode === 27) {
+      this.CloseProvisionalSlip();
+    }
+  }
+
 }

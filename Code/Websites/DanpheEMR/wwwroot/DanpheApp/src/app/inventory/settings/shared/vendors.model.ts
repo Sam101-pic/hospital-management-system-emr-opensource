@@ -5,7 +5,7 @@ export class VendorsModel {
   public VendorId: number = 0;
   public VendorName: string = '';
   public VendorCode: string = '';
-  public ContactPersion: string = '';
+  public ContactPerson: string = '';
   public ContactAddress: string = '';
   public ContactNo: string = '';
   public Email: string = '';

@@ -4,20 +4,22 @@ import { BillingBLService } from '../../shared/billing.bl.service';
 
 import { BillingDeposit } from "../../shared/billing-deposit.model";
 
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 
+import { CoreService } from '../../../core/shared/core.service';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
-import * as moment from 'moment';
+import { ENUM_DanpheHTTPResponseText } from '../../../shared/shared-enums';
 
 @Component({
   templateUrl: './duplicate-deposit-list.html',
   host: { '(window:keydown)': 'hotkeys($event)' }
 })
-   
+
 // App Component class
-export class BIL_DuplicatePrint_DepositListComponent{
+export class BIL_DuplicatePrint_DepositListComponent {
 
   public deposit: BillingDeposit;
   public showReceipt: boolean = false;
@@ -29,7 +31,8 @@ export class BIL_DuplicatePrint_DepositListComponent{
 
   constructor(
     public BillingBLService: BillingBLService,
-    public msgBoxServ: MessageboxService) {
+    public msgBoxServ: MessageboxService,
+    public coreService: CoreService) {
     this.duplicateBillGrid = GridColumnSettings.DuplicateDepositReceiptList;
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('CreatedOn', true));
     this.GetDepositList();
@@ -37,9 +40,21 @@ export class BIL_DuplicatePrint_DepositListComponent{
 
   GetDepositList() {
     this.BillingBLService.GetDepositList()
-      .subscribe(res => {
-        this.depositList = res.Results;
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+          this.depositList = res.Results;
+          if (this.depositList && this.depositList.length > 0) {
+            this.depositList = this.GetPatientsWithConsistentAge();
+          }
+        }
       });
+  }
+
+  GetPatientsWithConsistentAge() {
+    return this.depositList.map(patient => {
+      patient.Age = this.coreService.CalculateAge(patient.DateOfBirth);
+      return patient;
+    });
   }
 
 

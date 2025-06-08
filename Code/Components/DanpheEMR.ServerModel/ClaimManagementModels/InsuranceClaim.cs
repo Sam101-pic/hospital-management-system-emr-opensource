@@ -13,6 +13,7 @@ namespace DanpheEMR.ServerModel.ClaimManagementModels
         public string ClaimReferenceNo { get; set; }
         public int CreditOrganizationId { get; set; }
         public int PatientId { get; set; }
+        public int PatientVisitId { get; set; }
         public int SchemeId { get; set; }
         public string PatientCode { get; set; }
         public string MemberNumber { get; set; }
@@ -28,5 +29,7 @@ namespace DanpheEMR.ServerModel.ClaimManagementModels
         public DateTime? ModifiedOn { get; set; }
         public decimal ApprovedAmount { get; set; }
         public decimal RejectedAmount { get; set; }
+        public string InvoiceIdCSV { get; set; }
+        public string ModuleName { get; set; }
     }
 }

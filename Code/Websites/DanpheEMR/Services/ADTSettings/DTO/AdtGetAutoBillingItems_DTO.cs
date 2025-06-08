@@ -14,6 +14,7 @@
         public decimal PercentageOfBedCharges { get; set; }
         public bool UsePercentageOfBedCharges { get; set; }
         public bool IsRepeatable { get; set; }
+        public bool AllowAutoCancellation { get; set; }
         public bool IsActive { get; set; }
     }
 }

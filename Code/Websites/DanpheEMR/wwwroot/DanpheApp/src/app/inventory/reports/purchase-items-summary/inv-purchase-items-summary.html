@@ -1,35 +1,41 @@
 <div class="row">
     <div class="col-md-12">
-        <div class="col-md-6 caption custom-caption">
+        <div class="col-md-6 caption custom-caption" style="padding-left:0px;">
             <i class="fa fa-archive"></i>
             <span class="caption-subject">Purchase Items Report</span>
         </div>
     </div>
     <div class="col-md-12">
-        <div class="col-md-6">
-            <fiscal-year-calendar [showSingleDatePicker]="false" [showAllFiscalYear]="true" (fiscalYearDate)="selectDate($event)"> </fiscal-year-calendar>
+
+        <div class="col-md-6" style="padding-left:0px; margin-top: -5px;">
+            <fiscal-year-calendar [showSingleDatePicker]="false" [showAllFiscalYear]="true" (fiscalYearDate)="selectDate($event)">
+            </fiscal-year-calendar>
         </div>
+        <div class="col-md-2"></div>
         <div class="col-md-3">
             <div class="form-group row clearfix">
-                <input danphe-auto-complete class="form-control" (valueChanged)="onItemChange($event)" placeholder="Select Item Name" [(ngModel)]="selectedItem" [list-formatter]="ItemListFormatter" [ngModelOptions]="{standalone: true}" display-property-name="ItemName" value-property-name="ItemId" [source]="itemList" [match-formatted]="true" onclick="this.select();" />
+                <input danphe-auto-complete class="form-control" (valueChanged)="onItemChange($event)" placeholder="Select Item Name"
+                       [(ngModel)]="selectedItem" [list-formatter]="ItemListFormatter" [ngModelOptions]="{standalone: true}"
+                       display-property-name="ItemName" value-property-name="ItemId" [source]="itemList" [match-formatted]="true"
+                       onclick="this.select();" />
 
             </div>
         </div>
 
-        <div class="col-md-2">
-            <button class="btn blue" type="button" (click)="PurchaseItemsReport()"  [disabled]="loading" >
+        <div class="col-md-1" style="text-align:right; padding-right:5px;">
+            <button class="btn blue" type="button" (click)="PurchaseItemsReport()" [disabled]="loading">
                 <i class="fa fa-search"></i>&nbsp;
-                <span *ngIf="!loading" >Load</span>
+                <span *ngIf="!loading">Load</span>
                 <span *ngIf="loading">Loading...</span>
 
             </button>
         </div>
-        <div class="col-md-12 icheck-inline" style="text-align: right;" >
+        <div class="col-md-12 icheck-inline" style="text-align: right;padding-right: 0px;">
             <label class="mt-checkbox mt-checkbox-outline">
-                <input name="salutation"  type="radio" value="Consumables" [(ngModel)]="ItemType" (ngModelChange)="OnItemTypeChange()">
+                <input name="salutation" type="radio" value="Consumables" [(ngModel)]="ItemType" (ngModelChange)="OnItemTypeChange()">
                 <span></span>Consumables </label>
             <label class="mt-checkbox mt-checkbox-outline">
-                <input  name="salutation" type="radio" value="Capital Goods"  [(ngModel)]="ItemType" (ngModelChange)="OnItemTypeChange()">
+                <input name="salutation" type="radio" value="Capital Goods" [(ngModel)]="ItemType" (ngModelChange)="OnItemTypeChange()">
                 <span></span>Capital Goods </label>
         </div>
     </div>
@@ -37,7 +43,10 @@
 
 <div class="row">
     <div class="col-lg-12 col-sm-12">
-        <danphe-grid [grid-colDefaults]="InventoryPurchaseItemsReportColumns" [rangeType]="dateRange" [grid-data]="InventoryPurchaseItemsReportData" [NepaliDateInGridParams]="NepaliDateInGridSettings" [grid-exportOptions]="GetGridExportOptions()" [grid-showExport]="true" [report-title]="'Purchase Items Report'" [report-for]="'inventory'" [show-header]="true" [filter-parameters]="FilterParameters" [grid-footer-content]="footerContent">
+        <danphe-grid [grid-colDefaults]="InventoryPurchaseItemsReportColumns" [rangeType]="dateRange" [grid-data]="InventoryPurchaseItemsReportData"
+                     [NepaliDateInGridParams]="NepaliDateInGridSettings" [grid-exportOptions]="GetGridExportOptions()" [grid-showExport]="true"
+                     [report-title]="'Purchase Items Report'" [report-for]="'inventory'" [show-header]="true" [filter-parameters]="FilterParameters"
+                     [grid-footer-content]="footerContent">
         </danphe-grid>
     </div>
     <div class="col-lg-6 col-sm-12 col-md-6" style="margin-bottom: 10px !important;">

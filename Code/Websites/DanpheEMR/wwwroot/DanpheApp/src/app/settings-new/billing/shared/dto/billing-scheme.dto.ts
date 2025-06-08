@@ -37,4 +37,7 @@ export class BillingScheme_DTO {
   public HasSubScheme: boolean = false;
   public AllowProvisionalBilling: boolean = false;
   public SubSchemes = new Array<BillingSubScheme_DTO>();
+  public IsPharmacyCappingApplicable: boolean = false;
+  public IsBillingCappingApplicable: boolean = false;
+  public UseCappingAPI: boolean = false;
 }

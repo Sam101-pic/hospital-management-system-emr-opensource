@@ -277,6 +277,17 @@ td {
   border-radius: 15px;
 }
 
+.note-div {
+  background-color: #ffe4e9;
+  margin-top: 20px;
+}
+
+.note {
+  color: #ef6161;
+  font-weight: 700;
+  border-left: 0px;
+}
+
 @keyframes progress-forward {
   0% {
     width: 0%;
@@ -296,6 +307,19 @@ td {
 
   100% {
     width: 100%;
+  }
+}
+
+#id_invoice_section {
+  border-right: 1px solid #dee2e6;
+}
+
+@media (max-width: 767.98px) {
+  #id_invoice_section {
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
   }
 }
 

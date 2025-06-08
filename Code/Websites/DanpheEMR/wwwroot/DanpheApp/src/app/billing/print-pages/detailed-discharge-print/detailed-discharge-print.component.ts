@@ -3,7 +3,8 @@ import * as moment from "moment";
 import { CoreService } from "../../../core/shared/core.service";
 import { SecurityService } from "../../../security/shared/security.service";
 import { CommonFunctions } from "../../../shared/common.functions";
-import { ENUM_BillDepositType, ENUM_ServiceCategoryCodes } from "../../../shared/shared-enums";
+import { ENUM_BillDepositType, ENUM_PrintTemplateTypes, ENUM_ServiceCategoryCodes } from "../../../shared/shared-enums";
+import { PrintTemplateType } from '../../shared/print-template-type.model';
 
 @Component({
   selector: 'detailed-discharge-print',
@@ -18,6 +19,9 @@ export class DetailedDischargePrintComponent {
 
   @Input("is-provisional-discharge")
   public IsProvisionalDischarge: boolean = false;
+
+  @Input("estimated-DiscountAmount")
+  public EstimatedDiscountAmount: number = 0;
   public headerDetail: { CustomerName, Address, Email, CustomerRegLabel, CustomerRegNo, Tel };
   public PatientDetail: any;
   public AdmissionInfo: any;
@@ -52,20 +56,40 @@ export class DetailedDischargePrintComponent {
   public InvoiceDisplaySettings: any = { ShowHeader: true, ShowQR: true, ShowHospLogo: true, ShowPriceCategory: false, HeaderType: '' };
   public ShowProviderName: boolean = false;
   public OtherCurrencyDetail: OtherCurrencyDetail = { CurrencyCode: '', ExchangeRate: 0, BaseAmount: 0, ConvertedAmount: 0 };
-  constructor(private _coreService: CoreService, private _changeDetector: ChangeDetectorRef, private _securityService: SecurityService) {
+  public ToBePaid: number = 0;
+  public DepositUsed: number = 0;
+  ToBeReturned: number = 0;
+  public PrintTemplateTypeSettings = new PrintTemplateType();
+  public loading: boolean = false;
+  printContent: string = "";
+  DisplayAsStatement: boolean = false;
+  constructor(
+    public coreService: CoreService,
+    private _changeDetector: ChangeDetectorRef,
+    private _securityService: SecurityService
+  ) {
     this.GetHeaderDetails();
-    this.InvoiceDisplaySettings = this._coreService.GetInvoiceDisplaySettings();
-    this.ShowProviderName = this._coreService.SetShowProviderNameFlag();
+    this.InvoiceDisplaySettings = this.coreService.GetInvoiceDisplaySettings();
+    this.ShowProviderName = this.coreService.SetShowProviderNameFlag();
+    this.ReadDischargeStatementConfigParameter();
   }
 
+  ReadDischargeStatementConfigParameter() {
+    const param = this.coreService.Parameters.find(p => p.ParameterGroupName === "Billing" && p.ParameterName === "DisplayAsStatement");
+    if (param) {
+      const paramValue = JSON.parse(param.ParameterValue);
+      this.DisplayAsStatement = paramValue;
+    }
+  }
   ngOnInit(): void {
     if (this.ResultFromServerToBreak) {
+      this.ReadPrintReceiptDisplaySettingParameter();
       this.currTime = moment().format("HH:mm").toString();
       this.currDate = moment().format("YYYY-MM-DD").toString();
       this.currentUserName = this._securityService.loggedInUser.UserName;
       this.PatientDetail = this.ResultFromServerToBreak.PatientDetail;
       this.AdmissionInfo = this.ResultFromServerToBreak.AdmissionInfo;
-      if (this.IsDischarged) {
+      if (this.IsDischarged && !this.IsProvisionalDischarge) {
         this.InvoiceInfo = this.ResultFromServerToBreak.InvoiceInfo;
         if (this.InvoiceInfo && this.InvoiceInfo.OtherCurrencyDetail) {
           this.OtherCurrencyDetail = JSON.parse(this.InvoiceInfo.OtherCurrencyDetail);
@@ -75,15 +99,52 @@ export class DetailedDischargePrintComponent {
       }
       this.GroupItems(this.ResultFromServerToBreak);
     }
+  }
+  ngAfterViewInit(): void {
+    //Called after ngAfterContentInit when the component's view has been initialized. Applies to components only.
+    //Add 'implements AfterViewInit' to the class.
+    let htmlElement = document.getElementById("id_dynamic_discharge_detail");
+    if (htmlElement) {
+      let dischargeInvoiceData = document.createElement('div');
+      dischargeInvoiceData.innerHTML = this.ResultFromServerToBreak.InvoicePrintTemplateSummary;
+      this.printContent = this.ResultFromServerToBreak.InvoicePrintTemplateSummary;
+      document.getElementById('id_dynamic_discharge_detail').appendChild(dischargeInvoiceData);
+      this._changeDetector.detectChanges();
+    }
 
   }
 
+  ReadPrintReceiptDisplaySettingParameter() {
+    let currParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "UseDynamicInvoicePrint");
+    if (currParam && currParam.ParameterValue) {
+      const paramValue = JSON.parse(currParam.ParameterValue) as Array<PrintTemplateType>;
+
+      if (paramValue && this.IsDischarged && !this.IsProvisionalDischarge && this.ResultFromServerToBreak.InvoiceInfo && this.ResultFromServerToBreak.InvoiceInfo.PrintTemplateType) {
+        const printTemplateSettings = paramValue.find(p => JSON.parse(this.ResultFromServerToBreak.InvoiceInfo.PrintTemplateType).includes(p.PrintType));
+        if (printTemplateSettings && printTemplateSettings.PrintType === ENUM_PrintTemplateTypes.IpDischargeStatementDetailed) {
+          this.PrintTemplateTypeSettings = paramValue.find(p => JSON.parse(this.ResultFromServerToBreak.InvoiceInfo.PrintTemplateType).includes(p.PrintType));
+        } else {
+          this.PrintTemplateTypeSettings.Enable = false;
+        }
+      }
+
+      if (paramValue && !this.IsDischarged && this.ResultFromServerToBreak.PrintTemplateTypes) {
+        this.PrintTemplateTypeSettings = paramValue.find(p => JSON.parse(this.ResultFromServerToBreak.PrintTemplateTypes).includes(p.PrintType));
+      }
+    }
+  }
   GroupItems(resultFromServerToBreak): void {
     if (resultFromServerToBreak) {
       this.MedicineCharges = resultFromServerToBreak.PharmacyPendingBillsItems;
       this.DepositDetails = resultFromServerToBreak.DepositInfo;
       this.billItems = resultFromServerToBreak.BillItems;
+      if (this.IsDischarged && !this.IsProvisionalDischarge) {
+        this.DepositUsed = resultFromServerToBreak.InvoiceInfo.DepositUsed;
+      }
       this.billItems.forEach((itm, index) => {
+        if (!this.IsDischarged) {
+          itm.TotalAmount = itm.SubTotal - itm.DiscountAmount;
+        }
         if (itm.ServiceCategoryCode === ENUM_ServiceCategoryCodes.BedCharges) {
           this.BedCharges.push(itm);
         } else if (itm.ServiceCategoryCode === ENUM_ServiceCategoryCodes.InvestigationCharges) {
@@ -227,6 +288,7 @@ export class DetailedDischargePrintComponent {
       this.otherChargesTotal.DiscountAmount += amb.DiscountAmount;
       this.otherChargesTotal.TotalAmount += amb.TotalAmount;
 
+
       this.otherChargesTotal.SubTotal = CommonFunctions.parseAmount(this.otherChargesTotal.SubTotal, 2);
       this.otherChargesTotal.DiscountAmount = CommonFunctions.parseAmount(this.otherChargesTotal.DiscountAmount, 2);
       this.otherChargesTotal.TotalAmount = CommonFunctions.parseAmount(this.otherChargesTotal.TotalAmount, 2);
@@ -238,6 +300,7 @@ export class DetailedDischargePrintComponent {
       this.procedureChargesTotal.SubTotal += amb.SubTotal;
       this.procedureChargesTotal.DiscountAmount += amb.DiscountAmount;
       this.procedureChargesTotal.TotalAmount += amb.TotalAmount;
+
 
       this.procedureChargesTotal.SubTotal = CommonFunctions.parseAmount(this.procedureChargesTotal.SubTotal, 2);
       this.procedureChargesTotal.DiscountAmount = CommonFunctions.parseAmount(this.procedureChargesTotal.DiscountAmount, 2);
@@ -261,7 +324,12 @@ export class DetailedDischargePrintComponent {
 
   CalculateGrandTotals() {
     const billingSubTotal = this.billItems.reduce((acc, item) => acc + item.SubTotal, 0);
-    const billingDiscount = this.billItems.reduce((acc, item) => acc + item.DiscountAmount, 0);
+    let billingDiscount = 0;
+    if (this.IsDischarged) {
+      billingDiscount = this.billItems.reduce((acc, item) => acc + item.DiscountAmount, 0);
+    } else {
+      billingDiscount = this.EstimatedDiscountAmount > 0 ? this.EstimatedDiscountAmount : 0;
+    }
     const billingTotal = this.billItems.reduce((acc, item) => acc + item.TotalAmount, 0);
 
     const pharmacySubTotal = this.MedicineCharges.reduce((acc, item) => acc + item.SubTotal, 0);
@@ -270,11 +338,46 @@ export class DetailedDischargePrintComponent {
 
     this.grandTotals.SubTotal = billingSubTotal + pharmacySubTotal;
     this.grandTotals.DiscountAmount = billingDiscount + pharmacyDiscount;
-    this.grandTotals.TotalAmount = billingTotal + pharmacyTotal;
+    if (this.IsDischarged) {
+      this.grandTotals.TotalAmount = billingTotal + pharmacyTotal;
+    } else {
+      this.grandTotals.TotalAmount = this.grandTotals.SubTotal - this.grandTotals.DiscountAmount;
+    }
+
+    if (!this.IsDischarged || this.IsProvisionalDischarge) {
+      if (this.depositTotals.TotalDeposit > 0 && this.depositTotals.TotalDeposit >= this.grandTotals.TotalAmount) {
+        this.DepositUsed = this.grandTotals.TotalAmount;
+      }
+
+      if (this.depositTotals.TotalDeposit > 0 && this.depositTotals.TotalDeposit < this.grandTotals.TotalAmount) {
+        this.DepositUsed = this.depositTotals.TotalDeposit;
+      }
+    }
+
+    if ((this.DepositUsed > 0) && (this.grandTotals.TotalAmount >= this.DepositUsed)) {
+      this.ToBePaid = this.grandTotals.TotalAmount - this.DepositUsed;
+    }
+    else {
+      this.ToBePaid = this.grandTotals.TotalAmount;
+    }
+
+    if (this.depositTotals.TotalDeposit > 0) {
+      if (this.DepositUsed === this.grandTotals.TotalAmount) {
+        this.ToBeReturned = this.depositTotals.TotalDeposit - this.DepositUsed;
+      } else {
+        this.ToBeReturned = 0;
+      }
+    } else {
+      this.ToBeReturned = 0;
+    }
+
+    if (this.IsDischarged && this.DepositUsed === this.grandTotals.TotalAmount) {
+      this.ToBeReturned = this.InvoiceInfo.DepositReturnAmount;
+    }
   }
 
   GetHeaderDetails(): void {
-    let paramValue = this._coreService.Parameters.find(a => a.ParameterName === 'BillingHeader').ParameterValue;
+    let paramValue = this.coreService.Parameters.find(a => a.ParameterName === 'BillingHeader').ParameterValue;
     if (paramValue) {
       this.headerDetail = JSON.parse(paramValue);
     }
@@ -282,10 +385,10 @@ export class DetailedDischargePrintComponent {
   CalculateCalculateAgeAndAddGender(dateOfBirth): string {
     if (dateOfBirth) {
       let dobYear: number = Number(moment(dateOfBirth).format("YYYY"));
-      if (dobYear > 1920) {
-        let ageString = String(Number(moment().format("YYYY")) - Number(moment(dateOfBirth).format("YYYY")));
-        return `${ageString} Y/${this.PatientDetail.Gender}`;
-      }
+      // if (dobYear > 1920) {
+      let ageString = String(Number(moment().format("YYYY")) - Number(moment(dateOfBirth).format("YYYY")));
+      return `${ageString} Y/${this.PatientDetail.Gender}`;
+      // }
     }
   }
 
@@ -293,10 +396,34 @@ export class DetailedDischargePrintComponent {
   public browserPrintContentObj: any;
   public print() {
     this.browserPrintContentObj = document.getElementById("id_detailed_discharge_print");
-    this.openBrowserPrintWindow = true;
+    this.openBrowserPrintWindow = false;
     this._changeDetector.detectChanges();
+    this.openBrowserPrintWindow = true;
+    // this._changeDetector.detectChanges();
   }
+  public printReceipt() {
+    this.loading = true;
+    //Open 'Browser Print' if printer not found or selected printing type is Browser.
+    // this.browserPrintContentObj = this.printContent;
+    // this.openBrowserPrintWindow = false;
+    // this._changeDetector.detectChanges();
+    // this.openBrowserPrintWindow = true;
+    this.GenerateDynamicInvoicePrintBrowser(this.printContent);
+    this.loading = false;
 
+  }
+  GenerateDynamicInvoicePrintBrowser(dataToPrint: string) {
+    let iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.contentWindow.document.open();
+    iframe.contentWindow.document.write(dataToPrint);
+    iframe.contentWindow.document.close();
+
+    setTimeout(function () {
+      document.body.removeChild(iframe);
+    }, 500);
+
+  }
 }
 
 export class InvestigationChargesWithServiceDepartment {

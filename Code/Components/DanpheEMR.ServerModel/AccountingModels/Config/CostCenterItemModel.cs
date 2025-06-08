@@ -19,7 +19,7 @@ namespace DanpheEMR.ServerModel
         public int CreatedBy { get; set; }
         public bool IsActive { get; set; }
         //sud-nagesh: 20June'20-- for Acc-Hospital Separation.
-        public int? HospitalId { get; set; }
+        public int HospitalId { get; set; }
     }
 
     public class CostCenterModel
@@ -38,6 +38,7 @@ namespace DanpheEMR.ServerModel
         public DateTime? CreatedOn { get; set; }
         public int? ModifiedBy { get; set; }
         public DateTime? ModifiedOn { get; set; }
+        public int HospitalId { get; set; }
     
        
        }
@@ -59,6 +60,7 @@ namespace DanpheEMR.ServerModel
         public DateTime? ModifiedOn { get; set; }
 
         public string ParentCostCenterName { get; set; }
+        public int HospitalId { get; set; }
 
 
     }

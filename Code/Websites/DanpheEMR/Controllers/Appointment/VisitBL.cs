@@ -26,6 +26,9 @@ using DanpheEMR.Services.Visits.DTO;
 using DanpheEMR.Controllers.Billing;
 using DanpheEMR.Services.SSF.DTO;
 using DanpheEMR.Security;
+using DanpheEMR.Controllers.Appointment.DTOs;
+using Serilog;
+using DanpheEMR.Sync.IRDNepal;
 
 namespace DanpheEMR.Controllers
 {
@@ -60,6 +63,7 @@ namespace DanpheEMR.Controllers
         //had to pass patient db context, since it is called inside db-transaction of PatientDbContext
         public static void SyncBillToRemoteServer(object billToPost, string billType, VisitDbContext dbContext)
         {
+            var irdConfigs = GetIrdConfigurations(dbContext);
             if (billType == "sales")
             {
 
@@ -68,7 +72,7 @@ namespace DanpheEMR.Controllers
                 try
                 {
                     IRD_BillViewModel bill = IRD_BillViewModel.GetMappedSalesBillForIRD(billTxn, true);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesBillToIRD(bill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesBillToIRD(bill, irdConfigs);
                 }
                 catch (Exception ex)
                 {
@@ -100,7 +104,7 @@ namespace DanpheEMR.Controllers
                 try
                 {
                     IRD_BillReturnViewModel salesRetBill = IRD_BillReturnViewModel.GetMappedSalesReturnBillForIRD(billRet, true);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesReturnBillToIRD(salesRetBill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesReturnBillToIRD(salesRetBill, irdConfigs);
                 }
                 catch (Exception ex)
                 {
@@ -126,6 +130,18 @@ namespace DanpheEMR.Controllers
 
             }
         }
+
+        private static IrdConfigsDTO GetIrdConfigurations(VisitDbContext dbContext)
+        {
+            var param = dbContext.CFGParameters.FirstOrDefault(p => p.ParameterGroupName == "IRD" && p.ParameterName == "IrdSyncConfig");
+            if (param != null)
+            {
+                var irdConfigs = DanpheJSONConvert.DeserializeObject<IrdConfigsDTO>(param.ParameterValue);
+                return irdConfigs;
+            }
+            return new IrdConfigsDTO();
+        }
+
         public static void UpdateRequisitionItemsBillStatus(VisitDbContext visitDbContext,
           string serviceDepartmentName,
           string billStatus, //provisional,paid,unpaid,returned
@@ -234,6 +250,25 @@ namespace DanpheEMR.Controllers
                                                  where visit.PatientId == patientId
                                                  && DbFunctions.TruncateTime(visit.VisitDate) == DbFunctions.TruncateTime(visitDate)
                                                  && visit.PerformerId == providerId && visit.IsActive == true
+                                                 && visit.BillingStatus != ENUM_BillingStatus.returned // "returned"
+                                                 select visit).ToList();
+            if (patientvisitList.Count != 0)
+                return true;
+            else
+                return false;
+        }
+        public static bool HasDuplicateVisitWithSameDepartment(VisitDbContext visitDb, int patientId, int? departmentId, DateTime visitDate)
+        {
+            //bibek:17thDec'23--For DepartmentLevel appointment, ProviderId will be Zero or Null. so return false in that case.
+            if (departmentId == null || departmentId == 0)
+            {
+                return false;
+            }
+
+            List<VisitModel> patientvisitList = (from visit in visitDb.Visits
+                                                 where visit.PatientId == patientId
+                                                 && DbFunctions.TruncateTime(visit.VisitDate) == DbFunctions.TruncateTime(visitDate)
+                                                 && visit.DepartmentId == departmentId && visit.IsActive == true
                                                  && visit.BillingStatus != ENUM_BillingStatus.returned // "returned"
                                                  select visit).ToList();
             if (patientvisitList.Count != 0)
@@ -419,6 +454,9 @@ namespace DanpheEMR.Controllers
                         case "emergency":
                             codeChar = "ER";
                             break;
+                        case "outdoor":
+                            codeChar = "O";
+                            break;
                         default:
                             codeChar = "V";
                             break;
@@ -445,7 +483,7 @@ namespace DanpheEMR.Controllers
         }
 
 
-        public static VisitModel GetVisitItemsMapped(int patientId, string visitType, int? providerId, DateTime visitDate, int priceCategoryId, int? membershipTypeId, int userID, string connString)
+        public static VisitModel GetVisitItemsMapped(int patientId, string visitType, int? providerId, DateTime visitDate, int priceCategoryId, int? membershipTypeId, int userID, string connString, bool hasPreviousVisits)
         {
             var visit = new VisitModel();
             visit.PatientId = patientId;
@@ -454,7 +492,7 @@ namespace DanpheEMR.Controllers
             visit.BillingStatus = ENUM_BillingStatus.unpaid;// "unpaid";
             visit.VisitStatus = ENUM_VisitStatus.initiated;// "initiated";
             visit.CreatedOn = visitDate;
-            visit.AppointmentType = ENUM_AppointmentType.New;// "New";
+            visit.AppointmentType = hasPreviousVisits ? ENUM_AppointmentType.revisit : ENUM_AppointmentType.New;// "New";
             visit.CreatedBy = userID;
             visit.VisitDate = visitDate;
             visit.VisitTime = visitDate.TimeOfDay;
@@ -501,14 +539,30 @@ namespace DanpheEMR.Controllers
 
         public static Boolean IsValidForFollowUp(VisitDbContext visitDbContext, int visitId, string connString)
         {
+            var isParentVisitOutpatient = false;
+            var parentVisit = visitDbContext.Visits.FirstOrDefault(v => v.PatientVisitId == visitId);
+            if(parentVisit != null)
+            {
+                isParentVisitOutpatient = parentVisit.VisitType == ENUM_VisitType.outpatient ? true : false;
+            }
             Boolean isValid = false;
             CoreDbContext coreDbContext = new CoreDbContext(connString);
             int maxDays = 0;
             var maxDaysParameterValue = coreDbContext.Parameters.Where(a => a.ParameterGroupName == "Appointment" && a.ParameterName == "MaximumLastVisitDays").FirstOrDefault();
             if (maxDaysParameterValue != null)
             {
-                var value = maxDaysParameterValue.ParameterValue;
-                maxDays = int.Parse(value);
+                var data = JsonConvert.DeserializeObject<MaxLastVisitDaysParameter>(maxDaysParameterValue.ParameterValue);
+                if(data != null)
+                {
+                    if (isParentVisitOutpatient)
+                    {
+                        maxDays = data.outpatient;
+                    }
+                    else
+                    {
+                        maxDays = data.inpatient;
+                    }
+                }
             }
             int id = GetParentVisit(visitDbContext, visitId);
 
@@ -543,29 +597,61 @@ namespace DanpheEMR.Controllers
         {
             var systemDefaultScheme = visitDbContext.BillingSchemes.FirstOrDefault(a => a.IsSystemDefault == true);
 
-            if (quickVisitVM.Visit.PatientVisitId > 0 && quickVisitVM.Visit.SchemeId != systemDefaultScheme.SchemeId)
+            if (quickVisitVM.Visit.PatientVisitId > 0)
             {
                 PatientSchemeMapModel patientScheme = new PatientSchemeMapModel();
-                var patientSchemeFromClient = quickVisitVM.Patient.PatientScheme;
+                var patientSchemeFromClient = new PatientSchemeMapModel();
+                if (quickVisitVM.Patient.PatientScheme != null)
+                {
+                    patientSchemeFromClient = quickVisitVM.Patient.PatientScheme;
+
+                    //Check if PolicyNo already exists in Server
+                    if (IsPolicyNoAlreadyExistsForOtherPatient(patientSchemeFromClient, quickVisitVM.Patient.PatientId, visitDbContext))
+                    {
+                        throw new InvalidOperationException($"The PolicyNo Provided already exists for Other Patient ");
+                    }
+                }
                 BillingSchemeModel scheme = visitDbContext.BillingSchemes.FirstOrDefault(a => a.SchemeId == quickVisitVM.Visit.SchemeId);
                 if (scheme != null)
                 {
                     patientScheme = visitDbContext.PatientSchemeMaps.Where(a => a.PatientId == quickVisitVM.Patient.PatientId && a.SchemeId == scheme.SchemeId).FirstOrDefault();
                 }
-                if (patientScheme != null)
+                if (patientScheme != null && patientSchemeFromClient != null)
                 {
                     patientScheme.LatestClaimCode = quickVisitVM.Visit.ClaimCode;
                     patientScheme.PolicyHolderEmployerID = patientSchemeFromClient.PolicyHolderEmployerID;
                     patientScheme.PolicyHolderEmployerName = patientSchemeFromClient.PolicyHolderEmployerName;
+                    patientScheme.Ins_FirstServicePoint = patientSchemeFromClient.Ins_FirstServicePoint;
+                    if(patientScheme.PolicyHolderUID is null) { 
+                        patientScheme.PolicyHolderUID = patientSchemeFromClient.PolicyHolderUID;
+                    }
                     if (scheme.IsOpCreditLimited)
                     {
                         patientScheme.OpCreditLimit = patientSchemeFromClient.OpCreditLimit - (decimal)quickVisitVM.BillingTransaction.TotalAmount;
                     }
                     if (scheme.IsGeneralCreditLimited)
                     {
-                        patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit - (decimal)quickVisitVM.BillingTransaction.TotalAmount;
+                        if (quickVisitVM.BillingTransaction.IsCoPayment == true)
+                        {
+                            CfgParameterModel GeneralCreditLimitAdjustmentForCoPaymentParameter = visitDbContext.CFGParameters.Where(ap => ap.ParameterGroupName == "Insurance" && ap.ParameterName == "SubtractTotalAmountFromGeneralCreditLimitForCoPayment").FirstOrDefault();
+                            if (GeneralCreditLimitAdjustmentForCoPaymentParameter != null && GeneralCreditLimitAdjustmentForCoPaymentParameter.ParameterValue == "true")
+                            {
+                                patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit - (decimal)quickVisitVM.BillingTransaction.TotalAmount;
+                            }
+                            else
+                            {
+                                patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit - (decimal)quickVisitVM.BillingTransaction.CoPaymentCreditAmount;
+                            }
+                        }
+                        else
+                        {
+                            patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit - (decimal)quickVisitVM.BillingTransaction.TotalAmount;
+
+                        }
                     }
                     patientScheme.LatestPatientVisitId = quickVisitVM.Visit.PatientVisitId;
+                    patientScheme.PriceCategoryId = quickVisitVM.Visit.PriceCategoryId;
+                    patientScheme.OtherInfo = patientSchemeFromClient.OtherInfo;
                     patientScheme.ModifiedOn = DateTime.Now;
                     patientScheme.ModifiedBy = currentUser.EmployeeId;
 
@@ -576,13 +662,30 @@ namespace DanpheEMR.Controllers
                 else
                 {
                     patientScheme = patientSchemeFromClient;
+
                     if (scheme.IsGeneralCreditLimited)
                     {
                         patientScheme.OpCreditLimit = 0;
                         patientScheme.IpCreditLimit = 0;
-                        patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit - (decimal)quickVisitVM.BillingTransaction.TotalAmount;
+                        if (quickVisitVM.BillingTransaction.IsCoPayment == true)
+                        {
+                            CfgParameterModel GeneralCreditLimitAdjustmentForCoPaymentParameter = visitDbContext.CFGParameters.Where(ap => ap.ParameterGroupName == "Insurance" && ap.ParameterName == "GeneralCreditLimitAdjustmentForCoPayment").FirstOrDefault();
+                            if (GeneralCreditLimitAdjustmentForCoPaymentParameter != null && GeneralCreditLimitAdjustmentForCoPaymentParameter.ParameterValue == "true")
+                            {
+                                patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit - (decimal)quickVisitVM.BillingTransaction.TotalAmount;
+                            }
+                            else
+                            {
+                                patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit - (decimal)quickVisitVM.BillingTransaction.CoPaymentCreditAmount;
+                            }
+                        }
+                        else
+                        {
+                            patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit - (decimal)quickVisitVM.BillingTransaction.TotalAmount;
+
+                        }
                     }
-                    else if(scheme.IsOpCreditLimited || scheme.IsIpCreditLimited)
+                    else if (scheme.IsOpCreditLimited || scheme.IsIpCreditLimited)
                     {
                         patientScheme.OpCreditLimit = patientSchemeFromClient.OpCreditLimit - (decimal)quickVisitVM.BillingTransaction.TotalAmount;
                         patientScheme.IpCreditLimit = patientScheme.IpCreditLimit;
@@ -598,12 +701,14 @@ namespace DanpheEMR.Controllers
                     patientScheme.PatientCode = quickVisitVM.Patient.PatientCode;
                     patientScheme.LatestPatientVisitId = quickVisitVM.Visit.PatientVisitId;
                     patientScheme.SchemeId = quickVisitVM.Visit.SchemeId;
+                    patientScheme.PriceCategoryId = quickVisitVM.Visit.PriceCategoryId;
                     patientScheme.CreatedOn = DateTime.Now;
                     patientScheme.CreatedBy = currentUser.EmployeeId;
                     patientScheme.IsActive = true;
                     patientScheme.LatestClaimCode = quickVisitVM.Visit.ClaimCode;
+                    patientScheme.OtherInfo = patientSchemeFromClient.OtherInfo;
                     patientScheme.SubSchemeId = patientSchemeFromClient.SubSchemeId;
-
+                    patientScheme.Ins_FirstServicePoint = patientSchemeFromClient.Ins_FirstServicePoint;
                     visitDbContext.PatientSchemeMaps.Add(patientScheme);
                     visitDbContext.SaveChanges();
                 }
@@ -612,22 +717,132 @@ namespace DanpheEMR.Controllers
                 var patientSchemes = visitDbContext.PatientSchemeMaps.Where(a => a.SchemeId == quickVisitVM.Visit.SchemeId && a.PatientId == quickVisitVM.Visit.PatientId).FirstOrDefault();
                 if (patientSchemes != null)
                 {
-                    var ssfPriceCategory = visitDbContext.PriceCategories.Where(a => a.PriceCategoryId == quickVisitVM.Visit.PriceCategoryId).FirstOrDefault();
-                    if (ssfPriceCategory != null && ssfPriceCategory.PriceCategoryName.ToLower() == "ssf" && realTimeSSFClaimBooking)
+                    //var ssfPriceCategory = visitDbContext.PriceCategories.Where(a => a.PriceCategoryId == quickVisitVM.Visit.PriceCategoryId).FirstOrDefault();
+                    var ssfSCheme = visitDbContext.BillingSchemes.FirstOrDefault(s => s.SchemeId == patientSchemes.SchemeId);
+                    if (ssfSCheme != null && ssfSCheme.ApiIntegrationName != null && ssfSCheme.ApiIntegrationName.ToLower() == "ssf")
                     {
+                        Log.Information($"The Real Time SSF Claim Booking is started from Appointment and is in process to book,Invoice BL{quickVisitVM.BillingTransaction.InvoiceNo} with ClaimCode {quickVisitVM.BillingTransaction.ClaimCode}");
+                        var fiscalYear = visitDbContext.BillingFiscalYears.FirstOrDefault(f => f.FiscalYearId == quickVisitVM.BillingTransaction.FiscalYearId);
+                        var fiscalYearFormatted = fiscalYear != null ? fiscalYear.FiscalYearFormatted : "";
                         //making parallel thread call (asynchronous) to post to SSF Server. so that it won't stop the normal BillingFlow.
                         var billObj = new SSF_ClaimBookingBillDetail_DTO()
                         {
-                            InvoiceNoFormatted = $"BL{quickVisitVM.BillingTransaction.InvoiceNo}",
+                            InvoiceNoFormatted = $"{fiscalYearFormatted}-BL{quickVisitVM.BillingTransaction.InvoiceNo}",
                             TotalAmount = (decimal)quickVisitVM.BillingTransaction.TotalAmount,
-                            ClaimCode = (long)quickVisitVM.BillingTransaction.ClaimCode
+                            ClaimCode = (long)quickVisitVM.BillingTransaction.ClaimCode,
+                            VisitType = quickVisitVM.Visit.VisitType
                         };
 
                         SSF_ClaimBookingService_DTO claimBooking = SSF_ClaimBookingService_DTO.GetMappedToBookClaim(billObj, patientSchemes);
 
-                        Task.Run(() => BillingBL.SyncToSSFServer(claimBooking, "billing", _ssfDbContext, patientSchemes, currentUser));
+                        Task.Run(() => BillingBL.SyncToSSFServer(claimBooking, "billing", _ssfDbContext, patientSchemes, currentUser, realTimeSSFClaimBooking));
+                        Log.Information($"Parallel thread is created from Appointment to book, ssf Invoice BL{quickVisitVM.BillingTransaction.InvoiceNo} with ClaimCode {quickVisitVM.BillingTransaction.ClaimCode}");
+
                     }
                 }
+            }
+        }
+
+        private static bool IsPolicyNoAlreadyExistsForOtherPatient(PatientSchemeMapModel patientScheme, int patientId, VisitDbContext visitDbContext)
+        {
+            if(patientScheme.PolicyNo is null)
+            {
+                return false;
+            }
+            var alreadyExistsInServer = visitDbContext.PatientSchemeMaps.Any(p => p.PolicyNo == patientScheme.PolicyNo && p.PatientId != patientId && p.SchemeId == patientScheme.SchemeId);
+            return alreadyExistsInServer;
+        }
+
+        public static void SavePatientSchemeForFreeVisit(VisitDbContext visitDbContext, FreeVisit_DTO freeVisit, RbacUser currentUser)
+        {
+            try
+            {
+                var systemDefaultScheme = visitDbContext.BillingSchemes.FirstOrDefault(a => a.IsSystemDefault == true);
+
+                if (freeVisit.Visit.PatientVisitId > 0)
+                {
+                    PatientSchemeMapModel patientScheme = new PatientSchemeMapModel();
+                    var patientSchemeFromClient = new PatientSchemeMapModel();
+                    if (freeVisit.Patient.PatientScheme != null)
+                    {
+                        patientSchemeFromClient = freeVisit.Patient.PatientScheme;
+                        //Check if PolicyNo already exists in Server
+                        if (IsPolicyNoAlreadyExistsForOtherPatient(patientSchemeFromClient, freeVisit.Patient.PatientId, visitDbContext))
+                        {
+                        throw new InvalidOperationException($"The PolicyNo Provided already exists for Other Patient ");
+                        }
+                    }
+                    BillingSchemeModel scheme = visitDbContext.BillingSchemes.FirstOrDefault(a => a.SchemeId == freeVisit.Visit.SchemeId);
+                    if (scheme != null)
+                    {
+                        patientScheme = visitDbContext.PatientSchemeMaps.Where(a => a.PatientId == freeVisit.Patient.PatientId && a.SchemeId == scheme.SchemeId).FirstOrDefault();
+                    }
+                    if (patientScheme != null && patientSchemeFromClient != null)
+                    {
+                        patientScheme.LatestClaimCode = freeVisit.Visit.ClaimCode;
+                        patientScheme.PolicyHolderEmployerID = patientSchemeFromClient.PolicyHolderEmployerID;
+                        patientScheme.PolicyHolderEmployerName = patientSchemeFromClient.PolicyHolderEmployerName;
+                        if (scheme.IsOpCreditLimited)
+                        {
+                            patientScheme.OpCreditLimit = patientSchemeFromClient.OpCreditLimit;
+                        }
+                        if (scheme.IsGeneralCreditLimited)
+                        {
+                            patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit;
+                        }
+                        patientScheme.LatestPatientVisitId = freeVisit.Visit.PatientVisitId;
+                        patientScheme.PriceCategoryId = freeVisit.Visit.PriceCategoryId;
+                        patientScheme.OtherInfo = patientSchemeFromClient.OtherInfo;
+                        patientScheme.ModifiedOn = DateTime.Now;
+                        patientScheme.ModifiedBy = currentUser.EmployeeId;
+
+                        visitDbContext.Entry(patientScheme).State = EntityState.Modified;
+                        visitDbContext.SaveChanges();
+                    }
+                    else
+                    {
+                        patientScheme = patientSchemeFromClient;
+                        if (scheme.IsGeneralCreditLimited)
+                        {
+                            patientScheme.OpCreditLimit = 0;
+                            patientScheme.IpCreditLimit = 0;
+                            patientScheme.GeneralCreditLimit = patientSchemeFromClient.GeneralCreditLimit;
+                        }
+                        else if (scheme.IsOpCreditLimited || scheme.IsIpCreditLimited)
+                        {
+                            patientScheme.OpCreditLimit = patientSchemeFromClient.OpCreditLimit;
+                            patientScheme.IpCreditLimit = patientScheme.IpCreditLimit;
+                            patientScheme.GeneralCreditLimit = 0;
+                        }
+                        else
+                        {
+                            patientScheme.OpCreditLimit = 0;
+                            patientScheme.IpCreditLimit = 0;
+                            patientScheme.GeneralCreditLimit = 0;
+                        }
+                        patientScheme.PatientId = freeVisit.Patient.PatientId;
+                        patientScheme.PatientCode = freeVisit.Patient.PatientCode;
+                        patientScheme.LatestPatientVisitId = freeVisit.Visit.PatientVisitId;
+                        patientScheme.SchemeId = freeVisit.Visit.SchemeId;
+                        patientScheme.PriceCategoryId = freeVisit.Visit.PriceCategoryId;
+                        patientScheme.CreatedOn = DateTime.Now;
+                        patientScheme.CreatedBy = currentUser.EmployeeId;
+                        patientScheme.IsActive = true;
+                        patientScheme.LatestClaimCode = freeVisit.Visit.ClaimCode;
+                        patientScheme.OtherInfo = patientSchemeFromClient.OtherInfo;
+                        patientScheme.SubSchemeId = patientSchemeFromClient.SubSchemeId;
+                        visitDbContext.PatientSchemeMaps.Add(patientScheme);
+                        visitDbContext.SaveChanges();
+                    }
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw;
+            }        
+            catch (Exception ex)
+            {
+                throw new Exception("An unexpected error occurred while processing the patient scheme.", ex);
             }
         }
 
@@ -653,6 +868,26 @@ namespace DanpheEMR.Controllers
             }
 
             return isClaimed;
+        }
+
+        public async static void UpdatePatientScheme(VisitDbContext visitDbContext, VisitModel vis, RbacUser currentUser)
+        {
+            var patCurrentScheme = visitDbContext.PatientSchemeMaps
+                                                       .Where(a =>
+                                                              a.PatientId == vis.PatientId &&
+                                                              a.SchemeId == vis.SchemeId).FirstOrDefault();
+            if (patCurrentScheme != null)
+            {
+                patCurrentScheme.LatestPatientVisitId = vis.PatientVisitId;
+                patCurrentScheme.LatestClaimCode = vis.ClaimCode;
+                patCurrentScheme.ModifiedBy = currentUser.EmployeeId;
+                patCurrentScheme.ModifiedOn = DateTime.Now;
+                visitDbContext.Entry(patCurrentScheme).Property(p => p.LatestPatientVisitId).IsModified = true;
+                visitDbContext.Entry(patCurrentScheme).Property(p => p.LatestClaimCode).IsModified = true;
+                visitDbContext.Entry(patCurrentScheme).Property(p => p.ModifiedBy).IsModified = true;
+                visitDbContext.Entry(patCurrentScheme).Property(p => p.ModifiedOn).IsModified = true;
+                visitDbContext.SaveChanges();
+            }
         }
 
         //Krishna, 22Jan'23 Need to make this method async because we are using httpClient to post request to SSF server which should be async....
@@ -846,9 +1081,9 @@ namespace DanpheEMR.Controllers
         }
         #endregion
 
-        public static NewClaimCode_DTO GetLatestClaimCode(VisitDbContext visitDbContext,int schemeId)
+        public static NewClaimCode_DTO GetLatestClaimCode(VisitDbContext visitDbContext, int? creditOrganizationId)
         {
-            NewClaimCode_DTO newClaimObj = visitDbContext.Database.SqlQuery<NewClaimCode_DTO>("SP_Claim_GenerateNewClaimCode" + " " + schemeId).FirstOrDefault();
+            NewClaimCode_DTO newClaimObj = visitDbContext.Database.SqlQuery<NewClaimCode_DTO>("SP_Claim_GenerateNewClaimCode" + " " + creditOrganizationId).FirstOrDefault();
             return newClaimObj;
         }
 

@@ -17,7 +17,7 @@ export class BillingInvoiceBlService {
       'ItemCode': ['', Validators.compose([Validators.required])],
       'ServiceItemId': ['', Validators.compose([Validators.required])],
       'ItemName': ['', Validators.compose([Validators.required])],
-      'Quantity': [1, Validators.compose([Validators.required, Validators.min(0)])],
+      'Quantity': [1, Validators.compose([Validators.required, Validators.min(1)])],
       'Price': [0, Validators.compose([Validators.required, Validators.min(0)])],
       'DiscountPercent': [0, Validators.compose([this.discountPercentValidator])],
       'DiscountAmount': [0, Validators.compose([this.discountAmountValidator])],
@@ -34,6 +34,11 @@ export class BillingInvoiceBlService {
       'ServiceDepartmentId': [0, Validators.compose([])],
       'ServiceDepartmentName': [0, Validators.compose([])],
       'IntegrationItemId': [0, Validators.compose([])],
+      'AllowMultipleQty': [true, Validators.compose([])],
+      'CappingQuantity': [0, Validators.compose([])],
+      'CappingLimitDays': [0, Validators.compose([])],
+      'PreviouslySalesQuantity': [0, Validators.compose([])],
+      'IntegrationName': ['', Validators.compose([])]
     });
   }
   discountPercentValidator(control: FormControl): { [key: string]: boolean } {
@@ -99,9 +104,13 @@ export class BillingInvoiceBlService {
   ItemsListFormatter(data: any): string {
     let html: string = "";
     html = "<font color='blue'; size=03 >" + data["ItemCode"] + "&nbsp;&nbsp;" + ":" + "&nbsp;" + data["ItemName"].toUpperCase() + "</font>" + "&nbsp;&nbsp;";
-    html += "(<i>" + data["ServiceDepartmentName"] + "</i>)" + "&nbsp;&nbsp;" + this.coreService.currencyUnit + "<b>" + data["Price"] + "</b>";
+    if (data["ServiceDepartmentName"]) {
+      html += "(<i>" + data["ServiceDepartmentName"] + "</i>)" + "&nbsp;&nbsp;";
+    }
+    html += this.coreService.currencyUnit + "<b>" + data["Price"] + "</b>";
     return html;
   }
+
 
   PerformerListFormatter(data: any): string {
     return data["FullName"];

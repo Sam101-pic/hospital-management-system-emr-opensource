@@ -1,6 +1,10 @@
-﻿using DanpheEMR.ServerModel.PatientModels;
+﻿using DanpheEMR.ServerModel.BillingModels;
+using DanpheEMR.ServerModel.PatientModels;
+using DanpheEMR.ServerModel.ReportingModels;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -80,6 +84,9 @@ namespace DanpheEMR.ServerModel
         public float LengthOfStay { get; set; }
         public string RoomType { get; set; }
         public string ProcedureType { get; set; }
+        public string CarePersonName { get; set; }
+        public string CarePersonContact { get; set; }
+        public string Relation { get; set; }
     }
 
     public class DepositDetailVM
@@ -101,11 +108,14 @@ namespace DanpheEMR.ServerModel
     public class PatientDetailVM
     {
         public int PatientId { get; set; }
+        public string PatientCode { get; set; }
+        public string ShortName { get; set; }
+        public string AgeFormatted { get; set; }
         public string HospitalNo { get; set; }
         public string InpatientNo { get; set; }
         public string PatientName { get; set; }
         public string Address { get; set; }
-        public string CountrySubDivision { get; set; }
+        public string CountrySubDivisionName { get; set; }
         public string CountryName { get; set; }
         public string MunicipalityName { get; set; }
         public Int16? WardNumber { get; set; }
@@ -121,6 +131,8 @@ namespace DanpheEMR.ServerModel
         public string SSFPolicyNo { get; set;}
         public string PolicyNo { get; set; }
         public string SchemeName { get; set; }
+        public string FieldSettingsParamName { get; set; }
+      
     }
     public class BillingTransactionDetailVM
     {
@@ -228,4 +240,49 @@ namespace DanpheEMR.ServerModel
         public FractionCalculationModel FractionCalculation { set; get; }
     }
 
+    public class EstimationDischargeBillItemVM
+    {
+        public DateTime? BillDate { get; set; }
+        public int ServiceDepartmentId { get; set; }
+        public string ServiceDepartmentName { get; set; }
+        public int ServiceItemId { get; set; }
+        public string ItemName { get; set; }
+        public int? DoctorId { get; set; }
+        public string DoctorName { get; set; }
+        public decimal Price { get; set; }
+        public int Quantity { get; set; }
+        public decimal SubTotal { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public decimal? Tax { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string ItemCode { get; set; }
+
+        public int? ServiceCategoryId { get; set; }
+        public string ServiceCategoryName { get; set;}
+        public int IntegrationItemId { get; set; }
+
+        public string IntegrationName { get; set; }
+
+    }
+
+    public class EstimationDischareBillSummayVM
+    {
+        public string GroupName { get; set; }
+        public decimal SubTotal { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public decimal TotalAmount { get; set; }
+    }
+
+    public static class SeralizeBillingModelView {
+        public static List<T> MapDataTableToObjectList<T>(object vmData)
+        {
+            List<T> retListObj = new List<T>();
+            if (vmData != null)
+            {
+                string strDepItms = JsonConvert.SerializeObject(vmData);
+                retListObj = JsonConvert.DeserializeObject<List<T>>(strDepItms);
+            }
+            return retListObj;
+        }
+    }
 }

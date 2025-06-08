@@ -3,14 +3,15 @@ import { Router } from '@angular/router';
 import * as moment from 'moment';
 import { CoreService } from '../../../core/shared/core.service';
 import { SecurityService } from '../../../security/shared/security.service';
-import { PrinterSettingsModel } from '../../../settings-new/printers/printer-settings.model';
+import { ENUM_PrintingType, PrinterSettingsModel } from '../../../settings-new/printers/printer-settings.model';
 import { NepaliCalendarService } from '../../../shared/calendar/np/nepali-calendar.service';
-import { CommonFunctions } from '../../../shared/common.functions';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_BillPaymentMode, ENUM_Country, ENUM_PriceCategory } from '../../../shared/shared-enums';
+import { ENUM_BillPaymentMode, ENUM_Country, ENUM_DanpheHTTPResponses, ENUM_PriceCategory, ENUM_PrintTemplateTypes } from '../../../shared/shared-enums';
 import { BillingBLService } from '../../shared/billing.bl.service';
 import { BillingService } from '../../shared/billing.service';
 import { BilPrint_VM } from '../../shared/invoice-print-vms';
+import { PrintTemplateType } from '../../shared/print-template-type.model';
 
 @Component({
   selector: 'bil-print-discharge-statement',
@@ -62,7 +63,8 @@ export class Bil_Print_DischargeStatementComponent implements OnInit {
   public BillingAmount = { SubTotal: 0, DiscountAmount: 0, TotalAmount: 0 }
   public PharmacyAmount = { SubTotal: 0, DiscountAmount: 0, TotalAmount: 0 }
   public loading: boolean = false;
-
+  printContent: string = "";
+  public PrintTemplateTypeSettings = new PrintTemplateType();
 
   @Input('show-normal-bill') showNormalBill: boolean = false;
   @Input('show-discharge-bill') showDischargeBill: boolean = false;
@@ -74,11 +76,12 @@ export class Bil_Print_DischargeStatementComponent implements OnInit {
     BillItems: [],
     PharmacyPendingBillsItems: [],
     DepositInfo: [],
-    InvoiceInfo: {}
+    InvoiceInfo: {},
+    InvoicePrintTemplateSummary: ""
   };
 
   public OtherCurrencyDetail: OtherCurrencyDetail = { CurrencyCode: '', ExchangeRate: 0, BaseAmount: 0, ConvertedAmount: 0 };
-
+  DisplayAsStatement: boolean = false;
 
   constructor(
     public msgBoxServ: MessageboxService,
@@ -99,11 +102,21 @@ export class Bil_Print_DischargeStatementComponent implements OnInit {
       this.hospitalCode = "default";
     }
 
-    var paramValue = this.CoreService.Parameters.find(a => a.ParameterName == 'BillingHeader').ParameterValue;
+    let paramValue = this.CoreService.Parameters.find(a => a.ParameterName == 'BillingHeader').ParameterValue;
     if (paramValue)
       this.headerDetail = JSON.parse(paramValue);
     this.showMunicipality = this.CoreService.ShowMunicipality().ShowMunicipality;
     this.CountryNepal = ENUM_Country.Nepal;
+
+    this.ReadDischargeStatementConfigParameter();
+
+  }
+  ReadDischargeStatementConfigParameter() {
+    const param = this.CoreService.Parameters.find(p => p.ParameterGroupName === "Billing" && p.ParameterName === "DisplayAsStatement");
+    if (param) {
+      const paramValue = JSON.parse(param.ParameterValue);
+      this.DisplayAsStatement = paramValue;
+    }
   }
 
 
@@ -115,19 +128,19 @@ export class Bil_Print_DischargeStatementComponent implements OnInit {
   ngOnInit() {
 
     if (this.invoice) {
-
+      this.ReadReceiptPrintDisplaySettingParameter();
       if (this.invoice.InvoiceInfo.OtherCurrencyDetail) {
         this.OtherCurrencyDetail = JSON.parse(this.invoice.InvoiceInfo.OtherCurrencyDetail);
       } else {
         this.OtherCurrencyDetail = null;
       }
       this.localDateTime = this.GetLocalDate(this.invoice.InvoiceInfo.TransactionDate);
-      this.finalAge = CommonFunctions.GetFormattedAgeSex(this.invoice.PatientInfo.DateOfBirth, this.invoice.PatientInfo.Gender);
+      this.finalAge = this.CoreService.CalculateAge(this.invoice.PatientInfo.DateOfBirth);
 
       this.ipdNumber = this.invoice.VisitInfo.VisitCode;
       this.isInsurance = this.invoice.InvoiceInfo.IsInsuranceBilling;
       this.currTime = moment(this.invoice.InvoiceInfo.TransactionDate).format("HH:mm").toString();
-      this.invoice.InvoiceInfo.UserName = this.securityService.loggedInUser.UserName;;
+      this.invoice.InvoiceInfo.UserName = this.invoice.InvoiceInfo.UserName || this.securityService.loggedInUser.UserName;
       this.AmountCalculation();
       this.patientQRCodeInfo = `Name: ${this.invoice.PatientInfo.ShortName}
             Age/Sex: ${this.invoice.PatientInfo.Age} / ${this.invoice.PatientInfo.Gender.charAt(0)}
@@ -140,22 +153,52 @@ export class Bil_Print_DischargeStatementComponent implements OnInit {
     }
   }
 
+  ngAfterViewInit(): void {
+    //Called after ngAfterContentInit when the component's view has been initialized. Applies to components only.
+    //Add 'implements AfterViewInit' to the class.
+    this.RenderDynamicReceipt();
+
+  }
+
+  private RenderDynamicReceipt() {
+    let htmlElement = document.getElementById("id_dynamic_discharge");
+    if (htmlElement) {
+      let dischargeInvoiceData = document.createElement('div');
+      dischargeInvoiceData.innerHTML = this.invoice.InvoicePrintTemplate;
+      this.printContent = this.invoice.InvoicePrintTemplate;
+      document.getElementById('id_dynamic_discharge').appendChild(dischargeInvoiceData);
+      this.changeDetector.detectChanges();
+    }
+  }
+
+  ReadReceiptPrintDisplaySettingParameter() {
+    let currParam = this.CoreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "UseDynamicInvoicePrint");
+    if (currParam && currParam.ParameterValue) {
+      const paramValue = JSON.parse(currParam.ParameterValue) as Array<PrintTemplateType>;
+      this.PrintTemplateTypeSettings.Enable = false;
+      if (paramValue && this.invoice.InvoiceInfo.PrintTemplateType) {
+        const dischargeStatementParamValue = paramValue.find(p => JSON.parse(this.invoice.InvoiceInfo.PrintTemplateType).includes(p.PrintType));
+        if (dischargeStatementParamValue) {
+          this.PrintTemplateTypeSettings = dischargeStatementParamValue;
+        }
+        //!Manual Change Detection is done here in order to reflect the changes of dynamic print receipts, if not done, the dom element is not rendered and will face issues in rendering the receipt.
+        this.changeDetector.detectChanges();
+      }
+    }
+  }
   private MapDataForDetailedBreakDown(invoice: BilPrint_VM) {
     //Map PatientDetail
     this.ResultFromServer.PatientDetail.HospitalNo = invoice.PatientInfo.PatientCode;
     this.ResultFromServer.PatientDetail.PatientName = invoice.PatientInfo.ShortName;
     this.ResultFromServer.PatientDetail.DateOfBirth = invoice.PatientInfo.DateOfBirth;
     this.ResultFromServer.PatientDetail.PhoneNumber = invoice.PatientInfo.PhoneNumber;
-    if (invoice.PatientInfo.CountrySubDivisionName && invoice.PatientInfo.MunicipalityName && invoice.PatientInfo.WardNumber) {
-      this.ResultFromServer.PatientDetail.Address = `${invoice.PatientInfo.CountrySubDivisionName},${invoice.PatientInfo.MunicipalityName}-${invoice.PatientInfo.WardNumber}`;
-    } else if (invoice.PatientInfo.CountrySubDivisionName && invoice.PatientInfo.MunicipalityName && !invoice.PatientInfo.WardNumber) {
-      this.ResultFromServer.PatientDetail.Address = `${invoice.PatientInfo.CountrySubDivisionName},${invoice.PatientInfo.MunicipalityName}`;
-    } else {
-      this.ResultFromServer.PatientDetail.Address = `${invoice.PatientInfo.CountrySubDivisionName}`;
-    }
-    if (invoice.PatientInfo.Address) {
-      this.ResultFromServer.PatientDetail.Address = `${this.ResultFromServer.PatientDetail.Address}, ${invoice.PatientInfo.Address}`;
-    }
+
+    this.ResultFromServer.PatientDetail.CountryName = invoice.PatientInfo.CountryName;
+    this.ResultFromServer.PatientDetail.CountrySubDivisionName = invoice.PatientInfo.CountrySubDivisionName;
+    this.ResultFromServer.PatientDetail.MunicipalityName = invoice.PatientInfo.MunicipalityName;
+    this.ResultFromServer.PatientDetail.WardNumber = invoice.PatientInfo.WardNumber;
+    this.ResultFromServer.PatientDetail.Address = invoice.PatientInfo.Address;
+
     this.ResultFromServer.PatientDetail.PolicyNo = invoice.PatientInfo.PolicyNo;
     this.ResultFromServer.PatientDetail.Gender = invoice.PatientInfo.Gender;
     this.ResultFromServer.PatientDetail.InpatientNo = invoice.VisitInfo.VisitCode;
@@ -175,6 +218,7 @@ export class Bil_Print_DischargeStatementComponent implements OnInit {
     }
 
     this.ResultFromServer.InvoiceInfo = invoice.InvoiceInfo;
+    this.ResultFromServer.InvoicePrintTemplateSummary = invoice.InvoicePrintTemplateSummary
   }
 
   AmountCalculation() {
@@ -203,7 +247,12 @@ export class Bil_Print_DischargeStatementComponent implements OnInit {
     this.invoice.InvoiceInfo.SubTotal = subTotal;
     this.invoice.InvoiceInfo.DiscountAmount = discount;
     this.invoice.InvoiceInfo.TotalAmount = totalAmount;
-    this.invoice.InvoiceInfo.Tender = totalAmount;
+    //this.invoice.InvoiceInfo.Tender = totalAmount;
+    if ((this.invoice.InvoiceInfo.TotalAmount > this.invoice.InvoiceInfo.DepositAvailable) && (this.invoice.InvoiceInfo.PaymentMode != 'credit') && (this.invoice.InvoiceInfo.DepositUsed > 0)) {
+      this.invoice.InvoiceInfo.ToBePaid = this.invoice.InvoiceInfo.TotalAmount - this.invoice.InvoiceInfo.DepositAvailable;
+    } else {
+      this.invoice.InvoiceInfo.ToBePaid = this.invoice.InvoiceInfo.TotalAmount;
+    }
 
   }
   GetLocalDate(engDate: string): string {
@@ -221,6 +270,34 @@ export class Bil_Print_DischargeStatementComponent implements OnInit {
     //this.dischargeemmiter.emit({ Close: "close" });
   }
 
+  public printReceipt() {
+    this.loading = true;
+    //Open 'Browser Print' if printer not found or selected printing type is Browser.
+    if (!this.selectedPrinter || this.selectedPrinter.PrintingType === ENUM_PrintingType.browser) {
+      // this.browserPrintContentObj = this.printContent;
+      // this.openBrowserPrintWindow = false;
+      // this.changeDetector.detectChanges();
+      // this.openBrowserPrintWindow = true;
+      this.GenerateDynamicInvoicePrintBrowser(this.printContent);
+      this.loading = false;
+    }
+  }
+
+  GenerateDynamicInvoicePrintBrowser(dataToPrint: string) {
+    let iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.contentWindow.document.open();
+    iframe.contentWindow.document.write(dataToPrint);
+    iframe.contentWindow.document.close();
+
+    setTimeout(function () {
+      document.body.removeChild(iframe);
+    }, 500);
+
+
+    this.UpdatePrintCount();
+  }
+
   print() {
     this.loading = true;
     //Open 'Browser Print' if printer not found or selected printing type is Browser.
@@ -228,17 +305,38 @@ export class Bil_Print_DischargeStatementComponent implements OnInit {
     this.openBrowserPrintWindow = false;
     this.changeDetector.detectChanges();
     this.openBrowserPrintWindow = true;
-    this.UpdatePrintCount();
+    // this.UpdatePrintCount(); //This method to update print count is already called from success of print from template.
     this.loading = false;
   }
 
-  UpdatePrintCount() {
-
+  UpdatePrintCount(): void {
+    if (this.DisplayAsStatement) {
+      this.billingBLService.PutDischargeStatementPrintCount(this.invoice.InvoiceInfo.DischargeStatementId).subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status !== ENUM_DanpheHTTPResponses.OK) {
+          console.log("Failed to Update Print Count for Discharge Statement.");
+        }
+      })
+    } else {
+      let printCount = this.invoice.InvoiceInfo.PrintCount + 1;
+      this.billingBLService.PutPrintCount(printCount, this.invoice.InvoiceInfo.BillingTransactionId)
+        .subscribe((res: DanpheHTTPResponse): void => {
+          if (res.Status !== ENUM_DanpheHTTPResponses.OK) {
+            console.log("Failed to Update Print Count.");
+          }
+        });
+    }
   }
 
+  public ShowDetailedBreakDown: boolean = false;
   SwitchEstimationView($event) {
     if ($event) {
       this.IsDetailedDischarged = !this.IsDetailedDischarged;
+      //this.changeDetector.detectChanges();
+      this.ReadReceiptPrintDisplaySettingParameter();
+      this.changeDetector.detectChanges();
+      if (this.PrintTemplateTypeSettings.PrintType === ENUM_PrintTemplateTypes.IpDischargeStatement) {
+        this.RenderDynamicReceipt();
+      }
     }
   }
 
@@ -249,6 +347,10 @@ export class DetailedDischargeBreakDown_PatientDetail {
   PatientName: string = "";
   PhoneNumber: string = "";
   DateOfBirth: string = "";
+  CountryName: string = "";
+  CountrySubDivisionName: string = "";
+  MunicipalityName: string = "";
+  WardNumber: number = 0;
   Address: string = "";
   PolicyNo: string = "";
   InpatientNo: string = "";

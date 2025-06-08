@@ -59,6 +59,7 @@ export class PHRMInvoiceReturnModel {
     IsCoPayment: boolean = false;
     SchemeId: number = null;
     VisitType: string = '';
+    Checked: boolean = false;
     //Constructor of class
     constructor() {
         var _formBuilder = new FormBuilder();

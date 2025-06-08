@@ -1,16 +1,16 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core'
-import { StockLevelReport } from '../../shared/stock-level-report.model';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import * as moment from 'moment/moment';
+import { PHRMStoreModel } from '../../../../pharmacy/shared/phrm-store.model';
+import { ReportingService } from "../../../../reporting/shared/reporting-service";
+import { ActivateInventoryService } from '../../../../shared/activate-inventory/activate-inventory.service';
+import { CommonFunctions } from '../../../../shared/common.functions';
+import { GridEmitModel } from '../../../../shared/danphe-grid/grid-emit.model';
+import { IGridFilterParameter } from '../../../../shared/danphe-grid/grid-filter-parameter.interface';
 import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
+import { InventoryBLService } from '../../../shared/inventory.bl.service';
 import { InventoryReportsBLService } from '../../shared/inventory-reports.bl.service';
 import { InventoryReportsDLService } from '../../shared/inventory-reports.dl.service';
-import { ReportingService } from "../../../../reporting/shared/reporting-service";
-import { InventoryBLService } from '../../../shared/inventory.bl.service';
-import { PHRMStoreModel } from '../../../../pharmacy/shared/phrm-store.model';
-import { GridEmitModel } from '../../../../shared/danphe-grid/grid-emit.model';
-import { CommonFunctions } from '../../../../shared/common.functions';
-import { ActivateInventoryService } from '../../../../shared/activate-inventory/activate-inventory.service';
-import * as moment from 'moment/moment';
-import { IGridFilterParameter } from '../../../../shared/danphe-grid/grid-filter-parameter.interface';
+import { StockLevelReport } from '../../shared/stock-level-report.model';
 @Component({
   //selector: 'my-app',
   templateUrl: "./stock-level.component.html"
@@ -37,6 +37,7 @@ export class StockLevelComponent implements OnInit {
   public storeNames: string = "";
   public loading: boolean = false;
   FilterParameters: IGridFilterParameter[] = [];
+  public Footer: string = "";
   constructor(public inventoryReportBLService: InventoryReportsBLService,
     public inventoryDLService: InventoryReportsDLService,
     public inventoryService: InventoryBLService,
@@ -51,7 +52,12 @@ export class StockLevelComponent implements OnInit {
 
   ngOnInit() {
   }
-
+  ngAfterViewChecked() {
+    let footerContent = document.getElementById("id_stock_level_report_summary");
+    if (footerContent) {
+      this.Footer = document.getElementById("id_stock_level_report_summary").innerHTML;
+    }
+  }
   gridExportOptions = {
     fileName: 'CurrentStockLevelList' + moment().format('YYYY-MM-DD') + '.xls',
   };
@@ -114,9 +120,9 @@ export class StockLevelComponent implements OnInit {
   }
 
   ShowStockLevelReport() {
-    this.FilterParameters=[
-      {DisplayName:"Store",Value:this.storeNames},
-      {DisplayName:"ItemType",Value:this.selectedGRCategory},
+    this.FilterParameters = [
+      { DisplayName: "Store", Value: this.storeNames },
+      { DisplayName: "ItemType", Value: this.selectedGRCategory },
     ]
     this.loading = true;
     this.StockLevelReportData = new Array<StockLevelReport>();

@@ -29,5 +29,18 @@ namespace DanpheEMR.ViewModel.Billing
         public bool IsErLabApplicable { get; set; }
         public bool IsActive { get; set; }
         public int ServiceItemId { get; set; }
+        public bool IsIncentiveApplicable { get; set; }
+        public decimal? Price { get; set; }
+        public bool IsInsurancePackage { get; set; }
+        public string OTCategory { get; set; }
+        public int DepartmentId {  get; set; }
+        public int? DynamicReportGroupId {  get; set; }
+        public List<ReadPriceDetails_DTO> PriceDetails { get; set; }
+
+    }
+    public class ReadPriceDetails_DTO
+    {
+        public int PriceCategoryId { get; set; }
+        public decimal Price { get; set; }
     }
 }

@@ -8,6 +8,7 @@ import { CoreService } from '../../core/shared/core.service';
 import { SsfPatient_DTO } from '../../insurance/ssf/shared/service/ssf.service';
 import { Patient } from '../../patients/shared/patient.model';
 import { PatientService } from '../../patients/shared/patient.service';
+import { Salutation } from '../../settings-new/shared/DTOs/Salutation.Model';
 import { GeneralFieldLabels } from '../../shared/DTOs/general-field-label.dto';
 import { DanpheHTTPResponse } from '../../shared/common-models';
 import { CommonFunctions } from '../../shared/common.functions';
@@ -77,9 +78,12 @@ export class ERPatientRegistrationComponent {
   public patientLastName: string = ""
   public ShowTriagePopup: boolean = false;
   public patientEthnicGroup: string = "";
+  ShowDOB: boolean = false;
+  disableSelectEthnicGroup: boolean = false;
 
   //public Muncipalitylable: string = "";
   public GeneralFieldLabel = new GeneralFieldLabels();
+  SalutationList = new Array<Salutation>();
 
   constructor(
     private _changeDetector: ChangeDetectorRef,
@@ -90,7 +94,7 @@ export class ERPatientRegistrationComponent {
     // private coreService: CoreService,
     private _emergencyService: EmergencyService
   ) {
-
+    this.SalutationList = this._coreService.SalutationData.filter(salutation => salutation.IsActive);
     this.GeneralFieldLabel = _coreService.GetFieldLabelParameter();
     /*var Muncipalitylable = JSON.parse(_coreService.Parameters.find(p => p.ParameterGroupName == "Patient" && p.ParameterName == "Municipality").ParameterValue);
     if (Muncipalitylable) {
@@ -132,6 +136,7 @@ export class ERPatientRegistrationComponent {
         this.update = false;
         this.ERPatient.EnableControl("FirstName", false);
         this.ERPatient.EnableControl("Gender", false);
+        this.ERPatient.EnableControl("LastName", false);
         this.InitializeDataSelected();
       }
     }
@@ -152,6 +157,9 @@ export class ERPatientRegistrationComponent {
           //this.ERPatient.ERPatientValidator.controls["Gender"].setValue(this.currentERPatient.Gender);
           this.ERPatient.EnableControl("FirstName", false);
           this.ERPatient.EnableControl("Gender", false);
+          this.ERPatient.EnableControl("LastName", false);
+          this.ERPatient.EnableControl("Age", false);
+          this.disableSelectEthnicGroup = true;
           this.ERPatient.AgeUnit = this.currentERPatient.AgeUnit;
 
         }
@@ -169,6 +177,7 @@ export class ERPatientRegistrationComponent {
         this.ERPatient.DateOfBirth = moment().format('YYYY-MM-DD');
         this.ERPatient.Age = "0";
         this.GetCountrySubDivision();
+        this.LoadCountryDefaultSubDivision();
       }
     }
   }
@@ -230,11 +239,20 @@ export class ERPatientRegistrationComponent {
     patient.Age = this.CalculateAge(ssfPatientDetail.DateOfBirth);
     return patient;
   }
-
   CalculateAge(dateOfBirth): string {
     let dobYear: number = Number(moment(dateOfBirth).format("YYYY"));
     if (dobYear > 1920) {
-      return String(Number(moment().format("YYYY")) - Number(moment(dateOfBirth).format("YYYY")));
+      const ageInMonths = moment().diff(moment(dateOfBirth), 'months');
+      //Bibek:8thFeb-'24 Calculate the difference in days between the current date and the date of birth
+      const ageInDays = moment().diff(moment(dateOfBirth), 'days');
+      //Bibek:8thFeb-'24 Check if the person is less than a year old
+      if (ageInMonths < 12) {
+        //Bibek:8thFeb-'24 Display age in days if it is less than a month, otherwise display age in months
+        return ageInMonths < 1 ? `${ageInDays}D` : `${ageInMonths}M`;
+      }
+      // Bibek:8thFeb-'24 If the age is 1 year or more, return the age in years
+      const ageInYears = Math.floor(ageInMonths / 12);
+      return `${ageInYears}Y`;
     }
   }
 
@@ -263,6 +281,7 @@ export class ERPatientRegistrationComponent {
 
   InitializeDataSelected(): void {
     this.ERPatient = this.currentERPatient;
+    this.ERPatient.Salutation = this.currentERPatient.Salutation || '';
     //this.changeDetector.detectChanges();
     if (this.ERPatient.DateOfBirth === null) {
       if (!this.ERPatient.Age) {
@@ -280,7 +299,7 @@ export class ERPatientRegistrationComponent {
       this.ERPatient.DateOfBirth = moment(this.currentERPatient.DateOfBirth).format('YYYY-MM-DD');
     }
     this.isPoliceCaseState = this.ERPatient.IsPoliceCase;
-    if (this.ERPatient.ModeOfArrival) {
+    if (this.ERPatient.ModeOfArrival && this.ERPatient.ModeOfArrivalName) {
       let currMoa = new ModeOfArrivalModel();
       currMoa.ModeOfArrivalId = this.ERPatient.ModeOfArrival;
       currMoa.ModeOfArrivalName = this.ERPatient.ModeOfArrivalName;
@@ -323,12 +342,17 @@ export class ERPatientRegistrationComponent {
 
       this.ERPatient.DefaultDepartmentName = this.erServiceDepartmentName;
       if ((this.ERPatient.Age || this.ERPatient.Age === "0") && !this.ERPatient.DateOfBirth) {
-        this.CalculateDob;
+        this.CalculateDob();
         var age = this.ERPatient.Age;
         this.ERPatient.Age = age + this.ERPatient.AgeUnit;
       } else {
         var age = this.ERPatient.Age;
         this.ERPatient.Age = age + this.ERPatient.AgeUnit;
+      }
+      if (this.ShowDOB === true) {
+        if (this.ERPatient.DateOfBirth) {
+          this.ERPatient.Age = this.CalculateAge(this.ERPatient.DateOfBirth) + this.ERPatient.AgeUnit;
+        }
       }
 
       if (this.addNewUnknownERPatient && !this.selectionFromExistingPatient) {
@@ -340,14 +364,39 @@ export class ERPatientRegistrationComponent {
       if (this.selectionFromExistingPatient && this.ERPatient.PatientId && !this.ERPatient.PatientVisitId) {
         this.ERPatient.ERPatientValidator.controls["FirstName"].enable();
         this.ERPatient.ERPatientValidator.controls["Gender"].enable();
+        this.ERPatient.ERPatientValidator.controls["LastName"].enable();
       }
 
       //for checking validations, marking all the fields as dirty and checking the validity.
       for (var i in this.ERPatient.ERPatientValidator.controls) {
         this.ERPatient.ERPatientValidator.controls[i].markAsDirty();
         this.ERPatient.ERPatientValidator.controls[i].updateValueAndValidity();
+        if (i === 'Age') {
+          const ageControl = this.ERPatient.ERPatientValidator.controls[i];
+          const ageValue = ageControl.value;
+          if (isNaN(ageValue) || ageValue <= 0 || ageValue >= 150) {
+            ageControl.setErrors({ 'invalidAge': true });
+            this.loading = false;
+            let age = parseInt(this.ERPatient.Age, 10);
+            this.ERPatient.Age = age.toString();
+            return this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Invalid age"]);
+
+          } else {
+            ageControl.setErrors(null);
+          }
+        }
       }
-      if (this.ERPatient.IsValid(undefined, undefined) && this.ERPatient.EthnicGroup) {
+
+      if (this.RegistrationSchemeDetail && this.RegistrationSchemeDetail.IsMemberNumberCompulsory) {
+        const policyNo = this.RegistrationSchemeDetail.PatientScheme.PolicyNo;
+        if (!policyNo || policyNo.trim() === "") {
+          this.loading = false;
+          return this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`Member Number is required to register ${this.RegistrationSchemeDetail.SchemeName} Scheme's Patient!`]
+          );
+        }
+      }
+
+      if (this.ERPatient.IsValid(undefined, undefined)) {
         this._emergencyBLService.PostERPatient(this.ERPatient, this.selectionFromExistingPatient)
           .subscribe((res: DanpheHTTPResponse) => {
             if (res.Status === ENUM_DanpheHTTPResponses.OK) {
@@ -357,31 +406,53 @@ export class ERPatientRegistrationComponent {
               this.loading = false;
             }
             else {
-              this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Sorry, Patient Cannot be Added']);
+              this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
               console.log(res.ErrorMessage);
+              this.persistPatientAge();
               this.loading = false;
             }
           });
-
       }
       else {
         this.loading = false;
+        let age = parseInt(this.ERPatient.Age, 10);
+        this.ERPatient.Age = age.toString();
         this._messageBoxService.showMessage(ENUM_DanpheHTTPResponses.Failed, ["One or more validation error occurred"]);
       }
     }
   }
-
+  /**
+   * Validates and processes the age input by removing any non-numeric characters and ensuring that the `Age` field is a valid numeric string.
+   * The method expects the `Age` field to be a string with potential alphabetic characters (e.g., "30 years").
+   * It strips out the alphabetic characters and assigns the numeric part to the `Age` field. If the input is invalid or empty, it defaults to '0'.
+   * 
+   * @remarks
+   * This method is part of the patient form validation process to ensure that only the numeric part of the age is stored in the `Age` field.
+   * The method modifies the `NewPatient.Age` property directly.
+   * 
+   * @returns {void} This method does not return anything. It modifies the `NewPatient.Age` field in place.
+   */
+  persistPatientAge() {
+    const ageWithUnit = this.ERPatient.Age ? this.ERPatient.Age.trim() : '';
+    const numericAge = ageWithUnit.replace(/[a-zA-Z]/g, '').trim();
+    this.ERPatient.Age = numericAge ? numericAge : '0';
+  }
 
   UpdateERPatient(): void {
     this.loading = true;
     if (this.loading) {
       if ((this.ERPatient.Age || this.ERPatient.Age === "0") && !this.ERPatient.DateOfBirth) {
         this.CalculateDob;
-        var age = this.ERPatient.Age;
+        let age = this.ERPatient.Age;
         this.ERPatient.Age = age + this.ERPatient.AgeUnit;
       } else {
-        var age = this.ERPatient.Age;
+        let age = this.ERPatient.Age;
         this.ERPatient.Age = age + this.ERPatient.AgeUnit;
+      }
+      if (this.ShowDOB === true) {
+        if (this.ERPatient.DateOfBirth) {
+          this.ERPatient.Age = this.CalculateAge(this.ERPatient.DateOfBirth);
+        }
       }
 
       //for checking validations, marking all the fields as dirty and checking the validity.
@@ -390,6 +461,7 @@ export class ERPatientRegistrationComponent {
         this.ERPatient.ERPatientValidator.controls[i].updateValueAndValidity();
       }
       if (this.ERPatient.IsValid(undefined, undefined)) {
+        this.ERPatient.IsExistingPatient = true;
         this._emergencyBLService.UpdateERPatient(this.ERPatient)
           .subscribe((res: DanpheHTTPResponse) => {
             if (res.Status === ENUM_DanpheHTTPResponses.OK) {
@@ -410,6 +482,11 @@ export class ERPatientRegistrationComponent {
   }
 
   GetMatchingPatientList(): void {
+    if (!this.ERPatient.EthnicGroup) {
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['Ethnic Group is mandatory.']);
+      this.loading = false;
+      return;
+    }
     // if (!this.update && this.ERPatient.TriageCode === null) {
     //   this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Please Triage the patient first.']);
     //   this.loading = false;
@@ -561,7 +638,9 @@ export class ERPatientRegistrationComponent {
               let district = this.CountrySubDivisionList.find(a => a.Key === this.ERPatient.CountrySubDivisionId);
               this.selDistrict = district ? district.Value : "";
 
-              this.selDistrictOfBite = district ? district.Value : "";
+              let biteDistrict = this.CountrySubDivisionList.find(a => a.Key === this.ERPatient.PatientCases.BitingMunicipality);
+
+              this.selDistrictOfBite = biteDistrict ? biteDistrict.Value : "";
             }
           }
           else {
@@ -594,13 +673,14 @@ export class ERPatientRegistrationComponent {
     }
   }
 
+
   DistrictChanged(): void {
     let district = null;
     // check if user has given proper input string for item name
     //or has selected object properly from the dropdown list.
     if (this.selDistrict && this.CountrySubDivisionList) {
       if (typeof (this.selDistrict) === 'string' && this.CountrySubDivisionList.length) {
-        district = this.CountrySubDivisionList.find(a => a.Value.toLowerCase() === this.selDistrict);
+        district = this.CountrySubDivisionList.find(a => a.Value.toLowerCase() === this.selDistrict.toLowerCase());
       }
       else if (typeof (this.selDistrict) === 'object') {
         district = this.selDistrict;
@@ -608,8 +688,13 @@ export class ERPatientRegistrationComponent {
       if (district) {
         this.ERPatient.CountrySubDivisionId = district.Key;
       }
+      // Clear MunicipalityId if the district is invalid or cleared
+      if (!district || !this.selDistrict || this.selDistrict === '') {
+        this.ERPatient.MunicipalityId = null;
+      }
     }
   }
+
   TriagePatient(severity: number): void {
     this.loading = true;
     if (this.loading) {
@@ -688,10 +773,10 @@ export class ERPatientRegistrationComponent {
   CalculateDob(indicator?: number): void {
     if (this.ERPatient.AgeUnit) {
       if (this.ERPatient.AgeUnit === 'M') {
-        this.ERPatient.AgeUnit = "D";
+        this.ERPatient.AgeUnit = "M";
       }
       else if (this.ERPatient.AgeUnit === 'D') {
-        this.ERPatient.AgeUnit = "M";
+        this.ERPatient.AgeUnit = "D";
       }
       else if (this.ERPatient.AgeUnit === 'Y') {
         this.ERPatient.AgeUnit = "Y";
@@ -799,7 +884,11 @@ export class ERPatientRegistrationComponent {
       let patId = data;
       this._emergencyBLService.GetPatientById(patId).subscribe(res => {
         if (res.Status === "OK") {
-          this.ERPatient = { ...res.Results }
+          const preservedEmail = this.ERPatient.Email;
+          this.ERPatient = Object.assign(this.ERPatient, res.Results) //{ ...res.Results }
+          if (!this.ERPatient.Email) {
+            this.ERPatient.Email = preservedEmail;
+          }
           this.ERPatient.FullName = res.Results.ShortName;
           this.ERPatient.ContactNo = res.Results.PhoneNumber;
           this.ERPatient.IsExistingPatient = true;
@@ -823,14 +912,15 @@ export class ERPatientRegistrationComponent {
     this.nestedCases = [];
     this.ERPatient.MainCase = +caseId;
     this.ERPatient.PatientCases.MainCase = +caseId;
-    var data = this.allCasesMaster.filter(a => a.Id === +caseId);
+    const data = this.allCasesMaster.filter(a => a.Id === +caseId);
     //below code for Alias name should be shown only for MedicoLegal>OCMC.
     this.ocmcSelected = false;
-    this.ERPatient.ERPatientValidator.controls['LastName'].enable();
+    // this.ERPatient.ERPatientValidator.controls['LastName'].enable();
     this.ERPatient.UpdateValidator("on", "LastName", "required");
     this.ERPatient.PatientCases.SubCase = null;
 
     if (data[0] && data[0].ChildLookUpDetails && data[0].ChildLookUpDetails.length > 1) {
+      this.ERPatient.Case = data[0].Name;
       data[0].ChildLookUpDetails.forEach(a => {
         this.nestedCases.push(a);
       });
@@ -964,11 +1054,33 @@ export class ERPatientRegistrationComponent {
     if (ethnicGroup) {
       this.ERPatient.EthnicGroup = ethnicGroup.ethnicGroup;
     }
+    if (this.ERPatient.EthnicGroup) {
+      this.SetFocusById('erPatGender')
+    }
+    else {
+      this.SetFocusById('id_select_ethnic_group')
+    }
   }
+
+  ClearEthnicGroup(): void {
+    this.ERPatient.EthnicGroup = "";
+  }
+
   ShowTriagePopUp(): void {
     this.ShowTriagePopup = true;
   }
   HideTriagePopUp(): void {
     this.ShowTriagePopup = false;
+  }
+  HaveDOB() {
+    this.ShowDOB = !this.ShowDOB;
+    if (Number(this.ERPatient.Age) > 0) {
+      this.CalculateDob(Number(this.ERPatient.Age));
+      this.ERPatient.ERPatientValidator.get('DateOfBirth').setValue(this.ERPatient.DateOfBirth);
+
+    }
+    else if (this.ERPatient.DateOfBirth) {
+      this.CalculateAge(this.ERPatient.DateOfBirth);
+    }
   }
 }

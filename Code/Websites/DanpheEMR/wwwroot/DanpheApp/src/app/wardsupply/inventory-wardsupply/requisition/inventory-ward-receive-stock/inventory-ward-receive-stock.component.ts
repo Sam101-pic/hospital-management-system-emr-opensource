@@ -1,10 +1,11 @@
 import { Component, OnInit } from '@angular/core';
-import { InventoryService } from '../../../../inventory/shared/inventory.service';
 import { Router } from '@angular/router';
-import { WardSupplyBLService } from '../../../shared/wardsupply.bl.service';
-import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
+import { InventoryService } from '../../../../inventory/shared/inventory.service';
 import { SecurityService } from '../../../../security/shared/security.service';
+import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
+import { WardSupplyBLService } from '../../../shared/wardsupply.bl.service';
 import { wardsupplyService } from '../../../shared/wardsupply.service';
+import { ENUM_MessageBox_Status } from '../../../../shared/shared-enums';
 
 @Component({
   selector: 'app-inventory-ward-receive-stock',
@@ -15,6 +16,7 @@ export class InventoryWardReceiveStockComponent implements OnInit {
   public DispatchList: Array<IDispatchListView> = [];
   public loading: boolean;
   public CurrentStoreId: number = null;
+  IsAllItemsReceived: Boolean = false;
   constructor(public InventoryService: InventoryService,
     public wardsupplyBLService: WardSupplyBLService,
     public messageBoxService: MessageboxService, public securityService: SecurityService,
@@ -35,6 +37,7 @@ export class InventoryWardReceiveStockComponent implements OnInit {
           if (res.Status == "OK") {
             this.Requisition = res.Results.RequisitionDetail;
             this.DispatchList = res.Results.DispatchDetail;
+            this.IsAllItemsReceived = this.DispatchList.every(d => d.ReceivedBy && d.ReceivedBy.trim() !== '');
             this.loading = false;
             this.setFocusById('ReceivedRemarks');
           }
@@ -59,11 +62,11 @@ export class InventoryWardReceiveStockComponent implements OnInit {
           this.ReloadLoadStock();
         }
         else {
-          this.messageBoxService.showMessage("Failed", [res.ErrorMessage]);
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to receive stock. <br>' + res.ErrorMessage]);
           this.loading = false;
         }
       }, err => {
-        this.messageBoxService.showMessage("Failed", [err.error.ErrorMessage]);
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Failed to receive stock. <br>' + err]);
         this.loading = false;
       })
   }

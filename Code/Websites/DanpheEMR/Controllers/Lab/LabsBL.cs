@@ -10,6 +10,8 @@ using Newtonsoft.Json;
 using System.Configuration;
 using DanpheEMR.ServerModel.LabModels;
 using DanpheEMR.Enums;
+using DanpheEMR.ServerModel.PatientModels;
+using OfficeOpenXml.FormulaParsing.Excel.Functions.Text;
 /*File: LabsBL.cs
 * created: 12Sept'18 <sud>
 * Description: This class contains common functions used in Labs-Controllers.
@@ -44,8 +46,10 @@ namespace DanpheEMR.Labs
                                  join test in labDbContext.LabTests on req.LabTestId equals test.LabTestId
                                  join template in labDbContext.LabReportTemplates on req.ReportTemplateId equals template.ReportTemplateID
                                  from doc in labDbContext.Employee.Where(emp => emp.EmployeeId == req.PrescriberId).DefaultIfEmpty()
-                                 from comp in labDbContext.LabTestComponentResults.Where(cmp => cmp.RequisitionId == req.RequisitionId).DefaultIfEmpty()
+                                 from comp in labDbContext.LabTestComponentResults.Where(cmp => cmp.RequisitionId == req.RequisitionId && cmp.IsActive == true).DefaultIfEmpty()
                                  from rept in labDbContext.LabReports.Where(rpt => rpt.LabReportId == req.LabReportId).DefaultIfEmpty()
+                                 from billitm in labDbContext.BillingTransactionItems.Where(rpt => rpt.BillingTransactionItemId == req.BillingTransactionItemId).DefaultIfEmpty()
+                                 from refDoc in labDbContext.Employee.Where(emp => emp.EmployeeId == billitm.ReferredById).DefaultIfEmpty()
                                      //changed below condition by sudd.. to avoid null exception.. 
                                      //from doc in labDbContext.Employee.Where(e => req.ProviderId.HasValue && req.ProviderId.Value == e.EmployeeId).DefaultIfEmpty()
                                  where reqIdList.Contains(req.RequisitionId)
@@ -67,10 +71,17 @@ namespace DanpheEMR.Labs
                                      MunicipalityName = (from mun in labDbContext.Municipalities
                                                          where mun.MunicipalityId == pat.MunicipalityId
                                                          select mun.MunicipalityName).FirstOrDefault(),
+                                     CountryName = (from country in labDbContext.Countries
+                                                    where country.CountryId == pat.CountryId
+                                                        select country.CountryName).FirstOrDefault(),
+
                                      PrescriberId = (int?)req.PrescriberId,
+                                     ReferredById = (int?)billitm.ReferredById,
+                                     ReferredByName = rept == null ? (billitm.ReferredById  != null ? (string.IsNullOrEmpty(refDoc == null ? "" : refDoc.FullName) ? refDoc == null ? "" : refDoc.FullName : refDoc == null ? "" : refDoc.FullName) : "SELF1") : refDoc.FullName,
+
                                      //ashim: 06Sep2018 : Report details are saved only in final report. So we don't have report details in pending report.
                                      //ReferredByName will be: LongSignature (for internal), Or FullName (for external), or SELF for NULL, or Existing value based on conditions.
-                                     PrescriberName = rept == null ? (req.PrescriberId != null ? (string.IsNullOrEmpty(doc == null ? "" : doc.LongSignature) ? doc == null? "" : doc.FullName : doc == null ? "" : doc.LongSignature) : "SELF") : rept.PrescriberName,
+                                     PrescriberName = rept == null ? (req.PrescriberId != null ? (string.IsNullOrEmpty(doc == null ? "" : doc.FullName) ? doc == null? "" : doc.FullName : doc == null ? "" : doc.FullName) : "SELF") : rept.PrescriberName,
                                      ReceivingDate = rept == null ? ((req.RunNumberType.ToLower() == ENUM_LabRunNumType.histo || req.RunNumberType.ToLower() == ENUM_LabRunNumType.cyto) ? req.OrderDateTime : req.SampleCreatedOn) : rept.ReceivingDate,
                                      //ReceivingDate = rept == null ? ((req.RunNumberType.ToLower() == "histo" || req.RunNumberType.ToLower() == "cyto") ? req.OrderDateTime : req.SampleCreatedOn) : rept.ReceivingDate,
                                      ReportingDate = rept == null ? DateTime.Now : rept.ReportingDate,
@@ -148,7 +159,7 @@ namespace DanpheEMR.Labs
                                      PrintedBy = rept == null ? 0 : rept.PrintedBy,
                                      PrintedOn = rept == null? DateTime.Now : rept.PrintedOn,
                                      PrintedByName = "",
-                                     CovidFileUrl = string.IsNullOrEmpty(CovidFileUrlCommon) ? "" : CovidFileUrlCommon.Replace("GGLFILEUPLOADID", req.GoogleFileIdForCovid),
+                                     CovidFileUrl = string.IsNullOrEmpty(CovidFileUrlCommon) ? "" : CovidFileUrlCommon.Replace("GGLFILEUPLOADID", req.GoogleFileId),
                                      IsFileUploadedToTeleMedicine = req.IsFileUploadedToTeleMedicine,
                                      PassPortNumber = pat.PassportNumber,
                                      WardName = req.WardName,
@@ -157,7 +168,7 @@ namespace DanpheEMR.Labs
 
 
             return resultDetails;
-        }
+        }       
 
         public static LabReportVM FormatResultsForLabReportVM(List<LabResult_Denormalized_VM> resultSets, LabDbContext labDbContext)
         {
@@ -203,6 +214,8 @@ namespace DanpheEMR.Labs
         /// <returns></returns>
         public static ReportLookup GetLookup(LabDbContext labDbContext, List<LabResult_Denormalized_VM> resultSets)
         {
+            var PatientId = resultSets.FirstOrDefault().PatientId;
+            PatientSchemeMapModel SchemeMap = labDbContext.PatientSchemeMap.Where(a => a.PatientId == PatientId).FirstOrDefault();
             ReportLookup lookups = (from r in resultSets
                                     select new ReportLookup
                                     {
@@ -218,6 +231,8 @@ namespace DanpheEMR.Labs
                                         ReportingDate = r.ReportingDate,
                                         PrescriberName = r.PrescriberName,
                                         PrescriberId = r.PrescriberId,
+                                        ReferredById = r.ReferredById,
+                                        ReferredByName = r.ReferredByName,
                                         SampleCode = r.SampleCode,
                                         SampleCodeFormatted = r.SampleCodeFormatted,
                                         SampleDate = r.SampleDate,
@@ -227,9 +242,12 @@ namespace DanpheEMR.Labs
                                         Specimen = r.Specimen,
                                         MunicipalityName = r.MunicipalityName,
                                         CountrySubDivisionName = r.CountrySubDivisionName,
+                                        CountryName = r.CountryName,
+                                        WardNumber = r.WardNumber,
                                         ProfilePictureName = getProfilePicture(labDbContext,r.PatientId),
                                         PassPortNumber = r.PassPortNumber,
                                         WardName = r.WardName,
+                                        PolicyNumber = SchemeMap != null? SchemeMap.PolicyNo : "",
                                     }
                             ).FirstOrDefault();
             return lookups;
@@ -364,7 +382,9 @@ namespace DanpheEMR.Labs
                                              GroupName = componentMap.GroupName,
                                              IsAutoCalculate = componentMap.IsAutoCalculate,
                                              CalculationFormula = componentMap.CalculationFormula,
-                                             FormulaDescription = componentMap.FormulaDescription 
+                                             FormulaDescription = componentMap.FormulaDescription,
+                                             ValuePrecision = component.ValuePrecision,
+                                             ShowRangeDescriptionInLabReport = component.ShowRangeDescriptionInLabReport,
                                          }).ToList();
                     tst.Components = GetResulsOfTestRequisition(resultSets, tst.RequisitionId);
                     tst.MaxResultGroup = tst.Components.Max(v => v.ResultGroup);

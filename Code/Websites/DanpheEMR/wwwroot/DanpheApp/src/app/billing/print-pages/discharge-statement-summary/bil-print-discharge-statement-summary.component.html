@@ -33,11 +33,13 @@
           <tr>
             <td>
               <div class="flx" [ngClass]="'ipd-invoice-header-gap-' + hospitalCode"></div>
-              <div *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType==='image'">
+              <div class="discharge-statement-summary-header-image"
+                   *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType==='image'">
                 <img src="../../../../themes/theme-default/images/customer-headers/billing-invoice-header-image.png"
                      style="width: 100%;">
               </div>
-              <div *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType === 'custom'">
+              <div class="discharge-statement-summary-header-custom"
+                   *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType === 'custom'">
                 <billing-header *ngIf="InvoiceDisplaySettings.ShowHeader"></billing-header>
                 <div class="qr-code" style="position: absolute;right: 15px;top: 20px;"
                      *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.ShowQR">
@@ -215,7 +217,7 @@
                       <div style="padding-bottom: 8px;">
                         <span class="text-uppercase">User:
                         </span>
-                        <span>{{currentUserName}}</span>
+                        <span>{{UserName}}</span>
                       </div>
                       <div>
                         <span class="text-uppercase">Print Date: </span><span>{{currDate}}</span>
@@ -254,7 +256,7 @@
                       <div *ngIf="dischargeBill.BillingTransactionDetail && (dischargeBill.TotalAmount > DepositBalance)"
                            style="padding-bottom: 8px;">
                         <span class="text-uppercase">To Be Paid:</span>
-                        {{dischargeBill.TotalAmount - DepositBalance | number: "1.2-2"}}
+                        {{ToBePaid | number: "1.2-2"}}
                       </div>
                       <div *ngIf="dischargeBill.BillingTransactionDetail && (DepositBalance > dischargeBill.TotalAmount)"
                            style="padding-bottom: 8px;">

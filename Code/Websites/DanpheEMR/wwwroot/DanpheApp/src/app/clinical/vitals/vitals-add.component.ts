@@ -1,13 +1,13 @@
 // <reference path="../../radiology/imaging/imaging-requisition-list.component.ts" />
-import { Component, Output, EventEmitter, ChangeDetectorRef, Input, Renderer2 } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output, Renderer2 } from "@angular/core";
 
 import { VisitService } from '../../appointments/shared/visit.service';
-import { IOAllergyVitalsBLService } from '../shared/io-allergy-vitals.bl.service';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { IOAllergyVitalsBLService } from '../shared/io-allergy-vitals.bl.service';
 
-import { Vitals } from "../shared/vitals.model";
 import { PatientService } from "../../patients/shared/patient.service";
-import { ENUM_MessageBox_Status } from "../../shared/shared-enums";
+import { ENUM_MessageBox_Status, ENUM_VitalVerbalScale, ENUM_VitalsEyeScale, ENUM_VitalsMotorScale } from "../../shared/shared-enums";
+import { Vitals } from "../shared/vitals.model";
 
 @Component({
   selector: "vitals-add",
@@ -148,6 +148,8 @@ export class VitalsAddComponent {
   }
   //call back funtion for get patient vitals
   CallBackGetPatientVitalList(_vitalsList) {
+    //clear Old painDataList to remove duplication
+    this.painDataList = [];
     //looping through the vitalsList to check if any object contains height unit as inch so that it can be converted to foot inch.
     for (var i = 0; i < _vitalsList.length; i++) {
       if (_vitalsList[i].HeightUnit && _vitalsList[i].HeightUnit == "inch") {
@@ -155,10 +157,13 @@ export class VitalsAddComponent {
         //converting back for displaying in the format foot'inch''
         _vitalsList[i].Height = this.ioAllergyVitalsBLService.ConvertInchToFootInch(_vitalsList[i].Height);
       }
-      var jsonData = JSON.parse(_vitalsList[i].BodyPart);
+      let jsonData = JSON.parse(_vitalsList[i].BodyPart);
       this.painDataList.push(jsonData);
     }
     this.vitalsList = _vitalsList;
+    this.MapVitalData();
+
+    // this.callbackAdd.emit({ vitals: this.vitalsList, submit: false });
   }
 
   //enables the update button and assigns the selected vitals object to the CurrentVital object.
@@ -185,7 +190,14 @@ export class VitalsAddComponent {
       let split = this.selectedVitals.Height.split("'");
       this.foot = Number(split[0]);
       this.inch = Number(split[1]);
+      this.CurrentVital.Height = null; // Clear cm height
       this.footInchSelected = true;
+    } else if (this.selectedVitals.HeightUnit === "cm") {
+      // Handle case where height is in cm
+      this.CurrentVital.Height = Number(this.selectedVitals.Height);
+      this.foot = null; // Clear feet and inches values
+      this.inch = null;
+      this.footInchSelected = false; // Hide foot and inch fields
     }
 
     this.painData = [];
@@ -272,7 +284,7 @@ export class VitalsAddComponent {
       if (this.painData) {
         for (var i = 0; i < this.painData.length; i++) {
           if ((this.painData[i].BodyPart && !this.painData[i].PainScale) || (!this.painData[i].BodyPart && this.painData[i].PainScale)) {
-            this.msgBoxServ.showMessage("error", ["Please Enter Body Pain Data Properly"]);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please Enter Body Pain Data Properly"]);
             flag = 0;
             break;
           } else if (!this.painData[i].BodyPart && !this.painData[i].PainScale && i > 0) {
@@ -329,6 +341,12 @@ export class VitalsAddComponent {
       //    //converting back for displaying in the format foot'inch''
       //    res.Results.Height = this.ioAllergyVitalsBLService.ConvertInchToFootInch(res.Results.Height);
       //}
+
+
+
+
+
+
       //this.vitalsList.push(res.Results);
       this.callBackDisplay.emit({ vitals: res.Results });
       this.callbackAdd.emit({ vitals: res.Results, submit: true });
@@ -441,18 +459,79 @@ export class VitalsAddComponent {
 
 
   }
-
+  MapVitalData() {
+    this.vitalsList.forEach((vitals) => {
+      if (vitals.Eyes) {
+        vitals.Eyes = this.MapFetchedEyeScale(vitals.Eyes);
+      }
+      if (vitals.Motor) {
+        vitals.Motor = this.MapFetchedMotorScale(vitals.Motor);
+      }
+      if (vitals.Verbal) {
+        vitals.Verbal = this.MapFetchedVerbalScale(vitals.Verbal);
+      }
+    });
+  }
+  MapFetchedEyeScale(value: string): string {
+    switch (value) {
+      case ENUM_VitalsEyeScale.Scale1:
+        return "1";
+      case ENUM_VitalsEyeScale.Scale2:
+        return "2";
+      case ENUM_VitalsEyeScale.Scale3:
+        return "3";
+      case ENUM_VitalsEyeScale.Scale4:
+        return "4";
+      default:
+    }
+  }
+  MapFetchedMotorScale(value: string): string {
+    switch (value) {
+      case ENUM_VitalsMotorScale.Scale1:
+        return "1";
+      case ENUM_VitalsMotorScale.Scale2:
+        return "2";
+      case ENUM_VitalsMotorScale.Scale3:
+        return "3";
+      case ENUM_VitalsMotorScale.Scale4:
+        return "4";
+      case ENUM_VitalsMotorScale.Scale5:
+        return "5";
+      case ENUM_VitalsMotorScale.Scale6:
+        return "6";
+      default:
+    }
+  }
+  MapFetchedVerbalScale(value: string): string {
+    switch (value) {
+      case ENUM_VitalVerbalScale.Scale1:
+        return "1";
+      case ENUM_VitalVerbalScale.Scale2:
+        return "2";
+      case ENUM_VitalVerbalScale.Scale3:
+        return "3";
+      case ENUM_VitalVerbalScale.Scale4:
+        return "4";
+      case ENUM_VitalVerbalScale.Scale5:
+        return "5";
+      default:
+    }
+  }
   //call back function for put vitals.
   CallBackUpdateVitals(res) {
     this.loading = false;
     if (res.Status == "OK") {
       if (this.showVitalList) {
-        this.GetPatientVitalsList();
+        // this.GetPatientVitalsList();
+        this.MapVitalData();
         this.changeDetector.detectChanges();
         this.painData = [];
         this.painData.push({ BodyPart: "", PainScale: null });
+        this.callbackAdd.emit({ vitals: res.Results, submit: true });
         this.CurrentVital = new Vitals();
-        this.footInchSelected == false;
+        // this.foot = null;
+        // this.inch = null;
+        this.footInchSelected = false;
         this.updateButton = false;
       } else {
         this.callbackAdd.emit({ vitals: res.Results, submit: true });
@@ -460,14 +539,18 @@ export class VitalsAddComponent {
         this.painData = [];
         this.painData.push({ BodyPart: "", PainScale: null });
         this.CurrentVital = new Vitals();
-        this.footInchSelected == false;
+        this.footInchSelected = false;
         this.updateButton = false;
-        this.msgBoxServ.showMessage("success", ["updated successfully"]);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["updated successfully"]);
+        // const vitalList = res.Results;
+        // this.vitalsList[this.selectedIndex] =vitalList;
+        this.MapVitalData();
       }
-
+      this.foot = null;
+      this.inch = null;
     }
     else {
-      this.msgBoxServ.showMessage("failed", ['Failed. please check log for details.'], res.ErrorMessage);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Failed. please check log for details.'], res.ErrorMessage);
 
     }
   }
@@ -502,5 +585,75 @@ export class VitalsAddComponent {
     let onFieldChange = this.renderer2.selectRootElement('#bodyPart');
     onFieldChange.focus();
   }
+  MapEyeScale(value: number): string {
+    switch (value) {
+      case 1:
+        return ENUM_VitalsEyeScale.Scale1;
+      case 2:
+        return ENUM_VitalsEyeScale.Scale2;
+      case 3:
+        return ENUM_VitalsEyeScale.Scale3;
+      case 4:
+        return ENUM_VitalsEyeScale.Scale4;
+      default:
+    }
+  }
+  MapMotorScale(value: number): string {
+    switch (value) {
+      case 1:
+        return ENUM_VitalsMotorScale.Scale1;
+      case 2:
+        return ENUM_VitalsMotorScale.Scale2;
+      case 3:
+        return ENUM_VitalsMotorScale.Scale3;
+      case 4:
+        return ENUM_VitalsMotorScale.Scale4;
+      case 5:
+        return ENUM_VitalsMotorScale.Scale5;
+      case 6:
+        return ENUM_VitalsMotorScale.Scale6;
+      default:
+    }
+  }
+  MapVerbalScale(value: number): string {
+    switch (value) {
+      case 1:
+        return ENUM_VitalVerbalScale.Scale1;
+      case 2:
+        return ENUM_VitalVerbalScale.Scale2;
+      case 3:
+        return ENUM_VitalVerbalScale.Scale3;
+      case 4:
+        return ENUM_VitalVerbalScale.Scale4;
+      case 5:
+        return ENUM_VitalVerbalScale.Scale5;
+      default:
+    }
+  }
+  onEyeModelChange(value: string): void {
+    const selectedValue = parseInt(value, 10);
+    if (isNaN(selectedValue)) {
+      console.error("Invalid input: Unable to convert to a number.");
+      return;
+    }
+    this.CurrentVital.Eyes = this.MapEyeScale(selectedValue);
+  }
+  onMotorModelChange(value: string): void {
+    const selectedValue = parseInt(value, 10);
+    if (isNaN(selectedValue)) {
+      console.error("Invalid input: Unable to convert to a number.");
+      return;
+    }
+    this.CurrentVital.Motor = this.MapMotorScale(selectedValue);
+  }
+  onVerbalModelChange(value: string): void {
+    const selectedValue = parseInt(value, 10);
+    if (isNaN(selectedValue)) {
+      console.error("Invalid input: Unable to convert to a number.");
+      return;
+    }
+    this.CurrentVital.Verbal = this.MapVerbalScale(selectedValue);
+  }
+
 }
 

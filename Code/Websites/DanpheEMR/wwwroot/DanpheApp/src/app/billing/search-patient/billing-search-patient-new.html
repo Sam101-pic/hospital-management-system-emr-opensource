@@ -91,7 +91,7 @@
               Scheme: <b> {{SchemeName}}</b>
             </span>
             <span>
-              <i class="fa fa-user"></i>&nbsp;Address : <b>{{selPatient.Address}}</b>
+              <i class="fa fa-user"></i>&nbsp;Address : <b>{{coreService.SortPatientAddress(selPatient)}}</b>
             </span>
             <span *ngIf="selPatient.PhoneNumber">
               <i class="fa fa-phone"></i>&nbsp;Contact No : <b>{{selPatient.PhoneNumber}}</b>
@@ -119,6 +119,9 @@
           <button [rbac-permission]="{'name':'billing-pat-sticker-button','actionOnInvalid':'hidden'}"
                   id="btn_patientSticker" class="btn green btn-success margin-15-lft" (click)="OnClickPatientSticker()">Patient
             Sticker</button>
+          <button id="id_btn_add_medical_diagnosis" class="btn green btn-success margin-15-lft" (click)="OnAddDiagnosisClicked()">Add
+            Diagnosis</button>
+
         </div>
         <div class="row">
           <div class="col-md-12">
@@ -139,6 +142,17 @@
       <div style="margin-left:60px"> <i class="btn btn-danger" style="float: right"
            (click)="ClosePrintStickerPopup()">X</i>
         <patient-sticker [patientId]="this.selPatient.PatientId" (after-print-action)="AfterStickerPrint($event)"> </patient-sticker>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="popup-static portlet box portlet-fullscreen" *ngIf="showAddDiagnosis">
+  <div class="portlet-body form">
+    <div class="modelbox-div" style="margin-left:30%;margin-right:16%">
+      <div style="margin-left:60px"> <i class="btn btn-danger" style="float: right"
+           (click)="CloseAddDiagnosisPopup()">X</i>
+        <medical-diagnosis [selected-patient]="selectedPatient"></medical-diagnosis>
       </div>
     </div>
   </div>

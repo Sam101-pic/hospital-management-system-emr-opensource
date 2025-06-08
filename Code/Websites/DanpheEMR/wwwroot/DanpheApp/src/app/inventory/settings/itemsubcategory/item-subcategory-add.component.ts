@@ -1,16 +1,14 @@
 
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 
-import { ItemSubCategoryModel } from '../shared/item-subcategory.model';
 import { InventorySettingBLService } from "../shared/inventory-settings.bl.service";
+import { ItemSubCategoryModel } from '../shared/item-subcategory.model';
 
 import { SecurityService } from '../../../security/shared/security.service';
 //Parse, validate, manipulate, and display dates and times in JS.
-import * as moment from 'moment/moment';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { AccountHeadModel } from "../shared/account-head.model";
-import { isNumber } from "util";
 import { isNumeric } from "rxjs/internal-compatibility";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 
 
 @Component({
@@ -23,6 +21,8 @@ export class ItemSubCategoryAddComponent {
       public showAddPage: boolean = false;
       @Input("selectedItemSubCategory")
       public selectedItemSubCategory: ItemSubCategoryModel;
+      @Input("itemSubCategoryList")
+      public ItemSubCategoryList = Array<ItemSubCategoryModel>();
       @Output("callback-add")
       callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
       public update: boolean = false;
@@ -33,25 +33,25 @@ export class ItemSubCategoryAddComponent {
       public accountHeadList: Array<any> = new Array<any>();
       public showAddAccountHeadPopUp: boolean = false;
       public showAddLedgerBox: boolean = false;
-      public ledgerType:string="";
-      public ledReferenceId:any;
-      public ledgerId:number=0;
+      public ledgerType: string = "";
+      public ledReferenceId: any;
+      public ledgerId: number = 0;
       constructor(
             public invSettingBL: InventorySettingBLService,
             public securityService: SecurityService,
             public changeDetector: ChangeDetectorRef, public msgBoxServ: MessageboxService) {
-           // this.GetAccountHead();
+            // this.GetAccountHead();
             this.getMappedledgerlist();
       }
       @Input("showAddPage")
       public set value(val: boolean) {
-          this.showAddPage = val;
-          console.log(this.selectedItemSubCategory);
+            this.showAddPage = val;
+            console.log(this.selectedItemSubCategory);
             if (this.selectedItemSubCategory) {
                   this.update = true;
                   this.currentItemSubCategory = Object.assign(this.currentItemSubCategory, this.selectedItemSubCategory);
                   this.currentItemSubCategory.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
-                  this.ledgerId = (this.selectedItemSubCategory.LedgerId !=null ) ? this.selectedItemSubCategory.LedgerId : 0;
+                  this.ledgerId = (this.selectedItemSubCategory.LedgerId != null) ? this.selectedItemSubCategory.LedgerId : 0;
             }
             else {
                   this.currentItemSubCategory = new ItemSubCategoryModel();
@@ -67,13 +67,13 @@ export class ItemSubCategoryAddComponent {
                         if (res.Status == "OK") {
                               this.itemsubcategorylist = res.Results;
                               if (this.itemsubcategorylist.length > 0) {
-                              // this.itemsubcategorylist.map(a => a.AccountHeadName = this.accountHeadList.find(b => b.AccountHeadId == a.AccountHeadId).AccountHeadName);
+                                    // this.itemsubcategorylist.map(a => a.AccountHeadName = this.accountHeadList.find(b => b.AccountHeadId == a.AccountHeadId).AccountHeadName);
 
-                                this.itemsubcategorylist.forEach(itm => {
-                                       var led = this.accountHeadList.filter(b => b.LedgerReferenceId == itm.SubCategoryId);
-                                       itm.LedgerName = (led.length>0) ? led[0].LedgerName : null;
-                                       itm.LedgerId = (led.length>0) ? led[0].LedgerId : null;
-                                 })
+                                    this.itemsubcategorylist.forEach(itm => {
+                                          var led = this.accountHeadList.filter(b => b.LedgerReferenceId == itm.SubCategoryId);
+                                          itm.LedgerName = (led.length > 0) ? led[0].LedgerName : null;
+                                          itm.LedgerId = (led.length > 0) ? led[0].LedgerId : null;
+                                    })
                               }
                         }
                         else {
@@ -83,17 +83,17 @@ export class ItemSubCategoryAddComponent {
                   });
       }
       //Get Account Head List
-       public GetAccountHead() {
-             this.invSettingBL.GetAccountHead(true)
-                   .subscribe(res => {
-                         if (res.Status == "OK") {
-                               this.accountHeadList = res.Results;
-                               this.getItemSubCategoryList();
-                         }
-                   });
-       }
-       //Get Account ledger List
-       public getMappedledgerlist() {
+      public GetAccountHead() {
+            this.invSettingBL.GetAccountHead(true)
+                  .subscribe(res => {
+                        if (res.Status == "OK") {
+                              this.accountHeadList = res.Results;
+                              this.getItemSubCategoryList();
+                        }
+                  });
+      }
+      //Get Account ledger List
+      public getMappedledgerlist() {
             this.invSettingBL.getMappedledgerlist('inventorysubcategory')
                   .subscribe(res => {
                         if (res.Status == "OK") {
@@ -126,12 +126,28 @@ export class ItemSubCategoryAddComponent {
             }
       }
       //adding new department
-      AddItemSubCategory() {       
+      AddItemSubCategory() {
             //for checking validations, marking all the fields as dirty and checking the validity.
             for (var i in this.currentItemSubCategory.ItemSubCategoryValidator.controls) {
                   this.currentItemSubCategory.ItemSubCategoryValidator.controls[i].markAsDirty();
                   this.currentItemSubCategory.ItemSubCategoryValidator.controls[i].updateValueAndValidity();
             }
+
+            if (this.ItemSubCategoryList && this.ItemSubCategoryList.length) {
+                  const isSubCategoryNameAlreadyExists = this.ItemSubCategoryList.some(a => a.SubCategoryName.toLowerCase() === this.currentItemSubCategory.SubCategoryName.toLowerCase());
+                  const isSubCategoryCodeAlreadyExists = this.ItemSubCategoryList.some(a => a.Code.toLowerCase() === this.currentItemSubCategory.Code.toLowerCase());
+                  if (isSubCategoryNameAlreadyExists) {
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add Sub Category as the SubCategory Name "${this.currentItemSubCategory.SubCategoryName}" already exists.`]);
+                        return;
+                  }
+
+                  if (isSubCategoryCodeAlreadyExists) {
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add Sub Category as the SubCategory Code "${this.currentItemSubCategory.Code}" already exists.`]);
+                        return;
+                  }
+
+            }
+
             if (this.currentItemSubCategory.IsValidCheck(undefined, undefined)) {
                   this.loading = true;
                   //logic to create SubCategoryCode if left blank.
@@ -161,6 +177,22 @@ export class ItemSubCategoryAddComponent {
                   this.currentItemSubCategory.ItemSubCategoryValidator.controls[i].markAsDirty();
                   this.currentItemSubCategory.ItemSubCategoryValidator.controls[i].updateValueAndValidity();
             }
+
+            if (this.ItemSubCategoryList && this.ItemSubCategoryList.length) {
+                  const isSubCategoryNameAlreadyExists = this.ItemSubCategoryList.some(a => a.SubCategoryName.toLowerCase() === this.currentItemSubCategory.SubCategoryName.toLowerCase() && a.SubCategoryId !== this.currentItemSubCategory.SubCategoryId);
+                  const isSubCategoryCodeAlreadyExists = this.ItemSubCategoryList.some(a => a.Code.toLowerCase() === this.currentItemSubCategory.Code.toLowerCase() && a.SubCategoryId !== this.currentItemSubCategory.SubCategoryId);
+                  if (isSubCategoryNameAlreadyExists) {
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Sub Category as the SubCategory Name "${this.currentItemSubCategory.SubCategoryName}" already exists.`]);
+                        return;
+                  }
+
+                  if (isSubCategoryCodeAlreadyExists) {
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Sub Category as the SubCategory Code "${this.currentItemSubCategory.Code}" already exists.`]);
+                        return;
+                  }
+
+            }
+
             if (this.currentItemSubCategory.IsValidCheck(undefined, undefined)) {
                   this.loading = true;
                   this.invSettingBL.UpdateItemSubCategory(this.currentItemSubCategory)
@@ -184,7 +216,7 @@ export class ItemSubCategoryAddComponent {
             this.selectedItemSubCategory = null;
             this.update = false;
             this.showAddPage = false;
-            this.ledgerId=0;
+            this.ledgerId = 0;
       }
 
       //after adding Vendor is succesfully added  then this function is called.
@@ -221,31 +253,31 @@ export class ItemSubCategoryAddComponent {
             this.ledReferenceId = this.currentItemSubCategory.SubCategoryId;
             this.showAddLedgerBox = false;
             this.changeDetector.detectChanges();
-            this.ledgerType= "inventorysubcategory";  
-            this.showAddLedgerBox = true;     
+            this.ledgerType = "inventorysubcategory";
+            this.showAddLedgerBox = true;
       }
-      OnNewLedgerAdded($event){
+      OnNewLedgerAdded($event) {
             var data = $event.ledger;
             this.accountHeadList.push(data);
-            var led = this.accountHeadList.filter(l=>l.LedgerId==data.LedgerId);
-            this.ledgerId = (led.length>0) ? led[0].LedgerId : null;
+            var led = this.accountHeadList.filter(l => l.LedgerId == data.LedgerId);
+            this.ledgerId = (led.length > 0) ? led[0].LedgerId : null;
             this.currentItemSubCategory.LedgerId = this.ledgerId;
-            this.ledgerType="";
+            this.ledgerType = "";
       }
-      changeLedger(){
+      changeLedger() {
             this.currentItemSubCategory.LedgerId = +this.ledgerId;
       }
       FocusElementById(id: string) {
             window.setTimeout(function () {
-              let itmNameBox = document.getElementById(id);
-              if (itmNameBox) {
-                itmNameBox.focus();
-              }
+                  let itmNameBox = document.getElementById(id);
+                  if (itmNameBox) {
+                        itmNameBox.focus();
+                  }
             }, 600);
-          }
-        hotkeys(event){
-            if(event.keyCode==27){
-                this.Close()
+      }
+      hotkeys(event) {
+            if (event.keyCode == 27) {
+                  this.Close()
             }
-        }
+      }
 }

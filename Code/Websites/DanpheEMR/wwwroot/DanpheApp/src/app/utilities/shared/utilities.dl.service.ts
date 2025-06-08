@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import { DanpheHTTPResponse } from "../../shared/common-models";
+import { ChangePolicyNumberDTO } from "./DTOs/change-policy-number.dto";
 import { ChangeVisitScheme_DTO } from "./DTOs/change-visit-scheme.dto";
 import { OrganizationDeposit_DTO } from "./DTOs/organization-deposit.dto";
 import { ProcessConfirmationUserCredentials_DTO } from "./DTOs/process-confirmation-userCredentials.dto";
@@ -72,6 +73,9 @@ export class UtilitiesDLService {
   }
   public ConfirmProcess(processToConfirmUserCredentials: ProcessConfirmationUserCredentials_DTO) {
     return this.http.post<DanpheHTTPResponse>(`/api/ProcessConfirmation/ConfirmProcess`, processToConfirmUserCredentials, this.optionsJson);
+  }
+  public UpdatePolicyNumber(changePolicyNumber: ChangePolicyNumberDTO) {
+    return this.http.post<DanpheHTTPResponse>(`/api/Utilities/ChangePolicyNumber`, changePolicyNumber, this.optionsJson);
   }
 
 

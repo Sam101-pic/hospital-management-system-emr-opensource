@@ -1,7 +1,6 @@
-import { FormGroup, FormControl, Validators, FormBuilder, } from '@angular/forms'
-import { GoodsReceiptItems } from "./goods-receipt-item.model"
-import { ENUM_GRItemCategory } from "../../shared/shared-enums";
+import { FormBuilder, FormControl, FormGroup, Validators, } from '@angular/forms';
 import * as moment from 'moment/moment';
+import { GoodsReceiptItems } from "./goods-receipt-item.model";
 import { GROtherChargesItemModel } from './goods-receipt-other-charges.model';
 export class GoodsReceipt {
   public GoodsReceiptValidator: FormGroup = null;
@@ -88,6 +87,7 @@ export class GoodsReceipt {
   GRGroupId: number;
   public CcAmount: number = 0;
   VerificationId: number = null;
+  PONumber: number = null;
 
   constructor() {
 

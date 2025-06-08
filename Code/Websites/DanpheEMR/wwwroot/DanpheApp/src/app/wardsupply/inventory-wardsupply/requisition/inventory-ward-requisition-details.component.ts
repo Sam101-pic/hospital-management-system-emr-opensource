@@ -1,20 +1,18 @@
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
+import { Component, EventEmitter, Output } from '@angular/core';
+import { Router } from '@angular/router';
 
-import { RequisitionItems } from "../../../inventory/shared/requisition-items.model";
-import { Requisition } from "../../../inventory/shared/requisition.model"
+import { CoreService } from "../../../core/shared/core.service";
+import { SubStoreRequisition_DTO } from '../../../inventory/shared/dtos/substore-requisition.dto';
 import { InventoryBLService } from "../../../inventory/shared/inventory.bl.service";
+import { InventoryService } from '../../../inventory/shared/inventory.service';
+import { RequisitionItems } from "../../../inventory/shared/requisition-items.model";
+import { Requisition } from "../../../inventory/shared/requisition.model";
+import { DispatchVerificationActor } from '../../../inventory/shared/track-requisition-vm.model';
+import { SecurityService } from '../../../security/shared/security.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from "../../../shared/routefrom.service";
-import { InventoryService } from '../../../inventory/shared/inventory.service';
-import { CoreService } from "../../../core/shared/core.service"
-import * as moment from 'moment/moment';
-import { SecurityService } from '../../../security/shared/security.service';
-import { DispatchVerificationActor } from '../../../inventory/shared/track-requisition-vm.model';
-import { VerificationActor } from '../../../verification/inventory/requisition-details/inventory-requisition-details.component';
-import { SubStoreRequisitionItems_DTO } from '../../../inventory/shared/dtos/substore-requisition-item.dto';
-import { SubStoreRequisition_DTO } from '../../../inventory/shared/dtos/substore-requisition.dto';
 import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { VerificationActor } from '../../../verification/inventory/requisition-details/inventory-requisition-details.component';
 @Component({
   selector: 'inventory-ward-requisition-details',
   templateUrl: "./inventory-ward-requisition-details.html"  // "/InventoryView/RequisitionDetails"
@@ -47,6 +45,8 @@ export class InventoryRequisitionDetailsComponent {
   public Dispatchers: VerificationActor[] = [];
   @Output('call-back-inventory-requisition-details-popup-close') callBackInventoryRequisitionDetailsPopupClose: EventEmitter<Object> = new EventEmitter<Object>();
   loading: boolean = false;
+  Receivers: VerificationActor[] = [];
+  @Output('call-back-inventory-requisition-edit') callBackInventoryRequisitionEdit: EventEmitter<Object> = new EventEmitter<Object>();
 
 
   constructor(public securityService: SecurityService,
@@ -120,6 +120,7 @@ export class InventoryRequisitionDetailsComponent {
       this.Requisition = res.Results.Requisition;
       this.Verifiers = res.Results.Verifiers;
       this.Dispatchers = res.Results.Dispatchers;
+      this.Receivers = res.Results.Receivers;
       if (!this.Requisition && !this.Requisition.RequisitionItems && !this.Requisition.RequisitionItems.length) {
         this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Selected Requisition is without Items"]);
         this.requisitionList();
@@ -178,7 +179,8 @@ export class InventoryRequisitionDetailsComponent {
     }
     else {
       this.inventoryService.RequisitionId = this.requisitionId;
-      this.router.navigate(['WardSupply/Inventory/InventoryRequisitionItem']);
+      this.callBackInventoryRequisitionEdit.emit();
+      // this.router.navigate(['WardSupply/Inventory/InventoryRequisitionItem']);
     }
   }
 
@@ -230,6 +232,11 @@ export class InventoryRequisitionDetailsComponent {
   }
 
   Close() {
+    this.inventoryService.RequisitionId = 0;
     this.callBackInventoryRequisitionDetailsPopupClose.emit();
+  }
+
+  CancelWithdrawRequisitonPopUp() {
+    this.showCancelRequisitionPopUp = false;
   }
 }

@@ -18,6 +18,7 @@ export default class PHRMReportsGridColumns {
     { headerName: "Date", field: "Date", width: 90, cellRenderer: PHRMReportsGridColumns.DateConverterRenderer },
     { headerName: "Type", field: "TransactionType", width: 90 },
     { headerName: "ReceiptNo", field: "ReceiptNo", width: 110 },
+    { headerName: "Scheme", field: "SchemeName", width: 100 },
     { headerName: "Hospital Number", field: "HospitalNo", width: 90 },
     { headerName: "PatientName", field: "PatientName", width: 220 },
     { headerName: "SubTotal", field: "SubTotal", width: 80 },
@@ -33,6 +34,7 @@ export default class PHRMReportsGridColumns {
     { headerName: "Date", field: "Date", width: 90, cellRenderer: PHRMReportsGridColumns.DateConverterRenderer },
     { headerName: "Type", field: "TransactionType", width: 90 },
     { headerName: "ReceiptNo", field: "ReceiptNo", width: 110 },
+    { headerName: "Scheme", field: "SchemeName", width: 100 },
     { headerName: "Hospital Number", field: "HospitalNo", width: 90 },
     { headerName: "PatientName", field: "PatientName", width: 220 },
     { headerName: "SubTotal", field: "SubTotal", width: 80 },
@@ -163,14 +165,14 @@ export default class PHRMReportsGridColumns {
 
   static PHRMCreditInOutPatReport = [
     { headerName: 'Date', field: "Date", width: 80, cellRenderer: PHRMReportsGridColumns.DateConverterRenderer },
-    { headerName: "InvoiceNo", field: "InvoiceNum", width: 100 },
+    { headerName: "InvoiceNo", field: "InvoiceNo", width: 100 },
     { headerName: "HospitalNo", field: "PatientCode", width: 110 },
     { headerName: "PatientName", field: "PatientName", width: 200 },
     { headerName: "Address", field: "Address", width: 150 },
-    { headerName: "CreditAmount", field: "PaidAmount", width: 100 },
-    { headername: "VisitType", field: "VisitType", width: 100 },
-    { headername: "Organization", field: "OrganizationName", width: 150 },
-    { headername: "Remark", field: "Remark", width: 150 },
+    { headerName: "CreditAmount", field: "CreditAmount", width: 100 },
+    { headerName: "VisitType", field: "VisitType", width: 100 },
+    { headerName: "Organization", field: "OrganizationName", width: 150 },
+    { headerName: "Remark", field: "Remark", width: 150 },
 
   ]
 
@@ -268,6 +270,9 @@ export default class PHRMReportsGridColumns {
     //{ headerName: "Expiry Date", field: "ExpiryDate", width: 100 },
     { headerName: "Quantity", field: "Quantity", width: 100 },
     { headerName: "Purchase Rate", field: "PurchaseRate", width: 150 },
+    { headerName: "Cost Price", field: "CostPrice", width: 150 },
+    { headerName: "Sale Price", field: "SalePrice", width: 150 },
+    { headerName: "MRP", field: "MRP", width: 150 },
     { headerName: "Sub Total", field: "SubTotal", width: 100 },
     // { headerName: "Discount Amount", field: "DiscountAmount", width: 150 },
     { headerName: "VAT Amount", field: "VATAmount", width: 130 },
@@ -275,16 +280,19 @@ export default class PHRMReportsGridColumns {
   ]
 
   static PHRMExpiryReport = [
-    { headerName: "Sr.No.", field: "SN", width: 110 },
+    { headerName: "S.N.", field: "SN", width: 110 },
     { headerName: "Generic Name", field: "GenericName", width: 150 },
     { headerName: "Item Name", field: "ItemName", width: 200 },
     { headerName: "Supplier Name", field: "SupplierName", width: 200 },
     { headerName: "BatchNo", field: "BatchNo", width: 150 },
     { headerName: "ExpiryDate", field: "ExpiryDate", width: 250, cellRenderer: PHRMReportsGridColumns.DateOfExpiry },
-    { headerName: "SalePrice", field: "SalePrice", width: 150 },
-    { headerName: "Cost Price", field: "CostPrice", width: 150 },
-    { headerName: "Quantity", field: "AvailableQuantity", width: 150 },
-    { headerName: "StoreName", field: "Name", width: 150 },
+    { headerName: "S.Price", field: "SalePrice", width: 150 },
+    { headerName: "C.Price", field: "CostPrice", width: 100 },
+    { headerName: "Quantity", field: "AvailableQuantity", width: 100 },
+    { headerName: "Total Cost Value", field: "TotalCostValue", width: 150 },
+    { headerName: "Total Sales Value", field: "TotalSalesValue", width: 150 },
+    { headerName: "StoreName", field: "StoreName", width: 150 },
+
 
   ]
   static PHRMMinStockReport = [
@@ -305,16 +313,19 @@ export default class PHRMReportsGridColumns {
 
   ]
   static PHRMBillingReport = [
-    { headerName: "Invoice Date", field: "InvoiceDate", width: 130, cellRenderer: PHRMReportsGridColumns.DateConverterRenderer },
-    { headerName: "Invoice Number", field: "InvoicePrintId", width: 150 },
+    { headerName: "Transaction Date", field: "InvoiceDate", width: 130, cellRenderer: PHRMReportsGridColumns.DateConverterRenderer },
+    { headerName: "Transaction Type", field: "TransactionType", width: 150 },
+    { headerName: "Receipt No.", field: "InvoicePrintId", width: 150 },
+    { headerName: "Ref. Receipt No", field: "ReferenceReceiptNo", width: 120 },
+    { headerName: "Scheme", field: "SchemeName", width: 150 },
     { headerName: "HospitalNo.", field: "HospitalNo", width: 150 },
     { headerName: "PatientName", field: "PatientName", width: 200 },
+    { headerName: "Visit Type", field: "VisitType", width: 200 },
+    { headerName: "Organization", field: "OrganizationName", width: 200 },
     { headerName: "SubTotal", field: "SubTotal", width: 150 },
     { headerName: "DiscountAmount", field: "DiscountAmount", width: 150 },
     { headerName: "TotalAmount", field: "TotalAmount", width: 150 },
-    { headerName: "ReceivedAmount", field: "ReceivedAmount", width: 150 },
     { headerName: "CreditAmount", field: "CreditAmount", width: 150 },
-    { headerName: "PaymentMode", field: "PaymentMode", width: 150 },
     { headerName: "Store", field: "StoreName", width: 150 },
     { headerName: "User", field: "UserName", width: 150 },
 
@@ -528,14 +539,32 @@ export default class PHRMReportsGridColumns {
   ]
   static PHRMSalesSummary = [
     { headerName: "Store", field: "StoreName", width: 150 },
+    { headerName: "Gross Cash Sales", field: "GrossCashSales", width: 150 },
+    { headerName: "Cash Discount", field: "CashDiscount", width: 150 },
     { headerName: "Cash Sales", field: "CashSales", width: 150 },
+
+    { headerName: "Gross Cash Refund", field: "GrossCashRefund", width: 150 },
+    { headerName: "Cash Refund Discount", field: "CashRefundDiscount", width: 150 },
     { headerName: "Cash Sales Refund", field: "CashSalesRefund", width: 150 },
-    { headerName: "Total Cash Sales", field: "TotalCashSales", width: 150 },
-    { headerName: "Cash In Hand", field: "CashInHand", width: 150 },
+
+    { headerName: "Net Cash Sales", field: "NetCashSales", width: 150 },
+
+
+    { headerName: "Gross Credit Sales", field: "GrossCreditSales", width: 150 },
+    { headerName: "Credit Discount", field: "CreditDiscount", width: 150 },
     { headerName: "Credit Sales", field: "CreditSales", width: 150 },
+
+    { headerName: "Gross Credit Refund", field: "GrossCreditRefund", width: 150 },
+    { headerName: "Credit Refund Discount", field: "CreditRefundDiscount", width: 150 },
     { headerName: "Credit Sales Refund", field: "CreditSalesRefund", width: 150 },
-    { headerName: "Total Credit Sales", field: "TotalCreditSales", width: 150 },
-    { headerName: "Total Sales", field: "NetTotalSales", width: 150 },
+
+    { headerName: "Net Credit Sales", field: "NetCreditSales", width: 150 },
+
+    { headerName: "Collection From Receivable", field: "CollectionFromReceivable", width: 150 },
+    { headerName: "Cash Discount Given", field: "CashDiscountGiven", width: 150 },
+    { headerName: "Cash Discount Received", field: "CashDiscountReceived", width: 150 },
+    { headerName: "Deposit Collection", field: "DepositCollection", width: 150 },
+    { headerName: "Cash In Hand", field: "CashInHand", width: 150 },
   ]
   static PHRMINSPatientBima = [
     { headerName: "Date", field: "Date", width: 150, cellRenderer: PHRMReportsGridColumns.INSPatientBimaDateRenderer },
@@ -640,4 +669,136 @@ export default class PHRMReportsGridColumns {
     else
       return '';
   }
+
+  static PHRMStockTransferSummaryReportColumns = [
+    { headerName: "Generic Name", field: "GenericName", width: 150 },
+    { headerName: "Sales Rate", field: "SalePrice", width: 90 },
+    { headerName: "Cost Price", field: "CostPrice", width: 90 },
+    { headerName: "Unit", field: "Unit", width: 90 },
+    { headerName: "TransferQty", field: "TransferQuantity", width: 150 },
+    { headerName: "Amount", field: "Amount", width: 150 },
+    { headerName: "Transferred From", field: "TransferredFrom", width: 150 },
+    { headerName: "Transferred To", field: "TransferredTo", width: 150 },
+  ]
+  static PHRMDepositBalanceReportColumns = [
+    { headerName: "Hospital Number", field: "PatientCode", width: 110 },
+    { headerName: "Patient Name", field: "PatientName", width: 240 },
+    {
+      headerName: "Age/Sex", field: "", width: 100,
+      cellRenderer: PHRMReportsGridColumns.AgeSexRendererPatient,
+    },
+    { headerName: "Contact No", field: "PhoneNumber", width: 150 },
+    { headerName: "TotalDeposit", field: "TotalDeposit", width: 110 },
+    { headerName: "Total Deducted", field: "TotalDeducted", width: 110 },
+    { headerName: "Total Refunded", field: "TotalRefunded", width: 110 },
+    { headerName: "Balance", field: "Balance", width: 110 }
+  ]
+  static AgeSexRendererPatient(params) {
+    let dob = params.data.DateOfBirth;
+    let gender: string = params.data.Gender;
+    if (dob && gender) {
+      return CommonFunctions.GetFormattedAgeSex(dob, gender);
+    } else {
+      return "";
+    }
+  }
+  static PHRMDoctorwisePrescriptionSalesReport = [
+    { headerName: "Consultation Doctor", field: "FullName", width: 200 },
+    { headerName: "GenericName", field: "GenericName", width: 150 },
+    { headerName: "ItemName", field: "ItemName", width: 150 },
+    { headerName: "Quantity", field: "TotalQuantity", width: 150 },
+    { headerName: "NetAmount", field: "NetAmount", width: 150 },
+  ]
+  static PHRMBillSummaryReport = [
+    { headerName: "Visit Date", field: "VisitDate", width: 130, cellRenderer: PHRMReportsGridColumns.DateConverterRendererForBillsSummaryReport },
+    { headerName: "VisitType", field: "VisitType", width: 150 },
+    { headerName: "Scheme", field: "SchemeName", width: 150 },
+    { headerName: "Patient Name", field: "PatientName", width: 150 },
+    { headerName: "Hospital No.", field: "HospitalNo", width: 150 },
+    { headerName: "Department", field: "DepartmentName", width: 150 },
+    {
+      headerName: "Action",
+
+      field: "",
+      width: 150,
+      template:
+        `<a danphe-grid-action="detail" class="grid-action">
+                   Show Details </a>`
+    }
+  ]
+  static DateConverterRendererForBillsSummaryReport(params) {
+    if (params) {
+      let Date: string = params.data.VisitDate;
+      return moment(Date).format('DD-MMM-YYYY');
+    }
+  }
+
+  static PharmacyProvisionalSalesReportColumns = [
+    { headerName: "Hospital Number", field: "PatientCode", width: 100 },
+    { headerName: "Patient Name", field: "ShortName", width: 120 },
+    { headerName: "Contact", field: "PhoneNumber", width: 100 },
+    { headerName: "Visit", field: "VisitType", width: 100 },
+    { headerName: "Last Visit Date", field: "ToDate", width: 100, cellRenderer: PHRMReportsGridColumns.DateConverterRendererForProvisionalSaleReport },
+    { headerName: "Scheme", field: "SchemeName", width: 100 },
+    { headerName: "Policy No", field: "PolicyNo", width: 100 },
+    { headerName: "SubTotal", field: "SubTotal", width: 100 },
+    { headerName: "Discount", field: "DiscountAmount", width: 100 },
+    { headerName: "Total", field: "TotalAmount", width: 100 },
+    { headerName: "Store", field: "StoreName", width: 100 },
+    {
+      headerName: "Action",
+      field: "",
+      width: 150,
+      template:
+        `<a danphe-grid-action="detail" class="grid-action">
+                   Show Details </a>`
+    }
+  ]
+
+  static DateConverterRendererForProvisionalSaleReport(params) {
+    if (params) {
+      let Date: string = params.data.ToDate;
+      return moment(Date).format('DD-MMM-YYYY');
+    }
+  }
+
+  static PharmacyProvisionalSalesDetailReportColumns = [
+    { headerName: "S.N.", field: "SN", width: 100 },
+    { headerName: "Scheme", field: "SchemeName", width: 100 },
+    { headerName: "ReceiptNo", field: "ReceiptNo", width: 100 },
+    { headerName: "Transaction Type", field: "TransactionType", width: 100 },
+    { headerName: "Transaction Date", field: "TransactionDate", width: 100 },
+    { headerName: "Item Name", field: "ItemName", width: 150 },
+    { headerName: "Batch", field: "BatchNo", width: 100 },
+    { headerName: "Expiry", field: "ExpiryDate", width: 100 },
+    { headerName: "SalePrice", field: "SalePrice", width: 100 },
+    { headerName: "Qty", field: "Quantity", width: 100 },
+    { headerName: "SubTotal", field: "SubTotal", width: 100 },
+    { headerName: "Dis Amt", field: "DiscountAmount", width: 100 },
+    { headerName: "VAT Amt", field: "VATAmount", width: 100 },
+    { headerName: "Total", field: "TotalAmount", width: 100 },
+    { headerName: "Store", field: "StoreName", width: 100 },
+    { headerName: "User", field: "EmployeeName", width: 100 }
+  ]
+
+  static PharmacyNarcoticStockLedgerComponentColumns = [
+    { headerName: "PurchaseDate", field: "PurchaseDate", width: 100 },
+    { headerName: "BatchNo", field: "BatchNo", width: 100 },
+    // { headerName: "MfgDate", field: "MfgDate", width: 100 },
+    { headerName: "ItemName", field: "ItemName", width: 100 },
+    { headerName: "GenericName", field: "GenericName", width: 100 },
+    { headerName: "ExpiryDate", field: "ExpiryDate", width: 100 },
+    { headerName: "QntyReceived", field: "QntyReceived", width: 100 },
+    { headerName: "SupplierName", field: "SupplierName", width: 100 },
+    { headerName: "QntyInStock", field: "QntyInStock", width: 100 },
+    { headerName: "PrescribedByDoctor", field: "PrescribedByDoctorNmcNo", width: 100 },
+    { headerName: "DispenserName", field: "DispenserName", width: 100 },
+    { headerName: "DispensedDate", field: "DispensedDate", width: 100 },
+    { headerName: "QntyDispensed", field: "QntyDispensed", width: 100 },
+    { headerName: "PatientName", field: "PatientName", width: 100 },
+    { headerName: "ManufactureName", field: "Manufacture", width: 100 },
+    { headerName: "RecordOrder", field: "RecordOrder", width: 100 },
+    { headerName: "RecordDate", field: "RecordDate", width: 100 },
+    { headerName: "Remarks", field: "Remarks", width: 100 },
+  ]
 }

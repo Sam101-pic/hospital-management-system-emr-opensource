@@ -90,7 +90,8 @@
                 <danphe-grid [grid-colDefaults]="dischargedListGridColumns" [grid-data]="dischargedList"
                              (grid-actions)="DischargedListGridActions($event)"
                              [show-CustomDate]="true" (onDateChange)="onDateChangeDischargedList($event)" [rangeType]="dateRangeDischargedList"
-                             [NepaliDateInGridParams]="NepaliDateInGridSettings"> </danphe-grid>
+                             [NepaliDateInGridParams]="NepaliDateInGridSettings"
+                             [date-settings-name]="'nursing-opd-list'"> </danphe-grid>
               </div>
             </div>
           </div>

@@ -21,7 +21,7 @@ namespace DanpheEMR.ServerModel
         public bool IsActive { get; set; }
         public bool IsDefault { get; set; }
         //sud-nagesh: 20June'20-- for Acc-Hospital Separation.
-        public int? HospitalId { get; set; }
+        public int HospitalId { get; set; }
     }
 }
 

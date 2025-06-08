@@ -71,5 +71,7 @@ namespace DanpheEMR.ServerModel
         public bool SSU_IsActive { get; set; }
         [NotMapped]
         public string PolicyNo { get; set; }
+        public Int16? WardNumber { get; set; }
+        public int? MunicipalityId { get; set; }
     }
 }

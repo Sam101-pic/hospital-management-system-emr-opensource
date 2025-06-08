@@ -144,7 +144,8 @@
         <div class="input-group">
           <div class="icheck-inline">
             <label class="mt-checkbox mt-checkbox-outline">
-              <input type="radio" checked="checked" (change)="LoadPHRMPOListByStatus('pending')" name="name" value="" style="width:15px;height:15px" />
+              <input type="radio" checked="checked" (change)="LoadPHRMPOListByStatus('pending')" name="name" value=""
+                     style="width:15px;height:15px" />
               <span></span>Pending </label>
             <label class="mt-checkbox mt-checkbox-outline">
               <input type="radio" (change)="LoadPHRMPOListByStatus('complete')" name="name" value="" style="width:15px;height:15px" />
@@ -159,7 +160,10 @@
         </div>
       </div>
     </div>
-    <danphe-grid [grid-colDefaults]="PHRMpurchaseOrdersGridColumns" [grid-data]="PHRMPurchaseOrderList" [rangeType]="dateRange" [show-CustomDate]="true" [NepaliDateInGridParams]="NepaliDateInGridSettings" (onDateChange)="onDateChange($event)" (grid-actions)="PHRMPurchaseOrderGridAction($event)"> </danphe-grid>
+    <danphe-grid [grid-colDefaults]="PHRMpurchaseOrdersGridColumns" [grid-data]="PHRMPurchaseOrderList" [rangeType]="dateRange"
+                 [show-CustomDate]="true" [NepaliDateInGridParams]="NepaliDateInGridSettings" (onDateChange)="onDateChange($event)"
+                 (grid-actions)="PHRMPurchaseOrderGridAction($event)"
+                 [date-settings-name]="'common-range-with-today'"> </danphe-grid>
   </div>
 </div>
 <div class="popup-static portlet box portlet-fullscreen custom_modal" *ngIf="showPurchaseOrderAddEditPage">
@@ -169,7 +173,8 @@
         <div class="modelbox-div clearfix">
           <a class="btn btn-danger del-btn" (click)="ClosePurchaseOrderAddEditPopupPage()"><i class="fa fa-times"></i></a>
           <div>
-            <phrm-purchase-order (call-back-close-popup)="ClosePurchaseOrderAddEditPage($event)" (discard-changes-popup-close)="ClosePurchaseOrderAddEditPopupPage()"></phrm-purchase-order>
+            <phrm-purchase-order (call-back-close-popup)="ClosePurchaseOrderAddEditPage($event)"
+                                 (discard-changes-popup-close)="ClosePurchaseOrderAddEditPopupPage()"></phrm-purchase-order>
           </div>
         </div>
       </div>
@@ -276,11 +281,13 @@
                     <tr>
                       <th style="padding: 5px 5px; width: 2%;">SN.</th>
                       <th colspan="3" style="padding: 5px 5px;">Item Name</th>
-                      <th style="padding: 5px 5px;">Qty</th>
+                      <th style="padding: 5px 5px;" *ngIf="!PHRMPOItemsList[0].IsPacking">Qty</th>
+                      <th style="padding: 5px 5px;" *ngIf="PHRMPOItemsList[0].IsPacking">Packing Qty</th>
                       <th style="padding: 5px 5px;">Free Qty</th>
                       <th style="padding: 5px 5px;">Total Qty</th>
                       <th style="padding: 5px 5px;">UOM</th>
-                      <th style="padding: 5px 5px;">Standard Rate</th>
+                      <th style="padding: 5px 5px;" *ngIf="!PHRMPOItemsList[0].IsPacking">Standard Rate</th>
+                      <th style="padding: 5px 5px;" *ngIf="PHRMPOItemsList[0].IsPacking">Strip Rate</th>
                       <th style="padding: 5px 5px;">CCCharge %</th>
                       <th style="padding: 5px 5px;">CCCharge Amt</th>
                       <th style="padding: 5px 5px;">Total Amt</th>
@@ -288,19 +295,20 @@
                     <tr *ngFor="let row of PHRMPOItemsList; let i = index ">
                       <td style="padding: 5px 5px; width: 2%;">{{i+1}}</td>
                       <td colspan="3" style="padding: 5px 5px;">{{row.ItemName}} </td>
-                      <td style="padding: 5px 5px; ">{{row.Quantity}}</td>
+                      <td style="padding: 5px 5px; " *ngIf="!PHRMPOItemsList[0].IsPacking">{{row.Quantity}}</td>
+                      <td style="padding: 5px 5px; " *ngIf="PHRMPOItemsList[0].IsPacking">{{row.PackingQty}}</td>
                       <td style="padding: 5px 5px; ">{{row.FreeQuantity}}</td>
                       <td style="padding: 5px 5px;">{{row.TotalQuantity}}</td>
                       <td style="padding: 5px 5px; ">{{row.UOMName}}</td>
-                      <td style="padding: 5px 5px;">{{row.StandardRate }}</td>
+                      <td style="padding: 5px 5px;" *ngIf="!PHRMPOItemsList[0].IsPacking">{{row.StandardRate}}</td>
+                      <td style="padding: 5px 5px;" *ngIf="PHRMPOItemsList[0].IsPacking">{{row.StripRate}}</td>
                       <td style="padding: 5px 5px; ">{{row.CCChargePercentage}}</td>
                       <td style="padding: 5px 5px; ">{{row.CCChargeAmount}}</td>
                       <td style="padding: 5px 5px; ">{{row.TotalAmount }}</td>
                     </tr>
                     <tr style="border-top: 1px solid #ccc;">
                       <td colspan="6" style="padding: 5px 5px; vertical-align: top;">
-                        <p class="c_paragraphs"><strong>Total Value In Words: Total Value in
-                            words:&nbsp;{{PHRMPO.TotalAmount | NumberInWords }}Only.</strong>
+                        <p class="c_paragraphs"><strong>Total Value In Words:&nbsp;{{PHRMPO.TotalAmount | NumberInWords }}Only.</strong>
                         </p>
                       </td>
                       <td colspan="5" style="padding: 5px 5px; text-align: right;">
@@ -331,13 +339,15 @@
                     </tr>
                     <tr style="border-top: 1px solid #ccc;">
                       <td colspan="12" style="padding: 5px 5px; vertical-align: top;">
-                        <p class="c_paragraphs"><strong>Remarks: </strong><span class="tc-notes" style="font-style: italic" [innerHtml]="PHRMPO.Remarks"></span></p>
+                        <p class="c_paragraphs"><strong>Remarks: </strong><span class="tc-notes" style="font-style: italic"
+                                [innerHtml]="PHRMPO.Remarks"></span></p>
                       </td>
 
                     </tr>
                     <tr style="border-top: 1px solid #ccc;">
                       <td colspan="12" style="padding: 5px 5px; vertical-align: top;">
-                        <p class="c_paragraphs"><strong>Terms & Conditions: </strong><span class="tc-notes" style="font-style: italic" [innerHtml]="PHRMPO.TermsConditions"></span></p>
+                        <p class="c_paragraphs"><strong>Terms & Conditions: </strong><span class="tc-notes" style="font-style: italic"
+                                [innerHtml]="PHRMPO.TermsConditions"></span></p>
                       </td>
 
                     </tr>
@@ -345,7 +355,8 @@
                       <td colspan="2" style="padding: 20px 10px; vertical-align: top;">
                         <div>{{PHRMPO.EmployeeName}}</div>
                       </td>
-                      <td [attr.colSpan]="s.colSpan" *ngFor="let s of SignatoriesWithTheirColSpan; let i=index;" style="padding: 20px 10px; vertical-align: top;">
+                      <td [attr.colSpan]="s.colSpan" *ngFor="let s of SignatoriesWithTheirColSpan; let i=index;"
+                          style="padding: 20px 10px; vertical-align: top;">
                         <div *ngIf="GetVerifierDetails(i+1)">
                           <div>{{GetVerifierDetails(i+1).FullName}}</div>
                           <div>({{GetVerifierDetails(i+1).EmployeeRoleName}})</div>
@@ -362,7 +373,8 @@
                       <td colspan="2" style="padding: 5px 10px 10px 10px; vertical-align: top;">
                         <p class="c_paragraphs"><strong>Prepared By </strong></p>
                       </td>
-                      <td *ngFor="let s of SignatoriesWithTheirColSpan" [attr.colSpan]="s.colSpan" style="padding: 5px 10px 10px 10px; vertical-align: top;">
+                      <td *ngFor="let s of SignatoriesWithTheirColSpan" [attr.colSpan]="s.colSpan"
+                          style="padding: 5px 10px 10px 10px; vertical-align: top;">
                         <p class="c_paragraphs"><strong>{{s.signatory}}</strong></p>
                       </td>
                     </tr>
@@ -381,7 +393,8 @@
           </div>
           <div class="row center-style p2">
             <div class="col-md-12 col-xs-12 ">
-              <button *ngIf="!'complete,cancel'.includes(PHRMPO.POStatus)" type="button" id="edit" class="btn btn-primary" (click)="EditPO()">Edit <i class="glyphicon glyphicon-edit"></i></button>
+              <button *ngIf="!'complete,cancel'.includes(PHRMPO.POStatus)" type="button" id="edit" class="btn btn-primary" (click)="EditPO()">Edit <i
+                   class="glyphicon glyphicon-edit"></i></button>
 
               <button id="printButton" (click)="print()" class="btn btn-default"> Print
                 <i class="glyphicon glyphicon-print"></i>
@@ -397,7 +410,8 @@
 
 <!-- Nepali PO View  START-->
 <div *ngIf="showPopUp">
-  <app-phrm-po-view-np [showPopUp]="showPopUp" [purchaseOrderId]="currentPO.PurchaseOrderId" (call-back-close)="OnPOViewPopUpClose()" (call-back-edit)="EditPO($event)"></app-phrm-po-view-np>
+  <app-phrm-po-view-np [showPopUp]="showPopUp" [purchaseOrderId]="currentPO.PurchaseOrderId" (call-back-close)="OnPOViewPopUpClose()"
+                       (call-back-edit)="EditPO($event)"></app-phrm-po-view-np>
 </div>
 <!-- Nepali PO View  END-->
 

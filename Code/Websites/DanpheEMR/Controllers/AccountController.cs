@@ -26,6 +26,10 @@ using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks;
 using Google.Apis.Drive.v3.Data;
 using DanpheEMR.Enums;
+using DanpheEMR.Core.Caching;
+using DanpheEMR.Services.Authorization;
+using DocumentFormat.OpenXml.Spreadsheet;
+using DanpheEMR.Filters;
 
 namespace DanpheEMR.Controllers
 {
@@ -41,9 +45,9 @@ namespace DanpheEMR.Controllers
         private string JwtIssuer;
         private string JwtAudience;
         private string JwtValidMinutes;
+        private readonly ICacheService _cacheService;
 
-
-        public AccountController(IOptions<MyConfiguration> _config)
+        public AccountController(IOptions<MyConfiguration> _config, ICacheService cacheService)
         {
             connString = _config.Value.Connectionstring;
             connStringAdmin = _config.Value.ConnectionStringAdmin;
@@ -51,7 +55,7 @@ namespace DanpheEMR.Controllers
             JwtIssuer = _config.Value.JwtTokenConfig.JwtIssuer;
             JwtAudience = _config.Value.JwtTokenConfig.JwtAudience;
             JwtValidMinutes = _config.Value.JwtTokenConfig.JwtValidMinutes;
-
+            _cacheService = cacheService;
         }
 
         public IActionResult LicenseExpired()
@@ -84,6 +88,33 @@ namespace DanpheEMR.Controllers
 
 
             CoreDbContext coreDbContext = new CoreDbContext(connString);
+            ParameterModel whiteLabelParam = coreDbContext.Parameters
+        .Where(p => p.ParameterGroupName == "WhiteLabel" && p.ParameterName == "WhiteLabel")
+        .FirstOrDefault();
+
+            string heading = "Default Heading";
+            if (whiteLabelParam != null && !string.IsNullOrEmpty(whiteLabelParam.ParameterValue))
+            {
+                var jsonValue = JsonConvert.DeserializeObject<Dictionary<string, string>>(whiteLabelParam.ParameterValue);
+                if (jsonValue.ContainsKey("DANPHEEMR"))
+                {
+                    heading = jsonValue["DANPHEEMR"];
+                }
+            }
+            ViewData["CustomHeading"] = heading;
+
+            
+    
+            string footertext= "Default FooterText";
+            if (whiteLabelParam != null && !string.IsNullOrEmpty(whiteLabelParam.ParameterValue))
+            {
+                var jsonValue = JsonConvert.DeserializeObject<Dictionary<string, string>>(whiteLabelParam.ParameterValue);
+                if (jsonValue.ContainsKey("DanpheHealth"))
+                {
+                    footertext = jsonValue["DanpheHealth"];
+                }
+            }
+            ViewData["CustomFooterText"] = footertext;
 
             ParameterModel licenseParam = coreDbContext.Parameters.Where(p => p.ParameterGroupName == "TenantMgnt" && p.ParameterName == "SoftwareLicense")
                         .FirstOrDefault();
@@ -189,6 +220,7 @@ namespace DanpheEMR.Controllers
             return View();
         }
         // POST: /Account/Login
+        [RateLimitFilter(Name = "LoginRateLimit", Algorithm = "FixedWindow", MaxRequests = 5, WindowSize = 1, Message = "You must wait {n} seconds before accessing this url again.")]
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
@@ -232,7 +264,7 @@ namespace DanpheEMR.Controllers
                     };
 
                     TempData["loginJwtToken"] = tokenResult.token; // Keep the login token in TempData to send it back to Angular Client., Krishna, 13thJan'23
-
+                    SetRolePolicyMappingInCache(validUser.UserId); //Store Role Policy Mapping based on UserId in Cache to reduce database roundtrips.
 
                     if (model.RememberMe)
                     {
@@ -277,6 +309,29 @@ namespace DanpheEMR.Controllers
             return View(model);
         }
 
+        private void SetRolePolicyMappingInCache(int userId)
+        {
+            string cacheKey = $"policy_roles_{userId}";
+
+            RbacDbContext dbContext = new RbacDbContext(connString);
+
+            List<RolePolicyMappingDTO> rolesPolicy = (from policyRoleMapping in dbContext.RbacPolicyRoleMappings
+                                                      join policy in dbContext.RbacPolicies on policyRoleMapping.PolicyId equals policy.PolicyId
+                                                      join roles in dbContext.Roles on policyRoleMapping.RoleId equals roles.RoleId
+                                                      join usrRole in dbContext.UserRoleMaps on roles.RoleId equals usrRole.RoleId
+                                                      where usrRole.UserId == userId && policyRoleMapping.IsActive == true && usrRole.IsActive == true && roles.IsActive == true
+                                                      select new RolePolicyMappingDTO
+                                                      {
+                                                          PolicyName = policy.PolicyName,
+                                                          UserId = usrRole.UserId,
+                                                          RoleName = roles.RoleName
+                                                      }).ToList();
+
+            // Cache the result for furutre requests
+            _cacheService.AddToCache(cacheKey, rolesPolicy, minutesToCache: 60, useSlidingExpiration: true);
+
+        }
+
         //[HttpPost]
         //[AllowAnonymous]
         //[ValidateAntiForgeryToken]
@@ -293,6 +348,13 @@ namespace DanpheEMR.Controllers
             //once logged out currentuser gets null, so don't go inside if it's null..
             if (currentUser != null)
             {
+                //remove cached role policy cache.
+                string cacheKey = $"policy_roles_{currentUser.UserId}";
+                if (_cacheService.ExistsInCache(cacheKey))
+                {
+                    _cacheService.RemoveFromCache(cacheKey);
+                }
+
                 LoginInfo.EmployeeId = currentUser.EmployeeId;
                 LoginInfo.UserName = currentUser.UserName;
                 LoginInfo.ActionName = "logout";
@@ -309,6 +371,32 @@ namespace DanpheEMR.Controllers
             LoginViewModel newLogin = new LoginViewModel();
             ViewData["status"] = "logout-success";
 
+            CoreDbContext coreDbContext = new CoreDbContext(connString);
+            ParameterModel whiteLabelParam = coreDbContext.Parameters
+        .Where(p => p.ParameterGroupName == "WhiteLabel" && p.ParameterName == "WhiteLabel")
+        .FirstOrDefault();
+
+            string heading = "Default Heading";
+            if (whiteLabelParam != null && !string.IsNullOrEmpty(whiteLabelParam.ParameterValue))
+            {
+                var jsonValue = JsonConvert.DeserializeObject<Dictionary<string, string>>(whiteLabelParam.ParameterValue);
+                if (jsonValue.ContainsKey("DANPHEEMR"))
+                {
+                    heading = jsonValue["DANPHEEMR"];
+                }
+            }
+            ViewData["CustomHeading"] = heading;
+
+            string footertext = "Default FooterText";
+            if (whiteLabelParam != null && !string.IsNullOrEmpty(whiteLabelParam.ParameterValue))
+            {
+                var jsonValue = JsonConvert.DeserializeObject<Dictionary<string, string>>(whiteLabelParam.ParameterValue);
+                if (jsonValue.ContainsKey("DanpheHealth"))
+                {
+                    footertext = jsonValue["DanpheHealth"];
+                }
+            }
+            ViewData["CustomFooterText"] = footertext;
 
 
             return View("Login", newLogin);
@@ -543,9 +631,29 @@ namespace DanpheEMR.Controllers
         #endregion
 
 
-        //this API is not for our Application Login , This is our Testing login API, Which will be used from Swagger and Postman or Such other Clients for testing purpose., Krishna, 13thJan'23
+
+        /// <summary>
+        /// Authenticates a user and generates a JWT token for accessing DanpheEMR services.
+        /// </summary>
+        /// <param name="loginDto">The login credentials containing username and password.</param>
+        /// <returns>
+        /// Returns an <see cref="OkObjectResult"/> with the JWT token if the login is successful.
+        /// Returns an <see cref="UnauthorizedResult"/> if the login credentials are invalid.
+        /// Returns a <see cref="BadRequestResult"/> if the input is invalid.
+        /// Returns a <see cref="StatusCodeResult"/> with status code 500 if an internal server error occurs.
+        /// </returns>
+        /// <response code="200">Returns the JWT token and a success message upon successful login.</response>
+        /// <response code="400">Returned when the input is invalid or missing.</response>
+        /// <response code="401">Returned when the user credentials are invalid.</response>
+        /// <response code="500">Returned when an internal server error occurs.</response>
+        /// 5
+        [RateLimitFilter(Name = "LoginToDanpheEMRRateLimit", Algorithm = "FixedWindow", MaxRequests = 5, WindowSize = 1, Message = "You must wait {n} seconds before accessing this url again.")]
         [HttpPost]
         [Route("api/Account/GetLoginJwtToken")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public IActionResult LoginToDanpheEMR([FromBody] LoginDto loginDto)
         {
 
@@ -620,7 +728,8 @@ namespace DanpheEMR.Controllers
 
             var userClaims = new[]
             {
-                new Claim(ENUM_ClaimTypes.currentUser, JsonConvert.SerializeObject(currentUser))
+                new Claim(ENUM_ClaimTypes.currentUser, JsonConvert.SerializeObject(currentUser)),
+                new Claim(ENUM_ClaimTypes.userId, currentUser.UserId.ToString())
             };
 
             var token = new JwtSecurityToken(

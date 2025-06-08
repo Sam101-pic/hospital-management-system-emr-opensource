@@ -55,5 +55,10 @@ export class LabTestRequisition {
 
   public IsSelected: boolean = false;
   public ServiceItemId: number = 0;
+  public SampleReceivedOn: string = null;
+  public IsPreVerified: boolean = false;
+  public PreVerifiedBy: number = null;
+  public PreVerifiedOn: string = null;
+  public CreatedDay: string = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
 }
 

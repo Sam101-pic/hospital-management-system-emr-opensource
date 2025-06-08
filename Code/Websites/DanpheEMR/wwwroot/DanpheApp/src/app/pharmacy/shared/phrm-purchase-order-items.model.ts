@@ -46,6 +46,13 @@ export class PHRMPurchaseOrderItems {
     CCChargeAmount: number = 0;
     PendingFreeQuantity: number = 0;
     IsCancel: boolean;
+    IsPacking: boolean;
+    PackingQty: number = 0;
+    PackingTypeId: number = null;
+    PackingName: string = '';
+    StripRate: number = 0;
+    TaxableAmount: number = 0;
+    NonTaxableAmount: number = 0;
 
     constructor() {
 
@@ -58,7 +65,7 @@ export class PHRMPurchaseOrderItems {
             'StandardRate': [0, Validators.compose([Validators.required, this.wholeNumberRequired, this.positiveNumberValdiator])],
             'CCChargePercentage': [0, [Validators.required, Validators.min(0), Validators.max(100)]],
             'DiscountPercentage': [0, [Validators.required, Validators.min(0), Validators.max(100)]],
-            'VATPercentage': [0, [Validators.required, Validators.min(0), Validators.max(100)]],
+            'VATPercentage': [0, [Validators.required, Validators.min(0), Validators.max(100)]]
         });
     }
 

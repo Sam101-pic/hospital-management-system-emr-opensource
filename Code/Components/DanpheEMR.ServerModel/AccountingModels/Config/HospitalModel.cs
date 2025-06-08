@@ -14,5 +14,7 @@ namespace DanpheEMR.ServerModel
         public string HospitalShortName { get; set; }
         public string HospitalLongName { get; set; }
         public bool IsActive { get; set; }
+        public int PermissionId { get; set; }
+
     }
 }

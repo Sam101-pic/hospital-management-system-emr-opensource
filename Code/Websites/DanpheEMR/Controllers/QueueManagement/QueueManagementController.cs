@@ -5,6 +5,7 @@ using DanpheEMR.Services.QueueManagement;
 using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,7 +45,7 @@ namespace DanpheEMR.Controllers.QueueManagement
 
         [Route("GetAppointmentData")]
         [HttpGet]
-        public IActionResult GetAppointmentData(int deptId, int doctorId,bool pendingOnly)
+        public IActionResult GetAppointmentData(int deptId, List<int?> doctorId, bool pendingOnly)
         {
             try
             {

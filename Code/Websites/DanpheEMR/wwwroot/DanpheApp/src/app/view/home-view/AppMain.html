@@ -60,6 +60,7 @@
 
   .page-sidebar {
     box-shadow: 0px 0px 20px #eee;
+
   }
 
   body>div.tooltip.fade.top.in {
@@ -68,6 +69,52 @@
 
   span.title {
     font-weight: normal;
+  }
+
+
+  /* .sub-menu .nav-item a:hover {
+    background-color: #fafafa;
+    color: #444;
+    text-decoration: none;
+  } */
+
+  .sub-menu .nav-item .sub-routes.nav-link:hover {
+    background-color: #fafafa !important;
+    color: #444 !important;
+    text-decoration: none;
+  }
+
+
+
+  .menu-search-container {
+    position: sticky !important;
+    top: 0;
+    z-index: 1000;
+    display: inline-block;
+    margin-top: 0px;
+    margin-left: 5px;
+    border-radius: 25px !important;
+    overflow: hidden;
+    border: 2px solid #ccc;
+  }
+
+  .menu-search-input {
+    width: calc(100% - 5px);
+    /* Adjust the width */
+    padding-left: 10px;
+    padding-right: 10px;
+    background-color: #0773BC;
+    color: white;
+    border: none;
+  }
+
+  .menu-search-icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: white;
   }
 </style>
 
@@ -79,7 +126,7 @@
       <div class="page-header-inner ">
         <!-- BEGIN LOGO -->
         <div class="page-logo">
-          <a href="#">
+          <a routerLink="">
 
             <img src="../../../themes/theme-default/images/hospitals-logo/hospital-logo-landingpage.png" alt="logo"
                  class="logo-default" style="width:120px;margin-top:8px; filter: brightness(0) invert(1);" title="Go to DanpheEMR-Home" />
@@ -118,6 +165,13 @@
             <span *ngIf="PatService.globalPatient.DateOfBirth != null && PatService.globalPatient.PatientCode != null">
               /
               {{PatService.globalPatient.Gender}}
+            </span>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+          </b>
+          <b class="header-sm"
+             *ngIf="PatientAddressDisplaySettings.ShowPatientAddress && PatService.globalPatient.PatientId">
+            <span>
+              <i class="fa fa-map-marker"></i>Address : {{ coreService.SortPatientAddress(PatService.globalPatient, 'global_patient_address') }}
             </span>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
           </b>
@@ -176,7 +230,7 @@
                 <i class="fa fa-angle-down"></i>
               </a>
               <ul class="dropdown-menu dropdown-menu-default">
-                <li>
+                <li *ngIf="!coreService.isDemoEnvironment">
                   <a routerLink="Employee/ProfileMain">
                     <i class="icon-user"></i> My Profile
                   </a>
@@ -240,7 +294,7 @@
         <!-- BEGIN SIDEBAR -->
         <!-- DOC: Set data-auto-scroll="false" to disable the sidebar from auto scrolling/focusing -->
         <!-- DOC: Change data-auto-speed="200" to adjust the sub menu slide up/down speed -->
-        <div class="page-sidebar navbar-collapse collapse">
+        <div class="page-sidebar navbar-collapse collapse" style="padding-top: 5px !important ">
           <!-- BEGIN SIDEBAR MENU -->
           <!-- DOC: Apply "page-sidebar-menu-light" class right after "page-sidebar-menu" to enable light sidebar menu style(without borders) -->
           <!-- DOC: Apply "page-sidebar-menu-hover-submenu" class right after "page-sidebar-menu" to enable hoverable(hover vs accordion) sub menu mode -->
@@ -249,7 +303,14 @@
           <!-- DOC: Set data-keep-expand="true" to keep the submenues expanded -->
           <!-- DOC: Set data-auto-speed="200" to adjust the sub menu slide up/down speed -->
           <ul class="menu-content out page-sidebar-menu cstm-sidebar" style="padding-top: 0px">
-            <li *ngFor="let route of validRoutes">
+            <div class="menu-search-container" style="position:sticky">
+              <input type="search" class="menu-search-input" id="search" placeholder="Search Menu Items..." [(ngModel)]="searchText"
+                     (input)="FilterMenuItems()">
+              <span class="menu-search-icon" style="position:absolute; right:5px; top:50%; transform:translateY(-50%);">
+                <i class="fa fa-search"></i>
+              </span>
+            </div>
+            <li *ngFor="let route of filteredValidRoutes">
               <a routerLink="{{route.RouterLink}}" [routerLinkActive]="'left-nav-active'">
                 <img src="/themes/theme-default/images/nav/{{route.Css}}" style="height: 25px;width: 30px;" />
                 <span class="title">{{route.DisplayName}}</span>
@@ -261,7 +322,7 @@
                   <ng-container *ngFor="let childroute of route.ChildRoutes">
                     <li class="nav-item"
                         *ngIf="(childroute != null && childroute.DisplayName.length >0) && childroute.DefaultShow != false">
-                      <a routerLink="{{childroute.UrlFullPath}}" class="nav-link"
+                      <a routerLink="{{childroute.UrlFullPath}}" class=" sub-routes nav-link"
                          [routerLinkActive]="'left-nav-active'">
                         <span class="title">{{childroute.DisplayName}}</span>
                         <span class="badge badge-success"></span>
@@ -364,3 +425,7 @@
     <!--Model Box Body End-->
   </div>
 </div>
+
+<app-loading-spinner *ngIf="(loadingService.isLoading | async)">
+</app-loading-spinner>
+<app-global-search *ngIf="IsGlobalSearchEnabled"></app-global-search>

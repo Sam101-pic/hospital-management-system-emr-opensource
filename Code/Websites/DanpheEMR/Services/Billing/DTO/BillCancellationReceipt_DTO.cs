@@ -10,7 +10,7 @@ namespace DanpheEMR.Services.Billing.DTO
         public string PatientCode { get; set; }
         public string PatientName { get; set; }
         public string ContactNo { get; set; }
-        public DateTime? DateOfbirth { get; set; }
+        public DateTime? DateOfBirth { get; set; }
         public string Age { get; set; }
         public string Gender { get; set; }
         public string CountrySubdivisionName { get; set; }

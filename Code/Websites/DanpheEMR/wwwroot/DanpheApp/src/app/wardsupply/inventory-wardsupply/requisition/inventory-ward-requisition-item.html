@@ -81,7 +81,7 @@
         <div class="col-md-7">
           <input danphe-auto-complete [(ngModel)]="selectedInventory" class="form-control" [list-formatter]="InventoryListFormatter"
                  formControlName="RequestToStoreId" [source]="inventoryList" placeholder="Enter Inventory Name" display-property-name="Name"
-                 value-property-name=null onclick="this.select();" id="activeInventory" (valueChanged)="OnInventoryChange()" max-num-list="10"
+                 value-property-name=null onclick="this.select();" id="activeInventory" (ngModelChange)="OnInventoryChange()" max-num-list="10"
                  [attr.disabled]="(isEditMode)? true: null " />
           <span *ngIf="requisition.IsDirty('RequestToStoreId')" style="color: red" [hidden]="requisition.IsValidCheck('RequestToStoreId','required')">
             Inventory is required
@@ -96,8 +96,8 @@
       <div class="row">
         <label class="control-label col-md-4"><b>Requisition Date<b style="float:right">:</b> </b></label>
         <div class="col-md-8">
-          <danphe-date-picker [(ngModel)]="requisition.RequisitionDate" [ngModelOptions]="{standalone:true}" ngDefaultControl
-                              [CalendarTypes]="'np,en'"> </danphe-date-picker>
+          <danphe-date-picker [(ngModel)]="requisition.RequisitionDate" formControlName="RequisitionDate" ngDefaultControl
+                              [CalendarTypes]="'np,en'" [previous-fiscal-year]="AllowPreviousFiscalYear"> </danphe-date-picker>
           <div class="error-message" *ngIf="!IsReqDateValid"> Invalid Fiscal Year Date. </div>
         </div>
       </div>
@@ -125,7 +125,7 @@
           <th sortable-header col="itemnames"><b>ItemName</b></th>
           <th sortable-header col="specification"><b>Specification</b></th>
           <th sortable-header col="unitname"><b>Unit</b></th>
-          <th sortable-header col="AvailableQuantity"><b>Available Qty</b></th>
+          <!-- <th sortable-header col="AvailableQuantity"><b>Available Qty</b></th> -->
           <th sortable-header col="code"><b>Code</b></th>
           <th sortable-header col="Quantity"><b>Required Quantity</b></th>
           <th sortable-header c style="width:200px"><b>Remark</b></th>
@@ -171,10 +171,10 @@
           <!-- <td style="vertical-align:middle;width:20px">
               <a *ngIf="!row.SelectedItem || !row.SelectedItem.ItemId" class="fa fa-question" (click)="AddItemPopUp(i)" title="Unable to find item ? Click to add to Master"></a>
           </td> -->
-          <td style="width:100px">
+          <!-- <td style="width:100px">
             <input disabled type="number" style="width: 90px;" [(ngModel)]="row.AvailableQuantity"
                    name="availableQuantity" [ngModelOptions]="{standalone:true}">
-          </td>
+          </td> -->
           <td style="width:100px">
             <form [formGroup]="row.RequisitionItemValidator">
               <input [(ngModel)]="row.Code" [ngModelOptions]="{standalone:true}" min="0" disabled="disabled" class="form-control " name="code"
@@ -220,7 +220,7 @@
           <div>
             <div class="custom-control  custom-checkbox verification-check">
               <input type="checkbox" class="custom-control-input" id="defaultUnchecked"
-                     [(ngModel)]="requisition.IsVerificationEnabled" (ngModelChange)="ShowVerifiers()">
+                     [(ngModel)]="requisition.IsVerificationEnabled" (ngModelChange)="ShowVerifiers()" [disabled]="!HasPermission">
               <label title="Check If Verification Needed" class="custom-control-label" for="defaultUnchecked">Need
                 Verification</label>
             </div>
@@ -229,7 +229,7 @@
                 <div class="row">
                   <div class="col-md-5">
                     <button title="Delete this Verifier" class="btn btn-sm btn-danger" (click)="DeleteVerifier(i)"
-                            [disabled]="CheckIfDeleteVerifierAllowed()"><i class="glyphicon glyphicon-minus"></i>
+                            [disabled]="!HasPermission || CheckIfDeleteVerifierAllowed()"><i class="glyphicon glyphicon-minus"></i>
                     </button>
                     <label class="verifier" for="inputIconEx{{i}}">
                       <i class="fa fa-user"></i>{{GetSignatoryName(i)}}
@@ -238,11 +238,11 @@
                   <div class="col-md-6">
                     <input danphe-auto-complete class="form-control " autocomplete="off" [source]="VerifierList"
                            [(ngModel)]="verifier" [list-formatter]="VerifierListFormatter" placeholder="Select Verifier"
-                           display-property-name="Name" max-num-list="10" (valueChanged)="AssignVerifier($event,i)" />
+                           display-property-name="Name" max-num-list="10" (ngModelChange)="AssignVerifier($event,i)" [disabled]="!HasPermission" />
                   </div>
                   <div class="col-md-1">
                     <button title="Add Verifier" class="btn btn-sm btn-primary" (click)="AddVerifier()"
-                            [disabled]="CheckIfAddVerifierAllowed()"><i class="glyphicon glyphicon-plus"></i></button>
+                            [disabled]="!HasPermission || CheckIfAddVerifierAllowed()"><i class="glyphicon glyphicon-plus"></i></button>
                   </div>
                 </div>
               </div>
@@ -275,10 +275,5 @@
   </div>
 
 </div>
-
-<inventory-ward-requisition-details *ngIf="showInventoryRequisitionDetails" (call-back-inventory-requisition-details-popup-close)="CloseInventoryRequisitionDetailsPopup()">
-
-</inventory-ward-requisition-details>
-
 <!-- <item-add *ngIf="showAddItemPopUp" [showAddPage]="showAddItemPopUp"
           (callback-add)="OnNewItemAdded($event)"></item-add> -->

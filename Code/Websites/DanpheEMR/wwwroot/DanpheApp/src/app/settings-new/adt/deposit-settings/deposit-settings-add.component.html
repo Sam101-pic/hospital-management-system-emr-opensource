@@ -53,7 +53,7 @@
                                  [(ngModel)]="selectedScheme"
                                  placeholder="Select Scheme" max-num-list="8" min-chars="0"
                                  display-property-name="SchemeName" [list-formatter]="SchemeFormatter"
-                                 onclick="select()"
+                                 onclick="select()" match-formatted="true"
                                  (valueChanged)="SchemeEventHandler()" formControlName="SchemeName"
                                  value-property-name="SchemeName">
                           <span class="color-red font-sm"

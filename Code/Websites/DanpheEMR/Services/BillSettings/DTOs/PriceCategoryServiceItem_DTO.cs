@@ -27,6 +27,9 @@ namespace DanpheEMR.Services.BillSettings.DTOs
         public bool IsIncentiveApplicable { get; set; }
         public bool HasAdditionalBillingItems { get; set; }
         public int ItemId { get; set; }
+        public bool IsCappingEnabled { get; set; }
+        public int CappingLimitDays { get; set; }
+        public int CappingQuantity { get; set; }
 
     }
 }

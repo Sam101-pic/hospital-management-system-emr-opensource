@@ -1,5 +1,5 @@
 
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 
 import { Department } from '../../shared/department.model';
 import { ServiceDepartment } from '../../shared/service-department.model';
@@ -7,12 +7,12 @@ import { SettingsBLService } from '../../shared/settings.bl.service';
 
 import { SecurityService } from '../../../security/shared/security.service';
 //Parse, validate, manipulate, and display dates and times in JS.
-import * as moment from 'moment/moment';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { CoreService } from "../../../core/shared/core.service";
-import { IntegrationName } from "../../shared/integration-name.model";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { CommonFunctions } from "../../../shared/common.functions";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { IntegrationName } from "../../shared/integration-name.model";
 
 @Component({
   selector: "service-department-add",
@@ -124,39 +124,30 @@ export class ServiceDepartmentAddComponent {
           this.logError(err.ErrorMessage);
         });
   }
-
-  //adding new department
   AddServiceDepartment() {
-    //for checking validations, marking all the fields as dirty and checking the validity.
     for (var i in this.CurrentServiceDepartment.ServiceDepartmentValidator.controls) {
       this.CurrentServiceDepartment.ServiceDepartmentValidator.controls[i].markAsDirty();
       this.CurrentServiceDepartment.ServiceDepartmentValidator.controls[i].updateValueAndValidity();
     }
-    //this.CurrentServiceDepartment.IntegrationName = this.GetIntegrationName(this.CurrentServiceDepartment.DepartmentId);
     if (this.CurrentServiceDepartment.IsValidCheck(undefined, undefined)) {
       this.settingsBLService.AddServiceDepartment(this.CurrentServiceDepartment)
         .subscribe(
-          res => {
-            //if (res.Status == "OK" && res.Results) {
-            //    let dept = this.coreService.Masters.Departments.find(dept => dept.DepartmentId == res.Results.DepartmentId);
-            //    if (dept) {
-            //        dept = Object.assign(dept, res.Results)
-            //    }
-            if (res.Status == "OK") {
-              this.showMessageBox("success", "Service Department Added");
+          (res: DanpheHTTPResponse) => {
+            if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+              this.showMessageBox(ENUM_MessageBox_Status.Success, "Service Department Added");
               this.CurrentServiceDepartment = new ServiceDepartment();
               this.CallBackAddUpdateSrvDept(res)
             }
-            if (res.Status == "Error") {
-              this.showMessageBox("Duplicate Service Department", res.Results);
+            else if (res.Status === ENUM_DanpheHTTPResponses.Failed) {
+              this.showMessageBox(ENUM_MessageBox_Status.Failed, res.ErrorMessage);
             }
-            //}
           },
           err => {
             this.logError(err);
           });
     }
   }
+
   //GET: Integration Name List from Master Table for the Service Department
   LoadIntegrationNameList() {
     this.settingsBLService.GetIntegrationNameList()

@@ -26,11 +26,12 @@ import { PatientsDLService } from "../patients/shared/patients.dl.service";
 import { LabsBLService } from "../labs/shared/labs.bl.service";
 import { SharedModule } from "../shared/shared.module";
 import { NursingOrderMainComponent } from "./order/nursing-order-main.component";
-import { NursingWardBillingComponent } from "./ward-billing/nursing-ward-billing.component";
 //import { DrugsRequestComponent } from "./drugs-request/drugs-request.component";
 import { ADTSharedModule } from "../adt/adt-shared.module";
 import { VisitBLService } from "../appointments/shared/visit.bl.service";
 import { BillingSharedModule } from "../billing/billing-shared.module";
+import { BillingPrintSharedModule } from "../billing/print-pages/billing-print-shared.module";
+import { ClinicalNewSharedModule } from "../clinical-new/clinical-new-shared.module";
 import { NoteTemplateBLService } from "../clinical-notes/shared/note-template.bl.service";
 import { ClinicalSharedModule } from "../clinical/clinical-shared-module";
 import { IOAllergyVitalsBLService } from "../clinical/shared/io-allergy-vitals.bl.service";
@@ -67,7 +68,6 @@ import { OPDTriageComponent } from "./opd-triage/opd-triage.component";
 import { NursingAddDiagnosisComponent } from "./shared/add-diagnosis/nursing-add-diagnosis.component";
 import { NursingService } from "./shared/nursing-service";
 import { WardSelectionGuardService } from "./shared/ward-selection-guard.service";
-import { NursingIPRequestComponent } from "./ward-billing/nursing-ip-request.component";
 
 @NgModule({
   providers: [
@@ -92,7 +92,8 @@ import { NursingIPRequestComponent } from "./ward-billing/nursing-ip-request.com
     NoteTemplateBLService,
     MR_BLService,
     MR_DLService,
-    NursingService
+    NursingService,
+    // PackageBillingService
   ],
   imports: [
     ReactiveFormsModule,
@@ -107,7 +108,9 @@ import { NursingIPRequestComponent } from "./ward-billing/nursing-ip-request.com
     DoctorSharedModule,
     ADTSharedModule,
     SettingsSharedModule,
-    PharmacyModule
+    PharmacyModule,
+    ClinicalNewSharedModule,
+    BillingPrintSharedModule
   ],
   declarations: [
     NursingMainComponent,
@@ -116,12 +119,12 @@ import { NursingIPRequestComponent } from "./ward-billing/nursing-ip-request.com
     NursingOrderListComponent,
     NursingOutPatientComponent,
     NursingInPatientComponent,
-    NursingWardBillingComponent,
+    // NursingWardBillingComponent,
     //DrugsRequestComponent,
     DrugRequestListComponent,
     NursingIpBillItemRequestComponent,
     NephrologyComponent,
-    NursingIPRequestComponent,
+    // NursingIPRequestComponent,
     ActivateWardComponent,
     NursingTransferComponent,
     NursingReceiveNoteComponent,

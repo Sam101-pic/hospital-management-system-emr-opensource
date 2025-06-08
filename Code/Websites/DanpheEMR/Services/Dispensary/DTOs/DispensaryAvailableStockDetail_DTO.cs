@@ -20,6 +20,10 @@ namespace DanpheEMR.Services.Dispensary.DTOs
         public bool IsNarcotic { get; set; }
         public bool IsVATApplicable { get; set; }
         public double SalesVATPercentage { get; set; }
+        public string ItemCode { get; set; }
+        public bool IsCappingEnable { get; set; }
+        public int CappingDaysLimit { get; set; }
+        public decimal CappingQuantity { get; set; }
 
     }
 }

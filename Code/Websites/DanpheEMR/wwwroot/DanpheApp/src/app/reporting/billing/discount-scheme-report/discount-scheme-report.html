@@ -48,7 +48,7 @@
     </div>
   </div>
   <div class="row">
-    <div class="col-lg-12 col-sm-12" *ngIf="DiscountSchemeGridData.length>0">
+    <div class="col-lg-12 col-sm-12">
       <danphe-grid [grid-colDefaults]="DiscountSchemeGridColumns" [grid-data]="DiscountSchemeGridData" [grid-exportOptions]="gridExportOptions"
                    [grid-showExport]="true" [report-for]="'billing'" [NepaliDateInGridParams]="NepaliDateInGridSettings"
                    [grid-date-range]="dateRange">

@@ -5,7 +5,14 @@ export default class ProcurementGridColumns {
 
   static PurchaseRequestList = [
     { headerName: "PR No.", field: "PRNumber", width: 30 },
-    { headerName: "Request Date", field: "RequestDate", width: 100, cellRenderer: ProcurementGridColumns.DateTimeRendererForPurchaseRequest },
+    {
+      headerName: "Request Date",
+      width: 100,
+      cellRenderer: ProcurementGridColumns.AllDateFormatRenderer,
+      cellRendererParams: {
+        dateFieldName: 'RequestDate'
+      }
+    },
     { headerName: "Vendor", field: "VendorName", width: 100 },
     { headerName: "Status", field: "RequestStatus", width: 60 },
     { headerName: "Verification Status", width: 100, cellRenderer: VerificationGridColumns.VerificationStatusRenderer },
@@ -24,6 +31,13 @@ export default class ProcurementGridColumns {
     return moment(params.data.RequestDate).format("YYYY-MM-DD HH:mm");
   }
 
+  static AllDateFormatRenderer(params) {
+    const dateFieldName = params.colDef.cellRendererParams.dateFieldName;
+    const date = params.data[dateFieldName];
+    if (date != null) {
+      return moment(date).format("YYYY-MM-DD");
+    }
+  }
   static GetPOActions(params) {
     if (params.data.IsPOCreated && params.data.RequestStatus == 'complete') {
       return `<a danphe-grid-action="view" class="grid-action">
@@ -106,7 +120,7 @@ export default class ProcurementGridColumns {
                             <button class="dropdown-toggle grid-btnCstm" type="button" data-toggle="dropdown">...
                             <span class="caret"></span></button>
                             <ul class="dropdown-menu grid-ddlCstm">
-                            <li><a danphe-grid-action="CreateCopy" >Create copy from this PO</a></li>
+                            <li><a danphe-grid-action="CopyToPo" >Create copy from this PO</a></li>
                             
                             </ul>
                         </div>
@@ -167,6 +181,9 @@ export default class ProcurementGridColumns {
   static CreatedOnDateTimeRenderer(params) {
     return moment(params.data.RequestedOn).format("YYYY-MM-DD");
   }
+  static VendorReturnedOnDateTimeRenderer(params) {
+    return moment(params.data.CreatedOn).format("YYYY-MM-DD");
+  }
   static ShowActionForRFQList(params) {
     if (params.data.Status == "active" || params.data.Status == "partial") {
       if (params.data.QuotationId == null) {
@@ -216,7 +233,7 @@ export default class ProcurementGridColumns {
   static ReturnToVendorList = [
     { headerName: "Vendor Name", field: "VendorName", width: 150 },
     { headerName: "Credit Note No", field: "CreditNoteNo", width: 150 },
-    { headerName: "Returned On", field: "CreatedOn", width: 150, cellRenderer: ProcurementGridColumns.CreatedOnDateTimeRenderer, },
+    { headerName: "Returned On", field: "CreatedOn", width: 150, cellRenderer: ProcurementGridColumns.VendorReturnedOnDateTimeRenderer },
     {
       headerName: "Actions",
       field: "",

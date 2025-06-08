@@ -1,6 +1,6 @@
 ﻿using DanpheEMR.Core.Configuration;
 using DanpheEMR.DalLayer;
-using DanpheEMR.Services.Admission;
+using DanpheEMR.Services.Admission.AdmissionMaster;
 using DanpheEMR.Services.Admission.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;

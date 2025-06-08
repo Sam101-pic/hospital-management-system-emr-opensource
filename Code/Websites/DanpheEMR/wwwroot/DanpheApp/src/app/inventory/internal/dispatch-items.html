@@ -23,6 +23,8 @@
 <div class="row">
     <div class="col-md-12">
         <div class="caption">
+            <button class="btn btn-primary btn-sm" (click)="Back()"><i class="fa fa-angle-left" style="margin-right: 5px;"></i> Back
+            </button>
             <i class="glyphicon glyphicon-asterisk font-red-sunglo"></i>
             <span class="caption-subject font-blue-sharp bold uppercase">Dispatch Requisition</span>
         </div>
@@ -95,7 +97,7 @@
                                 <input id="dispatchQty{{i}}" (keyup.enter)="GoToNextInput(i)" [ngClass]="row.IsDisQtyValid ? 'bg-off' : 'bg-on'"
                                        name="DispatchedQuantity" formControlName="DispatchedQuantity" (focusout)="CheckAvailableQuantity(row,i)"
                                        min="0" [(ngModel)]="row.DispatchedQuantity" style="width:120px;" class="table-input" type="number"
-                                       title="{{row.IsDisQtyValid ? '' : 'stock not available'}}" (keyup.enter)="setFocusById('dispatchQty'+i+1)"
+                                       title="{{row.IsDisQtyValid ? '' : 'stock not available'}}"
                                        [attr.disabled]="row.IsFixedAsset ==true? '' :  null" />
 
                                 <div style="color:red" *ngIf="row.IsDirty('DispatchedQuantity')"
@@ -112,7 +114,8 @@
                         <td *ngIf="row.IsFixedAsset && showBarcode">
                             <danphe-multiselect [ddl-data]="row.BarCodeList" [placeholder-text]="'---Select BarCodeNumber---'"
                                                 [value-property-name]="'StockId'" (selected-items-list)="onBarcodeChanged($event, i)"
-                                                [display-property-name]="'BarCodeNumber'" [show-limit]="'100'" [single-selection]="false">
+                                                [display-property-name]="'BarCodeNumber'" [show-limit]="'100'" [single-selection]="false"
+                                                id="barcode{{i}}">
                             </danphe-multiselect>
                         </td>
                         <!-- <td>
@@ -127,9 +130,9 @@
     <div class="form-group">
         <div class="col-md-12">
             <span class="col-md-2">Remarks<sup *ngIf="isDispatchAllowed==false" class="color-red">*</sup><b></b><span class="right">:</span></span>
-            <textarea id="remarks" name="Remarks" [(ngModel)]="Remarks" cols="70" rows="3" (keyup.enter)="setFocusById('receivedBy')"></textarea>
+            <textarea id="remarks" name="Remarks" [(ngModel)]="Remarks" cols="73" rows="7" (keyup.enter)="setFocusById('DispatchBtn')"></textarea>
         </div>
-        <div class="col-md-12">
+        <div class="col-md-12" style="display: none;">
             <span class="col-md-2"> Received By<span class="right">:</span></span>
             <input id="receivedBy" type="text" [(ngModel)]="ReceivedBy" (keyup.enter)="setFocusById('DispatchBtn')">
         </div>

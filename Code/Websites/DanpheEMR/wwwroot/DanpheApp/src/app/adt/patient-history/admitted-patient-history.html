@@ -68,5 +68,26 @@
         </table>
       </div>
     </form>
+    <div *ngIf="ShowActiveBedReservation">
+      <table class="table table-striped table-hover" width="470" border="0" style="margin-left:15px;">
+        <tr>
+          <td colspan="5" align="center"><b style="font-size:15px;text-decoration:underline;margin-right:20px">Active Bed Reservations</b></td>
+        </tr>
+        <tr>
+          <td align="left"><b>Started on</b></td>
+          <td align="left"><b>Ward</b></td>
+          <td align="left"><b>Bed Feature/Bed</b></td>
+        </tr>
+        <tr>
+          <td width="190px">
+            <span *ngIf="ReservedBedDetail.StartedOn">
+              <date-lbl [value]="ReservedBedDetail.StartedOn" [show-time]="true"></date-lbl>
+            </span>
+          </td>
+          <td align="left"> {{ReservedBedDetail.WardName}} </td>
+          <td align="left"> {{ReservedBedDetail.BedFeatureName}}/{{ReservedBedDetail.BedNumber}} </td>
+        </tr>
+      </table>
+    </div>
   </div>
 </div>

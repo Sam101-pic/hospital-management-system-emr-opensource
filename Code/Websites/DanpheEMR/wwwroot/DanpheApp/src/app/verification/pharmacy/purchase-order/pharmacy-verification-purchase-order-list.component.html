@@ -41,7 +41,8 @@
                      [show-CustomDate]="true"
                      [NepaliDateInGridParams]="NepaliDateInGridSettings"
                      (onDateChange)="onDateChange($event)"
-                     (grid-actions)="PurchaseOrderGridAction($event)">
+                     (grid-actions)="PurchaseOrderGridAction($event)"
+                     [date-settings-name]="'common-range-with-today'">
         </danphe-grid>
     </div>
 </div>

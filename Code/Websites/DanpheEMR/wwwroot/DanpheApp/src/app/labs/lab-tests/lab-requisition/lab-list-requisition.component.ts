@@ -1,38 +1,33 @@
 import {
-  Component,
   ChangeDetectorRef,
-  AfterViewInit,
-  ElementRef,
-  ViewChild,
+  Component
 } from "@angular/core";
-import { RouterOutlet, RouterModule, Router } from "@angular/router";
+import { Router } from "@angular/router";
 import "rxjs/Rx";
-import { Observable } from "rxjs/Observable";
 
-import LabGridColumnSettings from "../../shared/lab-gridcol-settings";
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import LabGridColumnSettings from "../../shared/lab-gridcol-settings";
 
 import { PatientService } from "../../../patients/shared/patient.service";
 import { LabsBLService } from "../../shared/labs.bl.service";
 
-import { LabTestRequisition } from "../../shared/lab-requisition.model";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { LabTestResultService } from "../../shared/lab.service";
-import { Subscription } from "rxjs/Rx";
-import { CoreService } from "../../../core/shared/core.service";
-import {
-  NepaliDateInGridParams,
-  NepaliDateInGridColumnDetail,
-} from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import * as moment from 'moment/moment';
+import { CoreService } from "../../../core/shared/core.service";
 import { SecurityService } from "../../../security/shared/security.service";
+import {
+  NepaliDateInGridColumnDetail,
+  NepaliDateInGridParams,
+} from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { PatientsLabRequisitionDto } from "../../shared/DTOs/lab-requisition-list.dto";
+import { LabTestResultService } from "../../shared/lab.service";
 
 @Component({
   templateUrl: "./lab-list-requisition.html", // "/LabView/ListLabRequisition"
   host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class LabListRequisitionComponent {
-  public requisitions: Array<LabTestRequisition>;
+  public requisitions: Array<PatientsLabRequisitionDto>;
   //start: for angular-grid
   LabGridColumns: Array<any> = null;
   public showLabRequestsPage: boolean = false;
@@ -130,6 +125,11 @@ export class LabListRequisitionComponent {
         if (res.Status == "OK") {
           this.requisitions = res.Results;
           this.requisitions = this.requisitions.slice();
+          if (this.requisitions && this.requisitions.length > 0) {
+            this.requisitions.map(req => {
+              req.Age = this.coreService.CalculateAge(req.DateOfBirth);
+            })
+          }
         } else {
           this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
         }

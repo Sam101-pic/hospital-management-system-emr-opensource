@@ -32,5 +32,10 @@ namespace DanpheEMR.ViewModel.Clinical
         public string Diagnosis { get; set; }
         public DateTime? CreatedOn { get; set; }
         public DateTime VitalsTakenOn { get; set; }
+        public string GCS { get; set; }
+        public string Eyes { get; set; }
+        public string Motor { get; set; }
+        public string Verbal { get; set; }
+        public string Remarks { get; set; }
     }
 }

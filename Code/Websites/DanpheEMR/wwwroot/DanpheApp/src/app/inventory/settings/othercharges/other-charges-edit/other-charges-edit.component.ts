@@ -1,7 +1,8 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, FormGroup } from '@angular/forms';
 import { CoreService } from '../../../../core/shared/core.service';
 import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from '../../../../shared/shared-enums';
 import { OtherChargesMasterModel } from '../other-charges.model';
 import { OtherChargesService } from '../other-charges.service';
 
@@ -16,6 +17,9 @@ export class OtherChargesEditComponent implements OnInit {
   @Input() otherCharges: OtherChargesMasterModel;
   @Input("showEditPage") showEditPage: boolean = false;
   @Input('ChargeId') ChargeId: number = null;
+
+  @Input("otherChargesList")
+  public OtherChargesList = new Array<OtherChargesMasterModel>();
   @Output("update-event") UpdateEvent = new EventEmitter();
   @Output("close-edit-page") callBackClose = new EventEmitter();
   showEditMode: boolean = false;
@@ -28,6 +32,21 @@ export class OtherChargesEditComponent implements OnInit {
   }
   Save(form) {
     form.Id = this.ChargeId;
+
+    if (this.OtherChargesList && this.OtherChargesList.length) {
+      const isChargeNameAlreadyExists = this.OtherChargesList.some(a => a.ChargeName.toLowerCase() === form.ChargeName.toLowerCase() && a.ChargeId !== form.ChargeId);
+      if (isChargeNameAlreadyExists) {
+        this._msgBox.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Other Charges as the Charge Name "${form.ChargeName}" already exists.`]);
+        return;
+      }
+    }
+
+    if (form.VATPercentage < 0) {
+      this._msgBox.showMessage(ENUM_MessageBox_Status.Notice, [` Cannot Update Other Charges as the VAT Percentage should not be negative`]);
+      return;
+    }
+
+
     this._otherChargesService.UpdateOtherCharge(form)
       .subscribe(result => {
         if (result.Results && result.Status == "OK") {

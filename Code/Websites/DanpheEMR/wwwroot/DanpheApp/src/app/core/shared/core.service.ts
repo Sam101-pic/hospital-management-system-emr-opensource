@@ -1,7 +1,9 @@
 import { Injectable } from "@angular/core";
 //import { ParameterModel } from './parameter.model'
-import { hextorstr, KEYUTIL, KJUR, stob64 } from 'jsrsasign';
+import { Router } from "@angular/router";
+import { KEYUTIL, KJUR, hextorstr, stob64 } from 'jsrsasign';
 import * as qz from 'qz-tray';
+import { BehaviorSubject } from "rxjs";
 import { GovernmentItems } from "../../../app/labs/shared/lab-government-items.model";
 import { BillingMembershipTypeVsPriceCategoryMapping } from "../../billing/shared/billing-membershipTypeVsPriceCategoryMapping.model";
 import { Employee } from "../../employee/shared/employee.model";
@@ -9,15 +11,20 @@ import { LabTypesModel } from "../../labs/lab-selection/lab-type-selection.compo
 import { DanpheRoute } from "../../security/shared/danphe-route.model";
 import { BillingScheme_DTO } from "../../settings-new/billing/shared/dto/billing-scheme.dto";
 import { PrinterSettingsModel } from "../../settings-new/printers/printer-settings.model";
+import { Salutation } from "../../settings-new/shared/DTOs/Salutation.Model";
 import { CFGParameterModel } from "../../settings-new/shared/cfg-parameter.model";
+import { GeneralFieldLabels } from "../../shared/DTOs/general-field-label.dto";
+import { InsuranceMasterItems_DTO } from "../../shared/DTOs/insurance-master-items.dto";
+import { MasterFiscalYearDto } from "../../shared/DTOs/master-fiscal-year.dto";
+import { PatientAddressDisplaySettings_DTO } from "../../shared/DTOs/patient-address-display-settings.dto";
 import { NepaliCalendarService } from "../../shared/calendar/np/nepali-calendar.service";
 import { CodeDetailsModel } from "../../shared/code-details.model";
 import { CommonMaster } from "../../shared/common-masters.model";
 import { DanpheAppSettings, DanpheHTTPResponse } from "../../shared/common-models";
-import { GeneralFieldLabels } from "../../shared/DTOs/general-field-label.dto";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
-import { ENUM_DanpheHTTPResponses } from "../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../shared/shared-enums";
 import { CoreBLService } from "./core.bl.service";
+import { PharmacyPackageItem_DTO, PharmacyPackage_DTO } from "./dto/pharmacy-package.dto";
 
 
 @Injectable()
@@ -74,12 +81,23 @@ export class CoreService {
   public allGovItems: Array<GovernmentItems> = new Array<GovernmentItems>();
   public SameDependentIdApplicableCount: number = 0;
   public SchemeList = new Array<BillingScheme_DTO>();
-
+  // CurrentFiscalYearDetails: FiscalYearModel = new FiscalYearModel();
+  CurrentFiscalYearDetails: MasterFiscalYearDto = new MasterFiscalYearDto();
+  PatientAddressDisplaySettings = new PatientAddressDisplaySettings_DTO();
+  Packages: PharmacyPackage_DTO[] = [];
+  PackageItems: PharmacyPackageItem_DTO[] = [];
+  InsuranceMasterItems = new Array<InsuranceMasterItems_DTO>();
+  //SalutationData = new Array<Salutation>();
+  salutationData = new Array<Salutation>();
+  private salutationDataSubject = new BehaviorSubject<any[]>([]);
 
   constructor(
     public coreBlService: CoreBLService,
-    public msgBoxServ: MessageboxService
-  ) { }
+    public msgBoxServ: MessageboxService,
+    // private settingsBLService: SettingsBLService,
+    private _router: Router
+  ) {
+  }
 
   //Functions to set focus and remove focus and assign size to select html tag starts
   //with the help of these functions we make select html tag work with enter key
@@ -94,6 +112,16 @@ export class CoreService {
       document.getElementById(currElmId).setAttribute("size", numOfElemToShow);
   }
 
+  public GetIsPatientContactMandatory() {
+    var phoneParameter = this.Parameters.find(
+      (a) =>
+        a.ParameterGroupName == "ClinicalPatientHeaderDisplay" &&
+        a.ParameterName == "PatientContact"
+    );
+    let phoneNum = JSON.parse(phoneParameter.ParameterValue);
+
+    return phoneNum;
+  }
   public RemoveFocusFromCurrentSelect(currElmId: string) {
     this.selectEnterKeyCaptureEnabled = 0;
     this.nextFocusElemId = null;
@@ -124,6 +152,37 @@ export class CoreService {
 
   public GetMasterEntities() {
     return this.coreBlService.GetMasterEntities();
+  }
+  get SalutationData(): any[] {
+    return this.salutationData;
+  }
+
+  set SalutationData(value: any[]) {
+    this.salutationData = value;
+    this.salutationDataSubject.next([...value]); // Notify all subscribers
+  }
+  AddSalutationData(newSalutation: any) {
+    this.salutationData.push(newSalutation);
+    this.salutationDataSubject.next([...this.salutationData]);
+  }
+
+  UpdateSalutationData(updatedSalutation: any) {
+    const index = this.salutationData.findIndex(sal => sal.SalutationId === updatedSalutation.SalutationId);
+    if (index !== -1) {
+      this.salutationData[index] = updatedSalutation;
+      this.salutationDataSubject.next([...this.salutationData]);
+    }
+  }
+  public GetSalutations() {
+    this.coreBlService.GetSalutationList().subscribe((res) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+        this.SalutationData = res.Results;
+      } else {
+        this.msgBoxServ.showMessage("Failed", [
+          "Failed to get SalutationList.",
+        ]);
+      }
+    });
   }
 
   public SetMasterEntities(res) {
@@ -158,6 +217,17 @@ export class CoreService {
   public GetModuleLookups(moduleName: string) {
     if (moduleName) {
       return this.LookUps.filter((a) => a.ModuleName == moduleName);
+    }
+  }
+  public IsEnableEnglishCalendarOnly() {
+    let IsEnglishCalendar = this.Parameters.find(
+      (a) =>
+        a.ParameterGroupName == "Common" &&
+        a.ParameterName == "EnableEnglishCalendarOnly"
+    );
+    if (IsEnglishCalendar && IsEnglishCalendar.ParameterValue) {
+      let EnglishCalendar = JSON.parse(IsEnglishCalendar.ParameterValue);
+      return EnglishCalendar;
     }
   }
 
@@ -784,18 +854,14 @@ export class CoreService {
   public ShowEmptyReportSheetPrint() {
     var show = this.Parameters.find(
       (val) =>
-        val.ParameterName == "ShowEmptyReportSheet" &&
-        val.ParameterGroupName.toLowerCase() == "lab"
+        val.ParameterName === "LabEmptyPrintSheetConfig" &&
+        val.ParameterGroupName.toLowerCase() === "lab"
     );
     if (show) {
-      let val = show.ParameterValue.toLowerCase();
-      if (val == "true") {
-        return true;
-      } else {
-        return false;
-      }
+      let val = JSON.parse(show.ParameterValue);
+      return val;
     } else {
-      return false;
+      return { "ShowEmptyReportSheet": false, "ShowReportTemplateWiseSegregation": false, "ShowCultureTestComponents": false };
     }
   }
 
@@ -2412,22 +2478,34 @@ export class CoreService {
       }
     );
   }
-  public GetLabEmailSettings() {
+  public GetCommonEmailSettings() {
     var email = this.Parameters.find(
       (val) =>
-        val.ParameterName.toLowerCase() == "emailsettingslaboratory" &&
-        val.ParameterGroupName.toLowerCase() == "lab"
+        val.ParameterName === "EmailSettings" &&
+        val.ParameterGroupName === "Common"
     );
     if (email) {
       var obj = JSON.parse(email.ParameterValue);
       return obj;
     } else {
-      this.msgBoxServ.showMessage("error", [
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [
         "Please set EmailSettingParameters",
       ]);
     }
   }
 
+  public GetPharmacySubstoreAndSubcategory() {
+    var format = this.Parameters.find(
+      (val) =>
+        val.ParameterName == "AccountingInventoryConsumptionLevel" &&
+        val.ParameterGroupName.toLowerCase() == "accounting"
+    );
+    if (format) {
+      return format.ParameterValue.toLowerCase();
+    } else {
+      return "inventorysubstore";
+    }
+  }
   public GetFieldLabelParameter(): GeneralFieldLabels {
     if (this.Parameters) {
       const param = this.Parameters.find(a => a.ParameterGroupName === 'Employeelabel' && a.ParameterName === 'FieldLabels');
@@ -2473,17 +2551,277 @@ export class CoreService {
     this.SchemeList = schemes;
   }
 
+  public GetInsuranceMasterItems() {
+    this.coreBlService.GetInsuranceMasterItems().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+        this.setInsuranceMasterItems(res.Results);
+      }
+    });
+  }
+
+  public setInsuranceMasterItems(masterItems: Array<InsuranceMasterItems_DTO>) {
+    this.InsuranceMasterItems = masterItems;
+  }
   FocusButtonById(id: string) {
     const button = document.getElementById(id) as HTMLButtonElement;
     if (button) {
       button.focus();
     }
   }
+  // check if isDemoEnvironment ? --incase of demo environment use this to hide certain features
+  public isDemoEnvironment: boolean = false;
+  public CheckIfIsDemo() {
+    this.isDemoEnvironment = null;
+
+    let isDemo = this.AppSettings.DemoEnvironment;
+    if (isDemo) {
+      this.isDemoEnvironment = isDemo.IsDemoEnvironment;
+    }
+  }
+
+  public EnableFewaPay: boolean = false;
+  public SetFewaPayConfig() {
+    this.EnableFewaPay = this.AppSettings.EnableFewaPay;
+  }
+
+  public EnableDirectFonePay: boolean = false;
+  public SetDirectFonePayConfig() {
+    this.EnableDirectFonePay = this.AppSettings.EnableDirectFonePay;
+  }
+
+  public GetCurrentFiscalYear() {
+    this.coreBlService.GetCurrentFiscalYear().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+        this.CurrentFiscalYearDetails = res.Results;
+      }
+    });
+  }
+
+
+  GetActivePharmacyPackages() {
+    this.Packages = [];
+    this.coreBlService.GetActivePharmacyPackages()
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.Packages = res.Results;
+
+        }
+        else {
+          console.log('Failed to get Packages' + res.ErrorMessage);
+        }
+      },
+        err => {
+          console.log('Failed to get Packages' + err.ErrorMessage);
+        });
+  }
+
+  GetActivePharmacyPackageItems() {
+    this.PackageItems = [];
+    this.coreBlService.GetActivePharmacyPackageItems()
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.PackageItems = res.Results;
+        }
+        else {
+          console.log('Failed to get Package Items' + res.ErrorMessage);
+        }
+      },
+        err => {
+          console.log('Failed to get Package items' + err.ErrorMessage);
+        });
+  }
+
+  ParsePatientAddressDisplayParam(parameterValue: string, addressOf: string = ""): void {
+    const parsedSettings = JSON.parse(parameterValue);
+
+    let patientAddress = parsedSettings.find(f => f.ShowPatientAddress);
+    if (patientAddress) {
+      if (addressOf === 'global_patient_address') {
+        this.PatientAddressDisplaySettings.ShowPatientAddress = patientAddress.ShowPatientAddress;
+      }
+      else {
+        this.PatientAddressDisplaySettings.ShowPatientAddress = true;
+      }
+    }
+
+    let country = parsedSettings.find(f => f.ShowCountry);
+    if (country) {
+      this.PatientAddressDisplaySettings.ShowCountry = country.ShowCountry;
+      this.PatientAddressDisplaySettings.CountryDisplaySequence = parseInt(country.CountryDisplaySequence) || 0;
+    }
+
+    let countrySubDivision = parsedSettings.find(f => f.ShowCountrySubDivision);
+    if (countrySubDivision) {
+      this.PatientAddressDisplaySettings.ShowCountrySubDivision = countrySubDivision.ShowCountrySubDivision;
+      this.PatientAddressDisplaySettings.CountrySubDivisionDisplaySequence = parseInt(countrySubDivision.CountrySubDivisionDisplaySequence) || 0;
+    }
+
+    let municipality = parsedSettings.find(f => f.ShowMunicipality);
+    if (municipality) {
+      this.PatientAddressDisplaySettings.ShowMunicipality = municipality.ShowMunicipality;
+      this.PatientAddressDisplaySettings.MunicipalityDisplaySequence = parseInt(municipality.MunicipalityDisplaySequence) || 0;
+    }
+
+    let wardNumber = parsedSettings.find(f => f.ShowWardNumber);
+    if (wardNumber) {
+      this.PatientAddressDisplaySettings.ShowWardNumber = wardNumber.ShowWardNumber;
+      this.PatientAddressDisplaySettings.WardNumberDisplaySequence = parseInt(wardNumber.WardNumberDisplaySequence) || 0;
+    }
+
+    let address = parsedSettings.find(f => f.ShowAddress);
+    if (address) {
+      this.PatientAddressDisplaySettings.ShowAddress = address.ShowAddress;
+      this.PatientAddressDisplaySettings.AddressDisplaySequence = parseInt(address.AddressDisplaySequence) || 0;
+    }
+  }
+
+  GetCurrentModule(): string {
+    const regex = /^\/([^\/]*)/;
+    const url = this._router.url;
+    const match = url.match(regex);
+    if (match && match[1]) {
+      return match[1];
+    }
+    else {
+      return "";
+    }
+  }
+
+  SortPatientAddress(patient: any, addressOf: string = ""): string { //! Sanjeev : This method will be called from different component, those component have different patient object types. That's why here, receiving patient as type `any` instead of type `Patient`
+    if (!patient) {
+      console.error("Patient object is null. So address can't be sorted.");
+      return '';
+    }
+    let patientAddress = {
+      Address: patient.Address ? patient.Address : null,
+      MunicipalityName: patient.MunicipalityName ? patient.MunicipalityName : null,
+      CountrySubDivisionName: patient.CountrySubDivisionName ? patient.CountrySubDivisionName : null,
+      CountryName: patient.CountryName ? patient.CountryName : null,
+      WardNumber: patient.WardNumber ? patient.WardNumber : null
+    };
+    //! Sanjeev : Get PatientAddressDisplaySettings parameter values.
+    let patientAddressDisplayParam = this.Parameters.find(a => a.ParameterGroupName === 'Billing' && a.ParameterName === 'PatientAddressDisplaySettings');
+
+    if (patientAddressDisplayParam && patientAddressDisplayParam.ParameterValue) {
+      this.ParsePatientAddressDisplayParam(patientAddressDisplayParam.ParameterValue, addressOf);
+    }
+    else {
+      console.error("Unable to get parameter for ParameterName : 'PatientAddressDisplaySettings'.");
+      return '';
+    }
+
+    const displaySettings = this.PatientAddressDisplaySettings;
+
+    //! Sanjeev : Create an array with the address properties and their display sequences
+    let addressProperties = [
+      { name: 'CountryName', sequence: displaySettings.CountryDisplaySequence, show: displaySettings.ShowCountry },
+      { name: 'CountrySubDivisionName', sequence: displaySettings.CountrySubDivisionDisplaySequence, show: displaySettings.ShowCountrySubDivision },
+      { name: 'MunicipalityName', sequence: displaySettings.MunicipalityDisplaySequence, show: displaySettings.ShowMunicipality },
+      { name: 'WardNumber', sequence: displaySettings.WardNumberDisplaySequence, show: displaySettings.ShowWardNumber },
+      { name: 'Address', sequence: displaySettings.AddressDisplaySequence, show: displaySettings.ShowAddress },
+    ];
+
+    //! Sanjeev : Filter properties based on the show property being true and then sort based on sequence
+    let sortedAddressProperties = addressProperties
+      .filter(property => property.show)
+      .sort((a, b) => a.sequence - b.sequence);
+
+    //! Sanjeev : Construct the sorted address string
+    let sortedAddressParts = sortedAddressProperties
+      .filter(property => patientAddress[property.name] !== undefined) // Filter out undefined properties
+      .map(property => patientAddress[property.name]); // Map properties to their values
+
+    //! Sanjeev : Find indexes of null values in sortedAddressParts
+    let nullIndexes = sortedAddressParts.reduce((acc, currentValue, index) => {
+      if (currentValue === null || currentValue === '' || currentValue === undefined) {
+        acc.push(index);
+      }
+      return acc;
+    }, []);
+
+    //! Sanjeev : Remove items from sortedAddressParts and sortedAddressProperties at null indexes
+    sortedAddressParts = sortedAddressParts.filter((_, index) => !nullIndexes.includes(index));
+    sortedAddressProperties = sortedAddressProperties.filter((_, index) => !nullIndexes.includes(index));
+
+    const wardNumberIndex = sortedAddressProperties.findIndex(property => property.name === 'WardNumber');
+
+    if (wardNumberIndex !== -1) {
+      //! Sanjeev : If display sequence of WardNumber is other than first then, append between the previous address part and ward number and then remove ward number part from sortedAddressParts
+      if (wardNumberIndex > 0 && wardNumberIndex < sortedAddressParts.length) {
+        sortedAddressParts[wardNumberIndex - 1] = `${sortedAddressParts[wardNumberIndex - 1]}-${sortedAddressParts[wardNumberIndex]}`;
+        sortedAddressParts.splice(wardNumberIndex, 1); // Remove WardNumber from sortedAddressParts
+        sortedAddressProperties.splice(wardNumberIndex, 1); // Remove WardNumber from sortedAddressProperties
+      }
+    }
+
+    //! Sanjeev : Join the values with a comma and space
+    const sortedAddress = sortedAddressParts
+      .filter(part => part !== null && part !== '' && part !== undefined)
+      .join(', ');
+
+    return sortedAddress;
+  }
+
+  //! Bikesh: Common method to calculate the Age from Date of BIrth to maintain the consistency in overall Danphe Moudule.
+  CalculateAge(dateOfBirth: string): string {
+    const today = new Date();
+
+    // Convert the dateOfBirth string to a Date object
+    const dob = new Date(dateOfBirth);
+
+    // Calculate the differences
+    const years = today.getFullYear() - dob.getFullYear();
+    const months = today.getMonth() - dob.getMonth();
+    const days = today.getDate() - dob.getDate();
+
+    let yearsDiff = years;
+    let monthsDiff = months;
+    let daysDiff = days;
+
+    // Adjust for cases where the current month/day is earlier than the birth month/day
+    if (monthsDiff < 0 || (monthsDiff === 0 && daysDiff < 0)) {
+      yearsDiff--;
+      monthsDiff += 12;
+    }
+
+    if (daysDiff < 0) {
+      const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0); // Last day of the previous month
+      daysDiff += lastMonth.getDate();
+      monthsDiff--;
+    }
+
+    // Construct age string based on conditions
+    if (yearsDiff > 1) {
+      return `${yearsDiff}Y`; // Show years in the format "XY"
+    } else if (yearsDiff === 1) {
+      return `1Y`; // Show "1Y" for exactly one year
+    } else {
+      // Less than one year; return the month and day format
+      return monthsDiff > 0 || daysDiff > 0 ? `${monthsDiff}M-${daysDiff}D` : '0D'; // Show in format "XM-XD" or "0D"
+    }
+  }
+  FormateAgeSex(age: string, gender: string): string {
+    if (age && gender) {
+      let agesex = age + '/' + gender.charAt(0).toUpperCase();
+      return agesex;
+    }
+    else
+      return '';
+  }
+
 
 }
+
 
 export class LookupsModel {
   public ModuleName: string = null;
   public LookupName: string = null;
   public LookupDataJson: string = null;
+}
+
+export class FiscalYearModel {
+  public FiscalYearId: number = 0;
+  public FiscalYearName: string = null;
+  public StartDate: string = null;
+  public EndDate: string = null;
 }

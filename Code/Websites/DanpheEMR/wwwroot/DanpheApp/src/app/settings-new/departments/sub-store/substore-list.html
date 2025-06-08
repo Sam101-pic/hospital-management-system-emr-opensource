@@ -1,15 +1,15 @@
-
-
-
-
 <!--<div class="caption">
     <i class="glyphicon glyphicon-asterisk font-red-sunglo"></i>
     <span class="caption-subject font-blue bold uppercase">Manage Department</span>
 </div>
 <br />-->
 <a feature="button" class="btn blue bordered" (click)="AddStore()"><i class="fa fa-plus"></i>Add Substore</a>
-<substore-add *ngIf="showAddPage" [selectedStore]="selectedStore" [rbac-roles-list]="rbacRoleList"
-                (callback-add)="CallBackAdd($event)"></substore-add>
+<substore-add *ngIf="showAddPage"
+              [selectedStore]="selectedStore"
+              [rbac-roles-list]="rbacRoleList"
+              [substore-list]="substoreList"
+
+              (callback-add)="CallBackAdd($event)"></substore-add>
 
 <div *ngIf="showSubstoreList" class="row">
     <div class="col-md-12 col-xs-12 col-sm-12">
@@ -18,5 +18,3 @@
         </danphe-grid>
     </div>
 </div>
-
-

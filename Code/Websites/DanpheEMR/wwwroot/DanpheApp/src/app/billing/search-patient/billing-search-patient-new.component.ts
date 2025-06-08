@@ -10,7 +10,9 @@ import { SecurityService } from "../../security/shared/security.service";
 import { CallbackService } from "../../shared/callback.service";
 import { DanpheHTTPResponse } from "../../shared/common-models";
 import GridColumnSettings from '../../shared/danphe-grid/grid-column-settings.constant';
-import { ENUM_AdditionalServiceItemGroups, ENUM_ServiceBillingContext } from "../../shared/shared-enums";
+import { SelectedPatientDto } from "../../shared/diagnosis/dto/selected-patient.dto";
+import { MessageboxService } from "../../shared/messagebox/messagebox.service";
+import { ENUM_AdditionalServiceItemGroups, ENUM_MessageBox_Status, ENUM_ServiceBillingContext, ENUM_VisitType } from "../../shared/shared-enums";
 import { BillingMasterBlService } from "../shared/billing-master.bl.service";
 import { BillingBLService } from '../shared/billing.bl.service';
 import { BillingService } from '../shared/billing.service';
@@ -50,6 +52,8 @@ export class BillingSearchPatientNewComponent {
   public loadBillHistory: boolean = false;
 
   public SchemeName: string = "";
+  public showAddDiagnosis: boolean = false;
+  public selectedPatient: SelectedPatientDto;
 
   constructor(public patientService: PatientService,
     public billingBLService: BillingBLService,
@@ -59,7 +63,8 @@ export class BillingSearchPatientNewComponent {
     public coreService: CoreService,
     public securityService: SecurityService,
     public callbackService: CallbackService,
-    public billingMasterBlService: BillingMasterBlService) {
+    public billingMasterBlService: BillingMasterBlService,
+    private _messageBoxService: MessageboxService) {
     this.getParameter();
     this.GetPatientSearchMinCharacterCountParameter();
     //this.LoadPatientList("");
@@ -100,12 +105,12 @@ export class BillingSearchPatientNewComponent {
           data["LatestVisitType"] = "outpatient";//by default visittype will be outpatient after registration.
         }
         this.ServiceBillingContext = ENUM_ServiceBillingContext.OpBilling;
-        this.FetchServiceItemBasedOnSchemeAndPriceCategory(this.ServiceBillingContext, null, null);
-        this.AssignPatientGlobalValues_PatientService(data);
+        this.FetchServiceItemBasedOnSchemeAndPriceCategory(this.ServiceBillingContext, data.Visit.SchemeId, data.Visit.PriceCategoryId);
+        this.AssignPatientGlobalValues_PatientService(data.Patient);
         let currPat = this.patientService.globalPatient;
         this.billingService.CreateNewGlobalBillingTransaction();
-        this.billingService.BillingType = data.IsAdmitted ? "inpatient" : "outpatient";
-        this.AssignVisContextAndRedirectToBillingTxnPage(data.PatientId);
+        this.billingService.BillingType = data.Patient.IsAdmitted ? "inpatient" : "outpatient";
+        this.AssignVisContextAndRedirectToBillingTxnPage(data.Patient.PatientId);
       }
 
     }
@@ -152,7 +157,7 @@ export class BillingSearchPatientNewComponent {
       this.selPatient = this.PatientObj;
       this.ServiceBillingContext = ENUM_ServiceBillingContext.OpBilling;
       this.billingMasterBlService.SchemeId = this.PatientObj.SchemeId;
-      this.SchemeName = this.IsFollowupValid(this.PatientObj.VisitDate) ? this.PatientObj.SchemeName : null;
+      this.SchemeName = this.IsFollowupValid(this.PatientObj.VisitDate, this.PatientObj.VisitType) ? this.PatientObj.SchemeName : null;
       this.FetchServiceItemBasedOnSchemeAndPriceCategory(this.ServiceBillingContext, this.PatientObj.SchemeId, this.PatientObj.PriceCategoryId);
       const groupName = ENUM_AdditionalServiceItemGroups.Anaesthesia;
       this.FetchAdditionalServiceItems(groupName, this.PatientObj.PriceCategoryId);
@@ -190,7 +195,7 @@ export class BillingSearchPatientNewComponent {
     else if (this.PatientIPObj) {
       this.billingService.BillingType = this.PatientIPObj.IsAdmitted ? "inpatient" : "outpatient";
     }
-    this.patientService.globalPatient.LatestVisitType = this.billingService.BillingType;
+    // this.patientService.globalPatient.LatestVisitType = this.billingService.BillingType;
     this.AssignVisContextAndRedirectToBillingTxnPage(this.selPatient.PatientId);
   }
 
@@ -215,10 +220,12 @@ export class BillingSearchPatientNewComponent {
     globalPat.Address = ipData.Address;
     globalPat.CountrySubDivisionName = ipData.CountrySubDivisionName;
     globalPat.CountryId = ipData.CountryId;
+    globalPat.CountryName = ipData.CountryName;
     globalPat.CountrySubDivisionId = ipData.CountrySubDivisionId;
     globalPat.PANNumber = ipData.PANNumber;
     globalPat.Admissions = ipData.Admissions;
-
+    globalPat.MunicipalityName = ipData.MunicipalityName;
+    globalPat.WardNumber = ipData.WardNumber;
     globalPat.LatestVisitType = ipData.LatestVisitType;
     globalPat.VisitType = ipData.VisitType;
     globalPat.LatestVisitCode = ipData.LatestVisitCode;
@@ -254,11 +261,16 @@ export class BillingSearchPatientNewComponent {
 
   //this function is to handle Shortcuts in this page.
   public hotkeys(event) {
+    if (event.keyCode === 27) {
+      if (this.showPatientSticker) {
+        this.ClosePrintStickerPopup();
+      }
+    }
     if (event.altKey) {
       //console.log(event.keyCode);
       switch (event.keyCode) {
         case 78: {// => ALT+N comes here for New Patient.
-          if (this.securityService.HasPermission('btn-opbilling-addnewpatient')) {
+          if (this.securityService.HasPermission('btn-opbilling-addnewpatient') && this.showPatRegistration) {
             this.ShowOpPatAddPopUp();
           }
           break;
@@ -293,8 +305,9 @@ export class BillingSearchPatientNewComponent {
             //take last visitid if patient is currently admitted, else check if followup is valid or not..
             //else set visitcontext to empty since we can't use those for followup.
             //for inpatient take discharge date for followup valid chek..
-            if ((visContxt.VisitType == "inpatient" && visContxt.IsCurrentlyAdmitted) || (visContxt.VisitType == "inpatient" && this.IsFollowupValid(visContxt.DischargeDate)) || this.IsFollowupValid(visContxt.VisitDate)) {
+            if ((visContxt.VisitType == "inpatient" && visContxt.IsCurrentlyAdmitted) || (visContxt.VisitType == "inpatient" && this.IsFollowupValid(visContxt.DischargeDate, ENUM_VisitType.inpatient)) || this.IsFollowupValid(visContxt.VisitDate, ENUM_VisitType.outpatient)) {
               this.billingService.PatLastVisitContext = visContxt;
+              this.patientService.globalPatient.LatestVisitType = visContxt.VisitType;
             }
             else {
               this.billingService.PatLastVisitContext = new PatientLatestVisitContext_DTO();
@@ -320,17 +333,24 @@ export class BillingSearchPatientNewComponent {
   //If last visit was within Followup valid date range then take that visitId for billing and furhter..
   //pending: need to discuss what to do with Insurance Visits since validity of Insurance visit is only for 1 day..
   //but it won't impact the data so we can continue with this solution..
-  IsFollowupValid(lastVisDate: string) {
+  IsFollowupValid(lastVisDate: string, visitType: string = "outpatient") {
     let retValue = false;
     //check for followup valid days if last vist was not inpatient.
     let fwupValidDaysParam = this.coreService.Parameters.find(p => p.ParameterGroupName == "Appointment" && p.ParameterName == "MaximumLastVisitDays");
-    if (fwupValidDaysParam && fwupValidDaysParam.ParameterValue && parseInt(fwupValidDaysParam.ParameterValue)) {
-      let fwupValidDays = parseInt(fwupValidDaysParam.ParameterValue);
+    if (fwupValidDaysParam) {
+      const paramValue = JSON.parse(fwupValidDaysParam.ParameterValue);
+      let fwupValidDays = 0;
+      if (visitType === ENUM_VisitType.outpatient) {
+        fwupValidDays = parseInt(paramValue.outpatient);
+      } else {
+        fwupValidDays = parseInt(paramValue.inpatient);
+      }
       let daySinceLastVisit = moment().diff(moment(lastVisDate), 'days');
       if (fwupValidDays >= daySinceLastVisit) {
         retValue = true;
       }
     }
+
 
     return retValue;
   }
@@ -352,4 +372,21 @@ export class BillingSearchPatientNewComponent {
   AfterStickerPrint($event) {
 
   }
+
+  OnAddDiagnosisClicked(): void {
+    if (!this.selPatient.PatientVisitId) {
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Visit is mandatory to add Diagnosis of the patient']);
+      return;
+    }
+    this.selectedPatient = new SelectedPatientDto();
+    this.selectedPatient.PatientId = this.selPatient.PatientId;
+    this.selectedPatient.PatientCode = this.selPatient.PatientCode;
+    this.selectedPatient.PatientVisitId = this.selPatient.PatientVisitId;
+    this.selectedPatient.PatientName = this.selPatient.ShortName;
+    this.showAddDiagnosis = true;
+  }
+  CloseAddDiagnosisPopup(): void {
+    this.showAddDiagnosis = false;
+  }
+
 }

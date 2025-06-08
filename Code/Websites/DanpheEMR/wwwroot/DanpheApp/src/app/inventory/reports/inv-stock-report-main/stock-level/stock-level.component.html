@@ -8,7 +8,9 @@
       </div>
       <div class="row" style="background: #eaeaea;padding: 5px; margin: 5px;">
         <div class="col-md-4" *ngIf="showStoreList">
-          <danphe-multiselect [ddl-data]="storeList" [placeholder-text]="'---Select Item---'" [pre-selected]="preSelectedStores" [value-property-name]="'StoreId'" (selected-items-list)="onChange($event)" [display-property-name]="'Name'" [single-selection]="false">
+          <danphe-multiselect [ddl-data]="storeList" [placeholder-text]="'---Select Item---'" [pre-selected]="preSelectedStores"
+                              [value-property-name]="'StoreId'" (selected-items-list)="onChange($event)" [display-property-name]="'Name'"
+                              [single-selection]="false">
           </danphe-multiselect>
         </div>
         <div class="col-md-2">
@@ -16,7 +18,7 @@
             <i class="fa fa-search"></i>&nbsp;
             <span *ngIf="!loading">Load</span>
             <span *ngIf="loading">Loading...</span>
-            
+
           </button>
         </div>
         <div class="col-md-6">
@@ -26,16 +28,19 @@
                 <div class="icheck-inline">
                   List by Item Type: &nbsp;
                   <label class="mt-checkbox mt-checkbox-outline">
-                    <input type="radio" (change)="LoadStockLevelReportByStatus('a')" [(ngModel)]="value" name="name" value="a" style="width:15px;height:15px" />
+                    <input type="radio" (change)="LoadStockLevelReportByStatus('a')" [(ngModel)]="value" name="name" value="a"
+                           style="width:15px;height:15px" />
                     <span></span>All
                   </label>
                   <label class="mt-checkbox mt-checkbox-outline">
-                    <input type="radio" (change)="LoadStockLevelReportByStatus('b')" name="name" [(ngModel)]="value" value="b" style="width:15px;height:15px" />
+                    <input type="radio" (change)="LoadStockLevelReportByStatus('b')" name="name" [(ngModel)]="value" value="b"
+                           style="width:15px;height:15px" />
                     <span></span>Capital Goods
                   </label>
 
                   <label class="mt-checkbox mt-checkbox-outline">
-                    <input type="radio" (change)="LoadStockLevelReportByStatus('c')" name="name" [(ngModel)]="value" value="c" style="width:15px;height:15px" />
+                    <input type="radio" (change)="LoadStockLevelReportByStatus('c')" name="name" [(ngModel)]="value" value="c"
+                           style="width:15px;height:15px" />
                     <span></span>Consumables
                   </label>
                 </div>
@@ -50,13 +55,15 @@
 
 <div class="row">
   <div class="col-lg-12 col-sm-12" *ngIf="filteredStockLevelReport.length>0">
-    <danphe-grid [grid-colDefaults]="StockLevelReportColumns" [grid-data]="filteredStockLevelReport" [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" [show-header]="true" [report-for]="'inventory'" [report-title]="'Current Stock Level Report'" [filter-parameters]="FilterParameters" (grid-actions)="StockLevelGridAction($event)">
+    <danphe-grid [grid-colDefaults]="StockLevelReportColumns" [grid-data]="filteredStockLevelReport" [grid-exportOptions]="gridExportOptions"
+                 [grid-showExport]="true" [show-header]="true" [report-for]="'inventory'" [report-title]="'Current Stock Level Report'"
+                 [filter-parameters]="FilterParameters" (grid-actions)="StockLevelGridAction($event)" [grid-footer-content]="Footer">
     </danphe-grid>
   </div>
 
   <!-- START: Summary -->
   <div class="col-lg-6 col-sm-12 col-md-6" style="margin-bottom: 10px !important;">
-    <div class="table-responsive table-wrapper" id="print_summary">
+    <div class="table-responsive table-wrapper" id="id_stock_level_report_summary">
       <table class="table table-bordered table-hover table-condensed custom_table padLess_table" border="1">
         <thead>
           <tr>

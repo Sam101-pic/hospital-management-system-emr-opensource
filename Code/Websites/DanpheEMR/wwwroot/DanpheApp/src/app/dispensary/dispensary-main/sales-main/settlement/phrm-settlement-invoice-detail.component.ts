@@ -1,7 +1,6 @@
 import { Component, EventEmitter, Input, Output } from "@angular/core";
-import * as moment from "moment";
+import { CoreService } from "../../../../core/shared/core.service";
 import { PharmacyBLService } from "../../../../pharmacy/shared/pharmacy.bl.service";
-import { CommonFunctions } from "../../../../shared/common.functions";
 import { MessageboxService } from "../../../../shared/messagebox/messagebox.service";
 
 @Component({
@@ -34,7 +33,8 @@ export class PHRMSettlementInvoiceDetail {
 
   constructor(
     public pharmacyBLService: PharmacyBLService,
-    public msgBoxServ: MessageboxService) {
+    public msgBoxServ: MessageboxService,
+    public coreService: CoreService) {
 
   }
   ngOnInit() {
@@ -71,7 +71,7 @@ export class PHRMSettlementInvoiceDetail {
   }
 
   public CalculateAge() {
-    this.Age = CommonFunctions.GetFormattedAge(this.PatientInfo.DateOfBirth);
+    this.Age = this.coreService.CalculateAge(this.PatientInfo.DateOfBirth);
   }
 
 }

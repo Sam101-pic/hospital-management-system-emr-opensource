@@ -1,16 +1,18 @@
-import { Component, ChangeDetectorRef } from '@angular/core'
-import { RouterOutlet, RouterModule, Router } from '@angular/router'
 import { HttpClient } from '@angular/common/http';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import WARDGridColumns from '../../shared/ward-grid-cloumns';
-import { WardSupplyBLService } from "../../shared/wardsupply.bl.service";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { CommonFunctions } from "../../../shared/common.functions";
-import * as moment from 'moment/moment'
-import { DLService } from "../../../shared/dl.service";
-import { WardInventoryConsumptionModel } from '../../shared/ward-inventory-consumption.model';
+import { ChangeDetectorRef, Component } from '@angular/core';
+import { Router } from '@angular/router';
+import * as moment from 'moment/moment';
 import { SecurityService } from '../../../security/shared/security.service';
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { DLService } from "../../../shared/dl.service";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { WardConsumptionType } from '../../shared/ward-consumption-types.model';
+import WARDGridColumns from '../../shared/ward-grid-cloumns';
+import { WardInventoryConsumptionModel } from '../../shared/ward-inventory-consumption.model';
+import { WardSupplyBLService } from "../../shared/wardsupply.bl.service";
 import { wardsupplyService } from '../../shared/wardsupply.service';
 @Component({
   templateUrl: "./inventory-ward-consumption-list.html"   //"/WardSupplyView/ConsumptionList"
@@ -34,6 +36,9 @@ export class InventoryConsumptionListComponent {
   public toDate: string = null;
   public dateRange: string = null;
   public NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
+  ConsumptionTypes: WardConsumptionType[] = [];
+  SelectedConsumptionType: WardConsumptionType = new WardConsumptionType();
+  ConsumptionTypeId: number = null;
   constructor(
     _http: HttpClient,
     _dlService: DLService,
@@ -46,6 +51,7 @@ export class InventoryConsumptionListComponent {
     this.dlService = _dlService;
     //this.getAllComsumptionListDetails();
     this.CheckForSubstoreActivation();
+    this.GetConsumptionTypes();
   }
   CheckForSubstoreActivation() {
     this.CurrentStoreId = this.securityService.getActiveStore().StoreId;
@@ -65,21 +71,27 @@ export class InventoryConsumptionListComponent {
     }
   }
   onDateChange($event) {
-    this.fromDate = $event.fromDate;
-    this.toDate = $event.toDate;
+    if ($event) {
+      this.fromDate = $event.fromDate;
+      this.toDate = $event.toDate;
+      this.LoadData();
+    }
+  }
+  LoadData() {
     if (this.fromDate != null && this.toDate != null) {
       if (moment(this.fromDate).isBefore(this.toDate) || moment(this.fromDate).isSame(this.toDate)) {
         this.getInventoryComsumptionList();
       } else {
-        this.msgBoxServ.showMessage('failed', ['Please enter valid From date and To date']);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please enter valid From date and To date']);
       }
 
     }
   }
   public getInventoryComsumptionList() {
+    this.loading = true;
     try {
-      this.wardSupplyBLService.GetInventoryConsumptionListDetails(this.CurrentStoreId, this.fromDate, this.toDate)
-        .subscribe(res => {
+      this.wardSupplyBLService.GetInventoryConsumptionListDetails(this.CurrentStoreId, this.fromDate, this.toDate, this.ConsumptionTypeId)
+        .finally(() => { this.loading = false; }).subscribe(res => {
           if (res.Status == "OK") {
             if (res.Results.length) {
               this.consumptionListDetails = [];
@@ -95,6 +107,8 @@ export class InventoryConsumptionListComponent {
             console.log(res.Errors);
           }
         });
+      this.SelectedConsumptionType = null;
+      this.ConsumptionTypeId = null;
     } catch (exception) {
       this.ShowCatchErrMessage(exception);
     }
@@ -157,4 +171,28 @@ export class InventoryConsumptionListComponent {
       this.loading = false;
     }
   }
+  GetConsumptionTypes() {
+    this.wardSupplyBLService.GetActiveConsumptionTypes().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+        this.ConsumptionTypes = res.Results;
+      }
+    },
+      err => {
+        console.log(err.ErrorMessage);
+      })
+  }
+
+  OnConsumptionTypeChange() {
+    if (this.SelectedConsumptionType && this.SelectedConsumptionType.ConsumptionTypeId) {
+      this.ConsumptionTypeId = this.SelectedConsumptionType.ConsumptionTypeId;
+    }
+    else {
+      this.ConsumptionTypeId = null;
+    }
+  }
+
+  ConsumptionTypeFormatter(data): string {
+    return data["ConsumptionTypeName"];
+  }
+
 }

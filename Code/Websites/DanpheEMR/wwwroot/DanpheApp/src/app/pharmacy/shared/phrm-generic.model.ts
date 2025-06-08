@@ -16,6 +16,8 @@ export class PHRMGenericModel {
     public ModifiedOn: string = '';
     public IsActive: boolean = true;
     public CategoryId: number = 0;
+    public ItemCode: string = '';
+
     //sud: 13July'18--these are not in Generic table, we're joining in server side to get these values. 
     //public Dosage: string = null;
     //public Frequency: string = null;

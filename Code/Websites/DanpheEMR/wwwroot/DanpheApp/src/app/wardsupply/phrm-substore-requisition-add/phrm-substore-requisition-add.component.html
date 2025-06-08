@@ -93,9 +93,11 @@
               <div class="panel-body">
                 <div class="col-md-12">
                   <div>
-                    <danphe-date-picker [(ngModel)]="requisition.RequisitionDate" ngDefaultControl [CalendarTypes]="'np,en'"
-                                        [ngModelOptions]="{standalone:true}">
-                    </danphe-date-picker>
+                    <form [formGroup]="requisition.RequisitionValidator">
+                      <danphe-date-picker [(ngModel)]="requisition.RequisitionDate" ngDefaultControl [CalendarTypes]="'np,en'"
+                                          [previous-fiscal-year]="AllowPreviousFiscalYear" formControlName="RequisitionDate">
+                      </danphe-date-picker>
+                    </form>
                   </div>
                   <table class="table table-responsive table-striped table-hover inv_table table-bordered">
                     <thead>
@@ -103,7 +105,6 @@
                         <th></th>
                         <th sortable-header col="itemnames"><b>ItemName</b></th>
                         <th sortable-header col="uom"><b>Unit</b></th>
-                        <th sortable-header><b>Available Qty in Store</b></th>
                         <th sortable-header col="quantity"><b>Requesting Quantity</b></th>
                         <th sortable-header><b>Remark</b></th>
                         <th></th>
@@ -124,7 +125,6 @@
                           </form>
                         </td>
                         <td style="vertical-align: middle"><b>{{row.SelectedItem?.UOMName}}</b></td>
-                        <td style="vertical-align: middle"><b>{{row.SelectedItem?.AvailableQuantity}}</b></td>
                         <td>
                           <form [formGroup]="row.RequisitionItemValidator">
                             <input [(ngModel)]="row.Quantity" id="req_qty{{i}}" onwheel="this.blur()" min="1" onClick="this.select();"
@@ -147,7 +147,7 @@
                           <div class="custom-control  custom-checkbox verification-check">
                             <input type="checkbox" class="custom-control-input" id="defaultUnchecked"
                                    [(ngModel)]="requisition.IsVerificationEnabled"
-                                   (ngModelChange)="ShowVerifiers()">
+                                   (ngModelChange)="ShowVerifiers()" [disabled]="!HasPermission">
                             <label title="Check If Verification Needed" class="custom-control-label" for="defaultUnchecked">Need
                               Verification</label>
                           </div>
@@ -156,7 +156,7 @@
                               <div class="row">
                                 <div class="col-md-5">
                                   <button title="Delete this Verifier" class="btn btn-sm btn-danger" (click)="DeleteVerifier(i)"
-                                          [disabled]="CheckIfDeleteVerifierAllowed()"><i class="glyphicon glyphicon-minus"></i>
+                                          [disabled]="!HasPermission || CheckIfDeleteVerifierAllowed()"><i class="glyphicon glyphicon-minus"></i>
                                   </button>
                                   <label class="verifier" for="inputIconEx{{i}}">
                                     <i class="fa fa-user"></i>{{GetSignatotyName(i)}}
@@ -165,11 +165,12 @@
                                 <div class="col-md-6">
                                   <input danphe-auto-complete class="form-control " autocomplete="off" [source]="VerifierList"
                                          [(ngModel)]="verifier" [list-formatter]="VerifierListFormatter" placeholder="Select Verifier"
-                                         display-property-name="Name" max-num-list="10" (valueChanged)="AssignVerifier($event,i)" />
+                                         display-property-name="Name" max-num-list="10" (ngModelChange)="AssignVerifier($event,i)"
+                                         [disabled]="!HasPermission" />
                                 </div>
                                 <div class="col-md-1">
                                   <button title="Add Verifier" class="btn btn-sm btn-primary" (click)="AddVerifier()"
-                                          [disabled]="CheckIfAddVerifierAllowed()"><i class="glyphicon glyphicon-plus"></i></button>
+                                          [disabled]="!HasPermission || CheckIfAddVerifierAllowed()"><i class="glyphicon glyphicon-plus"></i></button>
                                 </div>
                               </div>
                             </div>
@@ -229,12 +230,12 @@
                 <div class="clear"></div>
                 <div class="left" style="text-align:left;">
                   <p>Requisition No:<b> {{requisitionToView.RequisitionNo}}</b></p>
-                  <p>Requisiting Store:<b> {{requisitionToView.RequestedStoreName}}</b></p>
+                  <p>Requisitioning store:<b> {{requisitionToView.RequestedStoreName}}</b></p>
                 </div>
                 <div class="right" style="text-align:right;">
                   <p><strong>Requisition Date:</strong>{{requisitionToView.RequisitionDate | date:"yyy-MM-dd"}}&nbsp;
-                    <i *ngIf="requisition.RequisitionDate">{{requisitionToView.RequisitionDate | nepaliDate:'format':'YYYY-MM-DD'}} 
-                      </i>
+                    <i *ngIf="requisition.RequisitionDate">{{requisitionToView.RequisitionDate | nepaliDate:'format':'YYYY-MM-DD'}}
+                    </i>
                   </p>
                 </div>
                 <div class="clear"></div>
@@ -245,7 +246,7 @@
                   <table class="table table-striped table-hover req_table" style="background-color:initial;margin-top:1rem;width: 100%;">
                     <thead>
                       <tr style="font-weight: bold;text-align:center">
-                        <td></td>
+                        <td *ngIf="ShowCheckBox"></td>
                         <td>Medicine Name</td>
                         <td>Quantity</td>
                         <td>Dispatched Qty.</td>
@@ -256,14 +257,14 @@
                     </thead>
                     <tbody>
                       <tr style="text-align:center" *ngFor="let row of requisitionToView.RequisitionItems">
-                        <td>
+                        <td *ngIf="ShowCheckBox">
                           <input *ngIf="row.RequestedItemStatus=='active' || row.RequestedItemStatus=='pending'" class="noPrint"
                                  title="Cancel this item." type="checkbox" [(ngModel)]="row.IsSelected" style="zoom:1.2"
                                  (change)="ShowCancelButtonOnCkboxChange()" />
                         </td>
                         <td>{{row.ItemName}}(<i style="color: blue;">{{row.GenericName}}</i>)</td>
                         <td>{{row.RequestedQuantity}}</td>
-                        <td>{{row.RequestedQuantity-row.PendingQuantity}}</td>
+                        <td>{{row.DispatchedQuantity}}</td>
                         <td>{{row.PendingQuantity}}</td>
                         <td><b>{{row.RequestedItemStatus}}</b>
                           <span *ngIf="row.RequestedItemStatus == 'cancelled'" id="CancellationToolTip" class="tooltip noPrint">

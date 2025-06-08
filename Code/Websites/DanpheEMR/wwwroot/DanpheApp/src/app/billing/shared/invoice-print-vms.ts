@@ -12,6 +12,8 @@ export class BilPrint_VM {
   DischargeInfo: BilPrint_DischargeInfoVM = null;
   BillingInvoiceSummary: Array<BilPrintBillingSummaryVM> = null;
   PharmacySummary: Array<BilPrintPharmacySummaryVM> = null;
+  InvoicePrintTemplate: string = "";
+  InvoicePrintTemplateSummary: string = "";
 
 }
 
@@ -96,6 +98,7 @@ export class SSF_BillingInvoiceInfoVM {
   public DiscountAmount: number = null;
   public TaxableAmount: number = null;
   public NonTaxableAmount: number = null;
+  public TotalAmountWithoutReturn: number = 0;
   public TotalAmount: number = null;
   public BillingTransactionId: number = null;
   public PaidDate: string = null;
@@ -119,6 +122,7 @@ export class SSF_BillingInvoiceInfoVM {
   public TaxTotal: number = null;
   public ReceivedAmount: number = null;
   public InvoiceDate: number = null;
+  public DepartmentName: string = "";
 }
 
 // export class SSF_PhrmInvoices {
@@ -135,6 +139,7 @@ export class SSF_BillingInvoiceInfoVM {
 export class SSF_PhrmInvoices {
   public InvoiceNumber: number = 0;
   public InvoiceNoFormatted: string = "";
+  public TotalAmountWithoutReturn: number = 0;
   public TotalAmount: number = 0;
   public ReceivedAmount: number = 0;
   public BalanceAmount: number = 0;
@@ -179,7 +184,9 @@ export class SSF_Invoice_PatInfo {
   public VisitCreationDate: string = "";
   public WardNumber: string = null;
   public SchemeName: string = null;
+  public SchemeId: number = null;
   public DepartmentName: string = null;
+  public PatientVisitId: number = null;
 }
 
 export class SSFClaimList {
@@ -196,6 +203,8 @@ export class SSFClaimList {
   public InvoiceNoFormatted: string = "";
   public BookingStatus: string = "";
   public ModuleName: string = "";
+  public InvoiceTotalAmountWithoutReturn: number = 0;
+  public IsCreditNote: boolean = false;
 }
 
 export class PatientWiseSSFClaimList {
@@ -209,6 +218,7 @@ export class PatientWiseSSFClaimList {
   public InvoiceList: Array<SSFClaimList> = new Array<SSFClaimList>();
   public InvoiceReturnsList = new Array<SSFInvoiceReturnsList>();
   public SchemeType: number = null;
+  public SchemeId: number = null;
 }
 
 export class SSF_InvoiceItems {
@@ -240,11 +250,12 @@ export class BilPrint_PatientInfoVM {
   public Gender: string = null;
   public DateOfBirth: string = null;
   public Age: string = null;
+  public AgeFormatted: string = "";
   public CountryId: number = null;
   public CountryName: string = null;
   public CountrySubDivisionId: number = null;
   public CountrySubDivisionName: string = null;
-  public Address: number = null;
+  public Address: string = null;
   public WardNumber: number = null;
   public PhoneNumber: string = null;
   public MembershipTypeId: number = null;
@@ -298,6 +309,11 @@ export class BilPrint_InvoiceInfoVM {
   public ReceivedAmount: number = null;
   public SchemeName: string = null;
   public OtherCurrencyDetail: string = null;
+  public ToBePaid: number = null;
+  public PrintTemplateType: string = "";
+  public DischargeStatementId: number = 0;
+  public ApiIntegrationName: string = "";
+
 }
 
 
@@ -320,6 +336,8 @@ export class BilPrint_InvoiceItemVM {
   public RequestedById: number = null;
   public RequestedByName: string = null;
   public RequestedBy: string = null;
+  public ReferredById: number = null;
+  public ReferredBy: string = null;
   public PriceCategory: string = null;
   public BillDate: string = null;
   public IsCoPayment: boolean = false;
@@ -340,6 +358,7 @@ export class BilPrint_VisitInfoVM {
   public ItemsRequestingDoctorsId: Array<number> = new Array<number>();
   public ItemsRequestingDoctors: string = null;
   public DepartmentName: string = null;
+  public ConsultingDoctorId: number = 0;
 }
 
 export class BilPrint_DepositListVM {

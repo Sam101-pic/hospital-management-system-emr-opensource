@@ -24,6 +24,7 @@ namespace DanpheEMR.ServerModel
         public DateTime? ModifiedOn { get; set; }
         public bool IsActive { get; set; }
         public bool IsAllergen { get; set; }
+        public string ItemCode { get; set; }
 
         public virtual List<PHRM_MAP_MstItemsPriceCategory> PHRM_MAP_MstItemsPriceCategories { get; set; } = new List<PHRM_MAP_MstItemsPriceCategory>();
 

@@ -5,6 +5,7 @@
     }
 </style>
 <transaction-view [voucherNumber]="voucherNumber" [showVoucherVerifyButton]="showVoucherVerification" [FiscalYearId]="fiscalYearId"
+                  [HospitalId]="ActiveHospitalId"
                   (callback-txnClose)="CallBackTransactionClose($event)" (callback-close)="CloseTransaction()"></transaction-view>
 <div>
     <div class="caption custom-caption top-report-section">
@@ -52,7 +53,7 @@
             <div class="col-md-1 col-xs-12" style=" margin-top:8px">
                 <div class="form-group">
                     <br>
-                    <button class="btn blue" type="button" [disabled]="btndisabled" (click)="GetTxnList()">
+                    <button class="btn green btn-success" type="button" [disabled]="btndisabled" (click)="GetTxnList()">
                         <i class="fa fa-refresh"></i>
                         Load
                     </button>

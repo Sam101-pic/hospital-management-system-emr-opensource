@@ -1,10 +1,12 @@
-import { Component, Directive, ViewChild } from '@angular/core';
-import { ReportingService } from "../../shared/reporting-service";
-import { DLService } from "../../../shared/dl.service";
 import { HttpClient } from '@angular/common/http';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { Component } from '@angular/core';
 import * as moment from 'moment/moment';
 import { CoreService } from '../../../core/shared/core.service';
+import { DLService } from "../../../shared/dl.service";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponseText } from '../../../shared/shared-enums';
+import { RPT_SchemeDTO } from '../../shared/dto/scheme.dto';
+import { ReportingService } from "../../shared/reporting-service";
 import { RPT_APPT_DoctorWiseOutPatientReportModel } from './doctorwise-outpatient-report.model';
 
 @Component({
@@ -23,12 +25,16 @@ export class RPT_APPT_DoctorwiseOutPatientReportComponent {
   public currentDate: string = "";
   public totalNewPatientCount: number = 0;
   public totalFollowUpPatientCount: number = 0;
+  TotalRevisitPatientCount: number = 0;
+  TotalReferralPatientCount: number = 0;
+  Schemes = new Array<RPT_SchemeDTO>();
+  SelectedScheme = new RPT_SchemeDTO();
 
   constructor(
     _http: HttpClient,
     _dlService: DLService,
     public msgBoxServ: MessageboxService,
-    public reportServ: ReportingService,
+    private _reportingService: ReportingService,
     public coreservice: CoreService) {
     this.http = _http;
     this.dlService = _dlService;
@@ -36,12 +42,13 @@ export class RPT_APPT_DoctorwiseOutPatientReportComponent {
     this.currentDrPatReport.fromDate = moment().format('YYYY-MM-DD');
     this.currentDrPatReport.toDate = moment().format('YYYY-MM-DD');
     this.currentDate = moment().format('YYYY-MM-DD');
+    this.Schemes = this._reportingService.SchemeList;
   }
 
   Load() {
     if (this.currentDrPatReport.fromDate != null && this.currentDrPatReport.toDate != null) {
       this.dlService.Read("/Reporting/DoctorwiseOutPatientReport?FromDate="
-        + this.currentDrPatReport.fromDate + "&ToDate=" + this.currentDrPatReport.toDate)
+        + this.currentDrPatReport.fromDate + "&ToDate=" + this.currentDrPatReport.toDate + "&SchemeId=" + this.currentDrPatReport.SchemeId)
         .map(res => res)
         .subscribe(res => this.Success(res),
           res => this.Error(res));
@@ -57,17 +64,23 @@ export class RPT_APPT_DoctorwiseOutPatientReportComponent {
   Success(res) {
     this.totalFollowUpPatientCount = 0;
     this.totalNewPatientCount = 0;
-    if (res.Status == "OK" && res.Results.length > 0) {
-      this.ReportData = res.Results;
-      this.showReport = true;
-      this.ReportData.forEach(x => {
-        this.totalFollowUpPatientCount += x.FOLLOWUP;
-        this.totalNewPatientCount += x.NEW;
-
-      });
-    }
-    else if (res.Status == "OK") {
-      this.msgBoxServ.showMessage("notice-message", ['Data is Not Available Between Selected dates...Try Different Dates']);
+    this.TotalReferralPatientCount = 0;
+    this.TotalRevisitPatientCount = 0;
+    this.ReportData = [];
+    if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+      if (res.Results.length > 0) {
+        this.ReportData = res.Results;
+        this.showReport = true;
+        this.ReportData.forEach(x => {
+          this.totalFollowUpPatientCount += x.FOLLOWUP;
+          this.totalNewPatientCount += x.NEW;
+          this.TotalReferralPatientCount += x.REFERRAL;
+          this.TotalRevisitPatientCount += x.REVISIT
+        });
+      }
+      else {
+        this.msgBoxServ.showMessage("notice-message", ['Data is Not Available Between Selected dates...Try Different Dates']);
+      }
     }
     else {
       this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
@@ -111,5 +124,20 @@ export class RPT_APPT_DoctorwiseOutPatientReportComponent {
 
     this.currentDrPatReport.fromDate = this.fromDate;
     this.currentDrPatReport.toDate = this.toDate;
+  }
+
+  SchemeFormatter(data: any): string {
+    let html = data["SchemeName"];
+    return html;
+  }
+
+  OnSchemeChange(): void {
+    if (this.SelectedScheme && typeof (this.SelectedScheme) === "object" && this.SelectedScheme.SchemeId) {
+      this.currentDrPatReport.SchemeId = this.SelectedScheme.SchemeId;
+    }
+    else {
+      this.SelectedScheme = new RPT_SchemeDTO();
+      this.currentDrPatReport.SchemeId = null;
+    }
   }
 }

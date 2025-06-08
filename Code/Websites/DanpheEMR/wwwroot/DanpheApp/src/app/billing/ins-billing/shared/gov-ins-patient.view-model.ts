@@ -1,10 +1,9 @@
 import {
-  NgForm,
-  FormGroup,
+  FormBuilder,
   FormControl,
-  Validators,
-  FormBuilder
-} from '@angular/forms'
+  FormGroup,
+  Validators
+} from '@angular/forms';
 
 import * as moment from 'moment/moment';
 
@@ -44,6 +43,7 @@ export class GovInsurancePatientVM {
   public ModifiedOn: string = null;
   public ModifiedBy: number = null;
   public IsActive: boolean = true;
+  public PolicyHolderUID: string = null;
 
   public GovInsPatientValidator: FormGroup = null;
 
@@ -89,7 +89,7 @@ export class GovInsurancePatientVM {
   }
 
   public IsValidCheck(fieldname, validator): boolean {
-    // this is used to check for patient form is valid or not 
+    // this is used to check for patient form is valid or not
     if (this.GovInsPatientValidator.valid) {
       return true;
     }
@@ -114,7 +114,7 @@ export class GovInsurancePatientVM {
       return { 'wrongDate': true };
   }
 
-  //to dynamically enable/disable any form-control. 
+  //to dynamically enable/disable any form-control.
   //here [disabled] attribute was not working from cshtml, so written a separate logic to do it.
   public EnableControl(formControlName: string, enabled: boolean) {
 

@@ -12,12 +12,57 @@ using DanpheEMR.ServerModel.ClinicalModels.Diet;
 using DanpheEMR.ServerModel.PatientModels;
 using DanpheEMR.ServerModel.ClinicalModels.BloodSugarMonitoring;
 using DanpheEMR.ServerModel.ClinicalModels.ConsulationRequests;
+using DanpheEMR.ServerModel.ClinicalModel_New;
+using System.Data.SqlClient;
+using System.Data;
+using DanpheEMR.ServerModel.ClinicalModel_New;
+using DanpheEMR.Services.NewClinical;
+using DanpheEMR.ServerModel.CommonModels;
 
 namespace DanpheEMR.DalLayer
 {
     public class ClinicalDbContext : DbContext
     {
-        public DbSet<VitalsModel> Vitals { get; set; }
+        public DbSet<DischargeInformationModel> DischargeInformation { get; set; }
+        public DbSet<OperationTypeModel> OperationTypes { get; set; }
+
+        public DbSet<DischargeConditionTypeModel> DischargeConditionTypes { get; set; }
+        public DbSet<DischargeTypeModel> DischargeType { get; set; }
+        public DbSet<EmployeeRoleModel> EmployeeRole { get; set; }
+        public DbSet<PatientVisitConsultantsModel> PatientVisitConsultants { get; set; }
+
+        public DbSet<BillingFiscalYear> ClinicalFiscalYear { get; set; }
+
+        public DbSet<BirthConditionModel> BabyBirthCondition { get; set; }
+        public DbSet<BabyBirthRecordModel> BabyBirthRecord { get; set; }
+        public DbSet<MedicationIntakeModel> MedicationIntakes { get; set; }
+        public DbSet<ClinicalMedicationFrequencyStandardModel> MedicationFrequencyStandards { get; set; }
+        public DbSet<BedFeature> BedFeatures { get; set; }
+        public DbSet<MedicalRecordModel> MedicalRecords { get; set; }
+        public DbSet<CountrySubDivisionModel> CountrySubDivisions { get; set; }
+      
+        public DbSet<MunicipalityModel> Municipalities { get; set; }
+
+
+		public DbSet<ClinicalInformationsModel> ClinicalInformations { get; set; }
+		public DbSet<ClinicalOptionRecordsModel> ClinicalOptionRecords { get; set; }
+		public DbSet<ClinicalQuestionAnswersModel> ClinicalQuestionAnswers { get; set; }
+		public DbSet<ClinicalAnswerOptionsModel> ClinicalAnswerOptions { get; set; }
+
+        public DbSet<PHRMStockMaster> StockMaster { get; set; }
+
+
+
+
+		public DbSet<ClinicalFieldOptionModel> ClinicalFieldOptions { get; set; }
+		public DbSet<PreDevelopedComponentListModel> PreDevelopedComponentList { get; set; }
+		public DbSet<QuestionaryModel> Questionary { get; set; }
+		public DbSet<ClinicalQuestionOptionModel> ClinicalQuestionOptions { get; set; }
+
+		public DbSet<ClinicalUserFieldsMapModel> ClinicalUserFields { get; set; }
+		public DbSet<ClinicalHeadingFieldsSetupModel> ClinicalHeadingFieldsSetups { get; set; }
+		public DbSet<ClinicalHeadingsModel> ClinicalHeadings { get; set; }
+		public DbSet<VitalsModel> Vitals { get; set; }
         public DbSet<AllergyModel> Allergy { get; set; }
         public DbSet<HomeMedicationModel> HomeMedications { get; set; }
         public DbSet<InputOutputModel> InputOutput { get; set; }
@@ -36,10 +81,12 @@ namespace DanpheEMR.DalLayer
         public DbSet<VisitModel> Visit { get; set; }
 
 
-
+        public DbSet<DiagnosisModel> cln_diagnosis { get; set; }
         public DbSet<ClinicalDiagnosisModel> ClinicalDiagnosis { get; set; }
         public DbSet<LabRequisitionModel> LabRequisitions { get; set; }
+        public DbSet<LabTestModel> LabTests { get; set; }
         public DbSet<ImagingRequisitionModel> ImagingRequisitions { get; set; }
+        public DbSet<ImagingReportModel> ImagingReports { get; set; }
         public DbSet<PHRMPrescriptionItemModel> PHRMPrescriptionItems { get; set; }
         public DbSet<BillItemRequisition> BillItemRequisitions { get; set; }
         public DbSet<BillServiceItemModel> BillItemPrices { get; set; }
@@ -108,17 +155,67 @@ namespace DanpheEMR.DalLayer
         public DbSet<BillingSchemeModel> Scheme { get; set; }
         public DbSet<BloodSugarModel> BloodSugar { get; set; }
         public DbSet<ConsultationRequestModel> ConsultationRequest { get; set; }
-
+        public DbSet<ClinicalTemplatesModel> ClinicalTemplates { get; set; }
         public DbSet<ClinicalIntakeOutputParameterModel> ClinicalIntakeOutputParameters { get; set; }
+        public DbSet<ClinicalVitalsModel> VitalsNew { get; set; }
+        public DbSet<ClinicalVitalsTransactionModel> VitalsTransactionNew { get; set; }
+        public DbSet<TreatmentCardexPlanModel> CardexPlan { get; set; }
+        public DbSet<PHRMGenericModel> PHRMGeneric { get; set; }
+        public DbSet<PHRMStoreStockModel> StoreStocks { get; set; }
+        public DbSet<ChiefComplainsModel> ComplainsModels { get; set; }
+        public DbSet<PatientComplaintsModel> PatientComplaints { get; set; }
+
+        public DbSet<PatientMedicationModel> PatientMedications { get; set; }
+        public DbSet<ClinicalPreDefinedTemplatesModel> ClinicalPreDefinedTemplatesModel { get; set; }
+        public DbSet<BillingTransactionItemModel> BillingTransactionItems { get; set; }
+
         public ClinicalDbContext(string conn) : base(conn)
         {
             this.Configuration.LazyLoadingEnabled = true;
             this.Configuration.ProxyCreationEnabled = false;
         }
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
-        {
 
-            modelBuilder.Entity<VitalsModel>().ToTable("CLN_PatientVitals");
+        {
+            modelBuilder.Entity<BillingTransactionItemModel>().ToTable("BIL_TXN_BillingTransactionItems");
+            modelBuilder.Entity<DischargeInformationModel>().ToTable("CLN_TXN_DischargeInformation");
+            modelBuilder.Entity<OperationTypeModel>().ToTable("MR_MST_OperationType");
+
+            modelBuilder.Entity<DischargeTypeModel>().ToTable("ADT_DischargeType");
+            modelBuilder.Entity<DischargeConditionTypeModel>().ToTable("ADT_MST_DischargeConditionType");
+            modelBuilder.Entity<EmployeeRoleModel>().ToTable("EMP_EmployeeRole");
+            modelBuilder.Entity<PatientVisitConsultantsModel>().ToTable("PAT_PatientVisitConsultants");
+            modelBuilder.Entity<BillingFiscalYear>().ToTable("BIL_CFG_FiscalYears");
+            modelBuilder.Entity<BirthConditionModel>().ToTable("ADT_MST_BabyBirthCondition");
+            modelBuilder.Entity<BabyBirthRecordModel>().ToTable("ADT_BabyBirthDetails");
+            modelBuilder.Entity<PatientComplaintsModel>().ToTable("CLN_TXN_ChiefComplaints");
+            modelBuilder.Entity<ChiefComplainsModel>().ToTable("CLN_MST_ChiefComplain");
+            modelBuilder.Entity<LabTestModel>().ToTable("LAB_LabTests");
+            modelBuilder.Entity<MedicationIntakeModel>().ToTable("CLN_MST_MedicationIntakeData");
+            modelBuilder.Entity<ClinicalMedicationFrequencyStandardModel>().ToTable("CLN_MST_MedicationFrequencyStandard");
+            modelBuilder.Entity<MedicalRecordModel>().ToTable("MR_RecordSummary");
+            modelBuilder.Entity<CountrySubDivisionModel>().ToTable("MST_CountrySubDivision");
+            modelBuilder.Entity<MunicipalityModel>().ToTable("MST_Municipality");
+            modelBuilder.Entity<BedFeature>().ToTable("ADT_MST_BedFeature");
+
+			modelBuilder.Entity<ClinicalInformationsModel>().ToTable("CLN_TXN_ClinicalInformations");
+			modelBuilder.Entity<ClinicalOptionRecordsModel>().ToTable("CLN_TXN_ClinicalOptionRecords");
+			modelBuilder.Entity<ClinicalQuestionAnswersModel>().ToTable("CLN_TXN_ClinicalQuestionAnswers");
+			modelBuilder.Entity<ClinicalAnswerOptionsModel>().ToTable("CLN_TXN_ClinicalAnswerOptions");
+
+			modelBuilder.Entity<ClinicalFieldOptionModel>().ToTable("CLN_MST_ClinicalFieldOption");
+		    modelBuilder.Entity<PreDevelopedComponentListModel>().ToTable("CLN_MST_PreDevelopedComponentList");
+		    modelBuilder.Entity<QuestionaryModel>().ToTable("CLN_MST_Questionnaire");
+		    modelBuilder.Entity<ClinicalQuestionOptionModel>().ToTable("CLN_MST_ClinicalQuestionOption");
+            modelBuilder.Entity<ClinicalTemplatesModel>().ToTable("CLN_MST_ClinicalTemplates");
+
+            modelBuilder.Entity<ClinicalUserFieldsMapModel>().ToTable("CLN_MAP_ClinicalUserFields");
+
+			modelBuilder.Entity<ClinicalHeadingFieldsSetupModel>().ToTable("CLN_MST_ClinicalField");
+			modelBuilder.Entity<ClinicalHeadingsModel>().ToTable("CLN_Mst_ClinicalHeading");
+
+
+			modelBuilder.Entity<VitalsModel>().ToTable("CLN_PatientVitals");
             modelBuilder.Entity<AllergyModel>().ToTable("CLN_Allergies");
             modelBuilder.Entity<InputOutputModel>().ToTable("CLN_InputOutput");
             modelBuilder.Entity<HomeMedicationModel>().ToTable("CLN_HomeMedications");
@@ -137,10 +234,11 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<SubjectiveNoteModel>().ToTable("CLN_Notes_Subjective");
             modelBuilder.Entity<EmployeeModel>().ToTable("EMP_Employee");
             modelBuilder.Entity<VisitModel>().ToTable("PAT_PatientVisits");
-
-            modelBuilder.Entity<ClinicalDiagnosisModel>().ToTable("CLN_Diagnosis");
+            modelBuilder.Entity<DiagnosisModel>().ToTable("CLN_Diagnosis");
+           // modelBuilder.Entity<ClinicalDiagnosisModel>().ToTable("CLN_Diagnosis");
             modelBuilder.Entity<LabRequisitionModel>().ToTable("LAB_TestRequisition");
             modelBuilder.Entity<ImagingRequisitionModel>().ToTable("RAD_PatientImagingRequisition");
+            modelBuilder.Entity<ImagingReportModel>().ToTable("RAD_PatientImagingReport");
             modelBuilder.Entity<PHRMPrescriptionItemModel>().ToTable("PHRM_PrescriptionItems");
             modelBuilder.Entity<BillItemRequisition>().ToTable("BIL_BillItemRequisition");
             modelBuilder.Entity<BillServiceItemModel>().ToTable("BIL_MST_ServiceItem");
@@ -214,6 +312,15 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<AdmissionModel>().ToTable("ADT_PatientAdmission");
             modelBuilder.Entity<BloodSugarModel>().ToTable("CLN_BloodSugarMonitoring");
             modelBuilder.Entity<ClinicalIntakeOutputParameterModel>().ToTable("CLN_MST_IntakeOutTakeParameter");
+
+            modelBuilder.Entity<ClinicalVitalsModel>().ToTable("CLN_MST_Vitals");
+            modelBuilder.Entity<ClinicalVitalsTransactionModel>().ToTable("CLN_TXN_Vitals");
+            modelBuilder.Entity<TreatmentCardexPlanModel>().ToTable("CLN_TXN_TreatmentCardex");
+            modelBuilder.Entity<PHRMGenericModel>().ToTable("PHRM_MST_Generic");
+            modelBuilder.Entity<PHRMStoreStockModel>().ToTable("PHRM_TXN_StoreStock");
+            modelBuilder.Entity<PHRMStockMaster>().ToTable("PHRM_MST_Stock");
+            modelBuilder.Entity<PatientMedicationModel>().ToTable("CLN_TXN_Patient_Medications");
+            modelBuilder.Entity<ClinicalPreDefinedTemplatesModel>().ToTable("CLN_CFG_PredefinedTemplates");
             //Vitals and visit mappings
             modelBuilder.Entity<VitalsModel>()
                         .HasRequired<VisitModel>(a => a.Visit)
@@ -275,6 +382,8 @@ namespace DanpheEMR.DalLayer
                    .WithMany(a => a.SocialHistory)
                     .HasForeignKey(s => s.PatientId);
         }
+
+ 
     }
 
 }

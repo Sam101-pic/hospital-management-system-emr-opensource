@@ -19,6 +19,7 @@ export class ReportingItemServiceItemMapping_DTO {
     public IsOT: boolean = false;
     public IsProc: boolean = false;
     public TaxApplicable: boolean = false;
+    DynamicReportGroupId: number;
 }
 
 

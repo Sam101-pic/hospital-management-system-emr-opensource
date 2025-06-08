@@ -18,6 +18,7 @@ import { Ward } from '../../shared/ward.model';
 
 import * as moment from 'moment/moment';
 import { PatientLatestVisitContext_DTO } from "../../../appointments/shared/dto/patient-lastvisit-context.dto";
+import { PatientLastVisitDetail_DTO } from "../../../appointments/shared/dto/patient-previous-visit-detail.dto";
 import { QuickVisitVM } from "../../../appointments/shared/quick-visit-view.model";
 import { VisitBLService } from "../../../appointments/shared/visit.bl.service";
 import { Visit } from "../../../appointments/shared/visit.model";
@@ -28,18 +29,22 @@ import { PatientScheme_DTO } from "../../../billing/shared/dto/patient-scheme.dt
 import { RegistrationScheme_DTO } from "../../../billing/shared/dto/registration-scheme.dto";
 import { InsuranceVM } from "../../../billing/shared/patient-billing-context-vm";
 import { PatientScheme } from "../../../billing/shared/patient-map-scheme";
+import { ClinicalNoteBLService } from "../../../clinical-new/shared/clinical.bl.service";
+import { BookAdmission_DTO } from "../../../clinical-new/shared/dto/book-admission.dto";
 import { CoreService } from "../../../core/shared/core.service";
+import { Eligibility } from "../../../insurance/nep-gov/shared/gov-ins-patient.view-model";
 import { SSFEligibility, SsfEmployerCompany } from "../../../insurance/ssf/shared/SSF-Models";
 import { Patient } from "../../../patients/shared/patient.model";
 import { BillingSchemeModel } from "../../../settings-new/shared/bill-scheme.model";
 import { PriceCategory } from "../../../settings-new/shared/price.category.model";
+import { AddPatientVisitConsultants_DTO } from "../../../shared/DTOs/add-patient-visit-consultants.dto";
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 import { NepaliCalendarService } from "../../../shared/calendar/np/nepali-calendar.service";
 import { NepaliDate } from "../../../shared/calendar/np/nepali-dates";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { CommonValidators } from "../../../shared/common-validator";
 import { CommonFunctions } from '../../../shared/common.functions';
-import { ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_BillingType, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_IntegrationNames, ENUM_MessageBox_Status, ENUM_PriceCategory, ENUM_RegistrationSubCases, ENUM_SSF_EligibilityType, ENUM_ServiceBillingContext, ENUM_ValidatorTypes, ENUM_VisitType } from "../../../shared/shared-enums";
+import { ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_BillingType, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_IntegrationNames, ENUM_MessageBox_Status, ENUM_PriceCategory, ENUM_RegistrationSubCases, ENUM_SSF_EligibilityType, ENUM_Scheme_ApiIntegrationNames, ENUM_ServiceBillingContext, ENUM_ValidatorTypes, ENUM_VisitType } from "../../../shared/shared-enums";
 import { AdmissionSlipDetails_DTO } from "../../shared/DTOs/admission-slip-details.dto";
 import { AdtAutoBillingItem_DTO } from "../../shared/DTOs/adt-auto-billingItems.dto";
 import { AdtBedFeatureSchemePriceCategoryMap_DTO } from "../../shared/DTOs/adt-bedfeature-scheme-pricecategory-map.dto";
@@ -131,6 +136,7 @@ export class AdmissionCreateComponent {
   public showWristBand: boolean = false;
   public printInvoice: boolean = false;
   public claimCodeType: string = "old";
+  public depositorContactError: string = '';
 
   PaymentPages: any[];
   public TempEmployeeCashTransaction: Array<EmployeeCashTransaction> = new Array<EmployeeCashTransaction>();
@@ -153,7 +159,16 @@ export class AdmissionCreateComponent {
   public OriginalBedFeatureList = new Array<BedFeature>();
   public DisplaySchemePriceCategorySelection: boolean = false;
   public PolicyNo: string = "";
+  public reservedBedList: BookAdmission_DTO[] = [];
+  public reservedBedDetails: any;
   public GeneralFieldLabel = new GeneralFieldLabels();
+
+  public AddPatientVisitConsultants = new Array<AddPatientVisitConsultants_DTO>();
+  public SelectedConsultant: any;
+
+  public PatientPreviousVisitDetail = new PatientLastVisitDetail_DTO();
+  public bedRes: Bed = new Bed();
+  public RegistrationSchemeDetail = new RegistrationScheme_DTO();
 
   constructor(
     public npCalendarService: NepaliCalendarService,
@@ -168,6 +183,7 @@ export class AdmissionCreateComponent {
     public changeDetector: ChangeDetectorRef,
     public coreService: CoreService,
     public visitBLService: VisitBLService,
+    public clinicalBlservice: ClinicalNoteBLService,
     private _admissionMasterBlService: AdmissionMasterBlService,
     private _billingInvoiceBlService: BillingInvoiceBlService) {
     this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
@@ -184,6 +200,7 @@ export class AdmissionCreateComponent {
       this.LoadParameters();
       this.LoadMembershipSettings();
       this.GetPatientDeposit();
+      this.GetReservedBedList();
       this.GetDocDptAndWardList();
       this.AdmissionCases = this.coreService.GetAdmissionCases();
 
@@ -237,52 +254,25 @@ export class AdmissionCreateComponent {
     this.CurrentAdmission.BillingTransaction.Remarks = this.isGovInsuranceAdmission ? "Government Insurance" : "";
   }
 
-  // public LoadAllBillingItems() {
-  //   let srvIdList = this.additionalBillingItemsInAdt.map(a => a.ServiceDeptId);
-  //   let itemIdList = this.additionalBillingItemsInAdt.map(a => a.ItemId);
+  LoadPatientLastVisit(patientId) {
+    if (patientId) {
+      this.visitBLService.GetPatientLastVisitDetail(patientId).subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          if (res.Results) {
+            this.PatientPreviousVisitDetail = res.Results;
+          } else {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`This is a new Patient`]);
+          }
+        } else {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Cannot load the patients previous visit`]);
+        }
+      }, err => {
+        console.log(err);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [err]);
+      });
+    }
 
-  //   if ((this.billingService.adtAdditionalBillItms && this.billingService.adtAdditionalBillItms.length)) {
-  //     this.SetAutoAddedAndNotAddedBillingItems();
-  //   }
-  //   else {
-  //     this.admissionBLService.GetBillItemList(srvIdList, itemIdList)
-  //       .subscribe((res) => {
-  //         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
-  //           if (res.Results && res.Results.length) {
-  //             let items = [];
-  //             this.additionalBillingItemsInAdt.forEach(v => {
-  //               let dt = res.Results.find(r => (r.ServiceDepartmentId == v.ServiceDeptId) && (r.ItemId == v.ItemId));
-  //               if (dt) {
-  //                 if (v.AutoAdd) {
-  //                   dt["IsAutoAdded"] = true;
-  //                 } else {
-  //                   dt["IsAutoAdded"] = false;
-  //                 }
-  //                 items.push(dt);
-  //               }
-  //             });
-  //             this.billingService.SetAdtAdditionalBillItms(items);
-  //             this.SetAutoAddedAndNotAddedBillingItems();
-  //           }
-  //         }
-  //         else {
-  //           console.log("Couldn't load bill item prices. (appointment-main)");
-  //         }
-  //       });
-  //   }
-  // }
-
-  // public SetAutoAddedAndNotAddedBillingItems() {
-  //   this.autoAddedBillingItem = this.billingService.adtAdditionalBillItms.filter(d => d["IsAutoAdded"] == true)
-  //   this.notAutoAddedBillingItem = this.billingService.adtAdditionalBillItms.filter(d => d["IsAutoAdded"] == false);
-
-  //   this.autoAddedBillingItem.forEach((d, i) => {
-  //     this.DefaultBillItemList.push(Object.assign(new BillingTransactionItem(), d));
-  //     this.DefaultBillItemList[i].IsTaxApplicable = d.TaxApplicable;
-  //   });
-
-  //   this.Calculation();
-  // }
+  }
 
   ItemNameListFormatter(data: any): string {
     let html = data["ItemName"];
@@ -415,6 +405,7 @@ export class AdmissionCreateComponent {
     this.CurrentAdmission.PatientId = this.patientService.getGlobal().PatientId;
     this.PolicyNo = this.patientService.getGlobal().PolicyNo;
     this.GetPatientLastVisitContext(this.CurrentAdmission.PatientId); //* Krishna, 13thApril'23, This method is responsible to fetch the latest VisitContext of a given  Patient.
+    this.LoadPatientLastVisit(this.CurrentAdmission.PatientId); //! This method is different than GetPatientLastVisitContext() method as this brings the last visit context with the last visit days count
     // let defaultMembershipType;
     // if (this.membershipTypeList && this.membershipTypeList.length > 0) {
     //   defaultMembershipType = this.membershipTypeList.find(a => a.SchemeName.toLowerCase() === "general");
@@ -465,11 +456,30 @@ export class AdmissionCreateComponent {
     //   this.isNewPatient = true;
     // }
   }
+  // CheckReservedBed(this.patientId, this.patientVisitId){
+
+  // }
+  GetReservedBedList() {
+    this.clinicalBlservice.GetReservedBedList()
+      .subscribe(res => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.reservedBedList = res.Results;
+          const bedIsReserved = this.reservedBedList.find(a => a.PatientId === this.patientId);
+          if (bedIsReserved) {
+            this.reservedBedDetails = bedIsReserved;
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Patient has bed reserved']);
+          }
+
+        } else {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['No Reserve Bed Found', res.ErrorMessage]);
+        }
+      });
+  }
   GetPatientLastVisitContext(PatientId: number): void {
     this.billingBlService.GetPatientLatestVisitContext(this.patientId).subscribe((res: DanpheHTTPResponse) => {
       if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
         this.PatientLastVisitContext = res.Results[0];
-        if (this.PatientLastVisitContext && this.PatientLastVisitContext.VisitType && this.PatientLastVisitContext.VisitType.toLowerCase() === ENUM_VisitType.outpatient.toLowerCase()) {
+        if (this.PatientLastVisitContext && this.PatientLastVisitContext.VisitType && (this.PatientLastVisitContext.VisitType.toLowerCase() === ENUM_VisitType.outpatient.toLowerCase() || this.PatientLastVisitContext.VisitType.toLowerCase() === ENUM_VisitType.emergency.toLowerCase())) {
           this.SchemePriceCategoryFromVisit.SchemeId = this.PatientLastVisitContext.SchemeId;
           this.SchemePriceCategoryFromVisit.PriceCategoryId = this.PatientLastVisitContext.PriceCategoryId;
         } else {
@@ -651,13 +661,13 @@ export class AdmissionCreateComponent {
     let depositDeductAmount = 0;
     for (var i = 0; i < data.length; i++) {
       if (data[i].TransactionType == "Deposit") {
-        depositAmount = data[i].DepositAmount;
+        depositAmount = data[i].SumInAmount;
       }
       else if (data[i].TransactionType == "ReturnDeposit") {
-        returnDepositAmount = data[i].DepositAmount;
+        returnDepositAmount = data[i].SumOutAmount;
       }
       else if (data[i].TransactionType == "depositdeduct") {
-        depositDeductAmount = data[i].DepositAmount;
+        depositDeductAmount = data[i].SumOutAmount;
       }
     }
     this.CurrentDeposit.DepositBalance = CommonFunctions.parseAmount(depositAmount - returnDepositAmount - depositDeductAmount);
@@ -707,7 +717,7 @@ export class AdmissionCreateComponent {
       if (!additionalBillValid && !defaultBillValid) {
 
         validationSummary.isValid = false;
-        this.msgBoxServ.showMessage("error", ['No Billing Item Found. There must be at least one Billing Item.']); this.loading = false; return;
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['No Billing Item Found. There must be at least one Billing Item.']); this.loading = false; return;
       }
     }
 
@@ -726,9 +736,9 @@ export class AdmissionCreateComponent {
     this.CheckForStrInDoctor();
 
     if (!this.CurrentAdmission.AdmittingDoctorId && this.AdmittingDoctorMandatory) {
-      this.msgBoxServ.showMessage("error", ['Please select Admitting DoctorName from List only !']); this.loading = false; return;
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Please select Admitting DoctorName from List only !']);
+      this.loading = false; return;
     }
-
     for (let i in this.CurrentAdmission.AdmissionValidator.controls) {
       this.CurrentAdmission.AdmissionValidator.controls[i].markAsDirty();
       this.CurrentAdmission.AdmissionValidator.controls[i].updateValueAndValidity();
@@ -742,25 +752,59 @@ export class AdmissionCreateComponent {
     this.SaveAdmission();//sud:1-Oct'21--No need to check for duplicate claimcode until we enable manual entry.
 
   }
+  CheckExistingReservedBed(resBedDetail): boolean {
+    if (resBedDetail.IsReserved === true) {
+      if (this.patientId === resBedDetail.ReservedByPatient.PatientId) {
+        this.CurrentPatientBedInfo.BedId = this.bedRes.BedId;
+        return true;
+      }
+      else {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["This bed is already reserved for some other patient"]);
+        this.loading = false;
+        return false;
+      }
+    }
+    else {
+      return true;
+    }
+  }
   public SaveAdmission() {
-
+    if (!this.CheckExistingReservedBed(this.bedRes)) {
+      return;
+    }
     if (this.CurrentAdmission.IsValidCheck(undefined, undefined) && this.CurrentPatientBedInfo.IsValidCheck(undefined, undefined)) {
       if (!(this.CurrentAdmission.BillingTransaction.Remarks && this.CurrentAdmission.BillingTransaction.Remarks.length) &&
         (this.CurrentAdmission.BillingTransaction.DiscountPercent || this.CurrentAdmission.Ins_HasInsurance || this.CurrentAdmission.BillingTransaction.PaymentMode === 'credit')) {
-        this.msgBoxServ.showMessage("failed", ["Billing Remarks is required."]);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Billing Remarks is required."]);
         this.loading = false;
         return;
       }
 
       if (this.CurrentAdmission.BillingTransaction.Remarks && this.CurrentAdmission.BillingTransaction.Remarks.trim().length === 0) {
-        this.msgBoxServ.showMessage("failed", ["Billing Remarks is required."]);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Billing Remarks is required."]);
         this.loading = false;
         return;
       }
       if (this.CurrentAdmission.BillingTransaction.PaymentMode === 'credit' && (!this.CurrentAdmission.BillingTransaction.OrganizationId || this.CurrentAdmission.BillingTransaction.OrganizationId === 0) && (!this.isGovInsuranceAdmission)) {
-        this.msgBoxServ.showMessage("failed", ["Credit Organization is Required for credit Paymentmode."]);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Credit Organization is Required for credit Paymentmode."]);
         this.loading = false;
         return;
+      }
+
+      if (this.SelectedSchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.SSF && !this.CurrentAdmission.PatientSchemesMap.OtherInfo) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["SSF Case is mandatory for SSF, Please select one"]);
+        this.loading = false;
+        return;
+      }
+
+      // Extract and validate PolicyNo from the PatientScheme object
+      if (this.RegistrationSchemeDetail && this.RegistrationSchemeDetail.IsMemberNumberCompulsory) {
+        const policyNo = this.RegistrationSchemeDetail.PatientScheme.PolicyNo;
+        if (!policyNo || policyNo.trim() === "") {
+          this.loading = false;
+          return this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, [`Member Number is required to register ${this.RegistrationSchemeDetail.SchemeName} Scheme's Patient!`]
+          );
+        }
       }
 
       this.loading = true;
@@ -803,10 +847,14 @@ export class AdmissionCreateComponent {
       this.CurrentAdmission.BillingTransaction.PaymentMode = this.CurrentAdmission.BillingTransaction.PaymentMode.toLowerCase() !== 'credit' ? 'cash' : 'credit';
       //this.CurrentAdmission.BillingTransaction.SchemeId = this.membershipTypeId;//sud:29Mar'23--For new billingStructure.
 
+      if (this.AddPatientVisitConsultants && this.AddPatientVisitConsultants.length > 0) {
+        this.CurrentAdmission.AddPatientVisitConsultants = this.AddPatientVisitConsultants;
+      }
       this.admissionBLService.PostAdmission(this.CurrentAdmission, this.CurrentPatientBedInfo, this.CurrentDeposit, this.CurrentAdmission.BillingTransaction)
         .subscribe(
           res => {
             if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+              this.AddPatientVisitConsultants = new Array<AddPatientVisitConsultants_DTO>();
               this.GetDetailsForAdmissionSlip(res.Results.PatientVisitId);
               this.coreService.loading = false;
               let retObj = res.Results;
@@ -833,12 +881,12 @@ export class AdmissionCreateComponent {
               this.showSticker = true;
 
               this.showPrintPopUp = true;
-              this.msgBoxServ.showMessage("success", ["Patient admitted successfully."]);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Patient admitted successfully."]);
             }
             else {
               this.loading = false;
               // this.CurrentAdmission.BillingTransaction.BillingTransactionItems = [];
-              this.msgBoxServ.showMessage("failed", ["Failed to admit patient."]);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Failed to admit patient. ${res.ErrorMessage}`]);
               console.log(res.ErrorMessage);
               this.coreService.loading = false;
             }
@@ -990,7 +1038,7 @@ export class AdmissionCreateComponent {
           if (itm.UsePercentageOfBedCharges) {
             billingTxnItm.Price = this._billingInvoiceBlService.CalculateAmountFromPercentage(itm.PercentageOfBedCharges, priceOfBedCharges);
           } else {
-            billingTxnItm.Price = itm.IntegrationName === ENUM_IntegrationNames.BedCharges ? itm.Price : itm.MinimumChargeAmount; //! We take from PriceCategory Mapping for Bed Charges and for other auto charge items from the autBillingItems itself.
+            billingTxnItm.Price = itm.Price;
           }
           billingTxnItm.ItemCode = itm.ItemCode;
           billingTxnItm.ItemName = itm.ItemName;
@@ -1076,13 +1124,12 @@ export class AdmissionCreateComponent {
 
       //currently we already have department name in doctor object, so we don't have to filter from departmentlist.
       this.selectedDept = this.selectedPerformer.DepartmentName;
-      //let dept = this.deptList.find(a => a.Key == this.selectedPerformer.DepartmentId);
-
-      //if (dept) {
-      //  this.selectedDept = dept.Value;
-      //}
 
       this.filteredDocList = this.doctorList.filter(doc => doc.DepartmentId == this.selectedPerformer.DepartmentId);
+      const doctorId = this.selectedPerformer.Key;
+      const department = this.selectedPerformer.DepartmentName;
+      const doctorName = this.selectedPerformer.Value;
+      this.AddConsultantDoctors(doctorId, true, doctorName, department);
     }
   }
 
@@ -1096,7 +1143,43 @@ export class AdmissionCreateComponent {
       this.CurrentAdmission.AdmittingDoctorId = null;
     }
   }
+  AddConsultantDoctors(consultantId: number, isPrimaryConsultant: boolean = false, consultantName: string, department: string) {
+    if (consultantId) {
+      if (this.AddPatientVisitConsultants && this.AddPatientVisitConsultants.find(a => a.ConsultantId === consultantId)) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`This Doctor is already added as consultant`]);
+        return;
+      }
+      const consultant = new AddPatientVisitConsultants_DTO();
+      consultant.ConsultantId = consultantId;
+      consultant.IsPrimaryConsultant = isPrimaryConsultant;
+      consultant.VisitType = ENUM_VisitType.inpatient;
+      consultant.ConsultantName = consultantName;
+      consultant.DepartmentName = department;
+      consultant.IsActive = true;
+      const alreadyPrimaryConsultant = this.AddPatientVisitConsultants.some(a => a.IsPrimaryConsultant);
+      if (alreadyPrimaryConsultant && isPrimaryConsultant) {
+        const index = this.AddPatientVisitConsultants.findIndex(a => a.IsPrimaryConsultant);
+        this.AddPatientVisitConsultants.splice(index, 1);
+      }
+      this.AddPatientVisitConsultants.push(consultant);
+      if (this.SelectedConsultant) {
+        this.SelectedConsultant = undefined;
+      }
+    }
+  }
 
+  ConsultantDoctorChanged() {
+    if (this.SelectedConsultant) {
+      const doctorId = this.SelectedConsultant.Key;
+      const department = this.SelectedConsultant.DepartmentName;
+      const doctorName = this.SelectedConsultant.Value;
+      this.AddConsultantDoctors(doctorId, false, doctorName, department);
+    }
+  }
+
+  RemoveConsultant(index: number) {
+    this.AddPatientVisitConsultants.splice(index, 1);
+  }
   public FilterDoctorList() {
     let deptId = 0;
     if (typeof (this.selectedDept) === 'string') {
@@ -1127,19 +1210,29 @@ export class AdmissionCreateComponent {
   }
 
   public BedChanged(bed: any, curr: number) {
-    var bedRes = this.bedList.find(b => b.BedId == bed && b.IsReserved);
-    if (bedRes && (this.reservedBedIdByPat !== bedRes.BedId)) {
-      this.msgBoxServ.showMessage("error", ['Cannot reserve this bed. This bed is already reserved by '
-        + bedRes.ReservedByPatient + ' for date: ' + moment(bedRes.ReservedForDate).format('YYYY-MM-DD HH:mm')]);
-      this.changeDetector.detectChanges();
-      this.CurrentPatientBedInfo.BedId = null;
-    } else if (bed === 0) {
-      this.msgBoxServ.showMessage("error", ["Cannot put bed value as 'Select bed'"]);
+    this.bedRes = this.bedList.find(b => b.BedId == bed);
+    if (this.bedRes && this.bedRes.IsReserved === true) {
+      this.CheckReservingPatientDetails(this.bedRes);
+    }
+    // else {
+    //   if (this.bedRes && (this.reservedBedIdByPat !== this.bedRes.BedId)) {
+    //     this.msgBoxServ.showMessage("error", ['Cannot reserve this bed. This bed is already reserved by '
+    //       + this.bedRes.ReservedByPatient + ' for date: ' + moment(this.bedRes.ReservedForDate).format('YYYY-MM-DD HH:mm')]);
+    //     this.changeDetector.detectChanges();
+    //     this.CurrentPatientBedInfo.BedId = 0;
+    //   }
+    else if (bed === 0) {
+      this.msgBoxServ.showMessage("error", ["Cannot put bed value as 'Select bed'"])
     }
   }
-
-
-
+  CheckReservingPatientDetails(bedRes) {
+    if (this.patientId === bedRes.ReservedByPatient.PatientId) {
+      this.CurrentPatientBedInfo.BedId = bedRes.BedId;
+    }
+    else {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["This bed is already reserved for some other patient"]);
+    }
+  }
   //public LoadBillItemsAdmissionRelated() {
   //    this.admissionBLService.GetAdmissionBillItems()
   //        .subscribe(res => {
@@ -1243,6 +1336,10 @@ export class AdmissionCreateComponent {
     } else {
       this.setFocusById('WardId');
     }
+  }
+
+  FocusOnConsultantFromAdmittingDoctor() {
+    this.setFocusById('id_consultant_doctors');
   }
 
   setFocusAfterChange() {
@@ -1526,8 +1623,11 @@ export class AdmissionCreateComponent {
     }
   }
 
+  SelectedSchemeApiIntegrationName: string = "";
   OnSchemePriceCategoryChanged(schemePriceObj: RegistrationScheme_DTO): void {
+    this.RegistrationSchemeDetail = schemePriceObj;
     if (schemePriceObj) {
+      this.SelectedSchemeApiIntegrationName = schemePriceObj.SchemeApiIntegrationName;
       if (this.CurrentAdmission.PriceCategoryId !== schemePriceObj.PriceCategoryId) {
         this.CurrentPatientBedInfo.WardId = null;
         this.CurrentPatientBedInfo.BedPrice = 0;
@@ -1617,5 +1717,27 @@ export class AdmissionCreateComponent {
       this.StickerPrintCallBack('exit');
     }
   }
+  OnEligibilityChanged(elibility: Eligibility) {
+    if (elibility) {
+      if (this.CurrentAdmission.BillingTransaction && elibility.IsCoPayment) {
+        this.CurrentAdmission.BillingTransaction.IsCoPayment = elibility.IsCoPayment;
+        this.CurrentAdmission.BillingTransaction.CoPaymentCashPercent = elibility.CoPayCashPercent;
+      }
+    }
+  }
 
+  ValidateDepositorContact(): void {
+    const value = this.CurrentDeposit.DepositorContact;
+    if (!value) {
+      this.depositorContactError = null;
+      return;
+    }
+    const validPattern = /^(\+\d{1,3}-)?\d{10}$/;
+
+    if (!validPattern.test(value)) {
+      this.depositorContactError = 'Please enter a valid phone number';
+    } else {
+      this.depositorContactError = null;
+    }
+  }
 }

@@ -28,7 +28,7 @@ namespace DanpheEMR.ServerModel
         public string Condition { get; set; }
         public string Treatment { get; set; }
         public string HistologyReport { get; set; }
-        public string SpeicialNotes { get; set; }
+        public string SpecialNotes { get; set; }
         public string Medications { get; set; }
         public string Allergies { get; set; }
         public string Activities { get; set; }
@@ -51,6 +51,7 @@ namespace DanpheEMR.ServerModel
         public int? BabyBirthConditionId { get; set; }
         public int? DeathTypeId { get; set; }
         public string DeathPeriod { get; set; }
+        public string AdviceOnDischarge { get; set; }
         [NotMapped]
         public virtual List<DischargeSummaryMedication> DischargeSummaryMedications { get; set; }
         [NotMapped]
@@ -65,6 +66,20 @@ namespace DanpheEMR.ServerModel
         public string SelectedImagingItems { get; set; }
         public string DiagnosisFreeText { get; set; }
         public string ProvisionalDiagnosis { get; set; }
+        public string ObstetricHistory { get; set; }
+        public string RelevantMaternalHistory { get; set; }
+        public string IndicationForAdmission { get; set; }
+        public string RespiratorySystem { get; set; }
+        public string CardiovascularSystem { get; set; }
+        public string GastrointestinalAndNutrition { get; set; }
+        public string Renal { get; set; }
+        public string NervousSystem { get; set; }
+        public string Metabolic { get; set; }
+        public string Sepsis { get; set; }
+        public string CongenitalAnomalies { get; set; }
+        public string Reflexes { get; set; }
+        public string MedicationsReceivedInNICUNursery { get; set; }
+        public string Discussion { get; set; }
 
         [NotMapped]
         public List<ADTDischargeSummaryConsultantModel> DischargeSummaryConsultants { get; set; }

@@ -17,6 +17,8 @@ using DanpheEMR.ServerModel.ReportingModels;
 using DanpheEMR.ServerModel.PharmacyModels;
 using System.Transactions;
 using System.Data.Entity;
+using DanpheEMR.Enums;
+using DanpheEMR.Filters;
 // For more information on enabling MVC for empty projects, visit http://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace DanpheEMR.Controllers
@@ -25,12 +27,14 @@ namespace DanpheEMR.Controllers
     {
         private readonly string connString = null;
         private PharmacyDbContext _pharmacyDbContext;
+        private PharmacyReportingDbContext _pharmacyReportingDbContext;
 
         public DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
         public PharmacyReportController(IOptions<MyConfiguration> _config) : base(_config)
         {
             connString = _config.Value.Connectionstring;
             _pharmacyDbContext = new PharmacyDbContext(connString);
+            _pharmacyReportingDbContext = new PharmacyReportingDbContext(connString);
         }
         #region Get Active Stores list
 
@@ -92,8 +96,9 @@ namespace DanpheEMR.Controllers
             try
             {
 
-                PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable dtResult = phrmreportingDbContext.PHRMPurchaseOrderReport(FromDate, ToDate, Status);
+                //    PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
+                //    DataTable dtResult = phrmreportingDbContext.PHRMPurchaseOrderReport(FromDate, ToDate, Status);
+                DataTable dtResult = _pharmacyReportingDbContext.PHRMPurchaseOrderReport(FromDate, ToDate, Status);
                 responseData.Status = "OK";
                 responseData.Results = dtResult;
             }
@@ -157,22 +162,19 @@ namespace DanpheEMR.Controllers
 
 
         #region PHRM User Collection ReportFunction
+        [RateLimitFilter(Name = "PHRMUserwiseCollectionReportRateLimit", Algorithm = "FixedWindow", MaxRequests = 1, WindowSize = 3, Message = "You must wait {n} seconds before accessing this url again.")]
         [HttpGet]
         [Route("PHRMUserwiseCollectionReport")]
-        public string PHRMUserwiseCollectionReport(DateTime FromDate, DateTime ToDate, string CounterId, string CreatedBy, int? StoreId)
+        public string PHRMUserwiseCollectionReport(DateTime FromDate, DateTime ToDate, int? CounterId, int? EmployeeId, int? StoreId)
         {
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             try
             {
                 PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                if (CounterId == "0")
-                {
-                    CounterId = "";
-                }
                 List<SqlParameter> paramList = new List<SqlParameter>() {  new SqlParameter("@FromDate", FromDate),
                             new SqlParameter("@ToDate", ToDate),
                             new SqlParameter("@CounterId", CounterId),
-                            new SqlParameter("@CreatedBy", CreatedBy == null ? string.Empty : CreatedBy),
+                            new SqlParameter("@EmployeeId", EmployeeId),
                             new SqlParameter("@StoreId", StoreId)
                 };
 
@@ -270,13 +272,13 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("PHRMDailySalesReport")]
-        public string PHRMDailySalesReport(DateTime FromDate, DateTime ToDate, int? itemId, int? storeId, int? CounterId, int? UserId)
+        public string PHRMDailySalesReport(DateTime FromDate, DateTime ToDate, int? itemId, int? storeId, int? counterId, int? UserId, int? genericId, string salesType)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
             {
                 PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable dtResult = phrmreportingDbContext.PHRMItemWiseSalesReport(FromDate, ToDate, itemId, storeId, CounterId, UserId);
+                DataTable dtResult = phrmreportingDbContext.PHRMItemWiseSalesReport(FromDate, ToDate, itemId, storeId, counterId, UserId, genericId, salesType);
                 responseData.Status = "OK";
                 responseData.Results = dtResult;
             }
@@ -289,6 +291,16 @@ namespace DanpheEMR.Controllers
             return DanpheJSONConvert.SerializeObject(responseData);
 
         }
+
+
+        [HttpGet]
+        [Route("PHRMItemWiseSalesSummaryReport")]
+        public IActionResult PHRMItemWiseSalesSummaryReport(DateTime FromDate, DateTime ToDate, int? itemId, int? storeId, int? counterId, int? UserId, int? genericId)
+        {
+            Func<object> func = () => _pharmacyReportingDbContext.PHRMItemWiseSalesSummaryReport(FromDate, ToDate, itemId, storeId, counterId, UserId, genericId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+
         [HttpGet]
         [Route("PHRMNarcoticsDailySalesReport")]
         public string PHRMNarcoticsDailySalesReport(DateTime FromDate, DateTime ToDate, int? itemId, int? storeId)
@@ -414,13 +426,14 @@ namespace DanpheEMR.Controllers
         #region PHRM Return To Supplier Report Function
         [HttpGet]
         [Route("PHRMReturnToSupplierReport")]
-        public string PHRMReturnToSupplierReport(DateTime FromDate, DateTime ToDate)
+        public string PHRMReturnToSupplierReport(DateTime FromDate, DateTime ToDate, int? SuppId)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
             {
-                PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable dtResult = phrmreportingDbContext.PHRMReturnToSupplierReport(FromDate, ToDate);
+                //  PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
+                //DataTable dtResult = phrmreportingDbContext.PHRMReturnToSupplierReport(FromDate, ToDate);
+                DataTable dtResult = _pharmacyReportingDbContext.PHRMReturnToSupplierReport(FromDate, ToDate, SuppId);
                 responseData.Status = "OK";
                 responseData.Results = dtResult;
             }
@@ -643,13 +656,13 @@ namespace DanpheEMR.Controllers
         #region Grid Data Function PHRMCreditInOutPatReport
         [HttpGet]
         [Route("PHRMCreditInOutPatReport")]
-        public string PHRMCreditInOutPatReport(DateTime FromDate, DateTime ToDate, bool IsInOutPat, string patientName)
+        public string PHRMCreditInOutPatReport(DateTime FromDate, DateTime ToDate, string VisitType)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
             {
                 PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable creditInOutPatResult = phrmreportingDbContext.PHRMCreditInOutPatReport(FromDate, ToDate, IsInOutPat, patientName);
+                DataTable creditInOutPatResult = phrmreportingDbContext.PHRMCreditInOutPatReport(FromDate, ToDate, VisitType);
                 responseData.Status = "OK";
                 responseData.Results = creditInOutPatResult;
             }
@@ -664,12 +677,12 @@ namespace DanpheEMR.Controllers
         #region Export To Excel Function PHRMCreditInOutPatReport
         [HttpGet]
         [Route("ExportToExcelPHRMCreditInOutPatientReport")]
-        public FileContentResult ExportToExcelPHRMCreditInOutPatientReport(DateTime FromDate, DateTime ToDate, bool IsInOutPat, string patientName)
+        public FileContentResult ExportToExcelPHRMCreditInOutPatientReport(DateTime FromDate, DateTime ToDate, string VisitType, string patientName)
         {
             try
             {
                 PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable exportExcelCreditInOutObj = phrmreportingDbContext.PHRMCreditInOutPatReport(FromDate, ToDate, IsInOutPat, patientName);
+                DataTable exportExcelCreditInOutObj = phrmreportingDbContext.PHRMCreditInOutPatReport(FromDate, ToDate, VisitType);
                 ExcelExportHelper export = new ExcelExportHelper("Sheet1");
 
                 //creating list for adding the column 
@@ -1081,14 +1094,14 @@ namespace DanpheEMR.Controllers
         #region Grid Data Function PHRMExpiryStockReport
         [HttpGet]
         [Route("PHRMExpiryStockReport")]
-        public string PHRMExpiryStockReport(int? ItemId, int? StoreId, DateTime FromDate, DateTime ToDate)
+        public string PHRMExpiryStockReport(int? ItemId, int? GenericId, int? StoreId, DateTime FromDate, DateTime ToDate)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
 
             try
             {
                 PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable expiryStkResult = phrmreportingDbContext.PHRMExpiryReport(ItemId, StoreId, FromDate, ToDate);
+                DataTable expiryStkResult = phrmreportingDbContext.PHRMExpiryReport(ItemId, GenericId, StoreId, FromDate, ToDate);
                 responseData.Status = "OK";
                 responseData.Results = expiryStkResult;
             }
@@ -1103,12 +1116,12 @@ namespace DanpheEMR.Controllers
         #region Export To Excel Function PHRMExpiryReport
         [HttpGet]
         [Route("ExportToExcelPHRMExpiryReport")]
-        public FileContentResult ExportToExcelPHRMExpiryReport(int ItemId, int StoreId, DateTime FromDate, DateTime ToDate)
+        public FileContentResult ExportToExcelPHRMExpiryReport(int? ItemId, int? GenericId, int? StoreId, DateTime FromDate, DateTime ToDate)
         {
             try
             {
                 PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable excelExportExpiryReportResult = phrmreportingDbContext.PHRMExpiryReport(ItemId, StoreId, FromDate, ToDate);
+                DataTable excelExportExpiryReportResult = phrmreportingDbContext.PHRMExpiryReport(ItemId, GenericId, StoreId, FromDate, ToDate);
                 ExcelExportHelper export = new ExcelExportHelper("Sheet1");
 
                 //creating list for adding the column 
@@ -1355,13 +1368,13 @@ namespace DanpheEMR.Controllers
         #region Grid Data Function PHRMBillingReport
         [HttpGet]
         [Route("PHRMBillingReport")]
-        public string PHRMBillingReport(DateTime FromDate, DateTime ToDate, int InvoiceNumber)
+        public string PHRMBillingReport(DateTime FromDate, DateTime ToDate, int? InvoiceNumber, int? PatientId, int? StoreId, string VisitType, string TransactionType, int? SchemeId)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
             {
                 PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable billingReportResult = phrmreportingDbContext.PHRMBillingReport(FromDate, ToDate, InvoiceNumber);
+                DataTable billingReportResult = phrmreportingDbContext.PHRMBillingReport(FromDate, ToDate, InvoiceNumber, PatientId, StoreId, VisitType, TransactionType, SchemeId);
                 responseData.Status = "OK";
                 responseData.Results = billingReportResult;
             }
@@ -1371,36 +1384,6 @@ namespace DanpheEMR.Controllers
                 responseData.ErrorMessage = ex.Message;
             }
             return DanpheJSONConvert.SerializeObject(responseData);
-        }
-        #endregion
-        #region Export To Excel Function PHRMBillingReport
-        [HttpGet]
-        [Route("ExportToExcelPHRMBillingReport")]
-        public FileContentResult ExportToExcelPHRMBillingReport(DateTime FromDate, DateTime ToDate, int InvoiceNumber)
-        {
-            try
-            {
-                PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable exportExcelBillingReportResult = phrmreportingDbContext.PHRMBillingReport(FromDate, ToDate, InvoiceNumber);
-                ExcelExportHelper export = new ExcelExportHelper("Sheet1");
-
-                //creating list for adding the column 
-                List<ColumnMetaData> colForBillingReport = new List<ColumnMetaData>();
-
-                //passing the collection in exportExcelHelper 
-                export.LoadFromDataTable(colForBillingReport, exportExcelBillingReportResult, "Pharmacy Billing Report", false, true);
-
-                //this used to export the package in excel...
-                byte[] filecontent = export.package.GetAsByteArray();
-                return File(filecontent, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                     , "PharmacyBillingReport_.xlsx");
-
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-
         }
         #endregion
         #endregion
@@ -1463,13 +1446,13 @@ namespace DanpheEMR.Controllers
         #region Grid Data Function PHRMStockSummaryReport
         [HttpGet]
         [Route("PHRMStockSummaryReport")]
-        public string PHRMStockSummaryReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int? StoreId)
+        public string PHRMStockSummaryReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int? StoreId, int? ItemId, int? GenericId)
         {
             DanpheHTTPResponse<dynamic> responseData = new DanpheHTTPResponse<dynamic>();
             try
             {
                 PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable StkSummaryReportResult = phrmreportingDbContext.PHRMStockSummaryReport(FromDate, ToDate, FiscalYearId, StoreId);
+                DataTable StkSummaryReportResult = phrmreportingDbContext.PHRMStockSummaryReport(FromDate, ToDate, FiscalYearId, StoreId, ItemId, GenericId);
                 List<StockSummaryDTO> StockTransations = DataTableToList.ConvertToList<StockSummaryDTO>(StkSummaryReportResult);
 
                 var grandTotal = new StockSummaryDTO
@@ -1617,13 +1600,13 @@ namespace DanpheEMR.Controllers
         #region PHRM Item Wise Purchase Report
         [HttpGet]
         [Route("PHRMItemWisePurchaseReport")]
-        public string PHRMItemWisePurchaseReport(DateTime FromDate, DateTime ToDate, int? itemid, string invoiceNo, int? grNo, int? supplierId)
+        public string PHRMItemWisePurchaseReport(DateTime FromDate, DateTime ToDate, int? itemid, string invoiceNo, int? grNo, int? supplierId, int? genericId)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
             {
                 PharmacyReportingDbContext phrmreportingDbContext = new PharmacyReportingDbContext(connString);
-                DataTable dtResult = phrmreportingDbContext.PHRMItemWisePurchaseReport(FromDate, ToDate, itemid, invoiceNo, grNo, supplierId);
+                DataTable dtResult = phrmreportingDbContext.PHRMItemWisePurchaseReport(FromDate, ToDate, itemid, invoiceNo, grNo, supplierId, genericId);
                 responseData.Status = "OK";
                 responseData.Results = dtResult;
             }
@@ -2323,9 +2306,9 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("ItemWiseWardSupplyReport")]
-        public IActionResult ItemWiseWardSupplyReport(DateTime fromDate, DateTime toDate, int? wardId,int? itemId)
+        public IActionResult ItemWiseWardSupplyReport(DateTime fromDate, DateTime toDate, int? wardId, int? itemId)
         {
-            Func<object> func = () => GetItemWiseWardSupplyReport(fromDate,toDate,wardId,itemId);
+            Func<object> func = () => GetItemWiseWardSupplyReport(fromDate, toDate, wardId, itemId);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -2346,5 +2329,114 @@ namespace DanpheEMR.Controllers
             };
             return itemWiseWardSupplyData;
         }
+
+        [HttpGet]
+        [Route("GenericWisePurchaseSummaryReport")]
+        public IActionResult GenericWisePurchaseSummaryReport(DateTime fromDate, DateTime toDate, int? genericId, int? supplierId)
+        {
+            Func<object> func = () => _pharmacyReportingDbContext.GenericWisePurchaseSummaryReport(fromDate, toDate, genericId, supplierId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        #region Stock Transfer Summary Report
+        [HttpGet]
+        [Route("StockTransferSummaryReport")]
+        public IActionResult GetPHRMStockTransferSummaryReport(DateTime fromDate, DateTime toDate, int? genericId, int? sourceStoreId, int? targetStoreId)
+        {
+            Func<object> func = () => _pharmacyReportingDbContext.PHRMStockTransferSummaryReport(fromDate, toDate, genericId, sourceStoreId, targetStoreId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+        #endregion
+
+        [HttpGet]
+        [Route("PharmacyDepositBalanceReport")]
+        public IActionResult PharmacyDepositBalanceReport()
+        {
+            Func<object> func = () => GetDispensaryDepositBalanceReport();
+            return InvokeHttpGetFunction<object>(func);
+        }
+        private object GetDispensaryDepositBalanceReport()
+        {
+            DataTable depositBalanceRptData = DALFunctions.GetDataTableFromStoredProc("SP_PHRM_DepositBalance_RPT", _pharmacyDbContext);
+            return depositBalanceRptData;
+        }
+        #region Get Doctorwise Sales Report 
+        [HttpGet]
+        [Route("PHRMDoctorwiseSalesReport")]
+        public IActionResult PHRMDoctorwiseSalesReport(DateTime FromDate, DateTime ToDate, int? PrescriberId, int? ItemId)
+        {
+            Func<object> func = () => GetPHRMDoctorwiseSalesReport(FromDate, ToDate, PrescriberId, ItemId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+        private object GetPHRMDoctorwiseSalesReport(DateTime FromDate, DateTime ToDate, int? PrescriberId, int? ItemId)
+        {
+            ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
+
+            List<SqlParameter> paramsList = new List<SqlParameter>();
+            paramsList.Add(new SqlParameter("@FromDate", FromDate));
+            paramsList.Add(new SqlParameter("@ToDate", ToDate));
+            paramsList.Add(new SqlParameter("@PrescriberId", PrescriberId));
+            paramsList.Add(new SqlParameter("@ItemId", ItemId));
+
+            DataTable dtDoctorWiseSalesRpt = DALFunctions.GetDataTableFromStoredProc("SP_PHRM_Report_DoctorwiseSalesReport", paramsList, reportingDbContext);
+            return dtDoctorWiseSalesRpt;
+        }
+        #endregion
+        #region Visit Wise Bill Summary Report
+        [HttpGet]
+        [Route("VisitWiseBillSummaryReport")]
+        public IActionResult VisitWiseBillsSummaryReport(int? PatientId, string VisitType, bool ShowDischargeStatementBillReport)
+        {
+            Func<object> func = () => _pharmacyReportingDbContext.VisitWiseBillSummaryReport(PatientId, VisitType, ShowDischargeStatementBillReport);
+            return InvokeHttpGetFunction<object>(func);
+        }
+        #endregion
+        #region Visit Wise Bill Summary Detail Report
+        [HttpGet]
+        [Route("VisitWiseBillSummaryDetailReport")]
+        public IActionResult VisitWiseBillsSummaryDetailReport(string PaymentMode, int PatientVisitId)
+        {
+            Func<object> func = () => _pharmacyReportingDbContext.VisitWiseBillSummaryDetailReport(PaymentMode, PatientVisitId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+        #endregion
+
+
+        #region Provisional Sales Report
+        [HttpGet]
+        [Route("ProvisionalSalesReport")]
+        public IActionResult GetProvisionalSalesReport(int? PatientId, string VisitType, int? StoreId)
+        {
+            Func<object> func = () => _pharmacyReportingDbContext.ProvisionalSalesReport(PatientId, VisitType, StoreId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+        #endregion
+
+        #region Patient List With Provisional
+        [HttpGet]
+        [Route("PatientsWithProvisional")]
+        public IActionResult GetPatientsWithProvisional()
+        {
+            Func<object> func = () => (from inv in _pharmacyDbContext.PHRMInvoiceTransactionItems.Where(i => i.BilItemStatus == "provisional" && i.Quantity > 0)
+                                       join pat in _pharmacyDbContext.PHRMPatient on inv.PatientId equals pat.PatientId
+                                       select new
+                                       {
+                                           PatientCode= pat.PatientCode,
+                                           PatientName = pat.ShortName,
+                                           PatientId = pat.PatientId,
+                                       }).Distinct().ToList();
+            return InvokeHttpGetFunction<object>(func);
+        }
+        #endregion
+
+        #region Provisional Sales Report
+        [HttpGet]
+        [Route("ProvisionalSalesDetailReport")]
+        public IActionResult GetProvisionalSalesDetailReport(int? PatientId, string VisitType, int SchemeId, int? StoreId)
+        {
+            Func<object> func = () => _pharmacyReportingDbContext.ProvisionalSalesDetailReport(PatientId, VisitType, SchemeId, StoreId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+        #endregion
     }
 }

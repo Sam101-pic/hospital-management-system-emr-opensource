@@ -10,11 +10,11 @@ export class PHRMDepositModel {
     public StoreId: number;
     public FiscalYearId: number = 0;
     public ReceiptNo: number = 0;
-    public PatientVisitId: number = 0;
+    public PatientVisitId: number = null;
     public PatientId: number = 0;
     public DepositType: string = "";
     public DepositAmount: number = 0;
-    public Remark: string = "";
+    public Remarks: string = "";
     public CounterId: number = 0;
     public PrintCount: number = 0;
     public PaymentMode: string = "";
@@ -25,10 +25,21 @@ export class PHRMDepositModel {
     public CreatedOn: string = "";
     public DepositBalance: number = 0;
     public DepositValidator: FormGroup = null;
+    public TransactionType: string = '';
+    public InAmount: number = 0;
+    public OutAmount: number = 0;
+    public InvoiceId: number = null;
+    public VisitType: string = '';
+    public ModuleName: string = 'Dispensary'
+
     //used only in client side
     public PatientName: string = null;
     public PatientCode: string = null;
     public PHRMEmployeeCashTransactions: Array<PHRMEmployeeCashTransaction> = new Array<PHRMEmployeeCashTransaction>();
+    public FiscalYear: string = '';
+    public DepositHeadId: number = 0;
+    public CareOf: string ='';
+    public CareOfContact: string ='';
     constructor() {
         var _formBuilder = new FormBuilder();
         this.DepositValidator = _formBuilder.group({

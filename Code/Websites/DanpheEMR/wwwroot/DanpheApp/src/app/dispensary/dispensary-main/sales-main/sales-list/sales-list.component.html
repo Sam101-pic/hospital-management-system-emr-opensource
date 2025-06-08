@@ -38,7 +38,8 @@
             <div class="col-md-12">
               <div class="row printStyle print-border">
                 <div style="text-align:center;">
-                  <pharmacy-invoice-print [invoice-id]="saleInvoiceDetails.InvoiceId" (call-back-print)="Close()"> </pharmacy-invoice-print>
+                  <pharmacy-invoice-print [invoice-id]="saleInvoiceDetails.InvoiceId" [allow-hib-claim]="false" (call-back-print)="Close()">
+                  </pharmacy-invoice-print>
                 </div>
               </div>
             </div>

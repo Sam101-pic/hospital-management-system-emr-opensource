@@ -1,4 +1,3 @@
-
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, Renderer2, SecurityContext } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { Router } from '@angular/router';
@@ -17,8 +16,12 @@ import { RadiologyService } from '../radiology-service';
 import { HttpClient } from '@angular/common/http';
 import html2canvas from 'html2canvas';
 import * as jsPDF from 'jspdf';
-import { CoreCFGEmailSettingsModel } from '../CoreCFGEmailSettings.model';
-import { ImageAttachmentModel, RadEmailModel } from '../rad-email.model';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { CommonEmailSetting_DTO } from '../../../shared/DTOs/common-email-setting.dto';
+import { CommonEmailModel } from '../../../shared/DTOs/common-email_DTO';
+import { ENUM_DanpheHTTPResponses, ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status, ENUM_TemplateStyleName } from '../../../shared/shared-enums';
+import { ImageAttachmentModel } from '../rad-email.model';
+import { TemplateStyleModel } from '../template-style-model';
 
 @Component({
   selector: "danphe-view-imaging-report",
@@ -31,6 +34,8 @@ export class ViewReportComponent {
   //requisitionId used instead of reportId because we're using using this component in patientoverview page where getting list of requisitions.
   @Input("requisitionId")
   public requisitionId: number = null;
+  @Input("Editable")
+  public Editable = true;
   public displayFullSizeImage: boolean = false;
   public album = [];
   public reportHtml;
@@ -48,18 +53,18 @@ export class ViewReportComponent {
   @Input('create-report-for-claim')
   public CreateReportForClaim: boolean = false;
 
-  public showChangeReferrerPopUp: boolean = false;
+  ShowChangePrescriberPopUp: boolean = false;
 
   public doctorSelected: any;
   public hospitalCode: string = null;
   public topHeightInReportClass: string = '';
 
   public loggedInUserId: number = null;
-  public showDigitalSignatureImage: boolean = true;
+  public showDigitalSignatureImage: boolean = false; // Set initial state to false
   public showEmailDataBox: boolean = false;
-  public radEmail: RadEmailModel = null;
+  public radEmail: CommonEmailModel = new CommonEmailModel();
   public loading: boolean = false;
-  public emailSettings: CoreCFGEmailSettingsModel = new CoreCFGEmailSettingsModel();
+  public emailSettings: CommonEmailSetting_DTO = new CommonEmailSetting_DTO();
 
   public imageUploadFolderPath: string = null;//sud:18Aug'19--for radiology image upload.
 
@@ -68,6 +73,37 @@ export class ViewReportComponent {
 
   printDetails: any;
   showPrint: boolean;
+  public PrintFooterGap: number = 0;
+  @Input("reportViewFromClaimManagement")
+  reportViewFromClaimManagement: boolean = false;
+  @Output("callback-After-imaging-report-Response") callbackResponse: EventEmitter<object> = new EventEmitter<object>();
+  public DisplaySignatureOnRight: boolean = false;
+
+  public PrintCount: number = 0;
+  public ShowPrintCount: boolean = false;
+  RadiologyReportMarginSettings = {
+    "MarginTop": 0,
+    "MarginRight": 0,
+    "MarginBottom": 0,
+    "MarginLeft": 0,
+  };
+  ChangeReferrer: boolean = false;
+  ShowChangeReferrerPopUp: boolean = false;
+  SelectedRefId: number = null;
+  SelectedReferrerName: string = null;
+  PatientHeaderOnAllPages: boolean = false;
+  SignatoriesOnAllPages: boolean = false
+  IsSignatureAtBottomOfLastPage: boolean = false;
+  @Input("RadiologyReportFromClaimScrubbing")
+  RadiologyReportFromClaimScrubbing: boolean = false;
+
+  PACSServerConfiguration = {
+    EnablePACSServer: "false",
+    BaseURL: ""
+  }
+  selectedTemplateStyle: TemplateStyleModel;
+  TemplateStyleList = new Array<TemplateStyleModel>();
+
   constructor(public imagingBLService: ImagingBLService, public coreService: CoreService,
     public radiologyService: RadiologyService, public securityService: SecurityService,
     public messageBoxService: MessageboxService,
@@ -78,14 +114,22 @@ export class ViewReportComponent {
     public _dicomService: DicomService, public renderer: Renderer2, public http: HttpClient
 
   ) {
-
     this.report.ReportText = "";
     this.enableImageUpload = this.radiologyService.EnableImageUpload();
     this.enableDicomImages = this.radiologyService.EnableDicomImages();
     this.reportHeader = this.radiologyService.ReportHeader;
     this.hospitalCode = this.coreService.GetHospitalCode();
     this.loggedInUserId = this.securityService.loggedInUser.EmployeeId;
-    this.emailSettings = this.coreService.GetEmailSettings();
+    let emailSettings = this.coreService.GetCommonEmailSettings();
+    if (emailSettings) {
+      let redSetting = emailSettings.find(a => a.UsedBy === "Radiology");
+      if (redSetting && redSetting.SenderEmail) {
+        this.emailSettings = redSetting;
+      }
+      else {
+        this.emailSettings = emailSettings.find(a => a.UsedBy === "Common");
+      }
+    }
     this.enableDoctorUpdateFromSignatory = this.coreService.UpdateAssignedToDoctorFromAddReportSignatory();
 
     if (this.hospitalCode && this.hospitalCode.toLowerCase() == 'mnk') {
@@ -99,9 +143,25 @@ export class ViewReportComponent {
     this.imageUploadFolderPath = this.radiologyService.GetImageUploadFolderPath();
     this.ExtRefSettings = this.radiologyService.GetExtReferrerSettings();
     this.RptHdrSettng = this.ReportHeaderPatientNameSettings();
+    this.FetchParameters();
 
+    let pacsServerParam = this.coreService.Parameters.find(param => param.ParameterGroupName === "Radiology" && param.ParameterName === "PACSServerConfiguration");
+    if (pacsServerParam) {
+      let paramValue = JSON.parse(pacsServerParam.ParameterValue)
+      if (paramValue) {
+        this.PACSServerConfiguration = paramValue;
+        this.PACSServerConfiguration.EnablePACSServer = JSON.parse(this.PACSServerConfiguration.EnablePACSServer);
+      }
+    }
   }
 
+  FetchParameters() {
+    this.AddGapInPrintPage();
+    this.GetParamForSignatureDisplay();
+    this.HideShowPrintCount();
+    this.GetParamForRadiologyReportMargin();
+    this.GetRadiologyReportDisplayConfig();
+  }
 
   //start: sud: 2July'19: For Keyboard Shortcuts..
   globalListenFunc: () => void;
@@ -126,6 +186,7 @@ export class ViewReportComponent {
       //  this.EditReport();
       //}
     });
+
   }
 
   public showImagingReport: boolean = false;
@@ -148,35 +209,46 @@ export class ViewReportComponent {
 
 
   public GetImagingReport(printWoPreview: boolean = false) {
-
     this.imagingBLService.GetImagingReportByRequisitionId(this.requisitionId)
-      .subscribe(res => {
-        if (res.Status == "OK" && res.Results) {
-
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
           this.report = res.Results;
-          //IMPORTANT: sanitizer.bypassSecurity : Needed to retain style/css of innerHTML !! --sud:12Apr'18'
-          let rptText = res.Results.ReportText;
+          if (this.report) {
+            this.report.Age = this.coreService.CalculateAge(this.report.DateOfBirth);
+          }
+          this.GetTemplateStyleByTemplateId(this.report.ReportTemplateId);
+
+          // IMPORTANT: sanitizer.bypassSecurity : Needed to retain style/css of innerHTML !! --sud:12Apr'18'
+          const rptText = res.Results.ReportText;
           this.report.ReportText = this.sanitizer.bypassSecurityTrustHtml(rptText);
 
           this.report.Signatories = JSON.parse(this.report.Signatories);
 
+          if (this.report.FooterTextsList.length) {
+            const selectedId = this.report.SelectedFooterTemplateId || null;
+            this.report.FooterTextsList.forEach(f => {
+              f.IsChecked = selectedId ? f.SelectedFooterTemplateId === selectedId : false;
+            });
+          }
+
+          console.log('Footer Texts List:', this.report.FooterTextsList);
+
           this.SetPatHeaderOnLoad();
-
           this.SetImagePath();
-
           this.showImagingReport = true;
           this.isReportLoadCompleted = true;
           this.printWithoutPreview = printWoPreview;
-
-        }
-        else {
-          this.messageBoxService.showMessage("failed", [res.ErrorMessage]);
+          this.callbackResponse.emit({ IsDataReceived: true });
+          this.changeDetector.detectChanges();
+        } else {
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
           console.log(res.ErrorMessage);
         }
-
+      }, error => {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Failed to fetch imaging report."]);
+        console.error('Error fetching imaging report:', error);
       });
   }
-
   public SetImagePath() {
     //ImageName contains names of multiple images seperated by ';'
     //split the string ImageName into array pathToImage.
@@ -227,21 +299,87 @@ export class ViewReportComponent {
     this.album = [];
     this.onReportEdit.emit({ Submit: true });
   }
+  UpdatePrintCount() {
+    this.imagingBLService.GetPrintCount(this.requisitionId)
+      .subscribe(res => {
+        if (res.Status == ENUM_DanpheHTTPResponseText.OK && res.Results) {
+          this.PrintCount = res.Results;
+        }
+        else {
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [res.ErrorMessage]);
+          console.log(res.ErrorMessage);
+        }
 
+      });
+  }
+  getCheckedFooterTexts(): string {
+    if (this.report.FooterTextsList && this.report.FooterTextsList.length > 0) {
+      const checkedFooterTexts = this.report.FooterTextsList
+        .filter(footerText => footerText.IsChecked)
+        .map(footerText => `<tr><td>${footerText.Text}</td></tr>`)
+        .join('');
 
+      if (checkedFooterTexts) {
+        return `<div class="col-md-12 col-xs-12"><table>${checkedFooterTexts}</table></div>`;
+      }
+    }
+
+    return '';
+  }
+  onFooterTextChecked(index: number) {
+    this.report.FooterTextsList.forEach((footer, i) =>
+      footer.IsChecked = i === index ? !footer.IsChecked : false);
+    this.report.SelectedFooterTemplateId = this.report.FooterTextsList[index].IsChecked
+      ? this.report.FooterTextsList[index].SelectedFooterTemplateId
+      : null;
+  }
   PrintReportHTML() {
+    this.UpdatePrintCount();
+    const footerContent = this.getCheckedFooterTexts();
+
+    const moveElementsToLastPage = () => {
+      const footerSectionElement = document.querySelector('.ftr-lst-sctn-lp') as HTMLElement;
+      const printPageElement = document.getElementById("printpage");
+      if (printPageElement) {
+        const lastPageContainer = document.createElement('div');
+        lastPageContainer.style.position = 'absolute';
+        lastPageContainer.style.width = '100%';
+        if (footerSectionElement) {
+          const footerContainer = document.createElement('div');
+          footerContainer.style.position = 'fixed';
+          footerContainer.style.width = '100%';
+          footerContainer.style.bottom = '0px';
+          footerContainer.innerHTML = footerContent;
+          lastPageContainer.appendChild(footerContainer);
+          footerSectionElement.remove();
+        } else {
+          console.error("Element with class 'footer-list-section' not found.");
+        }
+        printPageElement.appendChild(lastPageContainer);
+      } else {
+        console.error("Element with ID 'printpage' not found.");
+      }
+    };
+    if (!this.SignatoriesOnAllPages) {
+      moveElementsToLastPage();
+    } else {
+      const footerSectionElement = document.querySelector('.footer-list-section') as HTMLElement;
+      if (footerSectionElement) {
+        footerSectionElement.innerHTML = footerContent;
+      }
+    }
     var printContents = document.getElementById("printpage").innerHTML;
-    let documentContent = "<html><head>";
-    documentContent += '<link rel="stylesheet" type="text/css" href="../../themes/theme-default/DanphePrintStyle.css"/>';
-    documentContent += '<link rel="stylesheet" type="text/css" href="../../themes/theme-default/DanpheStyle.css"/>';
-    documentContent += '<link rel="stylesheet" type="text/css" href="../../../assets/global/plugins/bootstrap/css/bootstrap.min.css"/>';
-    documentContent += '</head><style>.no-print{display: none;} .patient-hdr-label{margin: 2px 0;}</style>';
-    documentContent += '<body>' + printContents + '</body></html>'
+    let documentContent = "<html>";
+    if (!this.selectedTemplateStyle) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["No template styles found, Please Add Template Styles from Setting."]);
+    }
+    let headerStyle = this.selectedTemplateStyle.HeaderStyle;
+    let footerStyle = this.selectedTemplateStyle.FooterStyle;
+    documentContent += '<body>' + headerStyle + printContents + footerStyle + '</body></html>';
     this.printDetails = documentContent;
     this.showPrint = true;
     this.showImagingReport = false;
   }
-
   callBackPrint() {
     setTimeout(() => {
       this.printDetails = null;
@@ -272,11 +410,13 @@ export class ViewReportComponent {
 
   public showEditReportWindow: boolean = false;
   public reportToEdit: ImagingReportViewModel = null;
+  public tempReportToEdit: ImagingReportViewModel[] = [];
   public currentPatient: Patient = null;
   EditReport() {
 
     this.reportToEdit = Object.assign({}, this.report);
     this.reportToEdit.PrescriberId = this.report.PrescriberId;
+    this.reportToEdit.ReferredById = this.report.ReferredById;
 
     this.currentPatient = <Patient>{
       PatientId: this.report.PatientId,
@@ -297,11 +437,13 @@ export class ViewReportComponent {
     this.showImagingReport = false;
     this.reportToEdit.Signatories = JSON.stringify(this.report.Signatories);
     this.reportToEdit.ReportText = this.sanitizer.sanitize(SecurityContext.HTML, this.report.ReportText);
+    this.tempReportToEdit.push(this.reportToEdit);
     this.showEditReportWindow = true;
 
   }
 
 
+  footerText: Array<any> = [];
 
   //post report called from post-report component using event emitter.
   UpdatePatientReport($event): void {
@@ -309,12 +451,14 @@ export class ViewReportComponent {
     try {
 
       let selReport = $event.report;
+      this.selectedTemplateStyle = $event.selectedTemplateStyle;
       let printReport = false;
       let isUpdate: boolean = false;
       if ($event.orderStatus == "print") {
         printReport = true;
         $event.orderStatus = "pending";
       }
+      this.footerText = selReport[0].FooterTextsList;
 
       if (selReport.ImagingReportId)
         isUpdate = true;
@@ -348,21 +492,26 @@ export class ViewReportComponent {
 
 
   OpenChangeDocPopup() {
-    this.showChangeReferrerPopUp = false;
+    this.ShowChangePrescriberPopUp = false;
     this.selectedPrescriberId = null;
     this.changeDetector.detectChanges();
-    this.showChangeReferrerPopUp = true;
+    this.ShowChangePrescriberPopUp = true;
+  }
+  OpenChangeReferrerPopUp() {
+    this.changeDetector.detectChanges();
+    this.ShowChangeReferrerPopUp = true;
   }
 
 
 
   closeReferrerPopup() {
-    this.showChangeReferrerPopUp = false;
+    this.ShowChangePrescriberPopUp = false;
+    this.ShowChangeReferrerPopUp = false;
   }
 
 
 
-  UpdateReferredByDrToDB() {
+  UpdatePrescriberByDr() {
 
     if (!this.selectedPrescriberId && !this.selectedPrescriberName) {
       this.messageBoxService.showMessage("failed", ["No Doctor Selected or Written."]);
@@ -399,46 +548,63 @@ export class ViewReportComponent {
       }
     }
 
-    this.showChangeReferrerPopUp = false;
+    this.ShowChangePrescriberPopUp = false;
 
   }
 
-
-  RemoveSignatureImage() {
-    if (this.showDigitalSignatureImage) {
-      this.showDigitalSignatureImage = false;
-      document.getElementById("btnShowHideSignaImage").innerHTML = "Show Image";
-    } else {
-      this.showDigitalSignatureImage = true;
-      document.getElementById("btnShowHideSignaImage").innerHTML = "Hide Signature";
-    }
-
+  handleImageError(event: Event): void {
+    const imgElement = event.target as HTMLImageElement;
+    imgElement.style.display = 'none'; // Hide the image logo, if not found iin the given path 
   }
 
   CloseSendEmailPopUp() {
     this.showEmailDataBox = false;
   }
 
-
   ProcessSendingData() {
     this.loading = false;
 
-    this.radEmail = new RadEmailModel();
+    this.radEmail = new CommonEmailModel();
 
     if (this.emailSettings.PdfContent) {
-      html2canvas(document.getElementById("printpage"), {
-        scale: 1
-      }).then(canvas => {
-        var image = canvas.toDataURL("image/png");
-        var ratio = canvas.width / canvas.height;
-        var imageWidth = 210;
-        var imageHeight = imageWidth / ratio;
-
-        var pdfSize: any = [210, imageHeight];
-
-        var doc = new jsPDF('p', 'mm', pdfSize);
-        doc.addImage(image, 'PNG', 0, 0, 210, imageHeight);
-        var binary = doc.output();
+      var dom = document.getElementById("printpage");
+      dom.style.border = "none";
+      html2canvas(dom, {
+        useCORS: true,
+        allowTaint: true,
+        scrollY: 0
+      }).then((canvas) => {
+        const image = { type: 'jpeg', quality: 2 };
+        const margin = [0.5, 0.5];
+        var imgWidth = 8.5;
+        var pageHeight = 11;
+        var innerPageWidth = imgWidth - margin[0] * 2;
+        var innerPageHeight = pageHeight - margin[1] * 2;
+        var pxFullHeight = canvas.height;
+        var pxPageHeight = Math.floor(canvas.width * (pageHeight / imgWidth));
+        var nPages = Math.ceil(pxFullHeight / pxPageHeight);
+        var pageHeight = innerPageHeight;
+        var pageCanvas = document.createElement('canvas');
+        var pageCtx = pageCanvas.getContext('2d');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = pxPageHeight;
+        var pdf = new jsPDF('p', 'in', 'a4');
+        for (var page = 0; page < nPages; page++) {
+          if (page === nPages - 1 && pxFullHeight % pxPageHeight !== 0) {
+            pageCanvas.height = pxFullHeight % pxPageHeight;
+            pageHeight = (pageCanvas.height * innerPageWidth) / pageCanvas.width;
+          }
+          var w = pageCanvas.width;
+          var h = pageCanvas.height;
+          pageCtx.fillStyle = 'white';
+          pageCtx.fillRect(0, 0, w, h);
+          pageCtx.drawImage(canvas, 5, page * pxPageHeight, w, h, 0, 0, w, h);
+          if (page > 0)
+            pdf.addPage();
+          var imgData = pageCanvas.toDataURL('image/' + image.type, image.quality);
+          pdf.addImage(imgData, image.type, margin[1], margin[0], innerPageWidth, pageHeight);
+        }
+        var binary = pdf.output();
         this.radEmail.PdfBase64 = btoa(binary);
         this.radEmail.AttachmentFileName = this.report.PatientName + "-" + moment().format("YYMMDDHHmm") + '.pdf';
       });
@@ -446,9 +612,13 @@ export class ViewReportComponent {
 
     this.radEmail.SendHtml = this.emailSettings.TextContent;
     this.radEmail.SendPdf = this.emailSettings.PdfContent;
-    this.radEmail.SenderTitle = this.emailSettings.SenderTitle;
+    //this.radEmail.SenderTitle = this.emailSettings.SenderTitle;
     this.radEmail.SenderEmailAddress = this.emailSettings.SenderEmail;
     this.radEmail.Subject = 'Report of ' + this.report.PatientName;
+    this.radEmail.SmtpServer = this.emailSettings.SmtpServer;
+    this.radEmail.Password = this.emailSettings.Password;
+    this.radEmail.PortNo = this.emailSettings.PortNo;
+    this.radEmail.EmailApiKey = this.emailSettings.EmailApiKey;
 
     this.LoadEmailAttachments_Images();
 
@@ -536,9 +706,9 @@ export class ViewReportComponent {
 
     if (this.radEmail && (this.radEmail.SendHtml || this.radEmail.SendPdf)) {
       this.radEmail.EmailList = new Array<string>();
-      for (var valCtrls in this.radEmail.RadEmailValidator.controls) {
-        this.radEmail.RadEmailValidator.controls[valCtrls].markAsDirty();
-        this.radEmail.RadEmailValidator.controls[valCtrls].updateValueAndValidity();
+      for (var valCtrls in this.radEmail.EmailValidator.controls) {
+        this.radEmail.EmailValidator.controls[valCtrls].markAsDirty();
+        this.radEmail.EmailValidator.controls[valCtrls].updateValueAndValidity();
       }
 
       if (this.radEmail.IsValidCheck(undefined, undefined)) {
@@ -602,17 +772,14 @@ export class ViewReportComponent {
   selectedPrescriberId: number = null;
   selectedPrescriberName: string = null;
 
-  OnReferrerChanged($event) {
+  OnPrescriberChanged($event) {
     this.selectedPrescriberId = $event.ReferrerId; //EmployeeId comes as ReferrerId from select referrer component.
     this.selectedPrescriberName = $event.ReferrerName;//EmployeeName comes as ReferrerName from select referrer component.
-
   }
-
   //end: Pratik: 20Sept'19--For External Referrals
 
 
   //start: Pratik:20Sept show Patient Name of Report Header in Local Language
-
   public isLocalNameSelected: boolean = false;
   public PatientNameToDisplay: string = null;
 
@@ -667,8 +834,123 @@ export class ViewReportComponent {
       return { LocalNameEnabled: false, DefaultLocalLang: false };
     }
   }
-
   //end: Pratik:20Sept show Patient Name of Report Header in Local Language
+
+  // maintain footer gaps in print page 
+  public AddGapInPrintPage() {
+    const currParam = this.coreService.Parameters.find(
+      (a) => a.ParameterGroupName === "Radiology" && a.ParameterName === "RadiologyPrintFooterGap"
+    );
+
+    if (currParam && currParam.ParameterValue) {
+      let parmaValue = JSON.parse(currParam.ParameterValue);
+      this.PrintFooterGap = parmaValue.FooterGap;
+    } else {
+      this.PrintFooterGap = 0;
+    }
+  }
+  GetParamForSignatureDisplay() {
+    const currParam = this.coreService.Parameters.find(
+      (a) => a.ParameterGroupName === "Radiology" && a.ParameterName === "DisplayRadiologySignatureOnRight");
+    if (currParam && currParam.ParameterValue) {
+      this.DisplaySignatureOnRight = JSON.parse(currParam.ParameterValue);
+    }
+    else {
+      this.DisplaySignatureOnRight = false;
+    }
+  }
+  GetParamForRadiologyReportMargin() {
+    const currParam = this.coreService.Parameters.find(
+      (a) => a.ParameterGroupName === "Radiology" && a.ParameterName === "RadiologyReportMarginSettings");
+    if (currParam && currParam.ParameterValue) {
+      this.RadiologyReportMarginSettings = JSON.parse(currParam.ParameterValue);
+    }
+    else {
+      this.RadiologyReportMarginSettings = {
+        "MarginTop": 0,
+        "MarginRight": 0,
+        "MarginBottom": 0,
+        "MarginLeft": 0,
+      };
+    }
+  }
+  HideShowPrintCount() {
+    const currParam = this.coreService.Parameters.find(
+      (a) => a.ParameterGroupName === "Radiology" && a.ParameterName === "ShowPrintCount");
+    if (currParam && currParam.ParameterValue) {
+      this.ShowPrintCount = JSON.parse(currParam.ParameterValue);
+    }
+    else {
+      this.ShowPrintCount = false;
+    }
+  }
+  OnReferrerChanged($event) {
+    this.SelectedRefId = $event.ReferrerId;
+    this.SelectedReferrerName = $event.ReferrerName;
+
+  }
+  UpdateReferredBy() {
+    if (!this.SelectedRefId && !this.SelectedReferrerName) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["No Doctor Selected or Written."]);
+    }
+    else {
+      if (this.requisitionId) {
+        if (this.SelectedRefId && this.SelectedReferrerName.trim() != '') {
+          this.imagingBLService.UpdateReferrer(this.SelectedRefId, this.SelectedReferrerName, this.requisitionId)
+            .subscribe((res: DanpheHTTPResponse) => {
+              if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                this.report["ReferredByName"] = res.Results;
+                this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Referrer Updated Successfully."]);
+              }
+              else {
+                this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Referrer Name cannot be Updated in your Lab Report"]);
+              }
+            });
+        }
+        else {
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["No Referrer Selected or Written."]);
+        }
+      }
+      else {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["There is no requisitions !!"]);
+      }
+    }
+    this.ShowChangeReferrerPopUp = false;
+  }
+  GetRadiologyReportDisplayConfig() {
+    const currParam = this.coreService.Parameters.find(
+      (a) => a.ParameterGroupName === "Radiology" && a.ParameterName === "RadiologyReportDisplayConfig");
+    if (currParam.ParameterValue) {
+      const parsValue = JSON.parse(currParam.ParameterValue);
+      this.PatientHeaderOnAllPages = !!parsValue.PatientHeaderOnAllPages;
+      this.SignatoriesOnAllPages = !!parsValue.SignatoriesOnAllPages;
+      this.IsSignatureAtBottomOfLastPage = !!parsValue.IsSignatureAtBottomOfLastPage;
+    }
+  }
+
+  public GetTemplateStyleByTemplateId(templateReportId: number | undefined | null): void {
+    this.TemplateStyleList = this.radiologyService.TemplateStyleList;
+    if (this.TemplateStyleList && this.TemplateStyleList.length) {
+      this.selectTemplate(templateReportId);
+    } else {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["There is no template style. Please select one from setting."])
+    }
+    return;
+
+  }
+
+  selectTemplate(templateReportId: number | undefined | null) {
+    if (!this.TemplateStyleList || this.TemplateStyleList.length === 0) {
+      this.selectedTemplateStyle = null;
+      return;
+    }
+    const tempStyle = this.TemplateStyleList.find(temp => (temp.TemplateId === templateReportId && temp.IsActive === true) || null);
+    if (tempStyle) {
+      this.selectedTemplateStyle = tempStyle;
+    } else {
+      this.selectedTemplateStyle = this.TemplateStyleList.find(temp => temp.IsActive === true && temp.TemplateCode.toLocaleLowerCase() === ENUM_TemplateStyleName.Default);
+    }
+  }
 
 }
 

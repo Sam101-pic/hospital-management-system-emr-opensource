@@ -12,4 +12,8 @@ export class StickerBLService {
         return this.stickerDLService.GetRegistrationStickerSettingsAndData(PatientVisitId)
             .map(res => { return res });
     }
+
+    public GetTemplateByTemplateCode(templateCode: string, patientVisitId: number) {
+        return this.stickerDLService.GetTemplateByTemplateCode(templateCode, patientVisitId).map(res => { return res; });
+    }
 }

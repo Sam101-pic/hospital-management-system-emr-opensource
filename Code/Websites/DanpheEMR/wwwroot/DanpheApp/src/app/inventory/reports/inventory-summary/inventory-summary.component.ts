@@ -33,12 +33,14 @@ export class InventorySummaryComponent implements OnInit, OnDestroy {
     public InventorySummaryReportData: Array<INV_RPT_InventorySummaryReport_DTO> = new Array<INV_RPT_InventorySummaryReport_DTO>();
     public Store: StoreModel = { StoreId: null, StoreName: 'All' };
     public storeId: number = null;
+    public Footer: string = "";
 
 
     public summary = {
         OpeningValue: 0, OpeningQuantity: 0, PurchaseValue: 0, PurchaseQuantity: 0, StockManageInValue: 0, StockManageInQuantity: 0, StockManageOutValue: 0,
         StockManageOutQuantity: 0, DispatchValue_Capital: 0, DispatchQuantity_Capital: 0, DispatchValue_Consumables: 0, DispatchQuantity_Consumables: 0,
-        ClosingValue: 0, ClosingQuantity: 0, ConsumptionValue: 0, ConsumptionQuantity: 0, TransInQty: 0, TransInValue: 0, TransOutQty: 0, TransOutValue: 0
+        ClosingValue: 0, ClosingQuantity: 0, ConsumptionValue: 0, ConsumptionQuantity: 0, TransInQty: 0, TransInValue: 0, TransOutQty: 0, TransOutValue: 0,
+        WriteOffQuantity: 0, WriteOffValue: 0
     };
     public loading: boolean = false;
     dateRange: string;
@@ -49,24 +51,29 @@ export class InventorySummaryComponent implements OnInit, OnDestroy {
         public msgBoxServ: MessageboxService, public coreService: CoreService,
         public reportServ: ReportingService, public changeDetector: ChangeDetectorRef
     ) {
-        this.CreateDynamicColumnList();
-        this.GetAllStoreList();
+        this.GetConsumptionOrDispatchSelectionParameter();
+
     }
     gridExportOptions = {
         fileName: 'InventorySummaryList' + moment().format('YYYY-MM-DD') + '.xls',
     };
 
     ngOnInit() {
-        //decide inventory from consumption or dispath        
-        var paramValue = this.coreService.Parameters.find(a => a.ParameterName == 'ConsumptionOrDispatchForReports' && a.ParameterGroupName == 'Inventory').ParameterValue;
-        if (paramValue) {
-            this.ConsumptionOrDispatch = paramValue;
-            if (this.ConsumptionOrDispatch == "consumption") {
-                this.reportServ.reportGridCols.InventorySummaryReport.push({ headerName: "Consumption Value", field: "ConsumptionValue", width: 70 });
-            }
-            this.reportServ.reportGridCols.InventorySummaryReport.push({ headerName: "Closing Value", field: "ClosingValue", width: 70 });
+        this.CreateDynamicColumnList();
+        this.GetAllStoreList();
+        if (this.ConsumptionOrDispatch == "consumption") {
+            this.reportServ.reportGridCols.InventorySummaryReport.push({ headerName: "Consumption Value", field: "ConsumptionValue", width: 70 });
         }
+        this.reportServ.reportGridCols.InventorySummaryReport.push({ headerName: "Closing Value", field: "ClosingValue", width: 70 });
+
         this.InventorySummaryReportColumns = this.reportServ.reportGridCols.InventorySummaryReport;
+    }
+
+    GetConsumptionOrDispatchSelectionParameter() {
+        let consumptionOrDispatchParameter = this.coreService.Parameters.find(a => a.ParameterName == 'ConsumptionOrDispatchForReports' && a.ParameterGroupName == 'Inventory');
+        if (consumptionOrDispatchParameter) {
+            this.ConsumptionOrDispatch = consumptionOrDispatchParameter.ParameterValue;
+        }
     }
     ngOnDestroy() {
 
@@ -74,6 +81,10 @@ export class InventorySummaryComponent implements OnInit, OnDestroy {
     }
     ngAfterViewChecked() {
         this.dateRange = "<b>From:</b>&nbsp;" + this.FromDate + "&nbsp;<b>To:</b>&nbsp;" + this.ToDate;
+        let footerContent = document.getElementById("id_print_inventory_summary_report");
+        if (footerContent) {
+            this.Footer = document.getElementById("id_print_inventory_summary_report").innerHTML;
+        }
     }
     private GetAllStoreList() {
         this.inventoryBLService.GetAllSubStores().subscribe(res => {
@@ -101,6 +112,7 @@ export class InventorySummaryComponent implements OnInit, OnDestroy {
         this.dynamicQtyColumList.push({ headerName: "StockManage-Out Qty", field: "StockManageOutQty", width: 70 });
         this.dynamicQtyColumList.push({ headerName: "StockManage-In Qty", field: "StockManageInQty", width: 70 });
         this.dynamicQtyColumList.push({ headerName: "Closing Qty", field: "ClosingQty", width: 70 });
+        this.dynamicQtyColumList.push({ headerName: "Write-Off Qty", field: "WriteOffQty", width: 70 });
     }
     onChangeColumnSelection($event) {
         //remove all qty columns
@@ -203,7 +215,7 @@ export class InventorySummaryComponent implements OnInit, OnDestroy {
             = this.summary.StockManageInQuantity = this.summary.StockManageOutValue
             = this.summary.StockManageOutQuantity = this.summary.DispatchValue_Capital = this.summary.DispatchQuantity_Capital = this.summary.DispatchValue_Consumables
             = this.summary.DispatchQuantity_Consumables = this.summary.ClosingValue = this.summary.ClosingQuantity
-            = this.summary.ConsumptionValue = this.summary.ConsumptionQuantity = this.summary.StockManageInValue = 0;
+            = this.summary.ConsumptionValue = this.summary.ConsumptionQuantity = this.summary.StockManageInValue = this.summary.WriteOffQuantity = this.summary.WriteOffValue = 0;
 
         if (data && data.length > 0) {
             data.forEach(row => {
@@ -221,6 +233,8 @@ export class InventorySummaryComponent implements OnInit, OnDestroy {
                 this.summary.TransInValue += row.TransInValue;
                 this.summary.TransOutQty += row.TransOutQty;
                 this.summary.TransOutValue += row.TransOutValue;
+                this.summary.WriteOffValue += row.WriteOffValue;
+                this.summary.WriteOffQuantity += row.WriteOffQty;
                 if (this.ConsumptionOrDispatch == "dispatch") {
                     //Need to add Capital and Consumables into Different Variables.
                     if (row.ItemType.toLowerCase() == "consumables") {

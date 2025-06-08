@@ -43,8 +43,8 @@ export class PHRMStockListComponent implements OnInit {
     this.stockDetailsGridColumns = this.isSelectedDispensaryInsurance ? PHRMGridColumns.PHRMInsuranceStockList : PHRMGridColumns.PHRMStockList;
     this.currentDispensary = this._dispensaryService.activeDispensary;
     this.selectedStoreId = this.currentDispensary.StoreId;
-    this.getAllItemsStockDetailsList();
     this.GetPharmacyStores();
+    this.getAllItemsStockDetailsList();
   }
   ngOnInit() {
     this.globalListenFunc = this.renderer2.listen('document', 'keydown', e => {
@@ -54,12 +54,10 @@ export class PHRMStockListComponent implements OnInit {
     });
   }
   public getAllItemsStockDetailsList() {
-    this.pharmacyBLService.GetAllItemsStockDetailsList()
+    this.pharmacyBLService.GetAllItemsStockDetailsList(this.selectedStoreId, this.showStockWithZeroQty)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.stockDetailsList = res.Results;
-          this.stockDetailsListCopy = this.stockDetailsList;
-          this.FilterStockList();
         }
         else {
           this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to get StockDetailsList. " + res.ErrorMessage]);
@@ -69,22 +67,7 @@ export class PHRMStockListComponent implements OnInit {
           this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to get StockDetailsList. " + err.ErrorMessage]);
         });
   }
-  //Showing zero quantity item details
-  FilterStockList() {
-    if (this.selectedStoreId) {
-      this.stockDetailsList = this.stockDetailsListCopy.filter(item => item.StoreId == this.selectedStoreId);
-    }
-    else {
-      this.stockDetailsList = this.stockDetailsListCopy;
-    }
-    if (this.showStockWithZeroQty) {
-      this.stockDetailsList = this.stockDetailsList.filter(a => a.AvailableQuantity < 1);
-    }
-    else {
-      this.stockDetailsList = this.stockDetailsList.filter(a => a.AvailableQuantity > 0);
-    }
-  }
-  ////Grid Action Method
+
   StockDetailsGridAction($event: GridEmitModel) {
     switch ($event.Action) {
       case "manage-stock": {
@@ -187,5 +170,9 @@ export class PHRMStockListComponent implements OnInit {
           this.msgBoxServ.showMessage("Error", ["Stores are not available."]);
         }
       });
+  }
+
+  LoadStock() {
+    this.getAllItemsStockDetailsList();
   }
 }

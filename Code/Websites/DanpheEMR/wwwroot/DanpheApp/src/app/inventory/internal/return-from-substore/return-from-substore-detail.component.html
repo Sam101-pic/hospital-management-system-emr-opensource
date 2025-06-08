@@ -14,11 +14,11 @@
                                                 <div class="media text-muted receiveContainer">
                                                     <span class="media-body small border-bottom border-gray">
                                                         <strong>Returned From:</strong>
-                                                        {{ReturnedItem.SourceStore}}
+                                                        {{SourceStore}}
                                                     </span>
                                                     <span class="media-body small border-bottom border-gray">
                                                         <strong>Received By:</strong>
-                                                        <div>{{ReturnedItem.ReceivedByName}}</div>
+                                                        <div>{{ReceivedByName}}</div>
                                                         <ng-template #elseBlockOne>Not Received</ng-template>
                                                     </span>
                                                     <span class="media-body small border-bottom border-gray">
@@ -34,22 +34,31 @@
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                <tr>
-                                                                    <td style="text-align: left;">{{ReturnedItem.Item}}</td>
-                                                                    <td style="text-align: left;">{{ReturnedItem.BatchNo}}</td>
-                                                                    <td style="text-align: left;"><b>{{ReturnedItem.ReturnedQuantity}}</b></td>
+                                                                <tr *ngFor="let ReturnItem of ReturnedItemList">
+                                                                    <td style="text-align: left;">{{ReturnItem.Item}}</td>
+                                                                    <td style="text-align: left;">{{ReturnItem.BatchNo}}</td>
+                                                                    <td style="text-align: left;"><b>{{ReturnItem.ReturnedQuantity}}</b></td>
                                                                 </tr>
                                                             </tbody>
                                                         </table>
                                                     </div>
                                                     <div class="media-body small border-bottom border-gray">
-                                                        <div>
-                                                            <strong class="col-md-2">Receiving Remarks :</strong>
-                                                            <textarea class="col-md-7" id="remarks" [(ngModel)]="ReturnedItem.ReceivedRemarks" name="ReceiveRemarks" rows="3"></textarea>
-                                                        </div>
+                                                        <form [formGroup]="ReturnFromSubstoreValidator">
+                                                            <div>
+                                                                <strong class="col-md-2">Receiving Remarks<sup style="color:red">*</sup> :</strong>
+                                                                <textarea class="col-md-7" id="remarks" formControlName="ReceivingRemarks"
+                                                                          rows="3"></textarea>
+
+                                                            </div>
+                                                            <span class="color-red font-sm"
+                                                                  *ngIf="ReturnFromSubstoreValidator.get('ReceivingRemarks')?.hasError('required') && ReturnFromSubstoreValidator.get('ReceivingRemarks').touched">
+                                                                <small>Remarks is Required</small>
+                                                            </span>
+                                                        </form>
                                                     </div>
-                                                    <div class="text-center">
-                                                        <button class="btn green btn-success" id="btn_Save" (click)="ReceiveIncomingStock()">Receive</button>
+                                                    <div class="text-center" style="margin-top:10px; margin-bottom:10px;">
+                                                        <button class="btn green btn-success" id="btn_Save"
+                                                                (click)="ReceiveIncomingStock()">Receive</button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -84,17 +93,17 @@
 
                                                     <span class="media-body small border-bottom border-gray">
                                                         <strong>Returned From:</strong>
-                                                        {{ReturnedItem.SourceStore}}
+                                                        {{SourceStore}}
                                                         <!-- get the source store -->
                                                     </span>
                                                     <span class="media-body small border-bottom border-gray">
                                                         <strong>Received By:</strong>
-                                                        <div>{{ReturnedItem.ReceivedByName}}</div>
+                                                        <div>{{ReceivedByName}}</div>
                                                         <ng-template #elseBlockOne>Not Received</ng-template>
                                                     </span>
                                                     <span class="media-body small border-bottom border-gray">
                                                         <strong>Received On:</strong>
-                                                        <div>{{ReturnedItem.ReceivedOn | date : "yyyy-MM-dd"}}</div>
+                                                        <div>{{ReceivedOn | date : "yyyy-MM-dd"}}</div>
 
                                                         <!-- <div *ngIf="!!incomingStockDetail.ReceivedOn; else elseBlockTwo">
                                                                 {{incomingStockDetail.ReceivedOn | date : "yyyy-MM-dd"}}
@@ -113,11 +122,12 @@
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                <tr>
-                                                                    <td style="text-align: left;">{{ReturnedItem.Item}}(<i style="color: blue;"></i>)</td>
-                                                                    <td style="text-align: left;">{{ReturnedItem.BatchNo}}</td>
+                                                                <tr *ngFor="let ReturnItem of ReturnedItemList">
+                                                                    <td style="text-align: left;">{{ReturnItem.Item}}(<i style="color: blue;"></i>)
+                                                                    </td>
+                                                                    <td style="text-align: left;">{{ReturnItem.BatchNo}}</td>
                                                                     <!-- <td style="text-align: left;">{{item.ExpiryDate | date : "yyyy-MM-dd"}}</td> -->
-                                                                    <td style="text-align: left;"><b>{{ReturnedItem.ReturnedQuantity}}</b></td>
+                                                                    <td style="text-align: left;"><b>{{ReturnItem.ReturnedQuantity}}</b></td>
                                                                 </tr>
                                                             </tbody>
                                                         </table>
@@ -129,11 +139,13 @@
                                                             </div><br /> -->
                                                         <div>
                                                             <strong class="col-md-2">Receiving Remarks :</strong>
-                                                            <textarea disabled class="col-md-7" id="remarks" [(ngModel)]="ReturnedItem.ReceivedRemarks" name="ReceiveRemarks" rows="3"></textarea>
+                                                            <textarea disabled class="col-md-7" id="remarks"
+                                                                      [(ngModel)]="ReceivedRemarks" name="ReceiveRemarks"
+                                                                      rows="3"></textarea>
                                                         </div>
                                                     </div>
-                                                    <div class="text-center">
-                                                        <button class="btn green btn-success" id="btn_Save" (click)="Cancel()">Cancel</button>
+                                                    <div class="text-center" style="margin-top:10px; margin-bottom:10px;">
+                                                        <button class="btn green btn-success" id="btn_Save" (click)="Cancel()">Close</button>
                                                     </div>
                                                 </div>
                                             </div>

@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using DanpheEMR.Sync.IRDNepal.Models;
+using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Configuration;
-using DanpheEMR.Sync.IRDNepal.Models;
-using DanpheEMR.ServerModel;
 
 
 namespace DanpheEMR.Sync.IRDNepal
@@ -15,36 +9,36 @@ namespace DanpheEMR.Sync.IRDNepal
     public class APIs
     {
 
-        public static string PostSalesBillToIRD(IRD_BillViewModel salesBill)
+        public static string PostSalesBillToIRD(IRD_BillViewModel salesBill, IrdConfigsDTO irdConfigs)
         {
             //return "200";
-            string url_IRDNepal = ConfigurationManager.AppSettings["url_IRDNepal"];
-            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesIRDNepal"];
+            string url_IRDNepal = irdConfigs.url_IRDNepal; //ConfigurationManager.AppSettings["url_IRDNepal"];
+            string api_SalesIRDNepal = irdConfigs.api_SalesIRDNepal; // ConfigurationManager.AppSettings["api_SalesIRDNepal"];
 
             string respMsg = PostCmmonBillToIRd(salesBill, url_IRDNepal, api_SalesIRDNepal);
             return respMsg;
         }
-        public static string PostSalesReturnBillToIRD(IRD_BillReturnViewModel salesReturnBill)
+        public static string PostSalesReturnBillToIRD(IRD_BillReturnViewModel salesReturnBill, IrdConfigsDTO irdConfigs)
         {
             //return "200";
-            string url_IRDNepal = ConfigurationManager.AppSettings["url_IRDNepal"];
-            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
+            string url_IRDNepal = irdConfigs.url_IRDNepal; //ConfigurationManager.AppSettings["url_IRDNepal"];
+            string api_SalesIRDNepal = irdConfigs.api_SalesReturnIRDNepal; //ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
             string respMsg = PostCmmonBillToIRd(salesReturnBill, url_IRDNepal, api_SalesIRDNepal);
             return respMsg;
         }
-        public static string PostPhrmInvoiceToIRD(IRD_PHRMBillSaleViewModel salesBill)
+        public static string PostPhrmInvoiceToIRD(IRD_PHRMBillSaleViewModel salesBill, IrdConfigsDTO irdConfigs)
         {
             //return "200";
-            string url_IRDNepal = ConfigurationManager.AppSettings["url_IRDNepal"];
-            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesIRDNepal"];
+            string url_IRDNepal = irdConfigs.url_IRDNepal; //ConfigurationManager.AppSettings["url_IRDNepal"];
+            string api_SalesIRDNepal = irdConfigs.api_SalesIRDNepal; //ConfigurationManager.AppSettings["api_SalesIRDNepal"];
             string respMsg = PostCmmonBillToIRd(salesBill, url_IRDNepal, api_SalesIRDNepal);
             return respMsg;
         }
-        public static string PostPhrmInvoiceReturnToIRD(IRD_PHRMBillSaleReturnViewModel salesReturnBill)
+        public static string PostPhrmInvoiceReturnToIRD(IRD_PHRMBillSaleReturnViewModel salesReturnBill, IrdConfigsDTO irdConfigs)
         {
             //return "200";
-            string url_IRDNepal = ConfigurationManager.AppSettings["url_IRDNepal"];
-            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
+            string url_IRDNepal = irdConfigs.url_IRDNepal; //ConfigurationManager.AppSettings["url_IRDNepal"];
+            string api_SalesIRDNepal = irdConfigs.api_SalesReturnIRDNepal; //ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
             string respMsg = PostCmmonBillToIRd(salesReturnBill, url_IRDNepal, api_SalesIRDNepal);
             return respMsg;
         }

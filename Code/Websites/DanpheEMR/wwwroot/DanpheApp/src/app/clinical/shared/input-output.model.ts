@@ -22,6 +22,8 @@ export class InputOutput {
     public Quality: string = null;
     public Remarks: string = null;
     public Contents: string = null;
+    RecordedDate: string = null;
+    RecordedTime: string = null;
 
     public InputOutputValidator: FormGroup = null;
 

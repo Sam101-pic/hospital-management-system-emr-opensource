@@ -1,7 +1,14 @@
 //This grid is to show list of Lab Report Templates
 import * as moment from 'moment/moment';
+import { SecurityService } from '../../security/shared/security.service';
 
 export default class EmergencyGridColumnSettings {
+  static securityService;
+
+  constructor(private _securityService: SecurityService) {
+    EmergencyGridColumnSettings.securityService = this._securityService;
+
+  }
   static ERPatientList = [
     { headerName: "Hospital No.", width: 80, field: "PatientCode" },
     { headerName: "Name", width: 170, field: "FullName" },
@@ -104,6 +111,26 @@ export default class EmergencyGridColumnSettings {
     }
 
   ]
+  ERFinalizedPatientList = [
+    { headerName: "Hospital Number", width: 70, field: "PatientCode" },
+    { headerName: "Name", width: 110, field: "FullName" },
+    { headerName: "Age", field: "Age", width: 50 },
+    { headerName: "Gender", field: "Gender", width: 50 },
+    { headerName: "Visit Date", field: "VisitDateTime", width: 80, cellRenderer: EmergencyGridColumnSettings.VisitDate },
+    { headerName: "Triage Status", field: "TriageCode", width: 60 },
+    { headerName: "Triage Date", field: "TriagedOn", width: 60 },
+    { headerName: "Status", field: "FinalizedStatus", width: 60 },
+    { headerName: "Finalized Date", field: "FinalizedOn", width: 80, cellRenderer: EmergencyGridColumnSettings.FinalizedDate },
+    { headerName: "Remarks", field: "FinalizedRemarks", width: 60 },
+
+    {
+      headerName: "Actions",
+      field: "",
+      width: 180,
+      cellRenderer: EmergencyGridColumnSettings.FinalizedPatientGridAction
+    }
+
+  ]
 
   static ERDeathPatientList = [
     { headerName: "Hospital Number", width: 70, field: "PatientCode" },
@@ -162,6 +189,67 @@ export default class EmergencyGridColumnSettings {
 
     return agesex;
   }
+  static FinalizedPatientGridAction(params) {
+    let template = '';
+    if (params.data.DischargeSummaryId) {
+      template = `
+      <i danphe-grid-action="patientoverview" class="fa fa-tv grid-action" style="padding: 3px;" title= "overview"></i>
+      <a danphe-grid-action="edit" class="grid-action">
+          Edit
+       </a>
+       `
+      if (EmergencyGridColumnSettings.securityService.HasPermission("emergency-Discharge-summary-view")) {
+        template += `  
+        <a danphe-grid-action="view-summary" class="grid-action">
+            View Summary </a>  `
+      }
+      template += `
+      <div class="dropdown" style="display:inline-block;"> 
+       <button class="dropdown-toggle grid-btnCstm" type="button" data-toggle="dropdown">... 
+       <span class="caret"></span></button> 
+       <ul class="dropdown-menu grid-ddlCstm"> 
+          <li><a danphe-grid-action="add-vitals" >Add Vitals</a></li>`;
+
+      if (EmergencyGridColumnSettings.securityService.HasPermission("btn-emergency-undo-finalized-patient")) {
+        template += `<li><a danphe-grid-action="undo" >Undo</a></li>`;
+      }
+
+      template += ` 
+       </ul> 
+      </div>`;
+      // <a danphe-grid-action="add-vitals" class="grid-action">
+      //     Add Vitals
+      // </a>`
+    }
+    else {
+      template += `
+       <i danphe-grid-action="patientoverview" class="fa fa-tv grid-action" style="padding: 3px;" title= "overview"></i>
+      <a danphe-grid-action="edit" class="grid-action">
+          Edit
+       </a>`
+      if (EmergencyGridColumnSettings.securityService.HasPermission("emergency-Discharge-summary-view")) {
+        template += `<a danphe-grid-action="add-summary" class="grid-action">
+          Add Summary
+      </a>`}
+      template += ` 
+      <div class="dropdown" style="display:inline-block;"> 
+       <button class="dropdown-toggle grid-btnCstm" type="button" data-toggle="dropdown">... 
+       <span class="caret"></span></button> 
+       <ul class="dropdown-menu grid-ddlCstm"> 
+          <li><a danphe-grid-action="consent-file" >Consent Files</a></li>
+          <li><a danphe-grid-action="add-vitals" >Add Vitals</a></li>`;
+
+      if (EmergencyGridColumnSettings.securityService.HasPermission("btn-emergency-undo-finalized-patient")) {
+        template += `<li><a danphe-grid-action="undo" >Undo</a></li>`;
+      }
+
+      template += ` 
+       </ul> 
+      </div>`;
+    }
+    return template;
+
+  }
 
   static Action(params) {
     if (params.data.ERDischargeSummaryId) {
@@ -175,10 +263,8 @@ export default class EmergencyGridColumnSettings {
              </a>
              <a danphe-grid-action="add-vitals" class="grid-action">
                 Add Vitals
-             </a>
-            <a danphe-grid-action="dischargesummary" class="grid-action">
-                            View Summary  
              </a>`
+
     } else {
       return `
             <i danphe-grid-action="patientoverview" class="fa fa-tv grid-action" style="padding: 3px;" title= "overview"></i>
@@ -190,12 +276,16 @@ export default class EmergencyGridColumnSettings {
              </a>
              <a danphe-grid-action="add-vitals" class="grid-action">
                 Add Vitals
-             </a>
-            <a danphe-grid-action="dischargesummary" class="grid-action">
-                            Add Summary  
              </a>`
+
     }
   }
+  // <a danphe-grid-action="dischargesummary" class="grid-action"> //!These needs to be added after fixing 
+  //                 View Summary  
+  //  </a>`
+  // <a danphe-grid-action="dischargesummary" class="grid-action">
+  //                 Add Summary  
+  //  </a>`
 
   static TriageRenderer(params) {
     if (params.data.TriageCode) {
@@ -222,7 +312,7 @@ export default class EmergencyGridColumnSettings {
   }
   static FinalizedDate(params) {
     let date: string = params.data.FinalizedOn;
-    return moment(date).format('YYYY-MM-DD HH:mm');
+    return moment(date).format('YYYY-MM-DD HH:mm A');
   }
   static TriagedDate(params) {
     let date: string = params.data.TriagedOn;
@@ -231,7 +321,7 @@ export default class EmergencyGridColumnSettings {
 
   static SelectButtonsToBeDisplayed(params) {
     if (Boolean(params.data.IsAddVitalBeforeTriage) === true && params.data.vitals !== null
-      && params.data.uploadedfiles !== null) {
+      && params.data.FileId !== null) {
       let template = `
         <a danphe-grid-action="edit" class="grid-action">
           Edit
@@ -246,7 +336,7 @@ export default class EmergencyGridColumnSettings {
            View Consent
          </a>`;
       return template;
-    } else if (Boolean(params.data.IsAddVitalBeforeTriage) === false && params.data.uploadedfiles !== null) {
+    } else if (Boolean(params.data.IsAddVitalBeforeTriage) === true && params.data.FileId !== null) {
       let template = `<a danphe-grid-action="edit" class="grid-action">
             Edit
          </a>
@@ -258,19 +348,6 @@ export default class EmergencyGridColumnSettings {
          </a>
          <a danphe-grid-action="consent" class="grid-action">
         View Consent
-         </a>`;
-      return template;
-    }
-    else if (Boolean(params.data.IsAddVitalBeforeTriage) === true && params.data.uploadedfiles !== null) {
-      let template = `<a danphe-grid-action="edit" class="grid-action">
-            Edit
-         </a>
-         
-         <a danphe-grid-action="add-vitals" class="grid-action">
-            Add Vitals
-         </a>
-         <a danphe-grid-action="consent" class="grid-action">
-         View Consent
          </a>`;
       return template;
     }
@@ -287,19 +364,6 @@ export default class EmergencyGridColumnSettings {
          </a>
          <a danphe-grid-action="consent" class="grid-action">
          Upload Consent
-         </a>`;
-      return template;
-    }
-    else if (Boolean(params.data.IsAddVitalBeforeTriage) === true) {
-      let template = `
-        <a danphe-grid-action="edit" class="grid-action">
-          Edit
-        </a>
-        <a danphe-grid-action="triage" class="grid-action">
-          Triage
-        </a>
-        <a danphe-grid-action="add-vitals" class="grid-action">
-            Add Vitals
          </a>`;
       return template;
     }

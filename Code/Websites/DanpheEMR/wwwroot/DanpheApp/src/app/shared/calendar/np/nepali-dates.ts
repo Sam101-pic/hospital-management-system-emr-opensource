@@ -13,21 +13,21 @@ export class NepaliMonth {
     monthNumber: number;//1,2,3,4,
     monthDisplayNumber: string;//"01", "02"
     isEnabled: boolean = true;
-    EngmonthSeq:number;
+    EngmonthSeq: number;
     static GetNepaliMonths(): Array<NepaliMonth> {
         let nepMonths: Array<NepaliMonth> = new Array<NepaliMonth>();
-        nepMonths.push({ monthNumber: 1, monthDisplayNumber: "01", monthName: "बैशाख", isEnabled: true,EngmonthSeq: 5});
-        nepMonths.push({ monthNumber: 2, monthDisplayNumber: "02", monthName: "जेष्ठ", isEnabled: true,EngmonthSeq:6 });
-        nepMonths.push({ monthNumber: 3, monthDisplayNumber: "03", monthName: "असार", isEnabled: true ,EngmonthSeq:7});
-        nepMonths.push({ monthNumber: 4, monthDisplayNumber: "04", monthName: "श्रावन", isEnabled: true ,EngmonthSeq:8});
-        nepMonths.push({ monthNumber: 5, monthDisplayNumber: "05", monthName: "भाद्र", isEnabled: true ,EngmonthSeq:9});
-        nepMonths.push({ monthNumber: 6, monthDisplayNumber: "06", monthName: "असोज", isEnabled: true ,EngmonthSeq:10});
-        nepMonths.push({ monthNumber: 7, monthDisplayNumber: "07", monthName: "कार्तिक", isEnabled: true,EngmonthSeq:11 });
-        nepMonths.push({ monthNumber: 8, monthDisplayNumber: "08", monthName: "मङ्सिर", isEnabled: true ,EngmonthSeq:12});
-        nepMonths.push({ monthNumber: 9, monthDisplayNumber: "09", monthName: "पौष", isEnabled: true ,EngmonthSeq:1});
-        nepMonths.push({ monthNumber: 10, monthDisplayNumber: "10", monthName: "माघ", isEnabled: true ,EngmonthSeq:2});
-        nepMonths.push({ monthNumber: 11, monthDisplayNumber: "11", monthName: "फाल्गुन", isEnabled: true ,EngmonthSeq:3});
-        nepMonths.push({ monthNumber: 12, monthDisplayNumber: "12", monthName: "चैत्र", isEnabled: true ,EngmonthSeq:4});
+        nepMonths.push({ monthNumber: 1, monthDisplayNumber: "01", monthName: "बैशाख", isEnabled: true, EngmonthSeq: 5 });
+        nepMonths.push({ monthNumber: 2, monthDisplayNumber: "02", monthName: "जेष्ठ", isEnabled: true, EngmonthSeq: 6 });
+        nepMonths.push({ monthNumber: 3, monthDisplayNumber: "03", monthName: "असार", isEnabled: true, EngmonthSeq: 7 });
+        nepMonths.push({ monthNumber: 4, monthDisplayNumber: "04", monthName: "श्रावन", isEnabled: true, EngmonthSeq: 8 });
+        nepMonths.push({ monthNumber: 5, monthDisplayNumber: "05", monthName: "भाद्र", isEnabled: true, EngmonthSeq: 9 });
+        nepMonths.push({ monthNumber: 6, monthDisplayNumber: "06", monthName: "असोज", isEnabled: true, EngmonthSeq: 10 });
+        nepMonths.push({ monthNumber: 7, monthDisplayNumber: "07", monthName: "कार्तिक", isEnabled: true, EngmonthSeq: 11 });
+        nepMonths.push({ monthNumber: 8, monthDisplayNumber: "08", monthName: "मङ्सिर", isEnabled: true, EngmonthSeq: 12 });
+        nepMonths.push({ monthNumber: 9, monthDisplayNumber: "09", monthName: "पौष", isEnabled: true, EngmonthSeq: 1 });
+        nepMonths.push({ monthNumber: 10, monthDisplayNumber: "10", monthName: "माघ", isEnabled: true, EngmonthSeq: 2 });
+        nepMonths.push({ monthNumber: 11, monthDisplayNumber: "11", monthName: "फाल्गुन", isEnabled: true, EngmonthSeq: 3 });
+        nepMonths.push({ monthNumber: 12, monthDisplayNumber: "12", monthName: "चैत्र", isEnabled: true, EngmonthSeq: 4 });
         return nepMonths;
     }
 }

@@ -35,6 +35,7 @@ import { DanpheHTTPResponse } from '../../shared/common-models';
 import { CommonFunctions } from '../../shared/common.functions';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../shared/routefrom.service';
+import { ENUM_MessageBox_Status } from '../../shared/shared-enums';
 import { LabReportVM } from '../reports/lab-report-vm';
 import { LabComponentModel } from '../shared/lab-component-json.model';
 import { LoginToTelemed } from '../shared/labMasterData.model';
@@ -52,8 +53,11 @@ export class LabTestsResults {
   public showReport: boolean = false;
   @Input("showAddEditResult")
   public showAddEditResult: boolean = false;
+
   @Input("showHeader")
   public showHeader: boolean = true;
+  @Input('from-claim-scrubbing')
+  FromClaimScrubbing: boolean = false;
   @Input("showSignatories")
   public showSignatories: boolean = true;
   @Input("printReportFromGrid")
@@ -102,6 +106,7 @@ export class LabTestsResults {
   public allowOpWithProvToPrintReport: boolean = false;
   public resEditParam: boolean = false;
   public showReUploadPopup: boolean = false;
+  @Output("callback-After-Response") callbackResponse: EventEmitter<object> = new EventEmitter<object>();
   TeleMedicineUploadForm: FormGroup = new FormGroup(
     {
       phoneNumber: new FormControl("", Validators.minLength(10)),
@@ -113,10 +118,13 @@ export class LabTestsResults {
   public Login = new LoginToTelemed();
   public TeleMedicineConfiguration: any;
   public IsTeleMedicineEnabled: boolean = false;
-  public loading: boolean = false;
   public LabHeaderSetting: any;
   public IsFileUploaded: boolean = false;
   public interval: any;
+  @Input("showReportFromClaimScrubbing")
+  showReportFromClaimScrubbing: boolean = false;
+  @Input('show-print-button-from-claim-scrubbing')
+  showPrintButtonFromClaimScrubbing: boolean = false;
   constructor(public labBLService: LabsBLService, public changeDetector: ChangeDetectorRef,
     public msgBoxServ: MessageboxService, public coreService: CoreService, public securityService: SecurityService,
     public routeFromService: RouteFromService) {
@@ -143,6 +151,10 @@ export class LabTestsResults {
   ngOnInit() {
     this.LabHeader = this.coreService.GetLabReportHeaderSetting();
     this.showHeader = this.LabHeader.showLabReportHeader;
+
+    if (this.FromClaimScrubbing) {
+      this.showHeader = true;
+    }
     //this.verificationRequired = this.coreService.EnableVerificationStep();
     if (this.TMForm) {
       this.TeleMedicineUploadForm.controls["firstName"].setValue(this.TMForm.firstName);
@@ -172,10 +184,16 @@ export class LabTestsResults {
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status == "OK" && res.Results) {
           this.templateReport = res.Results;
-          this.enableResultEdit = !(this.templateReport && this.templateReport.ReportId && (this.templateReport.ReportId > 0)) || this.resEditParam;
+          if (this.templateReport && this.templateReport.Lookups) {
+            this.templateReport.Lookups.Age = this.coreService.CalculateAge(this.templateReport.Lookups.DOB);
+          }
+          if (!this.showReportFromClaimScrubbing)
+            this.enableResultEdit = !(this.templateReport && this.templateReport.ReportId && (this.templateReport.ReportId > 0)) || this.resEditParam;
           this.MapSequence();
           // this.requisitionIdList = [];
           //below below should be called only when 
+
+          this.callbackResponse.emit({ IsDataReceived: true });
           if (isAfterEdit) {
             this.showAddEditResult = false;
             this.showReport = true;
@@ -191,7 +209,7 @@ export class LabTestsResults {
 
         }
         else {
-          this.msgBoxServ.showMessage("failed", ["Unable to get lab reports."]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Unable to get lab reports."]);
           console.log(res.ErrorMessage);
         }
 
@@ -445,7 +463,7 @@ export class LabTestsResults {
           formData.append("Files", file, file.name);
           this.labBLService.uploadFile(this.TeleMedicineConfiguration.TeleMedicineBaseUrl, this.TeleMedicineUploadForm.value, formData).subscribe((res) => {
             if (res) {
-              this.msgBoxServ.showMessage('success', ['Lab Report is Successfully Uploaded.']);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Lab Report is Successfully Uploaded.']);
               this.labBLService.UpdateFileUploadStatus(this.requisitionIdList).subscribe((res) => {
 
               });
@@ -454,7 +472,7 @@ export class LabTestsResults {
             }
           }, err => {
             this.coreService.loading = false;
-            this.msgBoxServ.showMessage('error', ['Something went wrong. Unable to uplaod lab report !!!.']);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Something went wrong. Unable to upload lab report !!!.']);
             this.IsFileUploaded = false;
             console.log(err);
           });
@@ -465,7 +483,7 @@ export class LabTestsResults {
     }
     else {
       this.coreService.loading = false;
-      this.msgBoxServ.showMessage("warning", ["Please Provide valid Phone Number to this patient."]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please Provide valid Phone Number to this patient."]);
     }
   }
 

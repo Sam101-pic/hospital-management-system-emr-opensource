@@ -1,7 +1,8 @@
 <div class="app-wrap">
   <div class="card-section">
     <div class="filter-wrap">
-      <from-to-date-select (on-change)="OnCardFromToDateChange($event)" [emit-always]="false">
+      <from-to-date-select (on-change)="OnCardFromToDateChange($event)" [emit-always]="false"
+                           [date-settings-name]="'common-range-with-today'">
       </from-to-date-select>
     </div>
     <div class="row">
@@ -260,7 +261,10 @@
                   <a ngbDropdownItem href="#">Test2</a>
                   <a ngbDropdownItem href="#">Test3</a>
                 </div> -->
-                <input danphe-auto-complete class="form-control" [(ngModel)]="selectedTest" value="" [source]="allLabTests" [list-formatter]="LabTestNameListFormatter" placeholder="--Select Test Name--" display-property-name="LabTestName" value-property-name=null onClick="this.select();" (ngModelChange)="AssignSelectedTest()" min-chars="1" [grid-sort]="'LabTestName'" match-formatted="true">
+                <input danphe-auto-complete class="form-control" [(ngModel)]="selectedTest" value="" [source]="allLabTests"
+                       [list-formatter]="LabTestNameListFormatter" placeholder="--Select Test Name--" display-property-name="LabTestName"
+                       value-property-name=null onClick="this.select();" (ngModelChange)="AssignSelectedTest()" min-chars="1"
+                       [grid-sort]="'LabTestName'" match-formatted="true">
 
               </div>
             </div>

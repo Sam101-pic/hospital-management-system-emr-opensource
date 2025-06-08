@@ -20,7 +20,8 @@ import { CRN_CreditNoteAllInfoVM, CRN_InvoiceItemsVM } from "../shared/credit-no
 
 @Component({
   templateUrl: "./bill-credit-note.html",
-  styleUrls: ['./bill-credit-note.component.css']
+  styleUrls: ['./bill-credit-note.component.css'],
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 
 export class BILL_CreditNoteComponent {
@@ -187,7 +188,7 @@ export class BILL_CreditNoteComponent {
 
 
   CheckClaimStatus(claimCode: number, patientId: number): void {
-    this.BillingBLService.IsClaimed(claimCode, patientId)
+    this.BillingBLService.IsClaimed_SSF(claimCode, patientId)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.IsInvoiceClaimed = res.Results;
@@ -278,8 +279,10 @@ export class BILL_CreditNoteComponent {
       if (this.IsCoPaymentInvoice && this.crnInfoVM.InvoiceInfo.PaymentMode.toLowerCase() === ENUM_BillPaymentMode.credit.toLowerCase()) {
         this.crnInfoVM.TransactionItems.forEach(a => {
           if (a.IsSelected) {
-            this.ReturnCashAmount += (a.CoPayCashAmount / a.ReturnQuantity);
-            this.ReturnCreditAmount += (a.CoPayCreditAmount / a.ReturnQuantity);
+            // this.ReturnCashAmount += (a.CoPayCashAmount / a.ReturnQuantity);
+            // this.ReturnCreditAmount += (a.CoPayCreditAmount / a.ReturnQuantity);
+            this.ReturnCashAmount += ((a.CoPayCashAmount / a.TotalQuantity) * a.ReturnQuantity);
+            this.ReturnCreditAmount += ((a.CoPayCreditAmount / a.TotalQuantity) * a.ReturnQuantity);
           }
         });
       } else if (this.crnInfoVM.InvoiceInfo.PaymentMode.toLowerCase() === ENUM_BillPaymentMode.credit.toLowerCase()) {
@@ -591,6 +594,12 @@ export class BILL_CreditNoteComponent {
       this.crnInfoVM.TransactionItems.forEach(itm => {
         itm.IsSelected = false;
       });
+    }
+  }
+
+  public hotkeys(event) {
+    if (event.keyCode == 27) {
+      this.ClosePrintPage();
     }
   }
 }

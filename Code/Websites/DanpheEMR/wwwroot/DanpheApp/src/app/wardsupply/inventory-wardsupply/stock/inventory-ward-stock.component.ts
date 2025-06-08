@@ -1,16 +1,16 @@
-import { Component, ChangeDetectorRef } from '@angular/core'
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { WardSupplyBLService } from '../../shared/wardsupply.bl.service';
-import { WARDInventoryStockModel } from '../../shared/ward-inventory-stock.model';
-import WARDGridColumns from '../../shared/ward-grid-cloumns';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { Router } from '@angular/router';
-import * as moment from 'moment/moment'
-import { GridEmitModel } from '../../../shared/danphe-grid/grid-emit.model';
-import { SecurityService } from '../../../security/shared/security.service';
-import { PHRMStoreModel } from '../../../pharmacy/shared/phrm-store.model';
-import { wardsupplyService } from '../../shared/wardsupply.service';
+import * as moment from 'moment/moment';
 import { CoreService } from '../../../core/shared/core.service';
 import { InventoryBLService } from '../../../inventory/shared/inventory.bl.service';
+import { PHRMStoreModel } from '../../../pharmacy/shared/phrm-store.model';
+import { SecurityService } from '../../../security/shared/security.service';
+import { GridEmitModel } from '../../../shared/danphe-grid/grid-emit.model';
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import WARDGridColumns from '../../shared/ward-grid-cloumns';
+import { WARDInventoryStockModel } from '../../shared/ward-inventory-stock.model';
+import { WardSupplyBLService } from '../../shared/wardsupply.bl.service';
+import { wardsupplyService } from '../../shared/wardsupply.service';
 @Component({
   templateUrl: "./inventory-ward-stock.html" // "/WardSupplyView/Stock"
 })
@@ -112,11 +112,15 @@ export class WardInventoryStockComponent {
             if (res.Results.length > 0) {
               this.inventoryStockDetailsList = [];
               this.inventoryStockDetailsList = res.Results;
-              this.wardSupplyService.inventoryStockList = res.Results;
+              // this.inventoryStockDetailsList.forEach(s => {
+              //   s.ItemRate = CommonFunctions.parseAmount(s.ItemRate);
+              // });
+              this.wardSupplyService.inventoryStockList = this.inventoryStockDetailsList;
               this.filterStockByInventory();
               this.filterStockBySubCategory();
             }
             else {
+              this.wardSupplyService.inventoryStockList = [];
               this.msgBoxServ.showMessage("Empty", ["No stock Available."]);
               console.log(res.Errors);
             }
@@ -138,7 +142,7 @@ export class WardInventoryStockComponent {
     else if (selectedInventoryId == null && selectedSubCategoryId !== null && selectedSubCategoryId !== 0) {
       this.filterSubstoreStockList = this.inventoryStockDetailsList.filter(a => a.SubCategoryId == selectedSubCategoryId);
     }
-    else if (selectedInventoryId !== null && selectedSubCategoryId == null) {
+    else if (selectedInventoryId !== null && (selectedSubCategoryId == null || selectedSubCategoryId == 0)) {
       this.filterSubstoreStockList = this.inventoryStockDetailsList.filter(a => a.StoreId == selectedInventoryId);
 
     }

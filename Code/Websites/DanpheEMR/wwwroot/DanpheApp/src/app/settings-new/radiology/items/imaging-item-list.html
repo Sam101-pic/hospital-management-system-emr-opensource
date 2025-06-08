@@ -1,13 +1,13 @@
-
 <!--<div class="caption">
     <i class="glyphicon glyphicon-asterisk font-red-sunglo"></i>
     <span class="caption-subject font-blue bold uppercase">Manage Imaging Item</span>
 </div>
 <br />-->
 
-<a feature="button" class="btn blue bordered"  (click)="AddImgItem()"><i class="fa fa-plus"></i>Add Item</a>
+<a feature="button" class="btn blue bordered" (click)="AddImgItem()"><i class="fa fa-plus"></i>Add Item</a>
 <img-item-add [showAddPage]="showAddPage"
               [selectedImgItem]="selectedImgItem"
+              [imgItemList]="imgItemList"
               (callback-add)="CallBackAdd($event)"></img-item-add>
 
 <div class="row">
@@ -17,5 +17,3 @@
         </danphe-grid>
     </div>
 </div>
-
-

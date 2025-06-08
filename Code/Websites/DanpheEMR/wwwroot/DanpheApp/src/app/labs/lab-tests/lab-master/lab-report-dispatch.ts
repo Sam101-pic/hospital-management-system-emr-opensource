@@ -1,21 +1,13 @@
-import { Component, ChangeDetectorRef, AfterViewInit, ElementRef, ViewChild, OnInit } from "@angular/core";
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
-import 'rxjs/Rx';
-import { Observable } from 'rxjs/Observable';
-import { PatientService } from "../../../patients/shared/patient.service";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { LabsBLService } from "../../shared/labs.bl.service";
-import { LabMasterModel, Requisition } from "../../shared/labMasterData.model";
-import { CommonFunctions } from "../../../shared/common.functions";
-import { LabPendingResultVM } from "../../shared/lab-view.models";
+import { ChangeDetectorRef, Component } from "@angular/core";
 import * as moment from 'moment/moment';
+import 'rxjs/Rx';
 import { CoreService } from "../../../core/shared/core.service";
-import { DanpheHTTPResponse } from '../../../shared/common-models';
-import { LabTestFinalReportModel, LabTestsInFinalReportModel } from '../../shared/lab-finalreport.VM';
-import { LabReportVM } from "../../reports/lab-report-vm";
-import { LabComponentModel } from '../../shared/lab-component-json.model';
+import { PatientService } from "../../../patients/shared/patient.service";
 import { SecurityService } from "../../../security/shared/security.service";
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { LabCategoryModel } from "../../shared/lab-category.model";
+import { LabsBLService } from "../../shared/labs.bl.service";
 
 @Component({
   templateUrl: "./lab-report-dispatch.html",
@@ -119,7 +111,6 @@ export class LabReportDispatchComponent {
     this.patientService.getGlobal().DateOfBirth = report.DateOfBirth;
     this.patientService.getGlobal().Gender = report.Gender;
     this.patientService.getGlobal().WardName = report.WardName;
-
   }
 
   public FilterDataByCategory() {
@@ -178,7 +169,13 @@ export class LabReportDispatchComponent {
   }
 
   GetFormattedAgeSex(dateOfBirth: string, gender: string) {
-    if (dateOfBirth && gender && (dateOfBirth.trim() != '') && (gender.trim() != ''))
-      return CommonFunctions.GetFormattedAgeSex(dateOfBirth, gender);
+    if (dateOfBirth && gender) {
+      let age = this.coreService.CalculateAge(dateOfBirth);
+      let formatAgeSex = this.coreService.FormateAgeSex(age, gender);
+      return formatAgeSex
+    }
+    else
+      return '';
+
   }
 }

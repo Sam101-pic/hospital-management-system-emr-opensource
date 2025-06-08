@@ -17,7 +17,14 @@ namespace DanpheEMR.Services.SSF.DTO
             int? subProduct = null;
             if (patientSchemeMap.RegistrationCase.ToLower() == "medical")
             {
-                subProduct = 1;
+                if(patientSchemeMap.OtherInfo != null)
+                {
+                    subProduct = int.Parse(patientSchemeMap.OtherInfo);
+                }
+                else
+                {
+                    subProduct = billObj.VisitType.ToLower() == ENUM_VisitType.inpatient.ToLower() ? ENUM_SSFSchemeTypesSubProduct.MedicalExpenses_IP : ENUM_SSFSchemeTypesSubProduct.MedicalExpenses_OP;
+                }
             }
             SSF_ClaimBookingService_DTO claimBookingObject = new SSF_ClaimBookingService_DTO()
             {
@@ -38,5 +45,6 @@ namespace DanpheEMR.Services.SSF.DTO
         public string InvoiceNoFormatted { get; set; }
         public decimal TotalAmount { get; set; }
         public long ClaimCode { get; set; }
+        public string VisitType { get; set; }
     }
 }

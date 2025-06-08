@@ -1,16 +1,14 @@
-import { Component, ChangeDetectorRef, OnInit } from '@angular/core'
-import { RouterOutlet, RouterModule, Router } from '@angular/router'
+import { ChangeDetectorRef, Component } from '@angular/core';
+import { Router } from '@angular/router';
 
-import { RouteFromService } from "../../shared/routefrom.service"
-import { InventoryBLService } from "../shared/inventory.bl.service"
 import { SecurityService } from '../../security/shared/security.service';
-import { InventoryService } from '../shared/inventory.service';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { InventoryBLService } from "../shared/inventory.bl.service";
 
-import { WriteOffItems } from "../shared/write-off-items.model"
-import { ItemMaster } from "../shared/item-master.model"
 import * as moment from 'moment/moment';
 import { ActivateInventoryService } from '../../shared/activate-inventory/activate-inventory.service';
+import { ItemMaster } from "../shared/item-master.model";
+import { WriteOffItems } from "../shared/write-off-items.model";
 
 @Component({
 
@@ -23,7 +21,7 @@ export class WriteOffItemsComponent {
   public VAT: number = 0;
   public TotalAmount: number = 0;
   public loading: boolean = false;
-  public itemIdBatchNoMap = new Array<{ ItemId: number, BatchDetail: Array<{ BatchNo: string, ItemPrice: number, AvailableQuantity: number }> }>();
+  // public itemIdBatchNoMap = new Array<{ ItemId: number, BatchDetail: Array<{ BatchNo: string, ItemPrice: number, AvailableQuantity: number, StockId: number }> }>();
   public currentWriteOffItem: WriteOffItems = new WriteOffItems();
   public currentWO: WriteOffItems = new WriteOffItems();
   public WOItems: Array<WriteOffItems> = new Array<WriteOffItems>();
@@ -56,7 +54,7 @@ export class WriteOffItemsComponent {
       if (res && res.Results) {
         res.Results.forEach(a => {
           this.ItemList.push({
-            "ItemId": a.ItemId, "ItemName": a.ItemName, "Description": a.Description, VAT: a.VAT, Rate: a.Rate, "Code": a.Code, "AvailableQuantity": a.AvailableQuantity
+            "ItemId": a.ItemId, "ItemName": a.ItemName, "Description": a.Description, VAT: a.VAT, StandardRate: a.Rate, "Code": a.Code, "AvailableQuantity": a.AvailableQuantity, "StockId": a.StockId
           });
         });
       }
@@ -104,9 +102,8 @@ export class WriteOffItemsComponent {
           this.WOItems[index].ItemId = Item.ItemId;
           this.WOItems[index].AvailableQty = Item.AvailableQuantity;
           this.WOItems[index].Code = Item.Code;
-          //load BatchNoList in dropdown by selected ItemId
-          //Get from server or bind from Loacal list
-          this.LoadBatchNoByItemId(this.WOItems[index].ItemId, index);
+          this.WOItems[index].ItemRate = Item.StandardRate;
+          this.WOItems[index].StockId = this.ItemList.find(i => i.ItemId == Item.ItemId).StockId;
         }
       }
     }
@@ -115,78 +112,12 @@ export class WriteOffItemsComponent {
       this.WOItems[index].VAT = 0
       this.WOItems[index].ItemId = 0
       this.WOItems[index].BatchNo = null;
-      this.WOItems[index].BatchNoList = null;
       this.WOItems[index].AvailableQty = 0;
     }
   }
-
-  //Load Batch NO and Available Quantity by ItemId
-  //If you have BatchNoList for perticular Item then don't go to server use from existed
-  LoadBatchNoByItemId(ItemId, index): void {
-
-    //check if itemlist for this srvdept already exists, get from server if not.
-    //check if ItemId (with BatchNoList) is exist at local then no need to go server
-    let BatchNoMap = this.itemIdBatchNoMap.find(a => a.ItemId == ItemId);
-    if (BatchNoMap && ItemId) {
-      //this.WOItems[index].BatchNoList = this.WOItems[index].BatchNoList;
-      this.WOItems[index].BatchNoList = BatchNoMap.BatchDetail;
-    }
-    else {
-      //get BatchNoList by selected ItemId
-      this.InventoryBLService.GetBatchNoListByItemId(ItemId)
-        .subscribe(res => {
-          if (res.Status == "OK") {
-            this.WOItems[index].BatchNoList = res.Results;
-            let BatchNos = { ItemId: ItemId, BatchDetail: res.Results };
-            this.itemIdBatchNoMap.push(BatchNos);
-          }
-          else {
-            this.messageBoxService.showMessage("error", [res.ErrorMessage]);
-          }
-        });
-    }
-  }
-
-  //when BatchNo selected call this method and check for Uniqueness (ItemNam && BatchNo)
-  //and also show Available Quantity of that perticular BatchNo and Item
-  SelectBatchNo(BatchNo, index) {
-    if (this.WOItems[index].ItemId != null && this.WOItems[index].ItemId != 0) {
-      let IsUniqueItmBatchNo = true;
-      //loop for check ItemName and BatchNo IsUnique
-      for (var i = 0; i < this.WOItems.length; i++) {
-        if (i != index) {
-          if (this.WOItems[i].ItemId == this.WOItems[index].ItemId && this.WOItems[i].BatchNo == BatchNo) {
-            IsUniqueItmBatchNo = false;
-          }
-        }
-      }
-      //Show Available Qty of selected ItemName and BatchNo
-      if (IsUniqueItmBatchNo) {
-        let Batchlist: any = this.WOItems[index].BatchNoList.find(i => i.BatchNo == BatchNo);
-        if (Batchlist) {
-          this.WOItems[index].AvailableQty = Batchlist.AvailableQuantity;
-          this.WOItems[index].ItemRate = Batchlist.ItemPrice;
-        }
-      } else {
-        //If Same ItemName with BatchNo is present in List don't allow use to duplication
-        this.messageBoxService.showMessage("notice-message", ["Item with This batch Allready in List."]);
-        this.WOItems.splice(index, 1);
-        this.currentWriteOffItem = new WriteOffItems();
-        this.WOItems.push(this.currentWriteOffItem);
-        this.changeDetectorRef.detectChanges();
-
-      }
-      this.setFocusById('wqtyip' + index);
-
-    }
-    //else {
-    //    this.messageBoxService.showMessage("notice-message",["Please Select Item First..!"]);
-    //}
-  }
-
   //used to format display item in ng-autocomplete
   myListFormatter(data: any): string {
-    let html = "<b>" + data["ItemName"] + "</b>" + "(Rate:" + data["Rate"] + ")";
+    let html = "<b>" + data["ItemName"] + "</b>" + "(Rate:" + data["StandardRate"] + ")";
     html += (data["Description"] == null || data["Description"] == "") ? "" : ("|" + data["Description"]);
     return html;
   }

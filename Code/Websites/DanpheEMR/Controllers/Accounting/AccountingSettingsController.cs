@@ -1,6 +1,5 @@
 ﻿using DanpheEMR.AccTransfer;
 using DanpheEMR.CommonTypes;
-using DanpheEMR.Controllers.Billing.Shared;
 using DanpheEMR.Core.Configuration;
 using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
@@ -8,15 +7,13 @@ using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.AccountingModels;
 using DanpheEMR.ServerModel.AccountingModels.DTOs;
-using DanpheEMR.ServerModel.ClinicalModels;
 using DanpheEMR.Services.Accounting.DTOs;
 using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
-using Org.BouncyCastle.Asn1.Ocsp;
+using OfficeOpenXml.FormulaParsing.Excel.Functions.Math;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -45,29 +42,71 @@ namespace DanpheEMR.Controllers
         }
 
         [HttpGet]
+        [Route("AllLedgerGroups")]
+        public IActionResult AllLedgerGroup()
+        {
+            Func<object> func = () => _accountingDbContext.LedgerGroups.Where(ledg => ledg.IsActive).ToList();
+            return InvokeHttpGetFunction<object>(func);
+        }
+        [HttpGet]
+        [Route("AllLedgers")]
+        public IActionResult GetAllLedgers()
+        {
+            Func<object> func = () => _accountingDbContext.Ledgers.Where(l => l.IsActive).ToList();
+            return InvokeHttpGetFunction<object>(func);
+        }
+        [HttpGet]
+        [Route("AllSubLedger")]
+        public IActionResult GetAllSubLedger()
+        {
+            Func<object> func = () => _accountingDbContext.SubLedger.Where(sledg => sledg.IsActive).ToList();
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        [HttpGet]
+        [Route("AllCodeDetails")]
+        public IActionResult AllCodeDetails()
+        {
+            Func<object> func = () => _accountingDbContext.ACCCodeDetails.ToList();
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        [HttpGet]
+        [Route("AllSections")]
+        public IActionResult AllSections()
+        {
+            Func<object> func = () => _accountingDbContext.Section.Where(a=> a.IsActive == true).ToList();
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        [HttpGet]
         [Route("GetSubLedgers")]
         public async Task<DanpheHTTPResponse<object>> GetSubLedgers()
         {
             DanpheHTTPResponse<object> responseDate = new DanpheHTTPResponse<object>();
             try
             {
+                int CurrentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
                 AccountingDbContext accountingDbContext = new AccountingDbContext(connString);
                 responseDate.Results = await accountingDbContext.SubLedger
-                                        .Join(accountingDbContext.Ledgers, subLedger => subLedger.LedgerId, ledger => ledger.LedgerId, (subLeder, ledger) =>
-                                        new SubLedger_DTO
-                                        {
-                                            SubLedgerId = subLeder.SubLedgerId,
-                                            SubLedgerCode = subLeder.SubLedgerCode,
-                                            SubLedgerName = subLeder.SubLedgerName,
-                                            IsActive = subLeder.IsActive,
-                                            IsDefault = subLeder.IsDefault,
-                                            Description = subLeder.Description,
-                                            HospitalId = subLeder.HospitalId,
-                                            LedgerId = ledger.LedgerId,
-                                            LedgerName = ledger.LedgerName,
-                                            OpeningBalance = subLeder.OpeningBalance,
-                                            DrCr = subLeder.DrCr
-                                        }).ToListAsync();
+                                         .Where(subLedger => subLedger.HospitalId == CurrentHospitalId)
+                                        .Join(accountingDbContext.Ledgers.Where(led => led.HospitalId == CurrentHospitalId), subLedger => subLedger.LedgerId, ledger => ledger.LedgerId, (subLeder, ledger) =>
+
+                                         new SubLedger_DTO
+                                         {
+                                             SubLedgerId = subLeder.SubLedgerId,
+                                             SubLedgerCode = subLeder.SubLedgerCode,
+                                             SubLedgerName = subLeder.SubLedgerName,
+                                             IsActive = subLeder.IsActive,
+                                             IsDefault = subLeder.IsDefault,
+                                             Description = subLeder.Description,
+                                             HospitalId = subLeder.HospitalId,
+                                             LedgerId = ledger.LedgerId,
+                                             LedgerName = ledger.LedgerName,
+                                             OpeningBalance = subLeder.OpeningBalance,
+                                             DrCr = subLeder.DrCr,
+                                             IsSystemDefault = subLeder.IsSystemDefault
+                                         }).ToListAsync();
                 responseDate.Status = ENUM_DanpheHttpResponseText.OK;
             }
             catch (Exception ex)
@@ -89,7 +128,7 @@ namespace DanpheEMR.Controllers
                 try
                 {
                     //var subLedger = JsonConvert.DeserializeObject<SubLedgerModel>(ledger);
-                    var obj = await accountingDbContext.SubLedger.Where(a => a.SubLedgerId == subLedger.SubLedgerId).FirstOrDefaultAsync();
+                    var obj = await accountingDbContext.SubLedger.Where(a => a.SubLedgerId == subLedger.SubLedgerId && a.HospitalId==subLedger.HospitalId).FirstOrDefaultAsync();
                     obj.IsActive = !subLedger.IsActive;
                     accountingDbContext.Entry(obj).Property(a => a.IsActive).IsModified = true;
                     await accountingDbContext.SaveChangesAsync();
@@ -120,11 +159,14 @@ namespace DanpheEMR.Controllers
                     RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
                     int currHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
                     //var subLedger = JsonConvert.DeserializeObject<SubLedgerModel>(ledger);
-                    var obj = await accountingDbContext.SubLedger.Where(a => a.SubLedgerId == subLedger.SubLedgerId).FirstOrDefaultAsync();
+                    var obj = await accountingDbContext.SubLedger.Where(a => a.SubLedgerId == subLedger.SubLedgerId && a.HospitalId ==subLedger.HospitalId).FirstOrDefaultAsync();
                     if (obj != null)
                     {
+                        if (!obj.IsSystemDefault)
+                        {
                         obj.LedgerId = subLedger.LedgerId;
                         obj.SubLedgerName = subLedger.SubLedgerName;
+                        }
                         obj.Description = subLedger.Description;
                         obj.OpeningBalance = subLedger.OpeningBalance;
                         obj.DrCr = subLedger.DrCr;
@@ -133,7 +175,7 @@ namespace DanpheEMR.Controllers
                         accountingDbContext.Entry(obj).Property(a => a.OpeningBalance).IsModified = true;
                         accountingDbContext.Entry(obj).Property(a => a.DrCr).IsModified = true;
                         await accountingDbContext.SaveChangesAsync();
-                        var flag = await AccountingTransferData.SubLedgerBalanceHisotryUpdate(subLedger, accountingDbContext, currHospitalId, currentUser.UserId);
+                        var flag = await AccountingTransferData.SubLedgerBalanceHisotryUpdate(subLedger, accountingDbContext, currHospitalId, currentUser.EmployeeId);
                         if (flag)
                         {
                             dbContextTransaction.Commit();
@@ -163,7 +205,7 @@ namespace DanpheEMR.Controllers
 
         [HttpPost]
         [Route("AddSubLedger")]
-        public Task<DanpheHTTPResponse<object>> AddSubLedger(string ledger)
+        public Task<DanpheHTTPResponse<object>> AddSubLedger([FromBody] List<SubLedgerModel> subLedgers)
         {
             AccountingDbContext accountingDbContext = new AccountingDbContext(connString);
             using (var dbContextTransaction = accountingDbContext.Database.BeginTransaction())
@@ -173,23 +215,23 @@ namespace DanpheEMR.Controllers
                 {
                     RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
                     int currHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
-                    var subLedger = JsonConvert.DeserializeObject<List<SubLedgerModel>>(ledger);
-                    subLedger.ForEach(sub =>
+                    //var subLedger = JsonConvert.DeserializeObject<List<SubLedgerModel>>(ledger);
+                    subLedgers.ForEach(sub =>
                    {
                        Random subLedgerCodeGenerator = new Random();
                        int subledgerCode = subLedgerCodeGenerator.Next(1, 999999);
                        sub.SubLedgerCode = subledgerCode.ToString();// AccountingTransferData.GetProvisionalSubLedgerCode(accountingDbContext);
-                       sub.CreatedBy = currentUser.UserId;
+                       sub.CreatedBy = currentUser.EmployeeId;
                        sub.CreatedOn = DateTime.Now;
                        sub.HospitalId = currHospitalId;
                        accountingDbContext.SubLedger.Add(sub);
                        accountingDbContext.SaveChanges();
                    });
-                    var flag = AccountingTransferData.SubLedgerBalanceHisotrySave(subLedger, accountingDbContext, currHospitalId, currentUser.UserId);
+                    var flag = AccountingTransferData.SubLedgerBalanceHisotrySave(subLedgers, accountingDbContext, currHospitalId, currentUser.EmployeeId);
                     if (flag)
                     {
                         dbContextTransaction.Commit();
-                        responseDate.Results = subLedger;
+                        responseDate.Results = subLedgers;
                         responseDate.Status = ENUM_DanpheHttpResponseText.OK;
                     }
                     else
@@ -225,28 +267,29 @@ namespace DanpheEMR.Controllers
             using (var dbContextTransaction = _accountingDbContext.Database.BeginTransaction())
             {
                 try
-                {List<SubLedgerModel> subLedgers = new List<SubLedgerModel>();
+                {
+                    List<SubLedgerModel> subLedgers = new List<SubLedgerModel>();
                     var subLedger = new SubLedgerModel();
                     subLedger_DTOs.ForEach(sub =>
-                    {                       
+                    {
                         Random subLedgerCodeGenerator = new Random();
                         int subledgerCode = subLedgerCodeGenerator.Next(1, 999999);
-                        subLedger.SubLedgerCode = subledgerCode.ToString(); 
+                        subLedger.SubLedgerCode = subledgerCode.ToString();
                         subLedger.SubLedgerName = sub.SubLedgerName;
                         subLedger.DrCr = sub.DrCr;
                         subLedger.LedgerId = sub.LedgerId;
-                        subLedger.Description= sub.Description;
+                        subLedger.Description = sub.Description;
                         subLedger.IsActive = sub.IsActive;
-                        subLedger.CreatedBy= currentUser.UserId;
-                        subLedger.CreatedOn=DateTime.Now;
-                        subLedger.OpeningBalance= sub.OpeningBalance;
+                        subLedger.CreatedBy = currentUser.EmployeeId;
+                        subLedger.CreatedOn = DateTime.Now;
+                        subLedger.OpeningBalance = sub.OpeningBalance;
                         subLedger.HospitalId = currHospitalId;
                         subLedger.IsDefault = sub.IsDefault;
                         subLedgers.Add(subLedger);
                     });
                     _accountingDbContext.SubLedger.AddRange(subLedgers);
                     _accountingDbContext.SaveChanges();
-                    var flag = AccountingTransferData.SubLedgerBalanceHisotrySave(subLedgers, _accountingDbContext, currHospitalId, currentUser.UserId);
+                    var flag = AccountingTransferData.SubLedgerBalanceHisotrySave(subLedgers, _accountingDbContext, currHospitalId, currentUser.EmployeeId);
 
                     if (flag)
                     {
@@ -260,7 +303,7 @@ namespace DanpheEMR.Controllers
                             ledgerMapping.HospitalId = currHospitalId;
                             _accountingDbContext.LedgerMappings.Add(ledgerMapping);
                         });
-                        
+
                         _accountingDbContext.SaveChanges();
 
                         dbContextTransaction.Commit();
@@ -317,6 +360,7 @@ namespace DanpheEMR.Controllers
             int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
 
             Func<object> func = () => (from voc in _accountingDbContext.Vouchers
+                                       where voc.HospitalId == currentHospitalId
 
                                        select new
                                        {
@@ -420,8 +464,9 @@ namespace DanpheEMR.Controllers
         public IActionResult GetChartofAccount()
         {
             //if (reqType == "GetChartofAccount")
+            int currentHospitaId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             Func<object> func = () => (from chartofAcc in _accountingDbContext.ChartOfAccounts
-
+                                       where chartofAcc.HospitalId == currentHospitaId
                                        select new
                                        {
                                            ChartOfAccountId = chartofAcc.ChartOfAccountId,
@@ -429,7 +474,8 @@ namespace DanpheEMR.Controllers
                                            Description = chartofAcc.Description,
                                            IsActive = chartofAcc.IsActive,
                                            COACode = chartofAcc.COACode,
-                                           PrimaryGroupId = chartofAcc.PrimaryGroupId
+                                           PrimaryGroupId = chartofAcc.PrimaryGroupId,
+                                           IsSystemDefault = chartofAcc.IsSystemDefault
                                        }).ToList<object>();
             return InvokeHttpGetFunction(func);
         }
@@ -496,8 +542,8 @@ namespace DanpheEMR.Controllers
         public IActionResult GetPrimaryList()
         {
             //(reqType == "get-primary-list")
-
-            Func<object> func = () => (_accountingDbContext.PrimaryGroup.Where(p => p.IsActive == true).ToList<object>());
+            int currentHospitaId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            Func<object> func = () => (_accountingDbContext.PrimaryGroup.Where(p => p.IsActive == true && p.HospitalId == currentHospitaId).ToList<object>());
             return InvokeHttpGetFunction(func);
         }
 
@@ -968,14 +1014,14 @@ namespace DanpheEMR.Controllers
         //        //                subLedger.IsActive = true;
         //        //                subLedger.LedgerId = ledger.LedgerId;
         //        //                subLedger.SubLedgerCode = AccountingTransferData.GetProvisionalSubLedgerCode(accountingDBContext);
-        //        //                subLedger.CreatedBy = currentUser.UserId;
+        //        //                subLedger.CreatedBy = currentUser.EmployeeId;
         //        //                subLedger.CreatedOn = DateTime.Now;
         //        //                subLedger.HospitalId = currentHospitalId;
         //        //                accountingDBContext.SubLedger.Add(subLedger);
         //        //                var SubLedgerList = new List<SubLedgerModel>();
         //        //                SubLedgerList.Add(subLedger);
         //        //                accountingDBContext.SaveChanges();
-        //        //                flag = AccountingTransferData.SubLedgerBalanceHisotrySave(SubLedgerList, accountingDBContext, currentHospitalId, currentUser.UserId);
+        //        //                flag = AccountingTransferData.SubLedgerBalanceHisotrySave(SubLedgerList, accountingDBContext, currentHospitalId, currentUser.EmployeeId);
 
         //        //                if (flag)
         //        //                {
@@ -1039,14 +1085,14 @@ namespace DanpheEMR.Controllers
         //        //                         subLedger.IsActive = true;
         //        //                         subLedger.LedgerId = ledger.LedgerId;
         //        //                         subLedger.SubLedgerCode = AccountingTransferData.GetProvisionalSubLedgerCode(accountingDBContext);
-        //        //                         subLedger.CreatedBy = currentUser.UserId;
+        //        //                         subLedger.CreatedBy = currentUser.EmployeeId;
         //        //                         subLedger.CreatedOn = DateTime.Now;
         //        //                         subLedger.HospitalId = currentHospitalId;
         //        //                         accountingDBContext.SubLedger.Add(subLedger);
         //        //                         var SubLedgerList = new List<SubLedgerModel>();
         //        //                         SubLedgerList.Add(subLedger);
         //        //                         accountingDBContext.SaveChanges();
-        //        //                         ledBalnce = AccountingTransferData.SubLedgerBalanceHisotrySave(SubLedgerList, accountingDBContext, currentHospitalId, currentUser.UserId);
+        //        //                         ledBalnce = AccountingTransferData.SubLedgerBalanceHisotrySave(SubLedgerList, accountingDBContext, currentHospitalId, currentUser.EmployeeId);
         //        //                     }
         //        //                     else
         //        //                     {
@@ -1193,7 +1239,7 @@ namespace DanpheEMR.Controllers
         //        //{
         //        //    VoucherModel voucher = DanpheJSONConvert.DeserializeObject<VoucherModel>(str);
         //        //    voucher.CreatedOn = System.DateTime.Now;
-        //        //    voucher.CreatedBy = currentUser.UserId;
+        //        //    voucher.CreatedBy = currentUser.EmployeeId;
         //        //    accountingDBContext.Vouchers.Add(voucher);
         //        //    accountingDBContext.SaveChanges();
         //        //    responseData.Results = voucher;
@@ -1214,7 +1260,7 @@ namespace DanpheEMR.Controllers
         //        //    else
         //        //    {
         //        //        voucherHead.CreatedOn = System.DateTime.Now;
-        //        //        voucherHead.CreatedBy = currentUser.UserId;
+        //        //        voucherHead.CreatedBy = currentUser.EmployeeId;
         //        //        voucherHead.HospitalId = currentHospitalId;
         //        //        accountingDBContext.VoucherHeads.Add(voucherHead);
         //        //        accountingDBContext.SaveChanges();
@@ -1241,7 +1287,7 @@ namespace DanpheEMR.Controllers
         //        //    else
         //        //    {
         //        //        ledgerGrpData.CreatedOn = DateTime.Now;
-        //        //        ledgerGrpData.CreatedBy = currentUser.UserId;
+        //        //        ledgerGrpData.CreatedBy = currentUser.EmployeeId;
         //        //        ledgerGrpData.HospitalId = currentHospitalId;//sud-nagesh:20Jun'20-for HospitalSeparation
         //        //        var maxCode = accountingDBContext.LedgerGroups.AsQueryable()
         //        //                            .Where(t => t.HospitalId == currentHospitalId && t.IsActive == true)
@@ -1259,7 +1305,7 @@ namespace DanpheEMR.Controllers
         //        //{
         //        //    CostCenterItemModel costCenterMod = DanpheJSONConvert.DeserializeObject<CostCenterItemModel>(str);
         //        //    costCenterMod.CreatedOn = System.DateTime.Now;
-        //        //    costCenterMod.CreatedBy = currentUser.UserId;
+        //        //    costCenterMod.CreatedBy = currentUser.EmployeeId;
         //        //    costCenterMod.HospitalId = currentHospitalId;
         //        //    accountingDBContext.CostCenterItems.Add(costCenterMod);
         //        //    accountingDBContext.SaveChanges();
@@ -1274,7 +1320,7 @@ namespace DanpheEMR.Controllers
         //        //{
         //        //    LedgerGroupCategoryModel ledGrpCatMod = DanpheJSONConvert.DeserializeObject<LedgerGroupCategoryModel>(str);
         //        //    ledGrpCatMod.CreatedOn = System.DateTime.Now;
-        //        //    ledGrpCatMod.CreatedBy = currentUser.UserId;
+        //        //    ledGrpCatMod.CreatedBy = currentUser.EmployeeId;
         //        //    accountingDBContext.LedgerGroupsCategory.Add(ledGrpCatMod);
         //        //    accountingDBContext.SaveChanges();
 
@@ -1312,7 +1358,7 @@ namespace DanpheEMR.Controllers
         //        {
         //            ChartOfAccountModel coa = DanpheJSONConvert.DeserializeObject<ChartOfAccountModel>(str);
         //            coa.CreatedOn = System.DateTime.Now;
-        //            coa.CreatedBy = currentUser.UserId;
+        //            coa.CreatedBy = currentUser.EmployeeId;
         //            coa.COACode = AccountingTransferData.GetAutoGeneratedCodeForCOA(accountingDBContext, coa);
         //            accountingDBContext.ChartOfAccounts.Add(coa);
         //            accountingDBContext.SaveChanges();
@@ -1819,13 +1865,14 @@ namespace DanpheEMR.Controllers
         [Route("CostCenter")]
         public async Task<IActionResult> PostCostCenter([FromBody] CostCenterModel costCenter)
         {
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             CostCenterModelDTO costCenterDTO = new CostCenterModelDTO();
             try
             {
                 //costCenter.CostCenterId = costCenter.CostCenterId;
-                var latestCostCenter = _accountingDbContext.CostCenters.OrderByDescending(o => o.CostCenterId).FirstOrDefault();
+                var latestCostCenter = _accountingDbContext.CostCenters.Where(o=>o.HospitalId == currentHospitalId).OrderByDescending(o=>o.CostCenterId).FirstOrDefault();
 
                 int latestCostcenterId = 0;
                 if (latestCostCenter != null)
@@ -1840,6 +1887,7 @@ namespace DanpheEMR.Controllers
 
                 costCenter.CreatedBy = currentUser.EmployeeId;
                 costCenter.CreatedOn = DateTime.Now;
+                costCenter.HospitalId = currentHospitalId;
 
                 if (costCenter.ParentCostCenterId == null || costCenter.ParentCostCenterId == 0)
                 {
@@ -1857,12 +1905,13 @@ namespace DanpheEMR.Controllers
                 costCenterDTO.ParentCostCenterId = costCenter.ParentCostCenterId;
                 costCenterDTO.Description = costCenter.Description;
                 costCenterDTO.IsActive = costCenter.IsActive;
-                costCenterDTO.HierarchyLevel=costCenter.HierarchyLevel;
+                costCenterDTO.HierarchyLevel = costCenter.HierarchyLevel;
+                costCenterDTO.HospitalId = costCenter.HospitalId;
 
 
                 if (costCenter.ParentCostCenterId != 0)
                 {
-                    var ParentCostCenterDetail = _accountingDbContext.CostCenters.Where(p => p.CostCenterId == costCenter.ParentCostCenterId).FirstOrDefault();
+                    var ParentCostCenterDetail = _accountingDbContext.CostCenters.Where(p => p.CostCenterId == costCenter.ParentCostCenterId && p.HospitalId == currentHospitalId).FirstOrDefault();
                     if (ParentCostCenterDetail != null)
                     {
                         costCenterDTO.ParentCostCenterName = ParentCostCenterDetail.CostCenterName;
@@ -1898,20 +1947,16 @@ namespace DanpheEMR.Controllers
             return await InvokeHttpGetFunctionAsync(func);
         }
 
-
-
-
-
-
         [HttpPut]
         [Route("CostCenter")]
         public async Task<IActionResult> UpdateCostCenter([FromBody] CostCenterModel costCenter)
         {
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             try
             {
-                var costCenterDetail = await _accountingDbContext.CostCenters.Where(cc => cc.CostCenterId == costCenter.CostCenterId).FirstOrDefaultAsync();
+                var costCenterDetail = await _accountingDbContext.CostCenters.Where(cc => cc.CostCenterId == costCenter.CostCenterId && cc.HospitalId == currentHospitalId).FirstOrDefaultAsync();
                 costCenterDetail.ModifiedBy = currentUser.EmployeeId;
                 costCenterDetail.ModifiedOn = DateTime.Now;
                 costCenterDetail.CostCenterName = costCenter.CostCenterName;
@@ -1938,14 +1983,15 @@ namespace DanpheEMR.Controllers
         [Route("GetParentCostCenters")]
         public async Task<IActionResult> GetParentCostCenters()
         {
+            int HospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             try
             {
-                var costCenters = await _accountingDbContext.CostCenters.Where(r => r.ParentCostCenterId == 0 || r.HierarchyLevel < 2).Select(a => new
+                var costCenters = await _accountingDbContext.CostCenters.Where(r => (r.ParentCostCenterId == 0 || r.HierarchyLevel < 2) && r.HospitalId == HospitalId).Select(a => new
                 {
                     ParentCostCenterId = a.CostCenterId,
-                    ParentCostCenterName = a.CostCenterName,       
+                    ParentCostCenterName = a.CostCenterName,
                     HierarchyLevel = a.HierarchyLevel
                 }).ToListAsync();
                 responseData.Status = ENUM_DanpheHttpResponseText.OK;
@@ -1966,11 +2012,12 @@ namespace DanpheEMR.Controllers
         {
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            int currentHospitalId= HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             try
             {
                 string str = this.ReadPostData();
                 CostCenterModel costCenter = DanpheJSONConvert.DeserializeObject<CostCenterModel>(str);
-                var costCenterDetail = await _accountingDbContext.CostCenters.Where(cc => cc.CostCenterId == costCenter.CostCenterId).FirstOrDefaultAsync();
+                var costCenterDetail = await _accountingDbContext.CostCenters.Where(cc => cc.CostCenterId == costCenter.CostCenterId && cc.HospitalId == currentHospitalId).FirstOrDefaultAsync();
                 costCenterDetail.ModifiedBy = currentUser.EmployeeId;
                 costCenterDetail.ModifiedOn = DateTime.Now;
                 costCenterDetail.IsActive = !costCenterDetail.IsActive;
@@ -1994,13 +2041,14 @@ namespace DanpheEMR.Controllers
 
         private async Task<object> GetAllCostCenters()
         {
-            var costCenters = await _accountingDbContext.CostCenters.Select(cc => new
+            int HospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            var costCenters = await _accountingDbContext.CostCenters.Where(cc => cc.HospitalId == HospitalId).Select(cc => new
             {
                 CostCenterId = cc.CostCenterId,
                 CostCenterCode = cc.CostCenterCode,
                 CostCenterName = cc.CostCenterName,
                 ParentCostCenterId = cc.ParentCostCenterId,
-                ParentCostCenterName = (_accountingDbContext.CostCenters.Where(parent => parent.CostCenterId == cc.ParentCostCenterId).Select(parent => parent.CostCenterName)),
+                ParentCostCenterName = (_accountingDbContext.CostCenters.Where(parent => parent.CostCenterId == cc.ParentCostCenterId && cc.HospitalId == HospitalId).Select(parent => parent.CostCenterName)),
                 BusinessCenterName = cc.BusinessCenterName,
                 Description = cc.Description,
                 IsDefault = cc.IsDefault,
@@ -2024,7 +2072,8 @@ namespace DanpheEMR.Controllers
                                        ledgrp.LedgerGroupName,
                                        ledgrp.IsActive,
                                        ledgrp.Description,
-                                       ledgrp.Name
+                                       ledgrp.Name,
+                                       ledgrp.IsSystemDefault
                                    }
                                   ).ToList<object>();
             return LedgerGrouplist;
@@ -2034,7 +2083,9 @@ namespace DanpheEMR.Controllers
             int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             var currentDate = DateTime.Now.Date;
             var fiscalYearList = (from fsYear in _accountingDbContext.FiscalYears
-                                  where fsYear.HospitalId == currentHospitalId
+                                  join map in _accountingDbContext.MapFiscalYears
+                                  on fsYear.FiscalYearId equals map.FiscalYearId
+                                  where map.HospitalId == currentHospitalId
                                   select new
                                   {
                                       FiscalYearId = fsYear.FiscalYearId,
@@ -2085,10 +2136,10 @@ namespace DanpheEMR.Controllers
                                          IsActive = s.IsActive,
                                          groupMappingId = m.GroupMappingId,
                                          VoucherName = _accountingDbContext.Vouchers.AsQueryable()
-                                                        .Where(t => t.VoucherId == m.VoucherId)
+                                                        .Where(t => t.VoucherId == m.VoucherId && m.HospitalId == currentHospitalId)
                                                         .Select(i => i.VoucherName).FirstOrDefault(),
                                          customVoucherName = _accountingDbContext.Vouchers.AsQueryable()
-                                                        .Where(t => t.VoucherId == m.CustomVoucherId)
+                                                        .Where(t => t.VoucherId == m.CustomVoucherId && t.HospitalId == currentHospitalId)
                                                         .Select(i => i.VoucherName).FirstOrDefault(),
 
                                      }).ToList();
@@ -2122,7 +2173,7 @@ namespace DanpheEMR.Controllers
                         ledger.LedgerName = ledger.LedgerName.Trim();
                         _accountingDbContext.Ledgers.Add(ledger);
                         _accountingDbContext.SaveChanges();
-                        AccountingTransferData.AddLedgerForClosedFiscalYears(_accountingDbContext, ledger);
+                        AccountingTransferData.AddLedgerForClosedFiscalYears(_accountingDbContext, ledger, currentHospitalId);
                         if (ledger.LedgerType == "pharmacysupplier")
                         {
                             LedgerMappingModel ledgerMapping = new LedgerMappingModel();
@@ -2150,14 +2201,14 @@ namespace DanpheEMR.Controllers
                         Random subLedgerCodeGenerator = new Random();
                         int subledgerCode = subLedgerCodeGenerator.Next(1, 999999);
                         subLedger.SubLedgerCode = subledgerCode.ToString();// AccountingTransferData.GetProvisionalSubLedgerCode(_accountingDbContext);
-                        subLedger.CreatedBy = currentUser.UserId;
+                        subLedger.CreatedBy = currentUser.EmployeeId;
                         subLedger.CreatedOn = DateTime.Now;
                         subLedger.HospitalId = currentHospitalId;
                         _accountingDbContext.SubLedger.Add(subLedger);
                         var SubLedgerList = new List<SubLedgerModel>();
                         SubLedgerList.Add(subLedger);
                         _accountingDbContext.SaveChanges();
-                        flag = AccountingTransferData.SubLedgerBalanceHisotrySave(SubLedgerList, _accountingDbContext, currentHospitalId, currentUser.UserId);
+                        flag = AccountingTransferData.SubLedgerBalanceHisotrySave(SubLedgerList, _accountingDbContext, currentHospitalId, currentUser.EmployeeId);
 
                         if (flag)
                         {
@@ -2202,7 +2253,7 @@ namespace DanpheEMR.Controllers
                         //Part:1--- Create ledger.. or Update LedgerInformation.
                         if (ledger.LedgerId == 0)
                         {
-                            var existedled = _accountingDbContext.Ledgers.Where(l => l.LedgerGroupId == ledger.LedgerGroupId && l.LedgerName.Trim().ToLower() == ledger.LedgerName.Trim().ToLower())
+                            var existedled = _accountingDbContext.Ledgers.Where(l => l.HospitalId == currentHospitalId && l.LedgerGroupId == ledger.LedgerGroupId && l.LedgerName.Trim().ToLower() == ledger.LedgerName.Trim().ToLower())
                            .FirstOrDefault();
                             if (existedled == null)
                             {
@@ -2219,7 +2270,7 @@ namespace DanpheEMR.Controllers
                                 ledger.HospitalId = currentHospitalId;
                                 _accountingDbContext.Ledgers.Add(ledger);
                                 _accountingDbContext.SaveChanges();
-                                AccountingTransferData.AddLedgerForClosedFiscalYears(_accountingDbContext, ledger);
+                                AccountingTransferData.AddLedgerForClosedFiscalYears(_accountingDbContext, ledger, currentHospitalId);
                                 ledBalnce = AccountingTransferData.LedgerAddUpdateInBalanceHisotry(ledger, _accountingDbContext, false, currentHospitalId, currentUser.EmployeeId);
                             }
                             else
@@ -2262,7 +2313,7 @@ namespace DanpheEMR.Controllers
                             }
                         }
 
-                        var existedSubLedger = _accountingDbContext.SubLedger.Where(sub => sub.LedgerId == ledger.LedgerId && sub.SubLedgerName.Trim().ToLower() == ledger.SubLedgerName.Trim().ToLower()).FirstOrDefault();
+                        var existedSubLedger = _accountingDbContext.SubLedger.Where(sub =>sub.HospitalId==currentHospitalId && sub.LedgerId == ledger.LedgerId && sub.SubLedgerName.Trim().ToLower() == ledger.SubLedgerName.Trim().ToLower()).FirstOrDefault();
                         if (existedSubLedger == null && parmValue.EnableSubLedger)
                         {
                             // Dev: 4 Jan '23 : Add Default SubLedger for each ledger 
@@ -2280,14 +2331,14 @@ namespace DanpheEMR.Controllers
                             Random subLedgerCodeGenerator = new Random();
                             int subledgerCode = subLedgerCodeGenerator.Next(1, 999999);
                             subLedger.SubLedgerCode = subledgerCode.ToString(); //AccountingTransferData.GetProvisionalSubLedgerCode(_accountingDbContext);
-                            subLedger.CreatedBy = currentUser.UserId;
+                            subLedger.CreatedBy = currentUser.EmployeeId;
                             subLedger.CreatedOn = DateTime.Now;
                             subLedger.HospitalId = currentHospitalId;
                             _accountingDbContext.SubLedger.Add(subLedger);
                             var SubLedgerList = new List<SubLedgerModel>();
                             SubLedgerList.Add(subLedger);
                             _accountingDbContext.SaveChanges();
-                            ledBalnce = AccountingTransferData.SubLedgerBalanceHisotrySave(SubLedgerList, _accountingDbContext, currentHospitalId, currentUser.UserId);
+                            ledBalnce = AccountingTransferData.SubLedgerBalanceHisotrySave(SubLedgerList, _accountingDbContext, currentHospitalId, currentUser.EmployeeId);
                             ledger.SubLedgerId = subLedger.SubLedgerId;
                         }
                         else
@@ -2324,7 +2375,7 @@ namespace DanpheEMR.Controllers
                                 {
                                     //hospitalid not required for existing ledger-mappings
                                     lederMapData.LedgerId = ledger.LedgerId;
-                                   // lederMapData.CostCenterId = ledger.CostCenterId;
+                                    // lederMapData.CostCenterId = ledger.CostCenterId;
                                     lederMapData.SubLedgerId = ledger.SubLedgerId;
                                     _accountingDbContext.LedgerMappings.Attach(lederMapData);
                                     _accountingDbContext.Entry(lederMapData).State = EntityState.Modified;
@@ -2403,10 +2454,12 @@ namespace DanpheEMR.Controllers
         }
         private object AddVouchers(string ipDataStr, RbacUser currentUser)
         {
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             VoucherModel voucher = DanpheJSONConvert.DeserializeObject<VoucherModel>(ipDataStr);
 
+            voucher.HospitalId = currentHospitalId;
             voucher.CreatedOn = System.DateTime.Now;
-            voucher.CreatedBy = currentUser.UserId;
+            voucher.CreatedBy = currentUser.EmployeeId;
             _accountingDbContext.Vouchers.Add(voucher);
             _accountingDbContext.SaveChanges();
             return voucher;
@@ -2423,7 +2476,7 @@ namespace DanpheEMR.Controllers
             else
             {
                 voucherHead.CreatedOn = System.DateTime.Now;
-                voucherHead.CreatedBy = currentUser.UserId;
+                voucherHead.CreatedBy = currentUser.EmployeeId;
                 voucherHead.HospitalId = currentHospitalId;
                 _accountingDbContext.VoucherHeads.Add(voucherHead);
                 _accountingDbContext.SaveChanges();
@@ -2445,7 +2498,7 @@ namespace DanpheEMR.Controllers
             else
             {
                 ledgerGrpData.CreatedOn = DateTime.Now;
-                ledgerGrpData.CreatedBy = currentUser.UserId;
+                ledgerGrpData.CreatedBy = currentUser.EmployeeId;
                 ledgerGrpData.HospitalId = currentHospitalId;//sud-nagesh:20Jun'20-for HospitalSeparation
 
                 /*Manipal-RevisionNeeded*/
@@ -2468,7 +2521,7 @@ namespace DanpheEMR.Controllers
             int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             CostCenterItemModel costCenterMod = DanpheJSONConvert.DeserializeObject<CostCenterItemModel>(ipDataStr);
             costCenterMod.CreatedOn = System.DateTime.Now;
-            costCenterMod.CreatedBy = currentUser.UserId;
+            costCenterMod.CreatedBy = currentUser.EmployeeId;
             costCenterMod.HospitalId = currentHospitalId;
             _accountingDbContext.CostCenterItems.Add(costCenterMod);
             _accountingDbContext.SaveChanges();
@@ -2481,13 +2534,13 @@ namespace DanpheEMR.Controllers
             int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             LedgerGroupCategoryModel ledGrpCatMod = DanpheJSONConvert.DeserializeObject<LedgerGroupCategoryModel>(ipDataStr);
             ledGrpCatMod.CreatedOn = System.DateTime.Now;
-            ledGrpCatMod.CreatedBy = currentUser.UserId;
+            ledGrpCatMod.CreatedBy = currentUser.EmployeeId;
             _accountingDbContext.LedgerGroupsCategory.Add(ledGrpCatMod);
             _accountingDbContext.SaveChanges();
 
             var curtLedGrpCategoryData = (from ledgrpCat in _accountingDbContext.LedgerGroupsCategory
                                           join chartOfAcc in _accountingDbContext.ChartOfAccounts on ledgrpCat.ChartOfAccountId equals chartOfAcc.ChartOfAccountId
-                                          where ledgrpCat.LedgerGroupCategoryId == ledGrpCatMod.LedgerGroupCategoryId
+                                          where ledgrpCat.LedgerGroupCategoryId == ledGrpCatMod.LedgerGroupCategoryId && chartOfAcc.HospitalId == currentHospitalId
                                           select new
                                           {
                                               LedgerGroupCategoryId = ledgrpCat.LedgerGroupCategoryId,
@@ -2514,10 +2567,11 @@ namespace DanpheEMR.Controllers
         private object AddChartOfAccount(string ipDataStr, RbacUser currentUser)
         {
             ChartOfAccountModel coa = DanpheJSONConvert.DeserializeObject<ChartOfAccountModel>(ipDataStr);
+            coa.HospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             coa.CreatedOn = System.DateTime.Now;
-            coa.CreatedBy = currentUser.UserId;
+            coa.CreatedBy = currentUser.EmployeeId;
             coa.ModifiedBy = null;
-            coa.COACode = AccountingTransferData.GetAutoGeneratedCodeForCOA(_accountingDbContext, coa);
+            coa.COACode = AccountingTransferData.GetAutoGeneratedCodeForCOA(_accountingDbContext, coa, coa.HospitalId);
             _accountingDbContext.ChartOfAccounts.Add(coa);
             _accountingDbContext.SaveChanges();
             return coa;
@@ -2560,35 +2614,50 @@ namespace DanpheEMR.Controllers
         }
         private object UpdateLedgerGroup(string ipDataStr)
         {
-            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
-            LedgerGroupModel ledgerGroup = DanpheJSONConvert.DeserializeObject<LedgerGroupModel>(ipDataStr);
-            var ledgerGrp = _accountingDbContext.LedgerGroups.Where(x => x.LedgerGroupId == ledgerGroup.LedgerGroupId && x.HospitalId == currentHospitalId).FirstOrDefault();
-            if (ledgerGrp != null)
+            try
             {
-                ledgerGrp.COA = ledgerGroup.COA;
-                ledgerGrp.Description = ledgerGroup.Description;
-                ledgerGrp.IsActive = ledgerGroup.IsActive;
-                ledgerGrp.LedgerGroupName = ledgerGroup.LedgerGroupName;
-                ledgerGrp.ModifiedBy = ledgerGroup.ModifiedBy;
-                ledgerGrp.ModifiedOn = System.DateTime.Now;
-                ledgerGrp.PrimaryGroup = ledgerGroup.PrimaryGroup;
-                _accountingDbContext.LedgerGroups.Attach(ledgerGrp);
-                _accountingDbContext.Entry(ledgerGrp).Property(x => x.COA).IsModified = true;
-                _accountingDbContext.Entry(ledgerGrp).Property(x => x.Description).IsModified = true;
-                _accountingDbContext.Entry(ledgerGrp).Property(x => x.IsActive).IsModified = true;
-                _accountingDbContext.Entry(ledgerGrp).Property(x => x.LedgerGroupName).IsModified = true;
-                _accountingDbContext.Entry(ledgerGrp).Property(x => x.ModifiedBy).IsModified = true;
-                _accountingDbContext.Entry(ledgerGrp).Property(x => x.ModifiedOn).IsModified = true;
-                _accountingDbContext.Entry(ledgerGrp).Property(x => x.PrimaryGroup).IsModified = true;
-                _accountingDbContext.SaveChanges();
-                return ledgerGrp;
+                int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+                LedgerGroupModel ledgerGroup = DanpheJSONConvert.DeserializeObject<LedgerGroupModel>(ipDataStr);
+                var ledgerGrp = _accountingDbContext.LedgerGroups
+                    .Where(x => x.LedgerGroupId == ledgerGroup.LedgerGroupId &&
+                                x.HospitalId == currentHospitalId)
+                    .FirstOrDefault();
 
+                if (ledgerGrp != null)
+                {
+                    if (!ledgerGrp.IsSystemDefault)
+                    {
+                    ledgerGrp.COA = ledgerGroup.COA;
+                    ledgerGrp.LedgerGroupName = ledgerGroup.LedgerGroupName;
+                    ledgerGrp.PrimaryGroup = ledgerGroup.PrimaryGroup;
+                    }                  
+                    ledgerGrp.Description = ledgerGroup.Description;
+                    ledgerGrp.IsActive = ledgerGroup.IsActive;
+                    ledgerGrp.ModifiedBy = ledgerGroup.ModifiedBy;
+                    ledgerGrp.ModifiedOn = System.DateTime.Now;
+                   
+                    _accountingDbContext.LedgerGroups.Attach(ledgerGrp);
+                    _accountingDbContext.Entry(ledgerGrp).Property(x => x.COA).IsModified = true;
+                    _accountingDbContext.Entry(ledgerGrp).Property(x => x.Description).IsModified = true;
+                    _accountingDbContext.Entry(ledgerGrp).Property(x => x.IsActive).IsModified = true;
+                    _accountingDbContext.Entry(ledgerGrp).Property(x => x.LedgerGroupName).IsModified = true;
+                    _accountingDbContext.Entry(ledgerGrp).Property(x => x.ModifiedBy).IsModified = true;
+                    _accountingDbContext.Entry(ledgerGrp).Property(x => x.ModifiedOn).IsModified = true;
+                    _accountingDbContext.Entry(ledgerGrp).Property(x => x.PrimaryGroup).IsModified = true;
+
+                    _accountingDbContext.SaveChanges();
+                    return ledgerGrp;
+                }
+                else
+                {
+                    throw new Exception("Failed to update ledgergroup");
+                }
             }
-            else
+            catch (Exception ex)
             {
-
-                throw new Exception("failed to update ledgergroup");
+                throw new Exception("An error occurred: " + ex.Message);
             }
+
         }
         private object UpdateCostCenterItemStatus(string ipDataStr)
         {
@@ -2610,15 +2679,22 @@ namespace DanpheEMR.Controllers
         {
             int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             LedgerModel ledger = DanpheJSONConvert.DeserializeObject<LedgerModel>(ipDataStr);
-            var led = _accountingDbContext.Ledgers.Where(s => s.LedgerId == ledger.LedgerId).FirstOrDefault();
+            var led = _accountingDbContext.Ledgers.Where(s => s.LedgerId == ledger.LedgerId && s.HospitalId == currentHospitalId).FirstOrDefault();
 
             using (var dbContextTransaction = _accountingDbContext.Database.BeginTransaction())
             {
                 try
                 {
-
                     if (led != null)
                     {
+                        if (!led.IsSystemDefault)
+                        {
+                        led.COA = ledger.COA;
+                        led.LedgerGroupName = ledger.LedgerGroupName;
+                        led.PrimaryGroup = ledger.PrimaryGroup;
+                        led.LedgerName = ledger.LedgerName;
+                        led.LedgerGroupId = ledger.LedgerGroupId;
+                        }                  
                         led.IsActive = ledger.IsActive;
                         led.LedgerName = ledger.LedgerName;
                         led.OpeningBalance = ledger.OpeningBalance;
@@ -2633,6 +2709,8 @@ namespace DanpheEMR.Controllers
                         led.LandlineNo = ledger.LandlineNo;
                         led.LedgerGroupId = ledger.LedgerGroupId;
                         led.LegalLedgerName = ledger.LegalLedgerName;
+
+                        
                         _accountingDbContext.Ledgers.Attach(led);
                         _accountingDbContext.Entry(led).Property(x => x.IsActive).IsModified = true;
                         _accountingDbContext.Entry(led).Property(x => x.LedgerName).IsModified = true;
@@ -2656,15 +2734,13 @@ namespace DanpheEMR.Controllers
 
                         if (flag)
                         {
-
-                            return led;
                             dbContextTransaction.Commit();
+                            return led;
                         }
                         else
                         {
-
-                            throw new Exception("failed to update ledger");
                             dbContextTransaction.Rollback();
+                            throw new Exception("failed to update ledger");
                         }
                     }
                     else
@@ -2683,8 +2759,9 @@ namespace DanpheEMR.Controllers
         }
         private object UpdateVoucherHead(string ipDataStr)
         {
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             VoucherHeadModel voucher = DanpheJSONConvert.DeserializeObject<VoucherHeadModel>(ipDataStr);
-            var voucherHead = _accountingDbContext.VoucherHeads.Where(s => s.VoucherHeadId == voucher.VoucherHeadId).FirstOrDefault();
+            var voucherHead = _accountingDbContext.VoucherHeads.Where(s => s.VoucherHeadId == voucher.VoucherHeadId && s.HospitalId == currentHospitalId).FirstOrDefault();
 
             if (voucherHead != null)
             {
@@ -2743,35 +2820,49 @@ namespace DanpheEMR.Controllers
         }
         private object UpdateChartOfAccount(string ipDataStr)
         {
-            ChartOfAccountModel coa = DanpheJSONConvert.DeserializeObject<ChartOfAccountModel>(ipDataStr);
-
-            var coaobj = _accountingDbContext.ChartOfAccounts.Where(s => s.ChartOfAccountId == coa.ChartOfAccountId).FirstOrDefault();
-            coa.COACode = AccountingTransferData.GetAutoGeneratedCodeForCOA(_accountingDbContext, coa);
-            if (coaobj != null)
+            try
             {
-                coaobj.ChartOfAccountName = coa.ChartOfAccountName;
-                coaobj.COACode = coa.COACode;
-                coaobj.PrimaryGroupId = coa.PrimaryGroupId;
-                coaobj.Description = coa.Description;
+                ChartOfAccountModel coa = DanpheJSONConvert.DeserializeObject<ChartOfAccountModel>(ipDataStr);
+                int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+                var coaobj = _accountingDbContext.ChartOfAccounts.Where(s => s.ChartOfAccountId == coa.ChartOfAccountId && s.HospitalId == currentHospitalId).FirstOrDefault();
+                coa.COACode = AccountingTransferData.GetAutoGeneratedCodeForCOA(_accountingDbContext, coa, currentHospitalId);
+                if (coaobj != null)
+                {
+                    if (coaobj.IsSystemDefault)
+                    {
+                        coaobj.ChartOfAccountName = coa.ChartOfAccountName;
+                        coaobj.COACode = coa.COACode;
+                        coaobj.PrimaryGroupId = coa.PrimaryGroupId;
+                    }
+                    coaobj.IsActive = coa.IsActive;
+                    coaobj.Description = coa.Description;
 
-                _accountingDbContext.ChartOfAccounts.Attach(coaobj);
-                _accountingDbContext.Entry(coaobj).Property(x => x.ChartOfAccountName).IsModified = true;
-                _accountingDbContext.Entry(coaobj).Property(x => x.COACode).IsModified = true;
-                _accountingDbContext.Entry(coaobj).Property(x => x.PrimaryGroupId).IsModified = true;
-                _accountingDbContext.Entry(coaobj).Property(x => x.Description).IsModified = true;
-                _accountingDbContext.SaveChanges();
-                return coaobj;
+                    _accountingDbContext.ChartOfAccounts.Attach(coaobj);
+                    _accountingDbContext.Entry(coaobj).Property(x => x.ChartOfAccountName).IsModified = true;
+                    _accountingDbContext.Entry(coaobj).Property(x => x.COACode).IsModified = true;
+                    _accountingDbContext.Entry(coaobj).Property(x => x.PrimaryGroupId).IsModified = true;
+                    _accountingDbContext.Entry(coaobj).Property(x => x.Description).IsModified = true;
+                    _accountingDbContext.SaveChanges();
+                    return coaobj;
+                }
+                else
+                {
+                    throw new Exception("failed to update chart of account");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                throw new Exception("failed to update chart of account");
+                throw new Exception("An error occurred: " + ex.Message);
+                throw;
             }
+
 
         }
         private object UpdateTransferRulesActive(string ipDataStr)
         {
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             string rulename = DanpheJSONConvert.DeserializeObject<string>(ipDataStr);
-            var groupMappingId = _accountingDbContext.GroupMapping.Where(s => s.Description == rulename)
+            var groupMappingId = _accountingDbContext.GroupMapping.Where(s => s.Description == rulename && s.HospitalId == currentHospitalId)
                                                                     .Select(i => i.GroupMappingId).FirstOrDefault();
 
             if (groupMappingId > 0)

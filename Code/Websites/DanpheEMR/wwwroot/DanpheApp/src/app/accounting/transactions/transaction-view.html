@@ -17,6 +17,11 @@
               </customer-header>
               <div class="row">
                 <div class="col-md-12 col-xs-12">
+                  <div style="text-align: right; color: orangered; font-weight: bold;" *ngIf="transaction.HasEditLog && !transaction.IsVerified">
+                    <span style="background-color: yellow; padding: 2px 5px; border-radius: 3px;">
+                      Edited
+                    </span>
+                  </div>
                   <hr style="border:1px solid black;margin-top: 0px;margin-bottom: 5px;" />
                   <div class="col-md-10">
                     <div class="row">
@@ -49,7 +54,7 @@
                               <b>Transaction Date:</b>
                               <span style="float:right">
                                 &nbsp;
-                                {{transaction.TransactionDate | nepaliDate:'format':'YYYY-MM-DD hh:mm'}} 
+                                {{transaction.TransactionDate | nepaliDate:'format':'YYYY-MM-DD hh:mm'}}
                               </span><br />
                               <span style="float:right">
                                 &nbsp;
@@ -163,8 +168,25 @@
                       <div class="col-md-12">
                         <b>Narration:</b>&nbsp;{{transaction.Remarks}}
                       </div>
-                      <div class="col-md-12" style="padding-top:50px;">
-                        <table style="width:100%;border:0;text-align:center;">
+                      <div class="col-md-12" *ngIf="transaction.HasEditLog && !transaction.IsVerified">
+                        <b>Reason For Edit:</b>&nbsp;{{transaction.LatestReason}}
+                      </div>
+                      <div class="col-md-12" style="padding-top:50px;display:flex;justify-content: space-between;">
+                        <span *ngFor="let sign of SignatureMenu;let i=index;" style="text-align: center;">
+                          <button class="no-print btn btn-sm" style="margin-left: 25px;float: right;margin-top: -35px;"
+                                  (click)="RemoveSignature(i)">X</button>
+                          <b style="border-top:1px solid black; padding:0px 10px;">
+                            {{ sign.Label }}
+                          </b>
+                          <br />
+                          <span *ngIf="sign.Action == 'Prepare'">
+                            {{transaction.Preparedby}}
+                          </span>
+                          <span *ngIf="sign.Action == 'Verify'">
+                            {{transaction.VerifiedBy}}
+                          </span>
+                        </span>
+                        <!-- <table style="width:100%;border:0;text-align:center;">
                           <tr>
                             <td></td>
                             <td></td>
@@ -214,7 +236,7 @@
                               </b>
                             </td>
                           </tr>
-                        </table>
+                        </table> -->
                       </div>
                     </div>
                     <br />
@@ -222,7 +244,7 @@
                     <div class="col-md-12" style="padding-bottom: 15px;">
                       <div class="form-actions" style="text-align: right;">
 
-                        <button
+                        <button *ngIf="CurrentActiveHospitalId == HospitalId"
                                 [rbac-permission]="{'name':'accounting-copy-voucher-button-permission','actionOnInvalid':'hidden'}"
                                 class="btn creamyblue btn-success hidden-print" (click)="copyVoucher()" value=""
                                 title="copy voucher" style="margin-left: 12px;">
@@ -239,13 +261,13 @@
                         <!-- edit btn show only for edit manual Voucher  -->
                         <button
                                 [rbac-permission]="{'name':'accounting-edit-voucher-button-permission','actionOnInvalid':'hidden'}"
-                                *ngIf="Iseditable &&  (!transaction.IsVerified || AllowVoucherEditAfterVerification)"
+                                *ngIf="Iseditable &&  (!transaction.IsVerified || AllowVoucherEditAfterVerification) && CurrentActiveHospitalId == HospitalId"
                                 class="btn creamyblue btn-success hidden-print" (click)="EditVoucher()"
                                 value="" title="edit manual voucher" style="margin-left: 12px;">
                           Edit Voucher<i class="fa fa-pencil" style="margin-left:10px;"></i>
                         </button>
 
-                        <button *ngIf="transaction.IsAllowReverseVoucher && !transaction.IsVoucherReversed"
+                        <button *ngIf="transaction.IsAllowReverseVoucher && !transaction.IsVoucherReversed && CurrentActiveHospitalId == HospitalId"
                                 [rbac-permission]="{'name':'allow-reverse-voucher','actionOnInvalid':'hidden'}"
                                 class="btn creamyblue btn-success hidden-print" (click)="reversevoucher()" value=""
                                 title="edit manual voucher" style="margin-left: 12px;">
@@ -285,6 +307,11 @@
               <customer-header [header-title]="transaction.VoucherType + '('+transaction.FiscalYear+')'">
               </customer-header>
               <div class="col-md-12 col-xs-12">
+                <div style="text-align: right; color: orangered; font-weight: bold;" *ngIf="transaction.HasEditLog && !transaction.IsVerified">
+                  <span style="background-color: yellow; padding: 2px 5px; border-radius: 3px;">
+                    Edited
+                  </span>
+                </div>
                 <hr style="border:1px solid black;margin-top: 0px;margin-bottom: 5px;" />
                 <div class="col-md-10" *ngIf="showPayeeAndCheque">
                   <div class="row">
@@ -579,8 +606,25 @@
                   <div>
                     <b>Narration:</b>&nbsp;{{transaction.Remarks}}
                   </div>
-                  <div class="col-md-12" style="padding-top:50px;">
-                    <table style="width:100%;border:0;text-align:center;">
+                  <div class="col-md-12" *ngIf="transaction.HasEditLog && !transaction.IsVerified">
+                    <b>Reason For Edit:</b>&nbsp;{{transaction.LatestReason}}
+                  </div>
+                  <div class="col-md-12" style="padding-top:50px;justify-content: space-between;">
+                    <span *ngFor="let sign of SignatureMenu;let i=index;" style="text-align: center;">
+                      <button class="no-print btn btn-sm" style="margin-left: 25px;float: right;margin-top: -35px;"
+                              (click)="RemoveSignature(i)">X</button>
+                      <b style="border-top:1px solid black; padding:0px 10px;">
+                        {{ sign.Label }}
+                      </b>
+                      <br />
+                      <span *ngIf="sign.Action == 'Prepare'">
+                        {{transaction.Preparedby}}
+                      </span>
+                      <span *ngIf="sign.Action == 'Verify'">
+                        {{transaction.VerifiedBy}}
+                      </span>
+                    </span>
+                    <!-- <table style="width:100%;border:0;text-align:center;">
                       <tr>
                         <td></td>
                         <td></td>
@@ -630,7 +674,7 @@
                           </b>
                         </td>
                       </tr>
-                    </table>
+                    </table> -->
                   </div>
                 </div>
                 <br />
@@ -645,7 +689,7 @@
                             value="" title="export to excel">
                       Export<i class="fa fa-file-excel-o" style="margin-left:10px;"></i>
                     </button>
-                    <button *ngIf="transaction.IsAllowReverseVoucher"
+                    <button *ngIf="transaction.IsAllowReverseVoucher && CurrentActiveHospitalId == HospitalId"
                             [rbac-permission]="{'name':'allow-reverse-voucher','actionOnInvalid':'hidden'}"
                             class="btn creamyblue btn-success hidden-print" (click)="reversevoucher()" value=""
                             title="edit manual voucher" style="margin-left: 12px;">
@@ -709,7 +753,7 @@
                               <b>Transaction Date:</b>
                               <span style="float:right">
                                 &nbsp;
-                                {{txnDetails.TransactionDate | nepaliDate:'format':'YYYY-MM-DD hh:mm'}} 
+                                {{txnDetails.TransactionDate | nepaliDate:'format':'YYYY-MM-DD hh:mm'}}
                               </span><br />
                               <span style="float:right">
                                 &nbsp;
@@ -787,7 +831,8 @@
                               {{ txnItm.SubLedgers[0]?.SubLedgerName }}
                             </td>
                             <td>
-                              {{txnItm.Description }} ({{ txnItm.CostCenterName }})
+                              {{txnItm.Description }}
+                              {{ subLedgerAndCostCenterSetting.EnableCostCenter ? ('(' + txnItm.CostCenterName + ')') : '' }}
                             </td>
                             <td>
                               <p *ngIf="txnItm.DrCr">{{txnItm.Amount | Currency:'4'}}</p>

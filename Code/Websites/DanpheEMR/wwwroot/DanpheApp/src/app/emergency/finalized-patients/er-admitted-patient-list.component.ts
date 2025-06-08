@@ -164,13 +164,13 @@ export class ERAdmittedPatientListComponent {
   public ReturnFromPatRegistrationEdit($event) {
     this.CloseAllERPatientPopUp();
     if ($event.submit) {
-      let itmIndex = this.allAdmittedPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
-      if (itmIndex >= 0) {
-        this.allAdmittedPatients.splice(itmIndex, 1, $event.ERPatient);
-        this.allAdmittedPatients = this.allAdmittedPatients.slice();
-      } else {
-        this.GetERAdmittedPatientList();
-      }
+      // let itmIndex = this.allAdmittedPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
+      // if (itmIndex >= 0) {
+      //   this.allAdmittedPatients.splice(itmIndex, 1, $event.ERPatient);
+      //   this.allAdmittedPatients = this.allAdmittedPatients.slice();
+      // } else {
+      this.GetERAdmittedPatientList();
+      // }
     }
   }
 
@@ -188,7 +188,7 @@ export class ERAdmittedPatientListComponent {
 
 
     this.globalVisit = this.visitService.CreateNewGlobal();
-    this.globalVisit.ERTabName = "finalized-lama";
+    this.globalVisit.ERTabName = "finalized-admitted";
     this.globalVisit.PatientVisitId = data.PatientVisitId;
     this.globalVisit.PatientId = data.PatientId;
     this.globalVisit.ProviderId = data.ProviderId;

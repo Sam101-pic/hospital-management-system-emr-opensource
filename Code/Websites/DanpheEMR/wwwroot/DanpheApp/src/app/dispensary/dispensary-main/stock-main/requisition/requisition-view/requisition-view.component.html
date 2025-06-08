@@ -40,7 +40,10 @@
         <table class="table table-striped table-hover req_table" style="background-color:initial;margin-top:1rem;width:100%">
           <thead>
             <tr style="font-weight: bold;text-align:center">
+              <td>Generic Name</td>
               <td>Medicine Name</td>
+              <td>ItemCode</td>
+              <td>Unit</td>
               <td>Quantity</td>
               <td>Dispatched Qty</td>
               <td>Pending Qty.</td>
@@ -51,7 +54,10 @@
           </thead>
           <tbody>
             <tr style="text-align:center" *ngFor="let row of requisition.RequisitionItems">
-              <td>{{row.ItemName}}(<i style="color: blue;">{{row.GenericName}}</i>)</td>
+              <td>{{row.GenericName}}</td>
+              <td>{{row.ItemName}}</td>
+              <td>{{row.ItemCode}}</td>
+              <td>{{row.Unit}}</td>
               <td>{{row.RequestedQuantity}}</td>
               <td>{{row.DispatchedQuantity}}</td>
               <td>{{row.PendingQuantity}}</td>
@@ -76,7 +82,8 @@
       <div class="col-md-12">
         <div style="text-align: left" class="col-md-4">Requested By:&nbsp;<b>{{requisition.RequestedBy}}</b></div>
         <div *ngIf="!!requisition.ReceivedBy" style="text-align: left" class="col-md-4">Received By:&nbsp;<b>{{requisition.ReceivedBy}}</b></div>
-        <div *ngIf="!!requisition.DispatchedBy" style="text-align: left" class="col-md-4">Dispatched By:&nbsp;<b>{{requisition.DispatchedBy}}</b></div>
+        <div *ngIf="!!requisition.DispatchedBy" style="text-align: left" class="col-md-4">Dispatched By:&nbsp;<b>{{requisition.DispatchedBy}}</b>
+        </div>
       </div>
     </div>
   </div>

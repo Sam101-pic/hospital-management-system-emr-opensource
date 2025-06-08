@@ -1,6 +1,7 @@
 import * as moment from "moment/moment";
 import { CoreService } from "../../../../src/app/core/shared/core.service";
 import { CommonFunctions } from "../common.functions";
+import { ENUM_DateTimeFormat } from "../shared-enums";
 import GridColumnSettings from "./grid-column-settings.constant";
 export class ReportGridColumnSettings {
 
@@ -231,7 +232,7 @@ export class ReportGridColumnSettings {
 
   //Admission Setting End
   public DateConverter_UserCollection(params) {
-    let Date: string = params.data.BillingDate;
+    let Date: string = params.data.Date;
     return moment(Date).format("DD-MMM-YYYY");
   }
 
@@ -254,6 +255,7 @@ export class ReportGridColumnSettings {
       cellRenderer: this.StaticAmountRoundOffForPaymentModeWiseReport,
     },
     { headerName: "User", field: "User", width: 100 },
+    { headerName: "PaymentDetails", field: "PaymentDetails", width: 100 },
     { headerName: "Remarks", field: "Remarks", width: 100 },
     { headerName: "Counter", field: "Counter", width: 100 },
   ];
@@ -278,6 +280,7 @@ export class ReportGridColumnSettings {
     { headerName: "Sub Total", field: "SubTotal", width: 80 },
     { headerName: "Discount", field: "DiscountAmount", width: 80 },
     { headerName: "TotalAmount", field: "TotalAmount", width: 90 },
+    { headerName: "Admission Date", field: "AdmissionDate", width: 90 },
     { headerName: "DischargeDate", field: "DischargeDate", width: 90 },
     { headerName: "User", field: "User", width: 100 },
     { headerName: "Remarks", field: "Remarks", width: 120 },
@@ -364,7 +367,7 @@ export class ReportGridColumnSettings {
 
   public DepartmentWiseDiscountSchemeGridColumns = [
     { headerName: "Service Department Name", field: "ServiceDepartmentName", width: 150 },
-    { headerName: "Scheme Name", field: "MembershipTypeName", width: 150 },
+    { headerName: "Scheme Name", field: "SchemeName", width: 150 },
     { headerName: "Total Quantity", field: "TotalQuantity", width: 90 },
     { headerName: "Total Invoice Amount", field: "TotalAmount", width: 90 },
     { headerName: "Total Discount", field: "TotalDiscount", width: 90 },
@@ -498,7 +501,12 @@ export class ReportGridColumnSettings {
     View Details</a>`;
   }
   public TotalItemsBillReport = [
-    { headerName: "Date", field: "TransactionDate", width: 130 },
+    {
+      headerName: "Date",
+      width: 130,
+      field: "TransactionDate",
+      cellRenderer: this.TransactionDateFormatter,
+    },
     {
       headerName: "MonthBS",
       field: "NepMonthName",
@@ -521,6 +529,7 @@ export class ReportGridColumnSettings {
     { headerName: "User Name", field: "UserName", width: 110 },
     { headerName: "Performer", field: "Performer", width: 180 },
     { headerName: "Prescriber", field: "PrescriberName", width: 180 },
+    { headerName: "Referrer", field: "ReferredByName", width: 180 },
     { headerName: "Remarks", field: "Remarks", width: 180 },
     { headerName: "ReferenceReceiptNo", field: "ReferenceReceiptNo", width: 180 },
     { headerName: "Scheme", field: "DiscountScheme", width: 180 },//sud:26Jun'23--Renamed header from 'Disc. Scheme' to 'Scheme'
@@ -560,7 +569,7 @@ export class ReportGridColumnSettings {
     { headerName: "Total", field: "Total", width: 120 },
     { headerName: "User", field: "User", width: 110 },
     { headerName: "Remarks", field: "Remarks", width: 180 },
-  ]
+  ];
 
   public SalesDaybookReport = [
     {
@@ -780,11 +789,13 @@ export class ReportGridColumnSettings {
     { headerName: "Age", field: "Age", width: 100 },
     { headerName: "Gender", field: "Gender", width: 100 },
     { headerName: "District", field: "DistrictName", width: 120 },
+    { headerName: "Municipality", field: "MunicipalityName", width: 120 },
+    { headerName: "Address", field: "Address", width: 120 },
     { headerName: "Doctor", field: "Doctor_Name", width: 120 },
     { headerName: "Department", field: "DepartmentName", width: 120 },
     // { headerName: "Visit Type", field: "VisitType", width: 140 },
     { headerName: "Appointment Type", field: "AppointmentType", width: 140 },
-    { headerName: "IsInsurance", field: "IsInsurancePatient", width: 100, cellRenderer: this.IsInsuranceRenderer }
+    { headerName: "Scheme", field: "SchemeName", width: 140 },
   ];
 
   //Rankwise Daily Appointment Report
@@ -928,13 +939,41 @@ export class ReportGridColumnSettings {
     { headerName: "No. of Days", field: "Number_of_Days", width: 100 },
   ];
 
-  //Rank-Membershipwise Admitted Patient Report
+  public PatientBedDetailsReportColumns = [
+    { headerName: "Patient Name", field: "PatientName", width: 160 },
+    { headerName: "Hospital Code", field: "HospitalCode", width: 100 },
+    { headerName: "IP Number", field: "IPNumber", width: 100 },
+
+    { headerName: "Requesting Department", field: "RequestingDepartment", width: 150 },
+    { headerName: "Admitting Doctor", field: "AdmittingDoctor", width: 160 },
+    { headerName: "Ward", field: "Ward", width: 110 },
+    { headerName: "Bed Feature", field: "BedFeature", width: 100 },
+    { headerName: "Status", field: "Status", width: 90 },
+    {
+      headerName: "Admitted Date",
+      field: "AdmittedDate",
+      width: 110
+    },
+    {
+      headerName: "Trans In Date",
+      field: "TransinDate",
+      width: 110
+    },
+    {
+      headerName: "Trans Out Date",
+      field: "TransOutDate",
+      width: 110
+    },
+    { headerName: "No. of Days", field: "NoOfDays", width: 100 },
+  ];
+
+  //Rank Wise Admitted Patient Report
   public RankMembershipwiseAdmittedPatientReport = [
     { headerName: "Admitted Date", field: "AdmissionDate", width: 150, cellRenderer: this.AdmissionDateRenderer },
     { headerName: "Hospital No.", field: "PatientCode", width: 120 },
     { headerName: "IP Number", field: "VisitCode", width: 120 },
     { headerName: "Rank", field: "Rank", width: 100 },
-    { headerName: "Membership", field: "MembershipName", width: 150 },
+    { headerName: "Scheme", field: "SchemeName", width: 150 },
     { headerName: "Patient Name", field: "PatientName", width: 160 },
     { headerName: "Age/Sex", field: "Age/Sex", width: 100 },
     { headerName: "Address", field: "Address", width: 150 },
@@ -966,6 +1005,8 @@ export class ReportGridColumnSettings {
     { headerName: "Admitted On", field: "AdmissionDate", width: 170 },
     { headerName: "Discharged On", field: "DischargedDate", width: 170 },
     { headerName: "Admitting Doctor", field: "AdmittingDoctor", width: 200 },
+    { headerName: "Discharge remarks", field: "DischargeRemarks", width: 200 },
+    { headerName: "Patient Remarks", field: "ProcedureType", width: 200 },
     // {
     //     headerName: "Actions",
     //     field: "",
@@ -1274,10 +1315,27 @@ export class ReportGridColumnSettings {
       field: "TransOutValue",
       width: 70,
       valueFormatter: this.decimalValueFormatter,
+    },
+    {
+      headerName: "Write-Off Value",
+      field: "WriteOffValue",
+      width: 70,
+      valueFormatter: this.decimalValueFormatter,
+    },
+    {
+      headerName: "Transfer-Out Value",
+      field: "TransOutValue",
+      width: 70,
+      valueFormatter: this.decimalValueFormatter,
     }
   ];
   public InventoryPurchaseItemsReport = [
-    { headerName: "Gr Date", field: "Dates", width: 100 },
+    {
+      headerName: "Gr Date",
+      field: 'Dates',
+      cellRenderer: this.AllDateFormatRenderer,
+      width: 100
+    },
     { headerName: "Gr No", field: "GoodsReceiptNo", width: 100 },
     { headerName: "Vendor Name", field: "VendorName", width: 150 },
     { headerName: "Bill No.", field: "BillNo", width: 100 },
@@ -1806,6 +1864,14 @@ export class ReportGridColumnSettings {
       return moment(date).format("DD-MMM-YYYY");
     }
   }
+
+  AllDateFormatRenderer(params) {
+    const dateFieldName = params.colDef.field;
+    const date = params.data[dateFieldName];
+    if (date != null) {
+      return moment(date).format("YYYY-MM-DD");
+    }
+  }
   public DateConverterRendererFunction(params) {
     let dates: string = params.data.Dates;
     return moment(dates).format("DD-MMM-YYYY");
@@ -2059,6 +2125,10 @@ export class ReportGridColumnSettings {
   DischargedDateFormatter(params) {
     let date: string = params.data.DischargedDate;
     return moment(date).format("YYYY-MM-DD HH:mm");
+  }
+  TransactionDateFormatter(params) {
+    let date: string = params.data.TransactionDate;
+    return moment(date).format(ENUM_DateTimeFormat.Year_Month_Day);
   }
 
   ThresholdMargin(params) {
@@ -2324,6 +2394,7 @@ export class ReportGridColumnSettings {
     { headerName: "New", field: "NewAppointment", width: 150 },
     { headerName: "Followup", field: "Followup", width: 150 },
     { headerName: "Referral", field: "Referral", width: 150 },
+    { headerName: "Revisit", field: "Revisit", width: 150 },
     { headerName: "Total", field: "TotalAppointments", width: 150 }
   ];
   public RPT_ADT_DailyVisitReportColumn = [
@@ -2333,6 +2404,8 @@ export class ReportGridColumnSettings {
     { headerName: "Days", field: "DayName", width: 100 },
     { headerName: "New Total", field: "NewTotal", width: 100 },
     { headerName: "Followup Total", field: "FollowupTotal", width: 100 },
+    { headerName: "Referral Total", field: "ReferralTotal", width: 100 },
+    { headerName: "Revisit Total", field: "RevisitTotal", width: 100 },
     { headerName: " Total", field: "TotalVisit", width: 100 },
   ];
   VisitDateRenderer(params) {
@@ -2341,44 +2414,58 @@ export class ReportGridColumnSettings {
   }
   public RPT_ADT_DistrictWiseReportColumn = [
     { headerName: "District Name", field: "DistrictName", width: 100 },
-    { headerName: "New Total Visit", field: "NewAppointment", width: 100 },
+    { headerName: "Total New Visit", field: "NewAppointment", width: 100 },
     { headerName: "Total Followup Visit", field: "Followup", width: 100 },
+    { headerName: "Total Referral Visit", field: "Referral", width: 100 },
+    { headerName: "Total Revisit Visit", field: "Revisit", width: 100 },
     { headerName: " Total", field: "TotalAppointments", width: 100 },
   ];
   public RPT_ADT_MunicipalityWiseReportColumn = [
     { headerName: "Municipality Name", field: "MunicipalityName", width: 100 },
-    { headerName: "New Total Visit", field: "NewAppointment", width: 100 },
+    { headerName: "Total New Visit", field: "NewAppointment", width: 100 },
     { headerName: "Total Followup Visit", field: "Followup", width: 100 },
+    { headerName: "Total Referral Visit", field: "Referral", width: 100 },
+    { headerName: "Total Revisit Visit", field: "Revisit", width: 100 },
     { headerName: " Total", field: "TotalAppointments", width: 100 },
   ];
   public RPT_ADT_MonthVisitReportColumn = [
     { headerName: "Month Name", field: "MonthName", width: 100 },
     { headerName: "New Total", field: "NewTotal", width: 100 },
     { headerName: "Followup Total", field: "FollowupTotal", width: 100 },
+    { headerName: "Referral Total", field: "ReferralTotal", width: 100 },
+    { headerName: "Revisit Total", field: "RevisitTotal", width: 100 },
     { headerName: " Total", field: "TotalVisit", width: 100 },
   ];
   public RPT_APPT_DepartmentWiseStatCounts = [
     { headerName: "Department", field: "DepartmentName", width: 140 },
     { headerName: "New Male Adult", field: "NewMaleAdult", width: 70 },
     { headerName: "New Female Adult", field: "NewFemaleAdult", width: 80 },
+    { headerName: "New Others Adult", field: "NewOthersAdult", width: 80 },
     { headerName: "New Male Child", field: "NewMaleChild", width: 70 },
     { headerName: "New Female Child", field: "NewFemaleChild", width: 80 },
+    { headerName: "New Others Child", field: "NewOthersChild", width: 80 },
     { headerName: "Followup Male Adult", field: "FollowupMaleAdult", width: 80 },
     { headerName: "Followup Female Adult", field: "FollowupFemaleAdult", width: 90 },
+    { headerName: "Followup Others Adult", field: "FollowupOthersAdult", width: 90 },
     { headerName: "Followup Male Child", field: "FollowupMaleChild", width: 80 },
     { headerName: "FollowUp Female Child", field: "FollowupFemaleChild", width: 90 },
+    { headerName: "FollowUp Others Child", field: "FollowupOthersChild", width: 90 },
     { headerName: "Total", field: "Total", width: 70 }
   ];
   public RPT_APPT_DoctorWiseStatisticsCounts = [
     { headerName: "DoctorName", field: "FullName", width: 140 },
     { headerName: "New Male Adult", field: "NewMaleAdult", width: 70 },
     { headerName: "New Female Adult", field: "NewFemaleAdult", width: 80 },
+    { headerName: "New Other Adult", field: "NewOtherAdult", width: 80 },
     { headerName: "New Male Child", field: "NewMaleChild", width: 70 },
     { headerName: "New Female Child", field: "NewFemaleChild", width: 80 },
+    { headerName: "New Other Child", field: "NewOtherChild", width: 80 },
     { headerName: "Old Male Adult", field: "OldMaleAdult", width: 80 },
     { headerName: "Old Female Adult", field: "OldFemaleAdult", width: 90 },
+    { headerName: "Old Other Adult", field: "OldOtherAdult", width: 90 },
     { headerName: "Old Male Child", field: "OldMaleChild", width: 80 },
     { headerName: "Old Female Child", field: "OldFemaleChild", width: 90 },
+    { headerName: "Old Other Child", field: "OldOtherChild", width: 90 },
     { headerName: "Total", field: "Total", width: 70 }
   ];
 
@@ -2399,11 +2486,11 @@ export class ReportGridColumnSettings {
     { headerName: "Quantity", field: "AvailableQuantity", width: 150 },
     { headerName: "Sub Store Name", field: "Name", width: 200 },
 
-  ]
+  ];
   static DateOfExpiry(params) {
     let expiryDate: Date = (params.data.ExpiryDate);
     let expiryDateFormatted = moment(expiryDate).format('YYYY-MM-DD');
-    let expiryDate1 = new Date(params.data.ExpiryDate)
+    let expiryDate1 = new Date(params.data.ExpiryDate);
     let date = new Date();
     let datenow = date.setMonth(date.getMonth() + 0);
     let datethreemonth = date.setMonth(date.getMonth() + 3);
@@ -2421,19 +2508,6 @@ export class ReportGridColumnSettings {
       return "<span style='background-color:green;color:white'>" + expiryDateFormatted + "(" + "Not Expired" + ")" + "</span>";
     }
   }
-  public IsInsuranceRenderer(params) {
-    var tempMsg;
-    if (params.data.Ins_HasInsurance == true) {
-      tempMsg = `<b style="background-color: lightgreen;">Yes</b>`
-    }
-    else if (params.data.Ins_HasInsurance == false) {
-      tempMsg = `<b style="background-color: yellow; padding:3px;">No</b>`
-    }
-    else {
-      tempMsg = ''
-    }
-    return tempMsg;
-  }
 
   public INVSupplierInfoReport = [
     { headerName: "VendorName", field: "VendorName", width: 110 },
@@ -2442,7 +2516,7 @@ export class ReportGridColumnSettings {
     { headerName: "Pan No.", field: "PanNo", width: 150 },
     { headerName: "ContactAddress", field: "ContactAddress", width: 150 },
     { headerName: "Email", field: "Email", width: 150 },
-  ]
+  ];
 
   public EditedPatientDetailReportColumns = [
     { headerName: "Hospital Number", field: "Hospital Number", width: 100 },
@@ -2455,7 +2529,12 @@ export class ReportGridColumnSettings {
   ];
   public IssuedItemListReportColumns = [
     { headerName: "Ref. No. (Dispatch No)", field: "DispatchNo", width: 130 },
-    { headerName: "Issued Date", field: "IssuedDate", width: 200 },
+    {
+      headerName: "Issued Date",
+      cellRenderer: this.AllDateFormatRenderer,
+      field: 'IssuedDate',
+      width: 150
+    },
     { headerName: "SubCategory", field: "SubCategoryName", width: 200 },
     { headerName: "Item Name", field: "ItemName", width: 200 },
     { headerName: "Unit", field: "Unit", width: 200 },
@@ -2470,8 +2549,8 @@ export class ReportGridColumnSettings {
   ];
 
   public RPT_RAD_FilmTypeCountColumns = [
-    { headerName: "Film Type", field: "FilmType", width: 250 },
-    { headerName: "Film Quantity Used", field: "QuantityUsed", width: 250 }
+    { headerName: "Film Type", field: "FilmType", width: 80 },
+    { headerName: "Film Quantity Used", field: "QuantityUsed", width: 80 }
   ];
 
   public SubstoreDispatchAndConsumptionReportColumns = [
@@ -2533,7 +2612,7 @@ export class ReportGridColumnSettings {
     { headerName: "Hospital No", field: "HospitalNo", width: 140 },
     { headerName: "IPNumber", field: "IPNumber", width: 120 },
     { headerName: "Rank ", field: "Rank", width: 160 },
-    { headerName: "Membership", field: "Membership", width: 120 },
+    { headerName: "Scheme", field: "SchemeName", width: 120 },
     { headerName: "PatientName", field: "PatientName", width: 120 },
     { headerName: "Age/Sex", field: "AgeSex", width: 100 },
     { headerName: "Address", field: "Address", width: 120 },
@@ -2563,12 +2642,73 @@ export class ReportGridColumnSettings {
     { headerName: "Due Amount", field: "TotalDueAmount", width: 150 },
     { headerName: "Care Person Name", field: "CarePersonName", width: 150 },
     { headerName: "Care Person Contact", field: "CarePersonContact", width: 150 }
-  ]
+  ];
   AdmittedDateRenderer(params) {
     let date: string = params.data.AdmittedOn;
     return moment(date).format("YYYY-MM-DD");
   }
+  public ItemWiseCopaymentReport = [
+    { headerName: "TransactionDate", field: "TransactionDate", width: 150 },
+    { headerName: "MonthBS", field: "NepMonthName", width: 100 },
+    { headerName: "MonthAD", field: "EngMonthName", width: 100 },
+    { headerName: "ReceiptNo", field: "ReceiptNo", width: 150 },
+    { headerName: "SchemeName", field: "SchemeName", width: 150 },
+    { headerName: "BillingType", field: "BillingType", width: 100 },
+    { headerName: "VisitType", field: "VisitType", width: 100 },
+    { headerName: "HospitalNumber", field: "HospitalNumber", width: 100 },
+    { headerName: "PolicyNo", field: "PolicyNo", width: 100 },
+    { headerName: "ClaimCode", field: "ClaimCode", width: 100 },
+    { headerName: "Claim Reference No.", field: "ClaimCode", width: 100 },
+    { headerName: "PatientName", field: "PatientName", width: 150 },
+    { headerName: "Department", field: "ServiceDepartmentName", width: 150 },
+    { headerName: "Item", field: "ItemName", width: 100 },
+    { headerName: "Price", field: "Price", width: 100 },
+    { headerName: "Quantity", field: "Quantity", width: 100, },
+    { headerName: "SubTotal", field: "SubTotal", width: 80 },
+    { headerName: "TotalAmount", field: "TotalAmount", width: 150 },
+    { headerName: "CoPayCashAmount", field: "CoPayCashAmount", width: 150 },
+    { headerName: "CoPayCreditAmount", field: "CoPayCreditAmount", width: 150 },
+    { headerName: "Performer", field: "AssignedToDoctor", width: 150 },
+    { headerName: "Referrer", field: "ReferredByDoctor", width: 150 },
+    { headerName: "Prescriber", field: "PrescriberDoctor", width: 150 },
+    { headerName: "UserName", field: "UserName", width: 150 },
+    { headerName: "Remarks", field: "Remarks", width: 150 },
+    { headerName: "ReferenceReceiptNo", field: "ReferenceReceiptNo", width: 150 }
+  ];
 
+  public ServiceDepartmentWiseCopaymentReport = [
+    { headerName: "Service Department", field: "ServiceDepartmentName", width: 200 },
+    { headerName: "Gross Sales", field: "GrossSales" },
+    { headerName: "TotalSalesQty", field: "TotalSalesQty" },
+    { headerName: "Net Sales", field: "NetSales" },
+    { headerName: "Return Credit Sales", field: "ReturnCreditSales" },
+    { headerName: "Return Qty", field: "ReturnQty" },
+    { headerName: "Net Quantity", field: "NetQuantity" },
+    { headerName: "TotalCoPayCashAmount", field: "TotalCoPayCashAmount" },
+    { headerName: "TotalCoPayCreditAmount", field: "TotalCoPayCreditAmount" },
+    { headerName: "RetCoPayCashAmount", field: "RetCoPayCashAmount" },
+    { headerName: "RetCopayCreditAmount", field: "RetCopayCreditAmount" },
+    { headerName: "NetCoPayCashAmount", field: "NetCoPayCashAmount" },
+    { headerName: "NetCoPayCreditAmount", field: "NetCoPayCreditAmount" },
+  ];
 
+  public BillWiseSalesReportGridColumns = [
+    { headerName: "Transaction Date", field: "TransactionDate", width: 150, cellRenderer: this.TransactionDate },
+    { headerName: "Transaction Type", field: "TransactionType", width: 90 },
+    { headerName: "Receipt No", field: "InvoiceNo", width: 90 },
+    { headerName: "Visit Type", field: "VisitType", width: 90 },
+    { headerName: "Ref Receipt No", field: "RefInvoiceNum", width: 90 },
+    { headerName: "Payment Mode", field: "PaymentMode", width: 90 },
+    { headerName: "Hospital Number", field: "PatientCode", width: 100 },
+    { headerName: "Patient Name", field: "ShortName", width: 100 },
+    { headerName: "Sub Total", field: "SubTotal", width: 100 },
+    { headerName: "Discount Amount", field: "DiscountAmount", width: 100 },
+    { headerName: "Total Amount", field: "TotalAmount", width: 100 },
+    { headerName: "Scheme Name", field: "SchemeName", width: 100 },
+  ];
 
+  TransactionDate(params) {
+    let date: string = params.data.TransactionDate;
+    return moment(date).format("YYYY-MM-DD");
+  }
 }

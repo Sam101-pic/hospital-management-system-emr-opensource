@@ -1,5 +1,5 @@
 <div>
-    <input type="button" class="btn btn-primary" (click)="AddNewFiscalYear()" value="Create New Fiscal Year" disabled />
+    <input type="button" class="btn green btn-success" (click)="AddNewFiscalYear()" value="Create New Fiscal Year" disabled />
     <fiscalyear-add [showAddPage]="showAddPage"
                     [selectedFiscalYear]="selectedFiscalYear"
                     (callback-add)="CallBackAdd($event)"></fiscalyear-add>

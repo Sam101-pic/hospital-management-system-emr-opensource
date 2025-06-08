@@ -14,6 +14,7 @@ import { EmpSettingsModule } from '../settings-new/employee/emp-settings.module'
 import { AccountingRoutingModule } from './accounting-routing.module';
 import { AccountingComponent } from './accounting.component';
 import { ActivateAccountingHospitalComponent } from './activate-hospital/accounting-hospital-activate.component';
+import { AddTenantComponent } from './add-tenant/add-tenant.component';
 import { BankReconciliationMainComponent } from './bank-reconciliation/bank-reconciliation-main.component';
 import { BankReconciliationComponent } from './bank-reconciliation/reconcile-bank-transactions/bank-reconciliation.component';
 import { SuspenseAccountReconciliationComponent } from './bank-reconciliation/reconcile-suspense-account/suspense-reconciliation.component';
@@ -21,6 +22,9 @@ import { CashFlowReportComponent } from './reports/Cash-Flow/cash-flow-report.co
 import { DayBookReportComponent } from './reports/Day-Book-Report/day-book-report.component';
 import { AccountHeadDetailReportComponent } from './reports/account-head-detail-report/account-head-detail-report.component';
 import { AccountingReportsComponent } from './reports/accounting-reports.component';
+import { AgeingReportComponent } from './reports/ageing-report/ageing-report.component';
+import { InvoiceWiseAgeingReportComponent } from './reports/ageing-report/invoice-wiae-ageing-report/invoice-wise-ageing-report.component';
+import { TransactionWiseAgeingReportComponent } from './reports/ageing-report/transaction-wise-ageing-report/transaction-wise-ageing-report.component';
 import { BalanceSheetReportComponent } from './reports/balance-sheet/balance-sheet-report.component';
 import { CashBankBookReportComponent } from './reports/cash-bank-book-report/cash-bank-book-report.component';
 import { DailyTransactionReportComponent } from './reports/daily-transaction/daily-transaction-report.component';
@@ -99,7 +103,11 @@ import { VoucherVerificationComponent } from './voucher-verification/voucher-ver
     BankReconciliationMainComponent,
     SuspenseAccountReconciliationComponent,
     SubLedgerAddComponent,
-    AccountHeadDetailReportComponent
+    AccountHeadDetailReportComponent,
+    AddTenantComponent,
+    AgeingReportComponent,
+    TransactionWiseAgeingReportComponent,
+    InvoiceWiseAgeingReportComponent
   ],
   bootstrap: []
 })

@@ -1,18 +1,23 @@
 import { Component, EventEmitter, Input, Output } from "@angular/core";
-import { Subscription } from "rxjs-compat";
+import * as moment from "moment";
+import { Subject, Subscription } from "rxjs-compat";
 import { BillingService } from "../../../billing/shared/billing.service";
 import { BillingSubScheme_DTO } from "../../../billing/shared/dto/bill-subscheme.dto";
 import { PatientScheme_DTO } from "../../../billing/shared/dto/patient-scheme.dto";
 import { RegistrationScheme_DTO } from "../../../billing/shared/dto/registration-scheme.dto";
 import { SchemeParameters } from "../../../billing/shared/scheme-parameter.model";
 import { CoreService } from "../../../core/shared/core.service";
-import { SSFEligibility, SsfEmployerCompany } from "../../../insurance/ssf/shared/SSF-Models";
+import { Eligibility, GovInsurancePatientVM } from "../../../insurance/nep-gov/shared/gov-ins-patient.view-model";
+import { Extension, GetPatientDetailsAndEligibilityApiResponse } from "../../../insurance/nep-gov/shared/hib-api-response.interface";
+import { GovInsuranceBlService } from "../../../insurance/nep-gov/shared/insurance.bl.service";
+import { SSFEligibility, SSFSchemeTypeSubProduct, SsfEmployerCompany } from "../../../insurance/ssf/shared/SSF-Models";
 import { SsfDataStatus_DTO, SsfService } from "../../../insurance/ssf/shared/service/ssf.service";
 import { BillingScheme_DTO } from "../../../settings-new/billing/shared/dto/billing-scheme.dto";
 import { PriceCategory } from "../../../settings-new/shared/price.category.model";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { DanpheCache, MasterType } from "../../../shared/danphe-cache-service-utility/cache-services";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_DanpheHTTPResponses, ENUM_DanpheSSFSchemes, ENUM_MessageBox_Status, ENUM_SSF_EligibilityType, ENUM_Scheme_ApiIntegrationNames, ENUM_ServiceBillingContext } from "../../../shared/shared-enums";
+import { ENUM_AddressType, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_DanpheSSFSchemes, ENUM_InsuranceIdentifierWithSBCode, ENUM_MessageBox_Status, ENUM_SSFSchemeTypeSubProduct, ENUM_SSF_EligibilityType, ENUM_Scheme_ApiIntegrationNames, ENUM_ServiceBillingContext } from "../../../shared/shared-enums";
 import { NewClaimCode_DTO } from "../dto/new-claim-code.dto";
 import { PatientMemberInfo_DTO } from "../dto/patient-member-info.dto";
 import { MedicareMemberVsMedicareBalanceVM } from "../medicare-model";
@@ -48,7 +53,7 @@ export class RegistrationSchemeSelectComponent {
   public regSchemeChangeEmitter: EventEmitter<RegistrationScheme_DTO> = new EventEmitter<RegistrationScheme_DTO>();
 
   public ssfSubscription: Subscription = new Subscription();
-
+  public NSHISubscription: Subscription = new Subscription();
 
   public currentSchemeId: number = 0;
   public old_SchemeId: number = 0;
@@ -68,10 +73,27 @@ export class RegistrationSchemeSelectComponent {
   public FetchSsfDetailLocally: boolean = false;
   public PatientImage: string = null;
   public DisplayMembershipLoadButton: boolean = false;
-
-  constructor(public visitBlService: VisitBLService, public msgBoxService: MessageboxService, public ssfService: SsfService, public coreService: CoreService, public billingService: BillingService) {
+  public insPatient: GovInsurancePatientVM = new GovInsurancePatientVM();
+  public insurancePatientInfo: GetPatientDetailsAndEligibilityApiResponse;
+  public IsHIBApiIntegrated: boolean = false;
+  public Country_All: any = null;
+  public insProviderList: Array<any> = [];
+  public LoadFromHIBServer: boolean = false;
+  public IsNSHIParameterEnabled: boolean = false;
+  public eligibility: Eligibility = new Eligibility();
+  public NSHISubject: Subject<GovInsurancePatientVM> = new Subject<GovInsurancePatientVM>();
+  public SchemeTypeSubProduct = new Array<SSFSchemeTypeSubProduct>();
+  public SelectedSubProduct: string = "";
+  IsClaimSubmitted: boolean = false;
+  CopaymentSetting: CopaymentSettings = new CopaymentSettings();
+  constructor(public visitBlService: VisitBLService, public msgBoxService: MessageboxService, public ssfService: SsfService, public coreService: CoreService, public billingService: BillingService, public insuranceBLService: GovInsuranceBlService) {
     //this.currentRegSchemeDto.SchemeId = 4;//this is default-hardcoded.. need to change this soon..
     this.GetSsfDataAsObservable();
+    this.GetNSHIDataAsObservable();
+    this.GetInsuranceProviderList();
+    this.GetHIBIntegrationParameter();
+    this.GetInsCopaymentConfigurationParameter();
+    this.Country_All = DanpheCache.GetData(MasterType.Country, null);
   }
 
   ngOnChanges() {
@@ -81,6 +103,30 @@ export class RegistrationSchemeSelectComponent {
   ngOnInit() {
     this.currentRegSchemeDto.SchemeId = this.selectedSchemePriceCategory.SchemeId;
     this.currentRegSchemeDto.PriceCategoryId = this.selectedSchemePriceCategory.PriceCategoryId;
+
+    this.GetSchemeTypeSubProduct();
+
+  }
+  GetSchemeTypeSubProduct() {
+    let arrayOfSSFSchemeSubProduct = Object.keys(ENUM_SSFSchemeTypeSubProduct).map((name) => {
+      return {
+        name,
+        value: ENUM_SSFSchemeTypeSubProduct[name as keyof typeof ENUM_SSFSchemeTypeSubProduct],
+      };
+    });
+
+    arrayOfSSFSchemeSubProduct = arrayOfSSFSchemeSubProduct.filter(a => isNaN(+(a.name)) === true);
+
+    this.SchemeTypeSubProduct = arrayOfSSFSchemeSubProduct;
+  }
+
+  selectSSFSchemeTypeSubProduct($event): void {
+    if ($event) {
+      const subProduct = $event.target.value;
+      this.SelectedSubProduct = subProduct;
+      this.currentRegSchemeDto.PatientScheme.OtherInfo = this.SelectedSubProduct;
+      this.CheckValidationAndEmit();
+    }
   }
 
   OnSchemeChanged(scheme: BillingScheme_DTO) {
@@ -100,7 +146,7 @@ export class RegistrationSchemeSelectComponent {
           const paramValue = JSON.parse(param.ParameterValue);
           const schemeId = paramValue ? paramValue.SchemeId : null;
           if (schemeId === scheme.SchemeId && paramValue.EnableAutoGenerate) {
-            this.GetLatestClaimCode(scheme.SchemeId);
+            this.GetLatestClaimCode(scheme.DefaultCreditOrganizationId);
           }
         }
       }
@@ -133,16 +179,27 @@ export class RegistrationSchemeSelectComponent {
         if (this.currentPatientId) {
           this.FetchSsfDetailLocally = true;
           this.DisplayMembershipLoadButton = true;
+          this.IsNSHIParameterEnabled = false;
+          this.loadFromSSFServer = true;
+          this.currentRegSchemeDto.MemberNo = this.policyNo;
           this.LoadSSFPatientInformation();
         } else {
           this.IsClaimSuccessful = true;
         }
       }
+      if (scheme && scheme.ApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS) {
+        if (this.IsHIBApiIntegrated) {
+          this.IsNSHIParameterEnabled = true;
+        }
+        else {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Please Enable HIB Confifuration Parameter"]);
+        }
+      }
     }
   }
 
-  GetLatestClaimCode(schemeId: number): void {
-    this.visitBlService.GetLatestClaimCodeForAutoGeneratedClaimCodes(schemeId).subscribe((res: DanpheHTTPResponse) => {
+  GetLatestClaimCode(creditOrganizationId: number): void {
+    this.visitBlService.GetLatestClaimCodeForAutoGeneratedClaimCodes(creditOrganizationId).subscribe((res: DanpheHTTPResponse) => {
       if (res.Status === ENUM_DanpheHTTPResponses.OK) {
         this.NewClaimCodeObj = res.Results;
         if (this.NewClaimCodeObj && !this.NewClaimCodeObj.IsMaxLimitReached) {
@@ -222,6 +279,7 @@ export class RegistrationSchemeSelectComponent {
       this.currentRegSchemeDto.IsCreditOnlyScheme = schemeObj.IsCreditOnlyScheme;
       this.currentRegSchemeDto.IsClaimCodeAutoGenerate = schemeObj.IsClaimCodeAutoGenerate;
       this.currentRegSchemeDto.IsDiscountApplicable = schemeObj.IsDiscountApplicable;
+      this.currentRegSchemeDto.IsDiscountEditable = schemeObj.IsDiscountEditable;
       this.currentRegSchemeDto.SchemeApiIntegrationName = schemeObj.ApiIntegrationName;
       this.currentRegSchemeDto.DefaultCreditOrganizationId = schemeObj.DefaultCreditOrganizationId;
       this.currentRegSchemeDto.DefaultPaymentMode = schemeObj.DefaultPaymentMode;
@@ -230,6 +288,7 @@ export class RegistrationSchemeSelectComponent {
       this.currentRegSchemeDto.IsCreditLimited = schemeObj.IsCreditLimited;
       this.currentRegSchemeDto.IsGeneralCreditLimited = schemeObj.IsGeneralCreditLimited;
       this.currentRegSchemeDto.IsMemberNumberCompulsory = schemeObj.IsMemberNumberCompulsory;
+      this.currentRegSchemeDto.DiscountPercent = schemeObj.DiscountPercent;
       if (schemeObj.IsGeneralCreditLimited) {
         this.currentRegSchemeDto.CreditLimitObj.GeneralCreditLimit = schemeObj.GeneralCreditLimit;
       }
@@ -290,6 +349,18 @@ export class RegistrationSchemeSelectComponent {
   }
 
   CheckValidationAndEmit() {
+
+    // Validation check for compulsory MemberNo 
+    if (this.currentRegSchemeDto.IsMemberNumberCompulsory) {
+      const policyNo = this.currentRegSchemeDto.MemberNo;
+      if (!policyNo || policyNo.trim() === "") {
+        this.msgBoxService.showMessage(
+          ENUM_MessageBox_Status.Warning,
+          [`Member Number is required to register ${this.currentRegSchemeDto.SchemeName} Scheme's Patient!`]
+        );
+        return;
+      }
+    }
     //Assign default PatientScheme if it's empty in CurrentRegScheme Dto
     if (!this.currentRegSchemeDto.PatientScheme || !this.currentRegSchemeDto.PatientScheme.SchemeId) {
       this.currentRegSchemeDto.PatientScheme = new PatientScheme_DTO();
@@ -368,6 +439,7 @@ export class RegistrationSchemeSelectComponent {
     retObj.OpCreditLimit = patientMemberInfo.OpCreditLimit;
     retObj.IpCreditLimit = patientMemberInfo.IpCreditLimit;
     retObj.GeneralCreditLimit = patientMemberInfo.GeneralCreditLimit;
+    retObj.PolicyHolderUID = this.insPatient.PolicyHolderUID;
 
     return retObj;
   }
@@ -384,14 +456,228 @@ export class RegistrationSchemeSelectComponent {
       this.ssfService.GetSsfPatientDetailAndEligibilityLocally(this.currentPatientId, this.currentRegSchemeDto.SchemeId);
     }
   }
+  async LoadNGHISPatientInformation() {
+    if (this.currentPatientId <= 0) {
+      if ((this.IsNSHIParameterEnabled) && this.LoadFromHIBServer) {
+        if (this.currentRegSchemeDto.MemberNo && this.currentRegSchemeDto.MemberNo.trim()) {
 
+          this.insuranceBLService.GetPatientDetailsAndEligibilityFromHIBServer(this.currentRegSchemeDto.MemberNo).finally(() => this.loading = false).subscribe((res: DanpheHTTPResponse) => {
+            if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+              this.TransformApiResponseDataToPatientObjet(res.Results);
+            }
+          });
+        }
+      }
+    }
+    if (this.currentPatientId > 0) {
+      //const isClaimSubmitted = await this.CheckIfClaimSubmitted(this.currentRegSchemeDto.MemberNo);
+      // if (isClaimSubmitted) {
+      this.GetEligibilityFromAPI(this.currentRegSchemeDto.MemberNo);
+      // } else {
+      //  this.GetNHSIpatientInformationLocally(this.currentRegSchemeDto.SchemeId, this.currentPatientId);
+      //}
+    }
+  }
+  GetNHSIpatientInformationLocally(SchemeId: number, PatientId: number) {
+    this.insuranceBLService.GetNHSIPatientDetailLocally(SchemeId, PatientId).subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+        this.insPatient = new GovInsurancePatientVM();
+        this.insPatient.eligibilityInfo.AllowedMoney = res.Results.GeneralCreditLimit;
+        this.insPatient.IsPatientInformationLoaded = true;
+        this.insPatient.IsPatientEligibilityLoaded = true;
+        this.currentRegSchemeDto.CreditLimitObj.GeneralCreditLimit = this.insPatient.eligibilityInfo.AllowedMoney;
+        this.insPatient.eligibilityInfo.RegistrationCase = res.Results.RegistrationCase;
+        this.insPatient.PolicyHolderUID = res.Results.PolicyHolderUID;
+        this.insPatient.eligibilityInfo.CoPayCashPercent = res.Results.CoPayPercent;
+        this.insPatient.eligibilityInfo.IsCoPayment = res.Results.CoPayPercent ? true : false;
+        this.insPatient.Ins_FirstServicePoint = res.Results.Ins_FirstServicePoint;
+        this.NSHISubject.next(this.insPatient);
+      }
+    });
+  }
+  GetEligibilityFromAPI(NSHI: string) {
+    this.insuranceBLService.CheckEligibility(NSHI).subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+        this.insPatient = new GovInsurancePatientVM();
+        let AllowedMoney = res.Results.insurance && res.Results.insurance[0] && res.Results.insurance[0].benefitBalance && res.Results.insurance[0].benefitBalance[0] && res.Results.insurance[0].benefitBalance[0].financial && res.Results.insurance[0].benefitBalance[0].financial[0] && res.Results.insurance[0].benefitBalance[0].financial[0].allowedMoney && res.Results.insurance[0].benefitBalance[0].financial[0].allowedMoney.value;
+        this.insPatient.eligibilityInfo.AllowedMoney = AllowedMoney;
+        this.insPatient.IsPatientInformationLoaded = true;
+        this.insPatient.IsPatientEligibilityLoaded = true;
+        this.currentRegSchemeDto.CreditLimitObj.GeneralCreditLimit = AllowedMoney;
+        const extension: Extension = res.Results.insurance[0] && res.Results.insurance[0].extension;
+        if (extension && extension.url === "https://hib.gov.np/fhir/FHIE+extension+Copayment") {
+          this.insPatient.eligibilityInfo.CoPayCashPercent = extension.valueDecimal * 100;
+          if (this.insPatient.eligibilityInfo.CoPayCashPercent) {
+            this.insPatient.eligibilityInfo.IsCoPayment = true;
+          }
+          else {
+            this.insPatient.eligibilityInfo.IsCoPayment = false;
+          }
+
+          if (this.CopaymentSetting && this.CopaymentSetting.IsEnabled && this.insPatient.eligibilityInfo.IsCoPayment) {
+            this.insPatient.eligibilityInfo.CoPayCashPercent = this.CopaymentSetting.CoPaymentCashPercent;
+          }
+        }
+
+        const externalExtensions: Extension[] = res.Results.extension;
+        if (externalExtensions && externalExtensions.length) {
+          let firstServicePointExtension = externalExtensions.find(e => e.url === "https://hib.gov.np/fhir/FHIE+extension+Profile+FSP");
+          if (firstServicePointExtension) {
+            this.insPatient.Ins_FirstServicePoint = firstServicePointExtension.valueString;
+          }
+
+          let imageURLExtension = externalExtensions.find(e => e.url === "https://hib.gov.np/fhir/FHIE+extension+Profile+Photo+Url");
+          if (imageURLExtension) {
+            this.insPatient.PatientImageURL = imageURLExtension.valueString;
+            this.PatientImage = this.insPatient.PatientImageURL;
+          }
+          else {
+            this.PatientImage = '';
+          }
+        }
+
+        if (this.currentRegSchemeDto && this.currentRegSchemeDto.PatientScheme && (!this.currentRegSchemeDto.PatientScheme.PolicyHolderUID || this.currentRegSchemeDto.PatientScheme.PolicyHolderUID === null)) {
+          this.insuranceBLService.GetPatientDetailsAndEligibilityFromHIBServer(this.currentRegSchemeDto.MemberNo).finally(() => this.loading = false).subscribe((res: DanpheHTTPResponse) => {
+            if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+              const patientResource = res.Results.PatientDetails.entry[0].resource;
+              const policyHolderUID = patientResource.id;
+              console.log(policyHolderUID);
+              this.insPatient.PolicyHolderUID = policyHolderUID;
+              this.currentRegSchemeDto.PatientScheme.PolicyHolderUID = policyHolderUID;
+              this.currentRegSchemeDto.NSHIPatientDetail.PolicyHolderUID = policyHolderUID;
+              console.log(this.insPatient);
+
+              this.CheckAndProceedToEmit();
+            }
+          });
+        }
+
+        this.NSHISubject.next(this.insPatient);
+      }
+    });
+  }
+  async TransformApiResponseDataToPatientObjet(res: GetPatientDetailsAndEligibilityApiResponse): Promise<void> {
+    if (!res.PatientDetails.entry || res.PatientDetails.entry.length === 0) {
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to get Patient Information from Server.']);
+      return;
+    }
+    const patientResource = res.PatientDetails.entry[0].resource;
+
+    if (!patientResource.name || patientResource.name.length === 0) {
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to get Patient Information from Server.']);
+      return;
+    }
+
+    if (!res.EligibilityResponse && !res.EligibilityResponse.insurance) {
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['This patient is not eligible. No balance information is available for this patient.']);
+      return;
+    }
+
+
+    const FistNameAndMiddleName = patientResource.name && patientResource.name[0] && patientResource.name[0].given && patientResource.name[0].given[0].split(' ');
+    const CapitalizedFistNameAndMiddleName = FistNameAndMiddleName.map(this.CapitalizeFirstLetter);
+    this.insPatient.IsPatientInformationLoaded = true;
+    this.insPatient.IsPatientEligibilityLoaded = true;
+
+    this.insPatient.FirstName = CapitalizedFistNameAndMiddleName[0] ? CapitalizedFistNameAndMiddleName[0] : '';
+    this.insPatient.MiddleName = CapitalizedFistNameAndMiddleName.slice(1).join(' ');
+
+    const LastNames = patientResource.name && patientResource.name[0] && patientResource.name[0].family && patientResource.name[0].family.split(' ');
+    const CapitalizedLastNames = LastNames.map(this.CapitalizeFirstLetter);
+
+    this.insPatient.LastName = CapitalizedLastNames.join(' ');
+
+    const physicalAddress = patientResource.address && patientResource.address.find(a => a.type === ENUM_AddressType.Physical);
+    this.insPatient.Address = physicalAddress && physicalAddress.text || '';
+
+    const telecom = patientResource.telecom && patientResource.telecom[0];
+    this.insPatient.PhoneNumber = telecom && telecom.value || '';
+
+    const email = patientResource.telecom && patientResource.telecom[1];
+    this.insPatient.Email = email && email.value.trim() || '';
+
+    this.insPatient.DateOfBirth = patientResource.birthDate || '';
+    this.insPatient.Age = this.CalculateAge(this.insPatient.DateOfBirth);
+
+
+    this.insPatient.Gender = this.CapitalizeFirstLetter(patientResource.gender);
+
+    const identifierWithSBCode = patientResource.identifier.find(item => {
+      return item.type.coding.some(coding => coding.code === ENUM_InsuranceIdentifierWithSBCode.SB);
+    });
+    this.insPatient.Ins_NshiNumber = identifierWithSBCode && identifierWithSBCode.value || '';
+
+    this.insPatient.AgeUnit = 'Y';
+
+    const PolicyHolderUID = patientResource.id;
+    this.insPatient.PolicyHolderUID = PolicyHolderUID;
+
+    const RegistrationCase = res.EligibilityResponse && res.EligibilityResponse.insurance && res.EligibilityResponse.insurance[0] && res.EligibilityResponse.insurance[0].benefitBalance && res.EligibilityResponse.insurance[0].benefitBalance[0] && res.EligibilityResponse.insurance[0].benefitBalance[0].category && res.EligibilityResponse.insurance[0].benefitBalance[0].category.text;
+    this.insPatient.eligibilityInfo.RegistrationCase = RegistrationCase;
+
+    const allowedMoney = res.EligibilityResponse && res.EligibilityResponse.insurance && res.EligibilityResponse.insurance[0] && res.EligibilityResponse.insurance[0].benefitBalance && res.EligibilityResponse.insurance[0].benefitBalance[0] && res.EligibilityResponse.insurance[0].benefitBalance[0].financial && res.EligibilityResponse.insurance[0].benefitBalance[0].financial[0] && res.EligibilityResponse.insurance[0].benefitBalance[0].financial[0].allowedMoney && res.EligibilityResponse.insurance[0].benefitBalance[0].financial[0].allowedMoney.value;
+
+    this.insPatient.eligibilityInfo.AllowedMoney = allowedMoney;
+    this.currentRegSchemeDto.CreditLimitObj.GeneralCreditLimit = allowedMoney;
+
+    const extension: Extension = res.EligibilityResponse && res.EligibilityResponse.insurance && res.EligibilityResponse.insurance[0].extension && res.EligibilityResponse.insurance[0].extension[0];
+
+    const firstServicePointExtension: Extension = patientResource && patientResource.extension && patientResource.extension.find(e => e.url === "https://hib.gov.np/fhir/FHIE+extension+Profile+FSP");
+    const districtExtension: Extension = patientResource && patientResource.extension && patientResource.extension.find(e => e.url === "https://hib.gov.np/fhir/FHIE+extension+Profile+District");
+    if (extension && extension.url === "https://hib.gov.np/fhir/FHIE+extension+Copayment") {
+      this.insPatient.eligibilityInfo.CoPayCashPercent = extension.valueDecimal * 100;
+      if (this.insPatient.eligibilityInfo.CoPayCashPercent) {
+        this.insPatient.eligibilityInfo.IsCoPayment = true;
+      }
+      else {
+        this.insPatient.eligibilityInfo.IsCoPayment = false;
+      }
+
+      if (this.CopaymentSetting && this.CopaymentSetting.IsEnabled && this.insPatient.eligibilityInfo.IsCoPayment) {
+        this.insPatient.eligibilityInfo.CoPayCashPercent = this.CopaymentSetting.CoPaymentCashPercent;
+      }
+    }
+    if (districtExtension) {
+      this.insPatient.CountrySubDivisionName = districtExtension.valueString;
+    }
+    if (firstServicePointExtension) {
+      this.insPatient.Ins_FirstServicePoint = firstServicePointExtension.valueString;
+    }
+    const patientImageURLExtension: Extension = patientResource && patientResource.extension && patientResource.extension.find(e => e.url === "https://hib.gov.np/fhir/FHIE+extension+Profile+Photo+Url");
+
+    if (patientImageURLExtension) {
+      this.insPatient.PatientImageURL = patientImageURLExtension.valueString;
+      this.PatientImage = this.insPatient.PatientImageURL;
+
+    }
+    this.NSHISubject.next(this.insPatient);
+  }
+
+  CapitalizeFirstLetter(input: string): string {
+    if (input) {
+      return input.charAt(0).toUpperCase() + input.slice(1);
+    }
+    else {
+      return '';
+    }
+  }
+
+  CalculateAge(dob: string) {
+    if (dob) {
+      let dobYear: number = Number(moment(dob).format("YYYY"));
+      if (dobYear > 1920) {
+        return String(Number(moment().format("YYYY")) - Number(moment(dob).format("YYYY")));
+      }
+    }
+  }
   GetSsfDataAsObservable() {
     this.ssfSubscription = this.ssfService.ReturnSsfData().subscribe(res => {
       let ssfData = new SsfDataStatus_DTO();
       ssfData = res;
       if (ssfData.isPatientInformationLoaded && ssfData.isPatientEligibilityLoaded && ssfData.isEmployerListLoaded) {
-        this.IsClaimSuccessful = ssfData.IsClaimSuccessful;
-        this.DisplayMembershipLoadButton = this.IsClaimSuccessful;
+        //making these below two variable true for ssf to make user load balance every time.
+        this.IsClaimSuccessful = true;//ssfData.IsClaimSuccessful;
+        this.DisplayMembershipLoadButton = true;//this.IsClaimSuccessful;
         if (ssfData.ssfPatientDetail.img !== null) {
           this.PatientImage = `data:image/jpeg;base64,${ssfData.ssfPatientDetail.img}`;
         } else {
@@ -495,6 +781,7 @@ export class RegistrationSchemeSelectComponent {
 
   ngOnDestroy() {
     this.ssfSubscription.unsubscribe();
+    this.NSHISubscription.unsubscribe();
   }
 
   SubSchemeListFormatter(data) {
@@ -508,8 +795,76 @@ export class RegistrationSchemeSelectComponent {
       this.CheckValidationAndEmit();
     }
   }
+  GetHIBIntegrationParameter(): void {
+    let param = this.coreService.Parameters.find(a => a.ParameterGroupName === 'GovInsurance' && a.ParameterName === 'HIBConfiguration');
+    if (param) {
+      let HIBConfigurationParameter = JSON.parse(param.ParameterValue);
+      this.IsHIBApiIntegrated = HIBConfigurationParameter.IsEnabled;
+    }
+  }
+  public GetInsuranceProviderList() {
+    this.insuranceBLService.GetInsuranceProviderList()
+      .subscribe(res => {
+        if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+          if (res.Results.length) {
+            this.insProviderList = res.Results;
+            this.insPatient.InsuranceProviderId = this.insProviderList[0].InsuranceProviderId;
+            this.insPatient.Ins_InsuranceProviderId = this.insProviderList[0].InsuranceProviderId;
+          }
+          else {
+            console.log(res.ErrorMessage);
+          }
+        }
+      });
+  }
+  ReturnNSHIData() {
+    return this.NSHISubject.asObservable();
+  }
+
+  GetNSHIDataAsObservable() {
+    this.NSHISubscription = this.ReturnNSHIData().subscribe(res => {
+      let NSHIPatientDetail = new GovInsurancePatientVM();
+      NSHIPatientDetail = res;
+      if (NSHIPatientDetail.IsPatientInformationLoaded && NSHIPatientDetail.IsPatientEligibilityLoaded) {
+        this.AssignNSHIPatientData(NSHIPatientDetail);
+        this.CheckValidationAndEmit();
+      }
+    });
+  }
+  AssignNSHIPatientData(NSHIData: GovInsurancePatientVM) {
+    if (NSHIData) {
+      this.currentRegSchemeDto.NSHIPatientDetail = NSHIData;
+    }
+  }
+
+  async CheckIfClaimSubmitted(NSHINumber: string): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      this.insuranceBLService.CheckIfClaimSubmitted(NSHINumber).subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+          if (res.Results > 0) {
+            this.IsClaimSubmitted = true;
+            resolve(this.IsClaimSubmitted);
+          }
+        }
+        this.IsClaimSubmitted = false;
+        resolve(this.IsClaimSubmitted);
+      });
+    });
+  }
+
+  GetInsCopaymentConfigurationParameter() {
+    let copaymentConfigurationParameter = this.coreService.Parameters.find(a => a.ParameterGroupName == "Insurance" && a.ParameterName == "CoPaymentConfiguration");
+    if (copaymentConfigurationParameter) {
+      this.CopaymentSetting = JSON.parse(copaymentConfigurationParameter.ParameterValue)
+    }
+  }
 }
 
+class CopaymentSettings {
+  IsEnabled: boolean = false;
+  CoPaymentCreditPercent: number = 0;
+  CoPaymentCashPercent: number = 0;
+}
 
 
 

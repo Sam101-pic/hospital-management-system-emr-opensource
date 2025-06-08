@@ -8,7 +8,9 @@ export class IncentiveDLService {
   public options = {
     headers: new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' })
   };
-
+  public jsonOptions = {
+    headers: new HttpHeaders({ 'Content-Type': 'application/json' })
+  };
   constructor(private http: HttpClient) {
   }
 
@@ -155,4 +157,18 @@ export class IncentiveDLService {
     let data = JSON.stringify(modifiedItems);
     return this.http.put<any>("/api/Incentive/BillTransactionItems", data, this.options);
   }
+
+  GetFilteredServiceItems(requestFilterPayload) {
+    return this.http.get<DanpheHTTPResponse>("/api/Incentive/IncentiveServiceItems", {
+      params: requestFilterPayload,
+      ...this.options
+    });
+  }
+  GetMasterServiceItems() {
+    return this.http.get<DanpheHTTPResponse>(`/api/BillingMaster/MasterServiceItems`, this.jsonOptions);
+  }
+  public GetPatientsWithVisitsInfo(searchTxt) {
+    return this.http.get<any>("/api/Patient/PatientWithVisitInfo?search=" + searchTxt, this.options);
+  }
+
 }

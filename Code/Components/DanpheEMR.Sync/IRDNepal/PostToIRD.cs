@@ -1,17 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Data.Entity;
-using System.Configuration;
-using System.Net.Http;
-using System.Net.Http.Formatting;
-using System.Net.Http.Headers;
-using DanpheEMR.ServerModel;
+﻿using DanpheEMR.ServerModel;
 using DanpheEMR.Sync.IRDNepal.Models;
-using DanpheEMR.Sync;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Data.Entity;
+using System.Linq;
 
 namespace DanpheEMR.Sync.IRDNepal
 {
@@ -37,9 +31,10 @@ namespace DanpheEMR.Sync.IRDNepal
                 string responseMsg = null;
                 try
                 {
+                    var irdConfigs = GetIrdConfigurations(dbContext);
                     IRD_BillViewModel salesBill = IRD_BillViewModel.GetMappedSalesBillForIRD(billTxn, false);
                     irdLog.JsonData = JsonConvert.SerializeObject(salesBill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesBillToIRD(salesBill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesBillToIRD(salesBill, irdConfigs);
                 }
                 catch (Exception ex)
                 {
@@ -88,9 +83,10 @@ namespace DanpheEMR.Sync.IRDNepal
                 string responseMsg = null;
                 try
                 {
+                    var irdConfigs = GetIrdConfigurations(dbContext);
                     IRD_BillReturnViewModel salesRetBill = IRD_BillReturnViewModel.GetMappedSalesReturnBillForIRD(billRet, false);
                     irdLog.JsonData = JsonConvert.SerializeObject(salesRetBill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesReturnBillToIRD(salesRetBill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesReturnBillToIRD(salesRetBill, irdConfigs);
 
                 }
                 catch (Exception ex)
@@ -140,12 +136,13 @@ namespace DanpheEMR.Sync.IRDNepal
                 string responseMsg = null;
                 try
                 {
+                    var irdConfigs = GetIrdConfigurations(dbContext);
                     invoice.PANNumber = GetPANNumber(dbContext, invoice.PatientId);
                     invoice.ShortName = GetShortName(dbContext, invoice.PatientId);
                     invoice.FiscalYear = GetFiscalYearNameById(dbContext, invoice.FiscalYearId);
                     IRD_PHRMBillSaleViewModel phrmInvoice = IRD_PHRMBillSaleViewModel.GetMappedInvoiceForIRD(invoice, false);
                     irdLog.JsonData = JsonConvert.SerializeObject(phrmInvoice);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceToIRD(phrmInvoice);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceToIRD(phrmInvoice, irdConfigs);
                 }
                 catch (Exception ex)
                 {
@@ -194,13 +191,14 @@ namespace DanpheEMR.Sync.IRDNepal
                 string responseMsg = null;
                 try
                 {
+                    var irdConfigs = GetIrdConfigurations(dbContext);
                     InvoiceRet.PANNumber = GetPANNumber(dbContext, InvoiceRet.PatientId);
                     InvoiceRet.ShortName = GetShortName(dbContext, InvoiceRet.PatientId);                                
                     IRD_PHRMBillSaleReturnViewModel salesRetBill = IRD_PHRMBillSaleReturnViewModel.GetMappedPhrmSalesReturnBillForIRD(InvoiceRet, false);
                     salesRetBill.fiscal_year = GetFiscalYearNameById(dbContext,InvoiceRet.PatientId);
                     salesRetBill.credit_note_number=GetCreditNoteNumberByInvoiceId(dbContext,InvoiceRet.InvoiceId).ToString();
                     irdLog.JsonData = JsonConvert.SerializeObject(salesRetBill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceReturnToIRD(salesRetBill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceReturnToIRD(salesRetBill, irdConfigs);
                 }
                 catch (Exception ex)
                 {
@@ -241,31 +239,32 @@ namespace DanpheEMR.Sync.IRDNepal
             {
                 irdLogdata.CreatedOn = DateTime.Now;
                 IRDNepalDbContext dbContext = new IRDNepalDbContext(bilConString);
-                string url_IRDNepal = ConfigurationManager.AppSettings["url_IRDNepal"];
+                var irdConfigs = GetIrdConfigurations(dbContext);
+                string url_IRDNepal = irdConfigs.url_IRDNepal; //ConfigurationManager.AppSettings["url_IRDNepal"];
                 switch (irdLogdata.BillType)
                 {
                     case "billing-sales":
                         {
-                            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesIRDNepal"];
+                            string api_SalesIRDNepal = irdConfigs.api_SalesIRDNepal; //ConfigurationManager.AppSettings["api_SalesIRDNepal"];
                             irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesIRDNepal;
                             break;
                         }
                     case "billing-sales-return":
                         {
-                            string api_SalesReturnIRDNepal = ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
+                            string api_SalesReturnIRDNepal = irdConfigs.api_SalesReturnIRDNepal; //ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
                             irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesReturnIRDNepal;
                             break;
                         }
                     case "phrm-invoice":
                         {
                             //string api_PhrmInvoiceIRDNepal = ConfigurationManager.AppSettings["api_PhrmInvoiceIRDNepal"];
-                            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesIRDNepal"];
+                            string api_SalesIRDNepal = irdConfigs.api_SalesIRDNepal; //ConfigurationManager.AppSettings["api_SalesIRDNepal"];
                             irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesIRDNepal;
                             break;
                         }
                     case "phrm-invoice-return":
                         {
-                            string api_SalesReturnIRDNepal = ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
+                            string api_SalesReturnIRDNepal = irdConfigs.api_SalesReturnIRDNepal; //ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
                             irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesReturnIRDNepal;
                             break;
                         }
@@ -278,6 +277,18 @@ namespace DanpheEMR.Sync.IRDNepal
 
             }
         }
+
+        private static IrdConfigsDTO GetIrdConfigurations(IRDNepalDbContext dbContext)
+        {
+            var param = dbContext.Parameters.FirstOrDefault(p => p.ParameterGroupName == "IRD" && p.ParameterName == "IrdSyncConfig");
+            if (param != null)
+            {
+                var irdConfigs = JsonConvert.DeserializeObject<IrdConfigsDTO>(param.ParameterValue);
+                return irdConfigs;
+            }
+            return new IrdConfigsDTO();
+        }
+
         //method to return inner most exception 
         public static string GetInnerMostException(Exception ex)
         {

@@ -13,6 +13,8 @@ export class ClaimManagementService {
   private isOrganizationSelected = new Subject<boolean>();
   private selectedOrganization = new Subject<CreditOrganization_DTO>();
   private _activeInsuranceProvider: CreditOrganization_DTO;
+  public IsNGHISSchemeSelected: boolean = false;
+  public CurrentApiIntegrationName: string;
 
   constructor(
     private claimManagementBLService: ClaimManagementBLService

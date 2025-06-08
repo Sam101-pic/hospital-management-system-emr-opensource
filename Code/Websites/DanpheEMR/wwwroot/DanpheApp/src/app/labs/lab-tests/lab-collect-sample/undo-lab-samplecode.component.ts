@@ -1,24 +1,17 @@
-import { Component, ChangeDetectorRef, Input, EventEmitter, Output } from "@angular/core";
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
+import { Component, EventEmitter, Input, Output } from "@angular/core";
 import 'rxjs/Rx';
-import { Observable } from 'rxjs/Observable';
-import { PatientService } from "../../../patients/shared/patient.service";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { LabsBLService } from "../../shared/labs.bl.service";
-import { LabMasterModel, Requisition } from "../../shared/labMasterData.model";
-import { CommonFunctions } from "../../../shared/common.functions";
-import { LabPendingResultVM } from "../../shared/lab-view.models";
-import * as moment from 'moment/moment';
-import { LabPatientModel } from "../../shared/lab-patient.model";
-import { LabSticker } from "../../shared/lab-sticker.model";
-import { LabTestRequisition } from "../../shared/lab-requisition.model";
 import { CoreService } from "../../../core/shared/core.service";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { LabTestRequisition } from "../../shared/lab-requisition.model";
+import { LabSticker } from "../../shared/lab-sticker.model";
+import { LabsBLService } from "../../shared/labs.bl.service";
 
 
 @Component({
     selector: 'undo-samplecode',
-  templateUrl: "./undo-labsamplecode.html",
-  styles: ['.tbl-max{max-height: 350px;}']
+    templateUrl: "./undo-labsamplecode.html",
+    styles: ['.tbl-max{max-height: 350px;}']
 })
 
 export class UndoLabSampleCode {
@@ -27,6 +20,8 @@ export class UndoLabSampleCode {
 
     @Input("requisitionIdList")
     public requisitionIdList: Array<number>;
+    @Input("undoFromPageAction")
+    public undoFromPageAction: string;
 
     @Input("PatientLabInfo")
     public patientinfos: LabSticker = new LabSticker();
@@ -68,26 +63,25 @@ export class UndoLabSampleCode {
         });
 
         if (reqIdList && reqIdList.length > 0) {
-            this.labBLService.UndoSampleCode(reqIdList)
+            this.labBLService.UndoSampleCode(reqIdList, this.undoFromPageAction)
                 .subscribe(res => {
                     if (res.Status == 'OK') {
-                        this.msgBoxServ.showMessage('Success', ["Sample Code Reset Successfully done"]);
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Sample Code Reset Successfully done"]);
                         this.loading = false;
                         this.sendDataBack.emit({ exit: 'exitonsuccess' });
                     }
-              });
+                });
         }
-        else
-        {
+        else {
             this.msgBoxServ.showMessage('Alert', ["Please select atleast one Test!"]);
             this.loading = false;
-        }       
-        
-        
-  }
+        }
 
-  CloseUndoBox() {
-    this.sendDataBack.emit({ exit: 'close' });
-  }
+
+    }
+
+    CloseUndoBox() {
+        this.sendDataBack.emit({ exit: 'close' });
+    }
 
 }

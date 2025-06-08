@@ -1,6 +1,5 @@
-import { FormGroup, FormControl, Validators, FormBuilder } from '@angular/forms'
+import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import * as moment from 'moment/moment';
-import { CommonValidators } from "../../shared/common-validator";
 import { GoodsReceiptOtherChargeModel, GROtherChargesItemModel } from './goods-receipt-other-charges.model';
 export class GoodsReceiptItems {
 
@@ -60,6 +59,9 @@ export class GoodsReceiptItems {
 
   public GRItemCharges: GRItemChargesDTO[] = [];
   public CostPrice: number = 0;
+  ItemCode: string = null;
+  GRItemRate: number = 0;
+  ItemTotalAmount: number = 0;
 
   constructor() {
     var _formBuilder = new FormBuilder();

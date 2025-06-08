@@ -16,7 +16,8 @@ import { Dispatch } from '../shared/dispatch.model';
 import { InventoryBLService } from "../shared/inventory.bl.service";
 import { InventoryService } from '../shared/inventory.service';
 @Component({
-  templateUrl: "./direct-dispatch.component.html"  // "/InventoryView/RequisitionItems"
+  templateUrl: "./direct-dispatch.component.html",  // "/InventoryView/RequisitionItems"
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class DirectDispatchComponent implements OnDestroy {
   dispatchDate: string = moment().format('YYYY-MM-DD');
@@ -24,8 +25,8 @@ export class DirectDispatchComponent implements OnDestroy {
   dispatchForm: FormGroup = new FormGroup({
     // dispatchDate: new FormControl(this.dispatchDate),
     targetStore: new FormControl('', Validators.required),
-    remarks: new FormControl('', Validators.required),
-    receivedBy: new FormControl(''),
+    remarks: new FormControl('', Validators.required)
+    //receivedBy: new FormControl(''),
   });
   dispatch: Dispatch = new Dispatch();
   stockList: any[] = [];
@@ -67,6 +68,13 @@ export class DirectDispatchComponent implements OnDestroy {
         .subscribe(res => {
           if (res.Status == "OK") {
             this.stockList = res.Results
+
+            this.stockList.forEach(a => {
+              if (a.BarCodeList && !(this.IsValidJSON(a.BarCodeList))) {
+                a.BarCodeList = JSON.parse(`[${a.BarCodeList}]`);
+              }
+            });
+
             if (this.fromRoute.RouteFrom != 'GRToDispatch') {
               this.addNewRow();
             }
@@ -164,13 +172,13 @@ export class DirectDispatchComponent implements OnDestroy {
     if (selectedDispItem.selectedItem != null && selectedDispItem.ItemId == selectedDispItem.selectedItem.ItemId) return;
     if (selectedDispItem.selectedItem == null) return;
     if (typeof (selectedDispItem.selectedItem) == "string") {
-      selectedDispItem.selectedItem = this.stockList.find(a => a.ItemName == selectedDispItem.selectedItem && a.BatchNo == selectedDispItem.BatchNo);
+      selectedDispItem.selectedItem = this.stockList.find(a => a.ItemName == selectedDispItem.selectedItem && a.BatchNo == selectedDispItem.BatchNo && a.CostPrice == selectedDispItem.CostPrice);
     }
     if (typeof (selectedDispItem.selectedItem) == "object") {
       let checkIsItemPresent = false;
       //means to avoid duplication of item
       for (var i = 0; i < this.dispatch.DispatchItems.length; i++) {
-        if (this.dispatch.DispatchItems[i].ItemId == selectedDispItem.ItemId && index != i) {
+        if (this.dispatch.DispatchItems[i].ItemId == selectedDispItem.ItemId && this.dispatch.DispatchItems[i].CostPrice == selectedDispItem.CostPrice && index != i) {
           checkIsItemPresent = true;
         }
       }
@@ -247,7 +255,7 @@ export class DirectDispatchComponent implements OnDestroy {
         item.SourceStoreId = this.activeInventoryService.activeInventory.StoreId;
         item.TargetStoreId = this.selectedStore.StoreId;
         item.Remarks = this.dispatchForm.get('remarks').value;
-        item.ReceivedBy = this.dispatchForm.get('receivedBy').value;
+        // item.ReceivedBy = this.dispatchForm.get('receivedBy').value;
         item.ReqDisGroupId = this.selectedStore.ReqDisGroupId;
       })
       this.dispatch.ReqDisGroupId = this.selectedStore.ReqDisGroupId;
@@ -299,6 +307,7 @@ export class DirectDispatchComponent implements OnDestroy {
   ////used to format display item in ng-autocomplete
   stockListFormatter(data: any): string {
     let html = "<font color='blue'; size=03 >" + data["ItemName"] + "</font>";
+    html += (" | CostPrice: " + data["CostPrice"]);
     html += (data["Description"] == null || data["Description"] == "") ? "" : (" | " + data["Description"]);
     html += (data["BatchNo"] == null || data["BatchNo"] == "") ? "" : (" | B: " + data["BatchNo"]);
     return html;
@@ -380,6 +389,25 @@ export class DirectDispatchComponent implements OnDestroy {
 
   CallBackDispatchDetailsPopUpClose() {
     this.showDispatchDetailsPopup = false;
+    this.router.navigate(['/Inventory/InternalMain/Requisition/RequisitionList']);
+  }
+  IsValidJSON(jsonString) {
+    try {
+      JSON.parse(jsonString);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  hotkeys(event): void {
+    if (event.keyCode === 27) {
+      this.CallBackDispatchDetailsPopUpClose();
+    }
+  }
+
+
+  Back() {
     this.router.navigate(['/Inventory/InternalMain/Requisition/RequisitionList']);
   }
 }

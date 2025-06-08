@@ -12,7 +12,9 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net;
 using System.IO;
-
+using DanpheEMR.Core;
+using Newtonsoft.Json;
+using DanpheEMR.Core.Parameters;
 namespace DanpheEMR.Controllers
 {
     public class HomeController : Controller
@@ -30,6 +32,24 @@ namespace DanpheEMR.Controllers
             try
             {
                 //ViewData["token"] = TempData["token"]; // TempData is being set from AccountController Login Action
+                CoreDbContext coreDbContext = new CoreDbContext(connString);
+                ParameterModel whiteLabelParam = coreDbContext.Parameters
+             .Where(p => p.ParameterGroupName == "WhiteLabel" && p.ParameterName == "WhiteLabel")
+             .FirstOrDefault();
+
+                string title = "Default Title"; // Default title 
+
+                if (whiteLabelParam != null && !string.IsNullOrEmpty(whiteLabelParam.ParameterValue))
+                {
+                    var jsonValue = JsonConvert.DeserializeObject<Dictionary<string, string>>(whiteLabelParam.ParameterValue);
+                    if (jsonValue.ContainsKey("DanpheHealth"))
+                    {
+                        title = jsonValue["DanpheHealth"];
+                    }
+                }
+
+                // Set the custom title in ViewData 
+                ViewData["CustomTitle"] = title;
                 return View();
             }
             catch (Exception ex)

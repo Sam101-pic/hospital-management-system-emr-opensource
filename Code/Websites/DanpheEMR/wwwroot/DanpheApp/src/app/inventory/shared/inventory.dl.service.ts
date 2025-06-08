@@ -242,7 +242,7 @@ export class InventoryDLService {
 
   //Get: Single Requisition Details (RequisitionItems) by RequisitionId for View  -- sud-19Feb'20
   public GetRequisitionItemsForViewByReqId(requisitionId: number) {
-    return this.http.get<any>(`/api/Inventory/RequisitionItemForView?requisitionId=${requisitionId}`);
+    return this.http.get<any>(`/api/Inventory/RequisitionItemsForView?requisitionId=${requisitionId}`);
   }
 
   public GetDispatchDetails(requisitionId: number) {
@@ -518,5 +518,8 @@ export class InventoryDLService {
   }
   public UpdatePurchaseOrderDraft(purchaseOrderDraft: PurchaseOrderDraft) {
     return this.http.put<any>("/api/Inventory/PurchaseOrderDraft", purchaseOrderDraft, this.optionsJson);
+  }
+  public GetReturnFromSubstoreItemsById(returnId: number) {
+    return this.http.get<any>(`/api/Inventory/ReturnFromSubstoreById?returnId=${returnId}`, this.options);
   }
 }

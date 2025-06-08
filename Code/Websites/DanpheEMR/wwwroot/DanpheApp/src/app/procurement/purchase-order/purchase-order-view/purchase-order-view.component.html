@@ -157,22 +157,22 @@
 
                         </tr>
                         <tr>
-                            <th style="padding: 0 5px;">Invoicing Address :</th>
-                            <td style="padding: 0 5px;white-space: pre-line; text-align: left;">{{purchaseorderDetails.InvoicingAddress}}</td>
-                            <th style="padding: 0 5px;"><b>Reference No:</b></th>
-                            <td style="padding: 0 5px;white-space: pre-line; text-align: left;">{{purchaseorderDetails.ReferenceNo}}</td>
+                            <td style="padding: 0 5px;"><b>Invoicing Address :</b></td>
+                            <td style="padding: 0 5px;">{{purchaseorderDetails.InvoicingAddress}}</td>
+                            <td style="padding: 0 5px;"><b>Reference No:</b></td>
+                            <td style="padding: 0 5px;">{{purchaseorderDetails.ReferenceNo}}</td>
 
                         </tr>
                         <tr>
-                            <th style="padding: 0 5px;">Delivery Address :</th>
-                            <td style="padding: 0 5px;white-space: pre-line; text-align: left;">{{purchaseorderDetails.DeliveryAddress}}</td>
-                            <th>Contact Person Name and<br> Office Email :</th>
+                            <td style="padding: 0 5px;"><b>Delivery Address :</b></td>
+                            <td style="padding: 0 5px;">{{purchaseorderDetails.DeliveryAddress}}</td>
+                            <td><b>Contact Person Name and<br> Office Email :</b></td>
                             <td style="padding: 0 5px;">{{purchaseorderDetails.ContactPersonName}}<br>{{purchaseorderDetails.ContactPersonEmail}}</td>
                         </tr>
                         <tr>
-                            <th style="padding: 0 5px;" *ngIf="poEximCodeParameterValue.showEximCode">EXIM CODE :
-                            </th>
-                            <td style="padding: 0 5px;white-space: pre-line; text-align: left;" *ngIf="poEximCodeParameterValue.showEximCode">
+                            <td style="padding: 0 5px;" *ngIf="poEximCodeParameterValue.showEximCode"><b>EXIM CODE :</b>
+                            </td>
+                            <td style="padding: 0 5px;" *ngIf="poEximCodeParameterValue.showEximCode">
                                 {{poEximCodeParameterValue.EXIMCODE}}</td>
 
                         </tr>
@@ -282,8 +282,8 @@
         </div>
     </div>
 </ng-template>
-<div class="row center-style">
-    <div class="col-md-12 col-xs-12" *ngIf="purchaseorderDetails != null">
+<div class="row center-style" style="margin-bottom: 15px !important;" *ngIf="purchaseorderDetails.POStatus !== 'cancelled'">
+    <div class="col-md-12 col-xs-12" *ngIf="purchaseorderDetails && purchaseorderDetails.PurchaseOrderId>0">
         <a class="btn btn-danger" *ngIf="purchaseorderDetails.IsModificationAllowed == true" data-toggle="modal" data-target="#CancelPopup">
             Withdraw
             <i class="glyphicon glyphicon-floppy-remove"></i> </a><span> </span><span> </span> &nbsp;
@@ -305,7 +305,7 @@
         <div class="modal-content">
             <div class="caption lb-caption">
                 <h3><span>Warning</span></h3>
-                <button type="button" class="btn btn-danger" data-dismiss="modal">
+                <button type="button" #closeModal class="btn btn-danger" data-dismiss="modal">
                     X
                 </button>
             </div>
@@ -337,4 +337,4 @@
     </div>
 </div>
 
-<app-print-page *ngIf="showPrint" [print-data]="printDetaiils" (print-sucess)="callBackPrint()"></app-print-page>
+<app-print-page *ngIf="showPrint" [print-data]="printDetails" (print-sucess)="callBackPrint()"></app-print-page>

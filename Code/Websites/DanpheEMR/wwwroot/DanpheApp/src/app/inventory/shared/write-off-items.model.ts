@@ -1,26 +1,23 @@
 ﻿
 import {
-    NgForm,
-    FormGroup,
-    FormControl,
-    Validators,
     FormBuilder,
-    ReactiveFormsModule
+    FormGroup,
+    Validators
 } from '@angular/forms';
 import * as moment from 'moment/moment';
-import { ItemMaster } from "../shared/item-master.model"
+import { ItemMaster } from "../shared/item-master.model";
 
 export class WriteOffItems {
 
-    public  WriteOffId:number = 0;
-    public  StockId:number = 0;
-    public  ItemId:number = 0;
-    public  ItemRate:number = 0;
+    public WriteOffId: number = 0;
+    public StockId: number = null;
+    public ItemId: number = 0;
+    public ItemRate: number = 0;
     public WriteOffQuantity: number = 0;
     public TotalAmount: number = 0;
-    public  WriteOffDate : string = moment().format("YYYY-MM-DD");
-    public  Remark:string = null;
-    public  CreatedBy:number = 0;
+    public WriteOffDate: string = moment().format("YYYY-MM-DD");
+    public Remark: string = null;
+    public CreatedBy: number = 0;
     public CreatedOn: string = "";
     public GoodsReceiptItemId: number = 0;
     public BatchNO: string = "";
@@ -33,9 +30,9 @@ export class WriteOffItems {
     public VAT: number = 0;
     public AvailableQty: number = 0;
     public SubTotal: number = 0;
-    public BatchNoList: Array<{ BatchNo: string, AvailableQuantity: number }> = new Array<{ BatchNo: string, AvailableQuantity: number }>();
+    // public BatchNoList: Array<{ BatchNo: string, AvailableQuantity: number, StockId: number }> = new Array<{ BatchNo: string, AvailableQuantity: number, StockId: number }>();
     public WriteOffItemValidator: FormGroup = null;
-    public Code:string=null;
+    public Code: string = null;
     public StoreId: number;
 
     constructor() {
@@ -45,7 +42,7 @@ export class WriteOffItems {
             'ItemId': ['', Validators.compose([Validators.required])],
             'WriteOffDate': ['', Validators.compose([Validators.required])],
             'WriteOffQuantity': ['', Validators.compose([Validators.required])],
-            'BatchNo': ['', Validators.compose([Validators.required])],
+            // 'BatchNo': ['', Validators.compose([Validators.required])],
             'Remark': ['', Validators.required]
         });
     }
@@ -58,7 +55,7 @@ export class WriteOffItems {
     }
 
 
-    public IsValid():boolean{if(this.WriteOffItemValidator.valid){return true;}else{return false;}} public IsValidCheck(fieldName, validator): boolean {
+    public IsValid(): boolean { if (this.WriteOffItemValidator.valid) { return true; } else { return false; } } public IsValidCheck(fieldName, validator): boolean {
         if (fieldName == undefined) {
             return this.WriteOffItemValidator.valid;
         }
@@ -80,7 +77,7 @@ export class WriteOffItems {
             return { 'wrongDate': true };
     }*/
 
-  
-   
- 
+
+
+
 }

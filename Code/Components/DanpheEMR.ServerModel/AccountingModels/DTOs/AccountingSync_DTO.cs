@@ -19,6 +19,8 @@ namespace DanpheEMR.ServerModel.AccountingModels.DTOs
         public string Description { get; set; }
         public int DisplaySequence { get; set; }
         public bool DrCr { get; set; }
-        public int TransactionRefNo { get; set; }
+        public string TransactionRefNo { get; set; }
+        public string VendorBillNo { get; set; }
+        public int? GoodReceiptId { get; set; }
     }
 }

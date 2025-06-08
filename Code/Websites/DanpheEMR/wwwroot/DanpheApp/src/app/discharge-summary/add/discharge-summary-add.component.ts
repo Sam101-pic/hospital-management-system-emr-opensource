@@ -1,6 +1,7 @@
 
 import { animate, style, transition, trigger } from "@angular/animations";
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
+import { FormBuilder, FormControl, FormGroup, Validators } from "@angular/forms";
 import { Router } from '@angular/router';
 import * as moment from 'moment/moment';
 import { forkJoin } from "rxjs";
@@ -12,6 +13,7 @@ import { DischargeSummaryConsultant } from "../../adt/shared/discharge-summary-c
 import { DischargeSummaryMedication } from "../../adt/shared/discharge-summary-medication.model";
 import { DischargeSummary } from "../../adt/shared/discharge-summary.model";
 import { DischargeType } from "../../adt/shared/discharge-type.model";
+import { VisitService } from "../../appointments/shared/visit.service";
 import { CoreService } from "../../core/shared/core.service";
 import { Employee } from '../../employee/shared/employee.model';
 import { LabTest } from '../../labs/shared/lab-test.model';
@@ -23,6 +25,7 @@ import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponses, ENUM_Data_Type, ENUM_DischargeType, ENUM_Genders, ENUM_MessageBox_Status, ENUM_RecoveredDischargeConditions } from "../../shared/shared-enums";
 import { DischargeSummaryBLService } from '../shared/discharge-summary.bl.service';
 import { DischargeSummaryFieldSettingsVM } from "../view-model/discharge-summary-field-setting-VM.model";
+import { TemplateFieldDTO } from "../view-model/template-field-dto";
 
 @Component({
   selector: 'discharge-summary-add',
@@ -43,7 +46,8 @@ import { DischargeSummaryFieldSettingsVM } from "../view-model/discharge-summary
   templateUrl: './discharge-summary-add.html',
 })
 export class DischargeSummaryAddComponent {
-  public CurrentDischargeSummary: DischargeSummary = new DischargeSummary();
+  // public CurrentDischargeSummary_VM: DischargeSummary = new DischargeSummary();
+  public CurrentDischargeSummary_VM: TempDischargeTemplate = new TempDischargeTemplate();
 
   public dischSumFieldSettings: DischargeSummaryFieldSettingsVM = new DischargeSummaryFieldSettingsVM();
 
@@ -77,7 +81,7 @@ export class DischargeSummaryAddComponent {
   public drIncharge: any = null;
   public labtest: any = null;
   public diagnosis: any = null;
-  public provisonalDiagnosis: any = null;
+  public provisionalDiagnosis: any = null;
   public anasthetists: any = null;
   public residenceDr: any = null;
   public icdsID: Array<number> = new Array<number>();
@@ -124,7 +128,7 @@ export class DischargeSummaryAddComponent {
   imagingItems: any[];
   IsFishTailtemplate: boolean = false;
   InvalidConsultant: boolean = false;
-
+  public loadingScreen: boolean = false;
   public CheckedBy: any;
   public UserList: any;
   icdVersionDisplay: any;
@@ -132,21 +136,39 @@ export class DischargeSummaryAddComponent {
   public dischargeSummaryTemplates: Array<any> = [];
   public dynamicTemplateContent: Array<any> = [];
   public TemplateTypeName: string = 'Discharge Summary';
-  public selectedTemplateFileds: Array<any> = [];
+  public selectedTemplateFields: Array<TemplateFieldDTO> = [];
   // public showTestsWithoutResult: boolean = true;
   // stringifiedDiagnosisList: string;
   selectedTemplateObj: any;
   TemplateId: number = null;
   public selectedDischargeTypeName: string;
   ShowBabyWeight: boolean = false;
+  StayDays: number = 0;
+  currentModuleName: any;
+  public loadHtmlfordischaregeSummary: string = "";
+  public TemplatesFromServer = new Array<TemplateField_DTO>();
+  public BabyWeight: string;
+  public DischargeType: string = null;
+  public DischargeCondition: string = null;
+  public FindingValue: string = '';
+  public FieldsToExclude = {
+    Investigations: false,
+    LabTests: false,
+    Imagings: false,
+    Medications: false,
+  };
+  @Input('IsERPatient')
+  IsERPatient: boolean = false;
 
   constructor(public dischargeSummaryBLService: DischargeSummaryBLService,
     public securityService: SecurityService,
     public msgBoxServ: MessageboxService,
     public changeDetector: ChangeDetectorRef,
     public coreService: CoreService,
-    public router: Router,
-    public settingsBLService: SettingsBLService) {
+    public router: Router, public visitService: VisitService,
+    public settingsBLService: SettingsBLService,
+    private formBuilder: FormBuilder
+  ) {
     this.GetProviderList();
     this.GetDischargeType();
     this.GetAnasthetistsEmpList();
@@ -155,8 +177,22 @@ export class DischargeSummaryAddComponent {
     this.CheckDoctorInchargeSettings();
     this.GetUsers();
     this.icdVersionDisplay = this.coreService.Parameters.find(p => p.ParameterGroupName == "Common" && p.ParameterName == "IcdVersionDisplayName").ParameterValue;
-    this.GetDischargeSummaryTemplates(this.TemplateTypeName);
+    // if (!this.showDischargeSummary) {
+    //   this.GetDischargeSummaryTemplates(this.TemplateTypeName);
+    // }
+    this.currentModuleName = this.securityService.currentModule;
+    console.log('Current Moduel', this.currentModuleName);
 
+  }
+
+  ngOnInit() {
+    let globalVisitInfo = this.visitService.getGlobal();
+    if (!this.selectedDischarge.VisitCode) {
+      this.selectedDischarge.VisitCode = globalVisitInfo.VisitCode;
+    }
+    if (this.selectedDischarge.DateOfBirth) {
+      this.selectedDischarge.Age = this.coreService.CalculateAge(this.selectedDischarge.DateOfBirth);
+    }
   }
 
   @Input("showDischargeSummary")
@@ -175,7 +211,7 @@ export class DischargeSummaryAddComponent {
   }
 
   LoadAllFunctions() {
-
+    this.loadingScreen = true;
     var reqs: Observable<any>[] = [];
     reqs.push(this.dischargeSummaryBLService.GetDischargeSummary(this.selectedDischarge.PatientVisitId).pipe(
       catchError((err) => {
@@ -198,6 +234,7 @@ export class DischargeSummaryAddComponent {
       }
       )
     ));
+    this.GetDischargeSummaryTemplates(this.TemplateTypeName);
 
     forkJoin(reqs).subscribe(result => {
       this.GetDischargeSummary(result[0]);
@@ -205,6 +242,8 @@ export class DischargeSummaryAddComponent {
       this.GetImagingResults(result[2]);
       this.AssignSelectedLabTests();
       this.AssignSelectedImagings();
+      this.CalculateHospitalStayDays();
+
     });
 
     this.GetICDList();
@@ -225,15 +264,16 @@ export class DischargeSummaryAddComponent {
 
   focusOut() {
     this.DataValidation();
-    if (this.CurrentDischargeSummary.IsValidCheck(undefined, undefined)) {
+    if (this.CurrentDischargeSummary_VM.IsValidCheck(undefined, undefined)) {
       this.GenerateDischargeSummaryData();
-      this.sendData.emit(this.CurrentDischargeSummary);
+      this.sendData.emit(this.CurrentDischargeSummary_VM);
     }
   }
 
   CheckDeathType() {
     this.deathType = this.coreService.CheckDeathType();
   }
+
 
   public GetDischargeType() {
     this.dischargeSummaryBLService.GetDischargeType()
@@ -349,7 +389,7 @@ export class DischargeSummaryAddComponent {
         }
       },
         err => {
-          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Failed to get lab results.. please check log for detail.']);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Failed to get Discharge Conditions.. please check log for detail.']);
           this.logError(err.ErrorMessage);
         });
   }
@@ -549,7 +589,7 @@ export class DischargeSummaryAddComponent {
     let html = data["DischargeTypeName"];
     return html;
   }
-  DignosisFormatter(data: any): string {
+  DiagnosisFormatter(data: any): string {
     let html = data["ICD10Code"] + '|' + data["icd10Description"];
     return html;
   }
@@ -562,31 +602,46 @@ export class DischargeSummaryAddComponent {
   }
 
   loadDrIncharge() {
-    this.CurrentDischargeSummary.DoctorInchargeId = this.drIncharge ? this.drIncharge.EmployeeId : this.drInchargeId;
+    if (this.drIncharge && typeof (this.drIncharge) == "string") {
+      this.CurrentDischargeSummary_VM.DoctorInchargeId = this.drInchargeId;
+    } else {
+      this.CurrentDischargeSummary_VM.DoctorInchargeId = this.drIncharge ? this.drIncharge.EmployeeId : this.drInchargeId;
+    }
   }
+
 
   //* Below method validates the doctorIncharge, if it is set or not. Krishna, 15thDec'22
   validateDrIncharge(): void {
     if (!(this.drIncharge && this.drIncharge.EmployeeId)) {
-      this.CurrentDischargeSummary.DoctorInchargeId = null;
-      this.CurrentDischargeSummary.DischargeSummaryValidator.get('DoctorInchargeId').setValue(null);
-      this.CurrentDischargeSummary.UpdateValidator("on", "DoctorInchargeId", "required");
+      this.CurrentDischargeSummary_VM.DoctorInchargeId = null;
+      this.CurrentDischargeSummary_VM.DischargeSummaryValidator.get('DoctorInchargeId').setValue(null);
+      this.CurrentDischargeSummary_VM.UpdateValidator("on", "DoctorInchargeId", "required");
+    }
+  }
+  anaesthesistId: number = null;
+  loadAnasthetists() {
+    if (this.anasthetists && typeof (this.anasthetists) == "string") {
+      this.CurrentDischargeSummary_VM.AnaesthetistsId = this.anaesthesistId;
+    } else {
+      this.CurrentDischargeSummary_VM.AnaesthetistsId = this.anasthetists ? this.anasthetists.EmployeeId : null;
     }
   }
 
-  loadAnasthetists() {
-    this.CurrentDischargeSummary.AnaesthetistsId = this.anasthetists ? this.anasthetists.EmployeeId : null;
-  }
-
+  residenceDrId: number = null;
   loadResidenceDr() {
-    this.CurrentDischargeSummary.ResidenceDrId = this.residenceDr ? this.residenceDr.EmployeeId : null;
+    if (this.residenceDr && typeof (this.residenceDr) == "string") {
+      this.CurrentDischargeSummary_VM.ResidenceDrId = this.residenceDrId;
+    } else {
+      this.CurrentDischargeSummary_VM.ResidenceDrId = this.residenceDr ? this.residenceDr.EmployeeId : null;
+    }
   }
 
   loadICDs() {
-    this.CurrentDischargeSummary.Diagnosis = this.diagnosis ? this.diagnosis.icd10Description : null;
+    this.CurrentDischargeSummary_VM.Diagnosis = this.diagnosis ? this.diagnosis.icd10Description : null;
+    this.CurrentDischargeSummary_VM.ProvisionalDiagnosis = this.provisionalDiagnosis ? this.provisionalDiagnosis.icd10Description : null;
   }
   LoadTemplateId() {
-    this.CurrentDischargeSummary.DischargeSummaryTemplateId = this.TemplateId;
+    this.CurrentDischargeSummary_VM.DischargeSummaryTemplateId = this.TemplateId;
   }
 
   loadlabTest() {
@@ -602,134 +657,203 @@ export class DischargeSummaryAddComponent {
       this.labtest = '';
     }
   }
-  //discharge summary
-  GetDischargeSummary(res) {
-    if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-      if (res.Results) {
-        this.CurrentDischargeSummary = new DischargeSummary();
-        this.CurrentDischargeSummary = Object.assign(this.CurrentDischargeSummary, res.Results.DischargeSummary);
-        if (this.CurrentDischargeSummary.DischargeConditionId) {
-          this.FilteredDischargeConditions = this.dischargeCondition.filter(a => a.DischargeConditionId == this.CurrentDischargeSummary.DischargeConditionId);
-          if (this.FilteredDischargeConditions.length > 0) {
-            this.DischargeConditionType = true;
+  SetDischargeSummaryData(res) {
+    //! map the data from model to form controller
+    const formControls = this.CurrentDischargeSummary_VM.TempDischargeSummaryValidator.controls;
+    //let formControls: any;
+    Object.keys(res.Results.DischargeSummary).forEach(key => {
+      if (key in formControls) {
+        // if (key === 'HistoryOfPresentingIllness') {
+        //   formControls[key].setValue(res.Results.DischargeSummary[key].value);
+        // } else {
+        formControls[key].setValue(this.CurrentDischargeSummary_VM[key]);
+        // }
+      }
+    });
+    if (this.CurrentDischargeSummary_VM.DischargeTypeId) {
+      const selectedDischargeType = this.dischargeTypeList.filter(a => a.DischargeTypeId == this.CurrentDischargeSummary_VM.DischargeTypeId)
+      if (selectedDischargeType) {
+        this.DischargeType = selectedDischargeType[0].DischargeTypeName;
+      }
+    }
+
+    if (this.CurrentDischargeSummary_VM.DischargeTypeId) {
+      this.FilteredDischargeConditions = this.dischargeCondition.filter(a => a.DischargeTypeId == this.CurrentDischargeSummary_VM.DischargeTypeId);
+      if (this.FilteredDischargeConditions.length > 0) {
+        this.DischargeConditionType = true;
+        const dischargeCondition = this.FilteredDischargeConditions.find(a => a.DischargeConditionId == this.CurrentDischargeSummary_VM.DischargeConditionId);
+        this.DischargeCondition = dischargeCondition && dischargeCondition.Condition;
+        if (this.DischargeCondition === ENUM_DischargeType.Delivery) {
+          this.ShowBabyWeight = true;
+          if (this.dischSumFieldSettings.BabyWeight) {
+            this.dischSumFieldSettings.BabyWeight.Show = true;
+            this.BabyWeight = this.CurrentDischargeSummary_VM.BabyWeight;
           }
         }
-        if (this.CurrentDischargeSummary.DeliveryTypeId) {
-          this.DeliveryType = true;
-        }
-        else if (this.CurrentDischargeSummary.DeathTypeId) {
-          this.Isdeath = true;
-        }
-        if (this.CurrentDischargeSummary && this.CurrentDischargeSummary.Diagnosis) {
-          this.selectedDiagnosisList = JSON.parse(this.CurrentDischargeSummary.Diagnosis);
-        }
-        if (this.CurrentDischargeSummary && this.CurrentDischargeSummary.ProvisionalDiagnosis) {
-          this.selectedProviDiagnosisList = JSON.parse(this.CurrentDischargeSummary.ProvisionalDiagnosis);
-        }
-        if (res.Results.Consultants.length) {
-          this.selectedConsultants = res.Results.Consultants;
-          this.selectedConsultants.forEach(a =>
-            a.FullName = a.consultantName
-          );
-          this.consultant = ''
+      }
+    }
+    if (this.CurrentDischargeSummary_VM.DeliveryTypeId) {
+      this.DeliveryType = true;
+    }
+    else if (this.CurrentDischargeSummary_VM.DeathTypeId) {
+      this.Isdeath = true;
+    }
+    if (this.CurrentDischargeSummary_VM && this.CurrentDischargeSummary_VM.Diagnosis) {
+      this.selectedDiagnosisList = JSON.parse(this.CurrentDischargeSummary_VM.Diagnosis);
+    }
+    if (this.CurrentDischargeSummary_VM && this.CurrentDischargeSummary_VM.ProvisionalDiagnosis) {
+      this.selectedProviDiagnosisList = JSON.parse(this.CurrentDischargeSummary_VM.ProvisionalDiagnosis);
+      this.provisionalDiagnosis = undefined;
+    }
+    if (res.Results.Consultants && res.Results.Consultants.length) {
+      this.selectedConsultants = res.Results.Consultants;
+      this.selectedConsultants.forEach(a =>
+        a.FullName = a.consultantName
+      );
+      this.consultant = ''
 
+    }
+    //if (res.Results.BabyBirthDetails.length) {
+    //  this.CurrentDischargeSummary_VM.BabyBirthDetails = new Array<BabyBirthDetails>();
+    //  res.Results.BabyBirthDetails.forEach(a => {
+    //    this.CurrentBabyBirthDeails = Object.assign(this.CurrentBabyBirthDeails, a);
+    //    this.CurrentDischargeSummary_VM.BabyBirthDetails.push(this.CurrentBabyBirthDeails);
+    //  });
+    //  this.CurrentDischargeSummary_VM.BabysFathersName = this.CurrentDischargeSummary_VM.BabyBirthDetails[0].FathersName;
+    //  this.CurrentDischargeSummary_VM.BabyBirthDetails.forEach(a => {
+    //    a.BirthDate = moment(a.BirthDate).format('YYYY-MM-DD');
+    //    this.tempBabyBirthDetails.push(a);
+    //  });
+    //  this.NoOfBabies = res.Results.BabyBirthDetails.length;
+    //  this.showBabyDetails = true;
+    //}
+    if (res.Results.DischargeSummary.CheckedBy) {
+      const checkedByUser = this.UserList.find(a => a.EmployeeId === res.Results.DischargeSummary.CheckedBy);
+      this.CheckedBy = checkedByUser.EmployeeName;
+      this.CurrentDischargeSummary_VM.CheckedById = checkedByUser.EmployeeId;
+    }
+    if (res.Results.Medications && res.Results.Medications.length) {
+      this.CurrentDischargeSummary_VM.DischargeSummaryMedications = new Array<DischargeSummaryMedication>();
+      this.NewMedications = new Array<DischargeSummaryMedication>();
+      res.Results.Medications.forEach(a => {
+        this.Medication = new DischargeSummaryMedication();
+        if (a.OldNewMedicineType == 0) {
+          this.Medication = Object.assign(this.Medication, a);
+          this.NewMedications.push(this.Medication);
         }
-        //if (res.Results.BabyBirthDetails.length) {
-        //  this.CurrentDischargeSummary.BabyBirthDetails = new Array<BabyBirthDetails>();
-        //  res.Results.BabyBirthDetails.forEach(a => {
-        //    this.CurrentBabyBirthDeails = Object.assign(this.CurrentBabyBirthDeails, a);
-        //    this.CurrentDischargeSummary.BabyBirthDetails.push(this.CurrentBabyBirthDeails);
-        //  });
-        //  this.CurrentDischargeSummary.BabysFathersName = this.CurrentDischargeSummary.BabyBirthDetails[0].FathersName;
-        //  this.CurrentDischargeSummary.BabyBirthDetails.forEach(a => {
-        //    a.BirthDate = moment(a.BirthDate).format('YYYY-MM-DD');
-        //    this.tempBabyBirthDetails.push(a);
-        //  });
-        //  this.NoOfBabies = res.Results.BabyBirthDetails.length;
-        //  this.showBabyDetails = true;
-        //}
-        if (res.Results.Medications.length) {
-          this.CurrentDischargeSummary.DischargeSummaryMedications = new Array<DischargeSummaryMedication>();
-          this.NewMedications = new Array<DischargeSummaryMedication>();
-          res.Results.Medications.forEach(a => {
-            this.Medication = new DischargeSummaryMedication();
-            if (a.OldNewMedicineType == 0) {
-              this.Medication = Object.assign(this.Medication, a);
-              this.NewMedications.push(this.Medication);
-            }
-            // else if (a.OldNewMedicineType == 1) {
-            //   this.Medication = Object.assign(this.Medication, a);
-            //   this.OldMedications.push(this.Medication);
-            // }
-            // else {
-            //   this.Medication = Object.assign(this.Medication, a);
-            //   this.StoppedOldMedications.push(this.Medication);
-            // }
-          });
-          if (!this.NewMedications.length)
-            this.AddMedicine(0);
-          // if (!this.OldMedications.length)
-          //   this.AddMedicine(1);
-          // if (!this.StoppedOldMedications.length)
-          //   this.AddMedicine(2);
+        // else if (a.OldNewMedicineType == 1) {
+        //   this.Medication = Object.assign(this.Medication, a);
+        //   this.OldMedications.push(this.Medication);
+        // }
+        // else {
+        //   this.Medication = Object.assign(this.Medication, a);
+        //   this.StoppedOldMedications.push(this.Medication);
+        // }
+      });
+      if (!this.NewMedications.length)
+        this.AddMedicine(0);
+      // if (!this.OldMedications.length)
+      //   this.AddMedicine(1);
+      // if (!this.StoppedOldMedications.length)
+      //   this.AddMedicine(2);
+    }
+    else {
+      this.AddMedicine(0);
+      // this.AddMedicine(1);
+      // this.AddMedicine(2);
+    }
+    if (this.CurrentDischargeSummary_VM.LabTests && this.CurrentDischargeSummary_VM.LabTests != null) {
+
+      // this.labTestId = new Array<number>();
+
+      // this.labTestId = this.CurrentDischargeSummary_VM.LabTests.split(",").map(Number);
+      this.labTests = new Array<any>();
+      this.AddedTests = this.labTests = JSON.parse(this.CurrentDischargeSummary_VM.LabTests);
+    }
+
+    if (this.CurrentDischargeSummary_VM.SelectedImagingItems && this.CurrentDischargeSummary_VM.SelectedImagingItems != null) {
+      this.imagingItems = new Array<any>();
+      this.imagingItems = JSON.parse(this.CurrentDischargeSummary_VM.SelectedImagingItems);
+      this.AddedImgTests = this.imagingItems;
+    }
+
+    if (this.CurrentDischargeSummary_VM.DischargeSummaryConsultants && this.CurrentDischargeSummary_VM.DischargeSummaryConsultants.length > 0) {
+      this.CurrentDischargeSummary_VM.DischargeSummaryConsultants.forEach(a => {
+        this.selectedConsultants.push(a);
+      });
+      // this.GenerateConsultantsData();
+    }
+    // this.consultant = res.Results.ConsultantName;
+    if (this.providerList && this.providerList.length) {
+      const doctorIncharge = this.providerList.find(p => p.EmployeeId === res.Results.DoctorInchargeId);
+      if (doctorIncharge) {
+        this.drIncharge = doctorIncharge.FullName;
+        this.drInchargeId = doctorIncharge.EmployeeId;
+        // this.CurrentDischargeSummary_VM.DischargeSummaryValidator.get('DoctorInchargeId').setValue(doctorIncharge.EmployeeId);
+      }
+
+      const residenceDoctor = this.providerList.find(p => p.EmployeeId === res.Results.ResidenceDrId);
+      if (residenceDoctor) {
+        this.residenceDrId = residenceDoctor.EmployeeId;
+        this.residenceDr = residenceDoctor.FullName;
+        // this.CurrentDischargeSummary_VM.DischargeSummaryValidator.get('ResidenceDrId').setValue(residenceDoctor.EmployeeId);
+      }
+    }
+    // this.drIncharge = res.Results.DoctorInchargeName;
+    this.drInchargeId = this.CurrentDischargeSummary_VM.DoctorInchargeId;
+
+    if (this.AnasthetistsList && this.AnasthetistsList.length) {
+      const anaesthetists = this.AnasthetistsList.find(a => a.EmployeeId === res.Results.AnaesthetistsId);
+      if (anaesthetists) {
+        this.anaesthesistId = anaesthetists.EmployeeId;
+        this.anasthetists = anaesthetists.FullName;
+        // this.CurrentDischargeSummary_VM.DischargeSummaryValidator.get('AnaesthetistsId').setValue(anaesthetists.EmployeeId);
+      }
+    }
+  }
+  //discharge summary
+  async GetDischargeSummary(res) {
+    if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+      this.loadingScreen = true;
+      if (res.Results) {
+        // this.CurrentDischargeSummary_VM = new TempDischargeTemplate();
+        if (res.Results.DischargeSummary) {
+          this.CurrentDischargeSummary_VM = Object.assign(this.CurrentDischargeSummary_VM, res.Results.DischargeSummary);
         }
         else {
-          this.AddMedicine(0);
-          // this.AddMedicine(1);
-          // this.AddMedicine(2);
+          this.CurrentDischargeSummary_VM = Object.assign(this.CurrentDischargeSummary_VM, res.Results);
         }
-        if (this.CurrentDischargeSummary.LabTests && this.CurrentDischargeSummary.LabTests != null) {
+        // if (this.CurrentDischargeSummary_VM.DischargeSummaryTemplateId) {
+        //   this.selectedTemplateObj = this.dischargeSummaryTemplates.find(a => a.TemplateId === this.CurrentDischargeSummary_VM.DischargeSummaryTemplateId)
+        //   if (this.selectedTemplateObj && this.selectedTemplateObj.TemplateId) {
+        //     await this.LoadTemplateFields(this.selectedTemplateObj.TemplateId);
+        //   }
+        // }
 
-          // this.labTestId = new Array<number>();
-
-          // this.labTestId = this.CurrentDischargeSummary.LabTests.split(",").map(Number);
-          this.labTests = new Array<any>();
-          this.labTests = JSON.parse(this.CurrentDischargeSummary.LabTests);
-        }
-
-        if (this.CurrentDischargeSummary.SelectedImagingItems && this.CurrentDischargeSummary.SelectedImagingItems != null) {
-          this.imagingItems = new Array<any>();
-          this.imagingItems = JSON.parse(this.CurrentDischargeSummary.SelectedImagingItems);
-          this.AddedImgTests = this.imagingItems;
-        }
-
-        if (this.CurrentDischargeSummary.DischargeSummaryConsultants && this.CurrentDischargeSummary.DischargeSummaryConsultants.length > 0) {
-          this.CurrentDischargeSummary.DischargeSummaryConsultants.forEach(a => {
-            this.selectedConsultants.push(a);
+        await this.LoadTemplateFieldsIfNeeded(this.CurrentDischargeSummary_VM.DischargeSummaryTemplateId);
+        let formGroupConfig = {};
+        if (this.TemplatesFromServer && this.TemplatesFromServer.length) {
+          this.TemplatesFromServer.forEach(field => {
+            formGroupConfig[field.FieldName] = [''];
           });
-          // this.GenerateConsultantsData();
-        }
-        // this.consultant = res.Results.ConsultantName;
-        this.drIncharge = res.Results.DoctorInchargeName;
-        this.drInchargeId = this.CurrentDischargeSummary.DoctorInchargeId;
-        this.CheckedBy = res.Results.CheckedBy;
-        //when given doctor is not present we get drname string as '.  ' , so we check if name length is greater than 3 then only will show name of doctor
-        if (res.Results.Anaesthetists.length > 3) {
-          this.anasthetists = res.Results.Anaesthetists;
-        }
-        if (res.Results.ResidenceDrName.length > 3) {
-          this.residenceDr = res.Results.ResidenceDrName;
-        }
+          this.CurrentDischargeSummary_VM.TempDischargeSummaryValidator = this.formBuilder.group(formGroupConfig);
+          console.log('TempDischargeSummaryValidator', this.CurrentDischargeSummary_VM.TempDischargeSummaryValidator);
 
-        if (this.CurrentDischargeSummary.DischargeSummaryTemplateId) {
-          this.selectedTemplateObj = this.dischargeSummaryTemplates.find(a => a.TemplateId === this.CurrentDischargeSummary.DischargeSummaryTemplateId)
-          if (this.selectedTemplateObj.TemplateId) {
-            this.LoadTemplateFields(this.selectedTemplateObj.TemplateId);
-          }
         }
+        this.SetDischargeSummaryData(res);
 
         this.update = true;
       }
       else {
         this.update = false;
-        this.CurrentDischargeSummary = new DischargeSummary();
-        this.CurrentDischargeSummary.PatientVisitId = this.selectedDischarge.PatientVisitId;
-        this.CurrentDischargeSummary.PatientId = this.selectedDischarge.patientId;
-        this.CurrentDischargeSummary.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
+        this.CurrentDischargeSummary_VM = new TempDischargeTemplate();
+        this.CurrentDischargeSummary_VM.PatientVisitId = this.selectedDischarge.PatientVisitId;
+        this.CurrentDischargeSummary_VM.PatientId = this.selectedDischarge.patientId;
+        this.CurrentDischargeSummary_VM.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
         //default residence doctor will be current logged in user.
         //Ashim: 15Dec2017 : RResidenceDr is not mandatory
-        //this.CurrentDischargeSummary.ResidenceDrId = this.securityService.GetLoggedInUser().EmployeeId;
-        this.CurrentDischargeSummary.CreatedOn = moment().format('YYYY-MM-DD HH:mm');
+        //this.CurrentDischargeSummary_VM.ResidenceDrId = this.securityService.GetLoggedInUser().EmployeeId;
+        this.CurrentDischargeSummary_VM.CreatedOn = moment().format('YYYY-MM-DD HH:mm');
         this.AddMedicine(0);
         this.AddMedicine(1);
         this.AddMedicine(2);
@@ -737,20 +861,32 @@ export class DischargeSummaryAddComponent {
       }
 
     } else {
-      this.msgBoxServ.showMessage("error", [res.ErrorMessage]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [res.ErrorMessage]);
+      this.CurrentDischargeSummary_VM.DischargeSummaryMedications = new Array<DischargeSummaryMedication>();
+      this.NewMedications = new Array<DischargeSummaryMedication>();
+      if (!this.NewMedications.length)
+        this.AddMedicine(0);
+    }
+    this.loadingScreen = false;
+  }
+
+  async LoadTemplateFieldsIfNeeded(templateId: number): Promise<void> {
+    if (templateId) {
+      this.selectedTemplateObj = this.dischargeSummaryTemplates.find(a => a.TemplateId === templateId);
+      if (this.selectedTemplateObj && this.selectedTemplateObj.TemplateId) {
+        await this.LoadTemplateFields(this.selectedTemplateObj.TemplateId);
+      }
     }
   }
 
   DataValidation() {
     this.CheckValidation();
-    this.CurrentDischargeSummary.DischargeSummaryMedications = new Array<DischargeSummaryMedication>();
-    for (var i in this.CurrentDischargeSummary.DischargeSummaryValidator.controls) {
-      this.CurrentDischargeSummary.DischargeSummaryValidator.controls[i].markAsDirty();
-      this.CurrentDischargeSummary.DischargeSummaryValidator.controls[i].updateValueAndValidity();
-
-
-      //this.CurrentDischargeSummary.DischargeSummaryValidator.controls[i].checkIsMendatory();
-      // this.CurrentDischargeSummary.DischargeSummaryMedications[i].DischargeSummaryMedicationValidator.controls['Medicine'].disable();
+    this.CurrentDischargeSummary_VM.DischargeSummaryMedications = new Array<DischargeSummaryMedication>();
+    for (var i in this.CurrentDischargeSummary_VM.TempDischargeSummaryValidator.controls) {
+      this.CurrentDischargeSummary_VM.TempDischargeSummaryValidator.controls[i].markAsDirty();
+      this.CurrentDischargeSummary_VM.TempDischargeSummaryValidator.controls[i].updateValueAndValidity();
+      //this.CurrentDischargeSummary_VM.DischargeSummaryValidator.controls[i].checkIsMendatory();
+      // this.CurrentDischargeSummary_VM.DischargeSummaryMedications[i].DischargeSummaryMedicationValidator.controls['Medicine'].disable();
     }
 
   }
@@ -764,28 +900,28 @@ export class DischargeSummaryAddComponent {
     // for multiple diagnosis
     if (this.selectedDiagnosisList.length >= 0) {
       let tempString = JSON.stringify(this.selectedDiagnosisList);
-      this.CurrentDischargeSummary.Diagnosis = tempString;
+      this.CurrentDischargeSummary_VM.Diagnosis = tempString;
     }
 
     // for multiple provisional diagnosis
     if (this.selectedProviDiagnosisList.length >= 0) {
       let tempString = JSON.stringify(this.selectedProviDiagnosisList);
-      this.CurrentDischargeSummary.ProvisionalDiagnosis = tempString;
+      this.CurrentDischargeSummary_VM.ProvisionalDiagnosis = tempString;
     }
 
     // Generating selected Imaging items
-    this.CurrentDischargeSummary.SelectedImagingItems = JSON.stringify(this.AddedImgTests);
+    this.CurrentDischargeSummary_VM.SelectedImagingItems = JSON.stringify(this.AddedImgTests);
   }
 
   GenerateInvestigationData() {
     this.labTests = new Array<any>();
-    this.CurrentDischargeSummary.LabTests = '';
+    this.CurrentDischargeSummary_VM.LabTests = '';
     if (this.AddedTests.length > 0) {
       this.AddedTests.forEach(a => {
         this.labTests.push(a);
       });
     }
-    this.CurrentDischargeSummary.LabTests = JSON.stringify(this.labTests);
+    this.CurrentDischargeSummary_VM.LabTests = JSON.stringify(this.labTests);
   }
 
   GenerateMedicationData() {
@@ -793,27 +929,58 @@ export class DischargeSummaryAddComponent {
     if (this.NewMedications.length > 0) {
       this.NewMedications.forEach(a => {
         if (a.Medicine) {
-          this.CurrentDischargeSummary.DischargeSummaryMedications.push(a);
+          this.CurrentDischargeSummary_VM.DischargeSummaryMedications.push(a);
 
         }
       });
     }
+  }
+
+  AssignValues() {
+    // Dynamically map form controls to the model properties
+    const formControls = this.CurrentDischargeSummary_VM.TempDischargeSummaryValidator.controls;
+    Object.keys(formControls).forEach(key => {
+      if (key in formControls) {
+        if (key === 'HistoryOfPresentingIllness') {
+          this.CurrentDischargeSummary_VM.PresentingIllness = formControls[key].value;
+        }
+        else if (key !== 'ProvisionalDiagnosis' && key !== 'LabTests') {
+          this.CurrentDischargeSummary_VM[key] = formControls[key].value;
+        }
+      }
+    });
+    this.CurrentDischargeSummary_VM.DischargeSummaryTemplateId = this.selectedTemplateObj.TemplateId;
+    this.CurrentDischargeSummary_VM.PatientVisitId = this.selectedDischarge.PatientVisitId;
+    this.CurrentDischargeSummary_VM.CreatedBy = this.selectedDischarge.CreatedBy;
+    this.CurrentDischargeSummary_VM.CreatedOn = this.selectedDischarge.CreatedOn;
+    if (this.CheckedBy) {
+      if (typeof this.CheckedBy === 'object') {
+        this.CurrentDischargeSummary_VM.CheckedBy = this.CheckedBy.EmployeeId;
+      } else {
+        this.CurrentDischargeSummary_VM.CheckedBy = this.CurrentDischargeSummary_VM.CheckedById;
+      }
+    } else {
+      this.CurrentDischargeSummary_VM.CheckedBy = null;
+    }
+    this.CurrentDischargeSummary_VM.DischargeSummaryId = this.CurrentDischargeSummary_VM.DischargeSummaryId ? this.CurrentDischargeSummary_VM.DischargeSummaryId : this.selectedDischarge.DischargeSummaryId;
+    const dischargeSummary = new TempDischargeTemplate();
 
   }
 
 
-
   PostDischargeSummary() {
-    this.CurrentDischargeSummary.IsSubmitted = false;
-    this.CurrentDischargeSummary.DischargeSummaryTemplateId = this.selectedTemplateObj.TemplateId;
-    this.dischargeSummaryBLService.PostDischargeSummary(this.CurrentDischargeSummary)
+    this.AssignValues();
+    if (this.CurrentDischargeSummary_VM.DischargeSummaryId == null) {
+      this.CurrentDischargeSummary_VM.DischargeSummaryId = 0;
+    }
+    this.dischargeSummaryBLService.PostDischargeSummary(this.CurrentDischargeSummary_VM)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Discharge Summary Saved"]);
           this.showDischargeSummary = false;
           this.showSummaryView = true;
           this.update = true;
-          this.CurrentDischargeSummary.DischargeSummaryId = res.Results.DischargeSummaryId;
+          this.CurrentDischargeSummary_VM.DischargeSummaryId = res.Results.DischargeSummaryId;
           this.sendData.emit({ Status: ENUM_DanpheHTTPResponses.OK });
           let callBackSummaryData: DischargeSummary = res.Results;
           this.CallBackAddUpdate(callBackSummaryData);
@@ -831,18 +998,18 @@ export class DischargeSummaryAddComponent {
   }
 
   PutDischargeSummary() {
-    this.CurrentDischargeSummary.ModifiedBy = this.securityService.GetLoggedInUser().EmployeeId;
-    this.CurrentDischargeSummary.ModifiedOn = moment().format('YYYY-MM-DD HH:mm');
+    this.CurrentDischargeSummary_VM.ModifiedBy = this.securityService.GetLoggedInUser().EmployeeId;
+    this.CurrentDischargeSummary_VM.ModifiedOn = moment().format('YYYY-MM-DD HH:mm');
 
-    if (this.CurrentDischargeSummary.DischargeConditionId) {
-      this.FilteredDischargeConditions = this.dischargeCondition.filter(a => a.DischargeTypeId == this.CurrentDischargeSummary.DischargeConditionId);
+    if (this.CurrentDischargeSummary_VM.DischargeConditionId) {
+      this.FilteredDischargeConditions = this.dischargeCondition.filter(a => a.DischargeTypeId == this.CurrentDischargeSummary_VM.DischargeConditionId);
       if (this.FilteredDischargeConditions.length > 0) {
         this.DischargeConditionType = true;
       }
     }
-
-    this.CurrentDischargeSummary.DischargeSummaryTemplateId = this.selectedTemplateObj.TemplateId;
-    this.dischargeSummaryBLService.UpdateDischargeSummary(this.CurrentDischargeSummary)
+    this.AssignValues();
+    this.CurrentDischargeSummary_VM.DischargeSummaryTemplateId = this.selectedTemplateObj.TemplateId;
+    this.dischargeSummaryBLService.UpdateDischargeSummary(this.CurrentDischargeSummary_VM)
       .subscribe(
         (res: DanpheHTTPResponse) => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK) {
@@ -867,7 +1034,7 @@ export class DischargeSummaryAddComponent {
     this.DataValidation();
     this.CheckForConsultantValidation();
 
-    if (this.CurrentDischargeSummary.IsValidCheck(undefined, undefined) && this.InvalidConsultant == false) {
+    if (this.CurrentDischargeSummary_VM.IsValidCheck(undefined, undefined) && this.InvalidConsultant == false) {
 
 
       this.GenerateDischargeSummaryData();
@@ -876,7 +1043,7 @@ export class DischargeSummaryAddComponent {
 
     }
     else {
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Enter Manditory fields"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Enter Mandatory fields"]);
     }
   }
 
@@ -884,7 +1051,7 @@ export class DischargeSummaryAddComponent {
 
     this.DataValidation();
     this.CheckForConsultantValidation();
-    if (this.CurrentDischargeSummary.IsValidCheck(undefined, undefined) && this.InvalidConsultant == false) {
+    if (this.CurrentDischargeSummary_VM.IsValidCheck(undefined, undefined) && this.InvalidConsultant == false) {
 
       this.GenerateDischargeSummaryData();
 
@@ -898,8 +1065,8 @@ export class DischargeSummaryAddComponent {
 
   CallBackAddUpdate(dischargeSummary: DischargeSummary) {
     dischargeSummary.DischargeSummaryTemplateId = this.selectedTemplateObj.TemplateId //Passing selected templateId Bikesh-24th-july'23
-    this.CurrentDischargeSummary = Object.assign(this.CurrentDischargeSummary, dischargeSummary);
-    this.callback.emit(this.CurrentDischargeSummary);
+    this.CurrentDischargeSummary_VM = Object.assign(this.CurrentDischargeSummary_VM, dischargeSummary);
+    this.callback.emit(this.CurrentDischargeSummary_VM);
 
   }
 
@@ -907,7 +1074,7 @@ export class DischargeSummaryAddComponent {
     var view: boolean;
     view = window.confirm("You won't be able to make further changes. Do you want to continue?");
     if (view) {
-      this.CurrentDischargeSummary.IsSubmitted = true;
+      this.CurrentDischargeSummary_VM.IsSubmitted = true;
       this.Update();
       this.showDischargeSummary = false;
       this.showSummaryView = true;
@@ -1062,7 +1229,7 @@ export class DischargeSummaryAddComponent {
   }
   RemoveMedicine(index, type) {
     try {
-      // this.CurrentDischargeSummary.DischargeSummaryMedications.splice(index, 1);
+      // this.CurrentDischargeSummary_VM.DischargeSummaryMedications.splice(index, 1);
       if (type == 0) {
         this.NewMedications.splice(index, 1);
       }
@@ -1085,48 +1252,62 @@ export class DischargeSummaryAddComponent {
   }
 
   public CheckValidation() {
-    if (this.CurrentDischargeSummary) {
-      this.CurrentDischargeSummary.UpdateValidator("off", "DischargeConditionId", "required");
+    if (this.CurrentDischargeSummary_VM) {
+      this.CurrentDischargeSummary_VM.UpdateValidator("off", "DischargeCondition", "required");
       if (this.DischargeConditionType) {
         //set validator on
-        this.CurrentDischargeSummary.UpdateValidator("on", "DischargeConditionId", "required");
+        this.CurrentDischargeSummary_VM.UpdateValidator("on", "DischargeCondition", "required");
 
       }
       if (this.complusoryDoctorIncharge == false)
-        this.CurrentDischargeSummary.UpdateValidator("off", "DoctorInchargeId", "required");
+        this.CurrentDischargeSummary_VM.UpdateValidator("off", "DoctorIncharge", "required");
       else
-        this.CurrentDischargeSummary.UpdateValidator("on", "DoctorInchargeId", "required");
+        this.CurrentDischargeSummary_VM.UpdateValidator("on", "DoctorIncharge", "required");
 
-      if (this.Isdeath == false)
-        this.CurrentDischargeSummary.UpdateValidator("off", "DeathTypeId", "required");
-      else
-        this.CurrentDischargeSummary.UpdateValidator("on", "DeathTypeId", "required");
+      // if (this.Isdeath == false)
+      //   this.CurrentDischargeSummary_VM.UpdateValidator("off", "DeathTypeId", "required");
+      // else
+      //   this.CurrentDischargeSummary_VM.UpdateValidator("on", "DeathTypeId", "required");
 
-      this.dischSumFieldSettings.Anesthetists.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "AnaesthetistsId", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "AnaesthetistsId", "required");
-      this.dischSumFieldSettings.ResidentDr.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "ResidenceDrId", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "ResidenceDrId", "required");
-      this.dischSumFieldSettings.BabyWeight.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "BabyWeight", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "BabyWeight", "required");
-      this.dischSumFieldSettings.SelectDiagnosis.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "icd10Description", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "icd10Description", "required");
-      this.dischSumFieldSettings.ProvisonalDiagnosis.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "icd10Description", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "icd10Description", "required");
-      this.dischSumFieldSettings.OtherDiagnosis.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "DiagnosisFreeText", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "DiagnosisFreeText", "required");
-      this.dischSumFieldSettings.ClinicalFindings.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "ClinicalFindings", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "ClinicalFindings", "required");
-      this.dischSumFieldSettings.CheifComplain.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "ChiefComplaint", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "ChiefComplaint", "required");
-      this.dischSumFieldSettings.HistoryOfPresentingIllness.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "PresentingIllness", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "PresentingIllness", "required");
-      this.dischSumFieldSettings.PastHistory.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "PastHistory", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "PastHistory", "required");
-      this.dischSumFieldSettings.CaseSummery.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "CaseSummary", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "CaseSummary", "required");
-      this.dischSumFieldSettings.Procedure.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "ProcedureNts", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "ProcedureNts", "required");
-      this.dischSumFieldSettings.OperativeFindings.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "OperativeFindings", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "OperativeFindings", "required");
-      this.dischSumFieldSettings.HospitalReport.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "HistologyReport", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "HistologyReport", "required");
-      this.dischSumFieldSettings.HospitalCourse.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "HospitalCourse", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "HospitalCourse", "required");
-      this.dischSumFieldSettings.TreatmentDuringHospitalStay.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "Treatment", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "Treatment", "required");
-      this.dischSumFieldSettings.ConditionOnDischarge.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "Condition", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "Condition", "required");
-      this.dischSumFieldSettings.PendingReports.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "PendingReports", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "PendingReports", "required");
-      this.dischSumFieldSettings.SpecialNotes.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "SpeicialNotes", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "SpeicialNotes", "required");
-      this.dischSumFieldSettings.Allergies.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "Allergies", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "Allergies", "required");
-      this.dischSumFieldSettings.Activities.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "Activities", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "Activities", "required");
-      this.dischSumFieldSettings.Diet.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "Diet", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "Diet", "required");
-      this.dischSumFieldSettings.RestDays.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "RestDays", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "RestDays", "required");
-      this.dischSumFieldSettings.FollowUP.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "FollowUp", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "FollowUp", "required");
-      this.dischSumFieldSettings.Others.IsMandatory ? this.CurrentDischargeSummary.UpdateValidator("on", "Others", "required") : this.CurrentDischargeSummary.UpdateValidator("off", "Others", "required");
+      this.dischSumFieldSettings.Anesthetists.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Anesthetists", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Anesthetists", "required");
+      this.dischSumFieldSettings.ResidentDr.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "ResidentDr", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "ResidentDr", "required");
+      this.dischSumFieldSettings.BabyWeight.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "BabyWeight", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "BabyWeight", "required");
+      this.dischSumFieldSettings.SelectDiagnosis.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "SelectDiagnosis", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "SelectDiagnosis", "required");
+      this.dischSumFieldSettings.ProvisionalDiagnosis.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "ProvisionalDiagnosis", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "ProvisionalDiagnosis", "required");
+      // this.dischSumFieldSettings.OtherDiagnosis.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "DiagnosisFreeText", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "DiagnosisFreeText", "required");
+      this.dischSumFieldSettings.ClinicalFindings.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "ClinicalFindings", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "ClinicalFindings", "required");
+      this.dischSumFieldSettings.ChiefComplaint.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "ChiefComplaint", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "ChiefComplaint", "required");
+      this.dischSumFieldSettings.HistoryOfPresentingIllness.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "HistoryOfPresentingIllness", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "HistoryOfPresentingIllness", "required");
+      this.dischSumFieldSettings.PastHistory.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "PastHistory", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "PastHistory", "required");
+      this.dischSumFieldSettings.CaseSummary.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "CaseSummary", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "CaseSummary", "required");
+      this.dischSumFieldSettings.ProcedureNts.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "ProcedureNts", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "ProcedureNts", "required");
+      this.dischSumFieldSettings.OperativeFindings.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "OperativeFindings", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "OperativeFindings", "required");
+      this.dischSumFieldSettings.HospitalReport.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "HospitalReport", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "HospitalReport", "required");
+      this.dischSumFieldSettings.HospitalCourse.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "HospitalCourse", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "HospitalCourse", "required");
+      // this.dischSumFieldSettings.TreatmentDuringHospitalStay.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Treatment", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Treatment", "required");
+      this.dischSumFieldSettings.Condition.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Condition", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Condition", "required");
+      this.dischSumFieldSettings.PendingReports.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "PendingReports", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "PendingReports", "required");
+      this.dischSumFieldSettings.SpecialNotes.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "SpecialNotes", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "SpecialNotes", "required");
+      this.dischSumFieldSettings.Allergies.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Allergies", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Allergies", "required");
+      this.dischSumFieldSettings.Activities.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Activities", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Activities", "required");
+      this.dischSumFieldSettings.Diet.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Diet", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Diet", "required");
+      this.dischSumFieldSettings.RestDays.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "RestDays", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "RestDays", "required");
+      this.dischSumFieldSettings.FollowUp.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "FollowUp", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "FollowUp", "required");
+      this.dischSumFieldSettings.Others.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Others", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Others", "required");
+      this.dischSumFieldSettings.ObstetricHistory.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "ObstetricHistory", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "ObstetricHistory", "required");
+      this.dischSumFieldSettings.RelevantMaternalHistory.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "RelevantMaternalHistory", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "RelevantMaternalHistory", "required");
+      this.dischSumFieldSettings.IndicationForAdmission.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "IndicationForAdmission", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "IndicationForAdmission", "required");
+      this.dischSumFieldSettings.RespiratorySystem.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "RespiratorySystem", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "RespiratorySystem", "required");
+      this.dischSumFieldSettings.CardiovascularSystem.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "CardiovascularSystem", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "CardiovascularSystem", "required");
+      this.dischSumFieldSettings.GastrointestinalAndNutrition.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "GastrointestinalAndNutrition", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "GastrointestinalAndNutrition", "required");
+      this.dischSumFieldSettings.Renal.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Renal", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Renal", "required");
+      this.dischSumFieldSettings.NervousSystem.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "NervousSystem", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "NervousSystem", "required");
+      this.dischSumFieldSettings.Metabolic.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Metabolic", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Metabolic", "required");
+      this.dischSumFieldSettings.Sepsis.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Sepsis", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Sepsis", "required");
+      this.dischSumFieldSettings.CongenitalAnomalies.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "CongenitalAnomalies", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "CongenitalAnomalies", "required");
+      this.dischSumFieldSettings.Reflexes.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Reflexes", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Reflexes", "required");
+      this.dischSumFieldSettings.MedicationsReceivedInNICUNursery.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "MedicationsReceivedInNICUNursery", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "MedicationsReceivedInNICUNursery", "required");
+      this.dischSumFieldSettings.Discussion.IsMandatory ? this.CurrentDischargeSummary_VM.UpdateValidator("on", "Discussion", "required") : this.CurrentDischargeSummary_VM.UpdateValidator("off", "Discussion", "required");
 
 
     }
@@ -1145,58 +1326,88 @@ export class DischargeSummaryAddComponent {
         }
       });
   }
+  // OnChangeDischargeType(newtype) {
+  //   this.DischargeConditionType = false;
+  //   this.DeliveryType = false;
+  //   this.showBabyDetails = false;
+  //   this.Isdeath = false;
+  //   this.CurrentDischargeSummary_VM.DeliveryTypeId = null;
+  //   //this.CurrentDischargeSummary_VM.BabyBirthConditionId = null;
+  //   this.CurrentDischargeSummary_VM.DeathTypeId = null;
+  //   //this.CurrentDischargeSummary_VM.DeathPeriod = null;
+  //   this.FilteredDischargeConditions = new Array<any>();
+  //   this.CurrentDischargeSummary_VM.DischargeTypeId = +this.CurrentDischargeSummary_VM.DischargeTypeId;
+  //   newtype = +newtype;
+  //   this.FilteredDischargeConditions = this.dischargeCondition.filter(a => a.DischargeTypeId === newtype);
+  //   var tempCheckDeath = this.deathTypeList.filter(a => a.DischargeTypeId === newtype);
+  //   if (this.FilteredDischargeConditions.length > 0) {
+  //     this.DischargeConditionType = true;
+  //   }
+  //   if (tempCheckDeath.length > 0) {
+  //     this.Isdeath = true;
+  //     //this.GenerateDeathCertificateNumber();
+  //     //this.CurrentDischargeSummary_VM.DeathPeriod = tempCheckDeath[0].DischargeTypeName;
+  //   }
 
+  //   //* Bikesh, 128thSept'23, Below logic will filter DischargeConditions for Recovered Discharge Type only. This will remove Delivery option if patient is male.
+  //   const selectedType = this.dischargeTypeList.find(type => type.DischargeTypeId === +this.CurrentDischargeSummary_VM.DischargeTypeId);
+  //   if (selectedType && selectedType.DischargeTypeName.toLowerCase() === ENUM_DischargeType.Recovered.toLowerCase() && this.selectedDischarge.Gender.toLowerCase() === ENUM_Genders.Male.toLowerCase()) {
+  //     this.FilteredDischargeConditions = this.FilteredDischargeConditions.filter(a => a.Condition.toLowerCase() !== ENUM_RecoveredDischargeConditions.Delivery.toLowerCase());
+  //   }
+
+  // }
   OnChangeDischargeType(newtype) {
     this.DischargeConditionType = false;
     this.DeliveryType = false;
     this.showBabyDetails = false;
     this.Isdeath = false;
-    this.CurrentDischargeSummary.DeliveryTypeId = null;
-    //this.CurrentDischargeSummary.BabyBirthConditionId = null;
-    this.CurrentDischargeSummary.DeathTypeId = null;
-    //this.CurrentDischargeSummary.DeathPeriod = null;
+    this.CurrentDischargeSummary_VM.DeliveryTypeId = null;
+    //this.CurrentDischargeSummary_VM.BabyBirthConditionId = null;
+    this.CurrentDischargeSummary_VM.DeathTypeId = null;
+    //this.CurrentDischargeSummary_VM.DeathPeriod = null;
     this.FilteredDischargeConditions = new Array<any>();
-    this.CurrentDischargeSummary.DischargeTypeId = +this.CurrentDischargeSummary.DischargeTypeId;
-    newtype = +newtype;
-    this.FilteredDischargeConditions = this.dischargeCondition.filter(a => a.DischargeTypeId === newtype);
-    var tempCheckDeath = this.deathTypeList.filter(a => a.DischargeTypeId === newtype);
+    const FilteredDischargeType = this.dischargeTypeList.filter(a => a.DischargeTypeName === newtype);
+    if (FilteredDischargeType) {
+      this.CurrentDischargeSummary_VM.DischargeTypeId = FilteredDischargeType[0].DischargeTypeId;
+    }
+    // this.CurrentDischargeSummary_VM.DischargeTypeId = +this.CurrentDischargeSummary_VM.DischargeTypeId;
+    // newtype = +newtype;
+    this.FilteredDischargeConditions = this.dischargeCondition.filter(a => a.DischargeTypeId === this.CurrentDischargeSummary_VM.DischargeTypeId);
+    var tempCheckDeath = this.deathTypeList.filter(a => a.DischargeTypeId === this.CurrentDischargeSummary_VM.DischargeTypeId);
     if (this.FilteredDischargeConditions.length > 0) {
       this.DischargeConditionType = true;
     }
     if (tempCheckDeath.length > 0) {
       this.Isdeath = true;
       //this.GenerateDeathCertificateNumber();
-      //this.CurrentDischargeSummary.DeathPeriod = tempCheckDeath[0].DischargeTypeName;
+      //this.CurrentDischargeSummary_VM.DeathPeriod = tempCheckDeath[0].DischargeTypeName;
     }
 
     //* Bikesh, 128thSept'23, Below logic will filter DischargeConditions for Recovered Discharge Type only. This will remove Delivery option if patient is male.
-    const selectedType = this.dischargeTypeList.find(type => type.DischargeTypeId === +this.CurrentDischargeSummary.DischargeTypeId);
+    const selectedType = this.dischargeTypeList.find(type => type.DischargeTypeId === +this.CurrentDischargeSummary_VM.DischargeTypeId);
     if (selectedType && selectedType.DischargeTypeName.toLowerCase() === ENUM_DischargeType.Recovered.toLowerCase() && this.selectedDischarge.Gender.toLowerCase() === ENUM_Genders.Male.toLowerCase()) {
       this.FilteredDischargeConditions = this.FilteredDischargeConditions.filter(a => a.Condition.toLowerCase() !== ENUM_RecoveredDischargeConditions.Delivery.toLowerCase());
     }
 
   }
-  OnChangeDischargeConditionType(condition) {
-    let checkDeliveryId = Number(condition);
+  OnChangeDischargeConditionType(condition: any) {
     this.DeliveryType = false;
-    this.showBabyDetails = false;
     this.ShowBabyWeight = false;
-    let check = this.deliveryTypeList.filter(a => a.DischargeConditionId == checkDeliveryId);
-    if (check.length > 0) {
-      this.DeliveryType = true;
-      //var babyDetails = new BabyBirthDetails();
-      //this.showBabyDetails = true;
-      //this.CurrentDischargeSummary.BabyBirthDetails = new Array<BabyBirthDetails>();
-      //babyDetails.BirthDate = this.today;
-      //babyDetails.BirthTime = moment().format("hh:mm:ss");
-      //babyDetails.CertificateNumber = this.GenerateCertificateNumber(babyDetails.BirthDate);
-      //this.CurrentDischargeSummary.BabyBirthDetails.push(babyDetails);
-    }
-    let selectedFilterDischargeCondition = this.FilteredDischargeConditions.filter(a => a.DischargeConditionId == checkDeliveryId);
-    if (selectedFilterDischargeCondition[0].Condition.toLowerCase() === ENUM_RecoveredDischargeConditions.Delivery.toLowerCase()) {
+    // Find the selected discharge condition
+    const selectedFilterDischargeCondition = this.FilteredDischargeConditions.find(a => a.Condition === condition);
+    if (selectedFilterDischargeCondition && selectedFilterDischargeCondition.Condition.toLowerCase() === ENUM_RecoveredDischargeConditions.Delivery.toLowerCase()) {
       this.ShowBabyWeight = true;
     }
+    this.CurrentDischargeSummary_VM.DischargeConditionId = selectedFilterDischargeCondition.DischargeConditionId;
+
+    // Check if the condition exists in the delivery type list
+    const check = this.deliveryTypeList.find(a => a.DischargeConditionId === selectedFilterDischargeCondition.DischargeConditionId);
+    if (check) {
+      this.DeliveryType = true;
+    }
+
   }
+
 
   public MakeDiagnosisList() {
     // console.log(this.diagnosis);
@@ -1232,31 +1443,31 @@ export class DischargeSummaryAddComponent {
     this.selectedDiagnosisList = temp.filter((d, index) => index != i);
   }
 
-  public MakeProvisonalDiagnosisList() {
+  public MakeProvisionalDiagnosisList() {
     // console.log(this.diagnosis);
-    if (this.provisonalDiagnosis != undefined && typeof (this.provisonalDiagnosis) != ENUM_Data_Type.String) {
+    if (this.provisionalDiagnosis != undefined && typeof (this.provisionalDiagnosis) != ENUM_Data_Type.String) {
       if (this.selectedProviDiagnosisList.length > 0) {
         let temp: Array<any> = this.selectedProviDiagnosisList;
         let isICDDuplicate: boolean = false;
 
 
-        if (temp.some(d => d.ICD10Id == this.provisonalDiagnosis.ICD10Id)) {
+        if (temp.some(d => d.ICD10Id == this.provisionalDiagnosis.ICD10Id)) {
           isICDDuplicate = true;
-          alert(`${this.provisonalDiagnosis.icd10Description} Already Added !`);
-          this.provisonalDiagnosis = undefined;
+          alert(`${this.provisionalDiagnosis.icd10Description} Already Added !`);
+          this.provisionalDiagnosis = undefined;
 
         }
         if (isICDDuplicate == false) {
           {
-            this.selectedProviDiagnosisList.push(this.provisonalDiagnosis);
-            this.provisonalDiagnosis = undefined;
+            this.selectedProviDiagnosisList.push(this.provisionalDiagnosis);
+            this.provisionalDiagnosis = undefined;
           }
         }
       } else {
-        this.selectedProviDiagnosisList.push(this.provisonalDiagnosis);
-        this.provisonalDiagnosis = undefined;
+        this.selectedProviDiagnosisList.push(this.provisionalDiagnosis);
+        this.provisionalDiagnosis = undefined;
       }
-    } else if (typeof (this.provisonalDiagnosis) === ENUM_Data_Type.String) {
+    } else if (typeof (this.provisionalDiagnosis) === ENUM_Data_Type.String) {
       alert("Enter Valid ICD10 !");
     }
   }
@@ -1464,17 +1675,17 @@ export class DischargeSummaryAddComponent {
 
   GenerateConsultantsData() {
     if (this.selectedConsultants.length > 0) {
-      // this.CurrentDischargeSummary.DischargeSummaryConsultants = [];
-      this.CurrentDischargeSummary.DischargeSummaryConsultants = [];
+      // this.CurrentDischargeSummary_VM.DischargeSummaryConsultants = [];
+      this.CurrentDischargeSummary_VM.DischargeSummaryConsultants = [];
       // this.selectedConsultants.forEach(d => {
       //   if (d.EmployeeId && d.EmployeeId != 0) {
       //     let selectedConsultant = JSON.parse(JSON.stringify(this.selectedConsultantsDetail));
       //     // this.selectedConsultants[1].ConsultantId = d.EmployeeId;
-      //     this.CurrentDischargeSummary.DischargeSummaryConsultants.push(selectedConsultant);
+      //     this.CurrentDischargeSummary_VM.DischargeSummaryConsultants.push(selectedConsultant);
       //   }
 
       // });
-      this.CurrentDischargeSummary.DischargeSummaryConsultants = Object.assign(this.selectedConsultants);
+      this.CurrentDischargeSummary_VM.DischargeSummaryConsultants = Object.assign(this.selectedConsultants);
 
     }
   }
@@ -1513,7 +1724,7 @@ export class DischargeSummaryAddComponent {
     return html;
   }
   CheckedByChanged() {
-    this.CurrentDischargeSummary.CheckedBy = this.CheckedBy.EmployeeId;
+    this.CurrentDischargeSummary_VM.CheckedBy = this.CheckedBy.EmployeeId;
   }
   GetDischargeSummaryTemplates(TemplateTypeName: string) {
     this.dischargeSummaryBLService.GetDischargeSummaryTemplates(TemplateTypeName)
@@ -1539,36 +1750,69 @@ export class DischargeSummaryAddComponent {
   OnTemplateSelected() {
     if (this.selectedTemplateObj) {
       this.LoadTemplateFields(this.selectedTemplateObj.TemplateId)
+
     }
   }
 
-  LoadTemplateFields(TemplateId: number) {
-    this.dischargeSummaryBLService.LoadTemplateFields(TemplateId).subscribe((res: DanpheHTTPResponse) => {
+  async LoadTemplateFields(TemplateId: number): Promise<void> {
+    try {
+      const res = await this.dischargeSummaryBLService.LoadTemplateFields(TemplateId).toPromise();
       if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-        this.selectedTemplateFileds = res.Results;
-        this.SelectedTemplateFiledsTransformData();
-      }
-    })
-  }
+        this.TemplatesFromServer = res.Results; // Set the templates from server
+        this.selectedTemplateFields = res.Results; // Set the selected template fields
 
+        let template = this.selectedTemplateFields.map(field => ({
+          control: field.FieldName,
+          required: field.IsMandatory
+        }));
+
+        this.CurrentDischargeSummary_VM.ConfigureValidator(template); // Configure the validator
+        this.SelectedTemplateFiledsTransformData(); // Transform the data
+        this.changeDetector.detectChanges(); // Manually trigger change detection
+
+        return; // Resolve the promise after the data is processed
+      } else {
+        throw new Error('Failed to load template fields'); // Throw error if the status is not OK
+      }
+    } catch (error) {
+      console.error('Error during LoadTemplateFields:', error);
+      throw new Error('An error occurred while executing the command definition. See the inner exception for details.'); // Throw detailed error message
+    }
+  }
+  DisplayFields(summaryData: any): boolean {
+    return summaryData.IsActive &&
+      (summaryData.FieldName !== 'DischargeCondition' ||
+        (this.DischargeConditionType && this.dischSumFieldSettings && this.dischSumFieldSettings.DischargeCondition && this.dischSumFieldSettings.DischargeCondition.Show)) &&
+      (summaryData.FieldName !== 'BabyWeight' || (this.dischSumFieldSettings && this.dischSumFieldSettings.BabyWeight && this.dischSumFieldSettings.BabyWeight.Show && this.ShowBabyWeight)) &&
+      summaryData.FieldName !== 'Investigations' &&
+      summaryData.FieldName !== 'Medications' &&
+      summaryData.FieldName !== 'Imagings' &&
+      summaryData.FieldName !== 'LabTests';
+  }
   //Bikesh:3-Aug-023 extracting selectedTemplateFileds properties
   SelectedTemplateFiledsTransformData() {
     this.dischSumFieldSettings = new DischargeSummaryFieldSettingsVM();
-    if (this.selectedTemplateFileds.length > 0) {
-      for (const item of this.selectedTemplateFileds) {
+    if (this.selectedTemplateFields && this.selectedTemplateFields.length > 0) {
+      for (const item of this.selectedTemplateFields) {
         const fieldName = item.FieldName;
         const show = item.IsActive;
         const isMandatory = item.IsMandatory;
+        const DisplayLabelAtForm = item.DisplayLabelAtForm;
+        const DisplayLabelAtPrint = item.DisplayLabelAtPrint;
 
-        this.UpdateFieldSettings(fieldName, show, isMandatory);
+        this.UpdateFieldSettings(fieldName, show, isMandatory, DisplayLabelAtForm, DisplayLabelAtPrint);
 
       }
+      this.AssignAssessmentAndPlan();
+
     }
   }
-  UpdateFieldSettings(fieldName: string, show: boolean, isMandatory: boolean) {
+  UpdateFieldSettings(fieldName: string, show: boolean, isMandatory: boolean, DisplayLabelAtForm: string, DisplayLabelAtPrint: string) {
     if (fieldName in this.dischSumFieldSettings) {
       this.dischSumFieldSettings[fieldName].Show = show;
       this.dischSumFieldSettings[fieldName].IsMandatory = isMandatory;
+      this.dischSumFieldSettings[fieldName].DisplayLabelAtForm = DisplayLabelAtForm;
+      this.dischSumFieldSettings[fieldName].DisplayLabelAtPrint = DisplayLabelAtPrint;
     }
   }
 
@@ -1580,5 +1824,252 @@ export class DischargeSummaryAddComponent {
   DischargeWithPendingBills(): void {
 
   }
+  AssignAssessmentAndPlan() {
+    for (let i = 0; i < this.selectedTemplateFields.length; i++) {
+      for (let j = 0; j < this.visitService.patientsAssessmentAndPlans.length; j++) {
+        if (this.selectedTemplateFields[i].FieldName === this.visitService.patientsAssessmentAndPlans[j].FieldName) {
+          // Assuming NotesValues is an array and you want the first value
+          const valueToAssign = this.visitService.patientsAssessmentAndPlans[j].NotesValues;
+
+          // Assign the value to CurrentDischargeSummary_VM
+          this.CurrentDischargeSummary_VM[this.selectedTemplateFields[i].FieldName] = valueToAssign;
+
+          console.log('Assigned Details are: ', valueToAssign);
+        }
+      }
+    }
+  }
+  CalculateHospitalStayDays() {
+    const currentDate: Date = new Date();
+    // const millisecondsPerDay = 1000 * 60 * 60 * 24; // Number of milliseconds in a day
+    let admittedDate: Date;
+    let dischargedDate: Date;
+
+    if (this.selectedDischarge && this.selectedDischarge.AdmittedDate) {
+      admittedDate = new Date(this.selectedDischarge.AdmittedDate);
+    } else {
+      admittedDate = currentDate;
+    }
+    if (this.selectedDischarge && this.selectedDischarge.DischargedDate) {
+      dischargedDate = new Date(this.selectedDischarge.DischargedDate);
+    } else {
+      dischargedDate = currentDate;
+    }
+    // const millisecondsDifference = dischargedDate.getTime() - admittedDate.getTime();
+    // this.StayDays = Math.ceil(millisecondsDifference / millisecondsPerDay);
+    this.StayDays = moment(dischargedDate).diff(admittedDate, "day");
+    if (this.StayDays === 0) {
+      this.StayDays = 1;
+    }
+  }
+  LoadDischargeSummary() {
+
+
+  }
 }
 
+export class TemplateField_DTO {
+  DischargeTypeId: number;
+  FieldName: string;
+  IsMandatory: boolean;
+  IsActive: boolean;
+  IsCompulsoryField: boolean;
+  DisplayLabelAtForm: string;
+  EnterSequence: number;
+}
+export class TempDischargeTemplate {
+  public DischargeSummaryId: number = 0;
+  public PatientVisitId: number = null;
+  public DischargeTypeId: number = null;
+  public DoctorInchargeId: number = null;
+  public OperativeProcedure: string = null;
+  public OperativeFindings: string = null;
+  public AnaesthetistsId: number = null;
+  public Anaesthetists: string = null;
+  public Diagnosis: string;
+  public CaseSummary: string = null;
+  public Condition: string = null;
+  public TreatmentDuringHospitalStay: string = null;
+  public HospitalReport: string = null;
+  public Treatment: string = null;
+  public HistologyReport: string = null;
+  public SpecialNotes: string = null;
+  public Medications: string = null;
+  public Allergies: string = null;
+  public Activities: string = null;
+  public Diet: string = null;
+  public RestDays: string = null;
+  public FollowUp: string = null;
+  public Others: string = null;
+  public ResidenceDrId: number = null;
+
+  public CreatedBy: number = null;
+  public ModifiedBy: number = null;
+
+  public CreatedOn: string = null;
+  public ModifiedOn: string = null;
+  public IsSubmitted: boolean = false;
+  public DischargeSummaryValidator: FormGroup = null;
+  public LabTests: string = null;
+  public DischargeSummaryMedications: Array<DischargeSummaryMedication> = new Array<DischargeSummaryMedication>();
+  // public DischargeSummaryConsultants: Array<DischargeSummaryConsultant> = new Array<DischargeSummaryConsultant>();
+  public DischargeSummaryConsultants: Array<DischargeSummaryConsultant> = new Array<DischargeSummaryConsultant>();
+  //public BabyBirthDetails : Array<BabyBirthDetails> = new Array<BabyBirthDetails>();
+  public DischargeConditionId: number = null;
+  public DeliveryTypeId: number = null;
+  //public BabyBirthConditionId: number = null;
+  public DeathTypeId: number = null;
+  //public BabysFathersName: string = null;
+  //public DeathCertificateNumber: string =null;
+  public PatientId: any;
+  public FiscalYearName: string = null;
+  //public DeathPeriod: string = null;
+
+  public ChiefComplaint: string = null;
+  public PendingReports: string = null;
+  public HospitalCourse: string = null;
+  public PresentingIllness: string = null;
+  public ProcedureNts: string = null;
+  public SelectedImagingItems: string = null;
+  public DischargeType: string = null;
+  public ProvisionalDiagnosis: string;
+  public DiagnosisFreeText: string;
+  public BabyWeight: string;
+  public ClinicalFindings: string;
+  public PastHistory: string = null;
+  public PhysicalExamination: string = null;
+
+  public DischargeSummaryTemplateId: number;
+  public DischargeCondition: string;
+  public DeathType: string;
+  public BabyBirthCondition: string;
+  public DeliveryType: string;
+  public DoctorIncharge: string;
+  public Age: number;
+  public SelectedDiagnosis: string;
+  public Anesthetists: string;
+  public ResidenceDrName: string;
+  public CheckedBy: any;
+  public Consultants: string;
+  public Consultant: string;
+  public hospitalStayDate: string;
+  public DrInchargeNMC: string;
+  public ConsultantNMC: string;
+  public ConsultantsSign: string;
+  public ConsultantSignImgPath: string;
+  public DrInchargeSignImgPath: string;
+  public DischargeOrder: string;
+  public AdviceOnDischarge: string;
+  public StayDays: number = 0;
+  public TempDischargeSummaryValidator: FormGroup = null;
+  public CheckedById: number = 0;
+  public ObstetricHistory: string;
+  public RelevantMaternalHistory: string;
+  public IndicationForAdmission: string;
+  public RespiratorySystem: string;
+  public CardiovascularSystem: string;
+  public GastrointestinalAndNutrition: string;
+  public Renal: string;
+  public NervousSystem: string;
+  public Metabolic: string;
+  public Sepsis: string;
+  public CongenitalAnomalies: string;
+  public Reflexes: string;
+  public MedicationsReceivedInNICUNursery: string;
+  public Discussion: string;
+  public ConfigureValidator(formControls: { control: string, required: boolean }[]) {
+    formControls.forEach(controlData => {
+      // Check if the field name contains 'Consultant' and skip validation if it does
+      if (controlData.control.includes('Consultant')) {
+        this.TempDischargeSummaryValidator.addControl(controlData.control, new FormControl(''));
+      } else {
+        const validators = controlData.required ? [Validators.required] : [];
+        this.TempDischargeSummaryValidator.addControl(controlData.control, new FormControl('', validators));
+      }
+    });
+  }
+
+  constructor() {
+
+    var _formBuilder = new FormBuilder();
+    this.TempDischargeSummaryValidator = _formBuilder.group({});
+
+    // var _formBuilder = new FormBuilder();
+    // this.TempDischargeSummaryValidator = _formBuilder.group({
+    //   'DischargeType': ['', Validators.compose([Validators.required])],
+    //   // 'Consultant': ['', Validators.compose([Validators.required])],
+    //   'DischargeCondition': ['', Validators.compose([Validators.required])],
+    //   'DoctorIncharge': ['', Validators.compose([Validators.required])],
+    //   'Anesthetists': [''],
+    //   'ResidentDr': [''],
+    //   'BabyWeight': [''],
+    //   'SelectDiagnosis': [''],
+    //   'ProvisonalDiagnosis': [''],
+    //   'SelectedDiagnosis': [''],
+    //   'OtherDiagnosis': [''],
+    //   'ClinicalFindings': [''],
+    //   'CheifComplain': [''],
+    //   'HistoryOfPresentingIllness': [''],
+    //   'PastHistory': [''],
+    //   'CaseSummery': [''],
+    //   'Procedure': [''],
+    //   'OperativeFindings': [''],
+    //   'HospitalReport': [''],
+    //   'HospitalCourse': [''],
+    //   'TreatmentDuringHospitalStay': [''],
+    //   'ConditionOnDischarge': [''],
+    //   'PendingReports': [''],
+    //   'SpecialNotes': [''],
+    //   'Allergies': [''],
+    //   'Activities': [''],
+    //   'Diet': [''],
+    //   'RestDays': [''],
+    //   'FollowUP': [''],
+    //   'Others': [''],
+    //   'CheckedBy': [''],
+    //   'Investigations': [''],
+    //   'LabTests': [''],
+    //   'Imgaings': [''],
+    //   'Medications': [''],
+    //   'DischargeOrder': ['']
+    // });
+
+  }
+  public IsDirty(fieldName): boolean {
+    if (fieldName == undefined)
+      return this.TempDischargeSummaryValidator.dirty;
+    else
+      return this.TempDischargeSummaryValidator.controls[fieldName].dirty;
+  }
+
+  public IsValid(): boolean {
+    if (this.TempDischargeSummaryValidator.valid) {
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
+  public IsValidCheck(fieldName, validator): boolean {
+    if (fieldName == undefined)
+      return this.TempDischargeSummaryValidator.valid;
+    else
+      return !(this.TempDischargeSummaryValidator.hasError(validator, fieldName));
+  }
+  //Dynamically add validator
+
+  public UpdateValidator(onOff: string, formControlName: string, validatorType: string) {
+    if (!this.TempDischargeSummaryValidator.controls[formControlName]) {
+      return;
+    }
+
+    const control = this.TempDischargeSummaryValidator.controls[formControlName];
+
+    if (validatorType === 'required') {
+      control.setValidators(onOff === "on" ? [Validators.required] : []);
+      control.updateValueAndValidity();
+    }
+  }
+
+
+}

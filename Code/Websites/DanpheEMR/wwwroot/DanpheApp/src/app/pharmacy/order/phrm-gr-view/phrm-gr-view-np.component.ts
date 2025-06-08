@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, Output, EventEmitter, OnDestroy } from '@angular/core'
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import * as moment from 'moment';
@@ -31,6 +31,9 @@ export class PhrmGRViewNpComponent implements OnInit, OnDestroy {
       public cancelForm = new FormGroup({ CancelRemarks: new FormControl('', Validators.required) });
       cancelRemarks: string = "";
       public headerDetail: { header1, header2, header3, header4, hospitalName, address, email, PANno, tel, DDA };
+
+      @Input("EnableAdjustmentEdit")
+      EnableAdjustmentEdit: boolean = false;
 
       constructor(public pharmacyBLService: PharmacyBLService, public msgBox: MessageboxService, public pharmacyService: PharmacyService, public router: Router, public coreService: CoreService) {
 
@@ -135,7 +138,7 @@ export class PhrmGRViewNpComponent implements OnInit, OnDestroy {
             }
       }
 
-      
+
       editReceipt(flag: boolean) {
             if (flag) {
                   this.msgBox.showMessage("Access Denied", ["This receipt has been transfered to accounting.", "Further editing is forbidden."]);
@@ -148,11 +151,11 @@ export class PhrmGRViewNpComponent implements OnInit, OnDestroy {
 
       //Get Pharmacy Billing Header Parameter from Core Service (Database) assign to local variable
       GetPharmacyReceiptHeaderParameter() {
-        var paramValue = this.coreService.Parameters.find(a => a.ParameterName == 'Pharmacy Receipt Header').ParameterValue;
-        if (paramValue)
-          this.headerDetail = JSON.parse(paramValue);
-        else
-          this.msgBox.showMessage("error", ["Please enter parameter values for Pharmacy receipt Header"]);
+            var paramValue = this.coreService.Parameters.find(a => a.ParameterName == 'Pharmacy Receipt Header').ParameterValue;
+            if (paramValue)
+                  this.headerDetail = JSON.parse(paramValue);
+            else
+                  this.msgBox.showMessage("error", ["Please enter parameter values for Pharmacy receipt Header"]);
       }
-    
+
 }

@@ -10,6 +10,7 @@ using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace DanpheEMR.Controllers.SSF
@@ -153,6 +154,14 @@ namespace DanpheEMR.Controllers.SSF
             }
         }
 
+        [HttpPost]
+        [Route("CheckBookingStatus")]
+        [Produces(typeof(DanpheHTTPResponse<List<ClaimBookingDetailsFromSSFServer_Root_DTO>>))]
+        public async Task<IActionResult> CheckBookingStatus([FromBody] CheckBookingStauts_DTO checkBookingStauts)
+        {
+            Func<Task<object>> func = () => _ISSFService.CheckClaimBookingStatus(_SSFDbContext, checkBookingStauts);
+            return await InvokeHttpPostFunctionAsync(func);
+        }
 
         [HttpGet]
         [Route("GetClaimBookingDetail")]
@@ -215,6 +224,59 @@ namespace DanpheEMR.Controllers.SSF
             try
             {
                 responseData.Results = await _ISSFService.GetSSFPatientDetailLocally(_SSFDbContext, patientId, schemeId);
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+                return Ok(responseData);
+            }
+            catch (Exception ex)
+            {
+                responseData.ErrorMessage = $"{ex.Message} exception details {ex.ToString()}";
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.Failed;
+                return BadRequest(responseData);
+            }
+        }
+
+        [HttpGet]
+        [Route("GetSSFSubProduct")]
+        public async Task<IActionResult> GetSSFSubProduct(Int64 claimCode)
+        {
+            try
+            {
+                responseData.Results = await _ISSFService.GetSSFSubProduct(_SSFDbContext, claimCode);
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+                return Ok(responseData);
+            }
+            catch (Exception ex)
+            {
+                responseData.ErrorMessage = $"{ex.Message} exception details {ex.ToString()}";
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.Failed;
+                return BadRequest(responseData);
+            }
+        }
+        [HttpPost]
+        [Route("Attachments")]
+        public async Task<IActionResult> AddAttachments([FromBody] AddAttachmentDTO addAttachment)
+        {
+            try
+            {
+                responseData.Results = await _ISSFService.AddAttachments(_SSFDbContext, addAttachment);
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+                return Ok(responseData);
+            }
+            catch (Exception ex)
+            {
+                responseData.ErrorMessage = $"{ex.Message} exception details {ex.ToString()}";
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.Failed;
+                return BadRequest(responseData);
+            }
+        }
+
+        [HttpGet]
+        [Route("SubmittedClaims")]
+        public async Task<IActionResult> GetSubmittedClaim(string FromDate, string ToDate)
+        {
+            try
+            {
+                responseData.Results = await _ISSFService.GetSubmittedClaims(_SSFDbContext, FromDate, ToDate);
                 responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
                 return Ok(responseData);
             }

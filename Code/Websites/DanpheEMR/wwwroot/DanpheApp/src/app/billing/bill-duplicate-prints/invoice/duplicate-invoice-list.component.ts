@@ -1,15 +1,14 @@
 import { ChangeDetectorRef, Component } from '@angular/core';
-import { BillingBLService } from '../../shared/billing.bl.service';
-import { BillingTransaction } from '../../shared/billing-transaction.model';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { BillingBLService } from '../../shared/billing.bl.service';
 
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import * as moment from 'moment/moment';
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
-import { DanpheLoadingInterceptor } from '../../../shared/danphe-loader-intercepter/danphe-loading.services';
 import { CoreService } from '../../../core/shared/core.service';
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { DanpheLoadingInterceptor } from '../../../shared/danphe-loader-intercepter/danphe-loading.services';
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { PatientBillingDTO } from '../../shared/dto/bill-duplicate-print-invoices.dto';
 
 @Component({
   templateUrl: './duplicate-invoice-list.html',
@@ -27,8 +26,8 @@ export class BIL_DuplicatePrint_InvoiceListComponent {
   public showPrintPopup: boolean = false;
 
 
-  public AllTransactionList: Array<BillingTransaction> = new Array<BillingTransaction>();
-  public filteredTransactionList: Array<BillingTransaction> = new Array<BillingTransaction>();
+  public AllTransactionList: Array<PatientBillingDTO> = new Array<PatientBillingDTO>();
+  public filteredTransactionList: Array<PatientBillingDTO> = new Array<PatientBillingDTO>();
   public duplicateBillPrintGridColumns: Array<any> = null;
 
   public showCustomDate: boolean = true;
@@ -77,8 +76,6 @@ export class BIL_DuplicatePrint_InvoiceListComponent {
         }
       });
   }
-
-
   DuplicateBillPrintGridActions($event: GridEmitModel) {
     switch ($event.Action) {
       case "showDetails":

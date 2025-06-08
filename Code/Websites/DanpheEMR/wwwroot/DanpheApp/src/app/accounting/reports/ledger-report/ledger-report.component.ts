@@ -8,6 +8,8 @@ import { MessageboxService } from '../../../shared/messagebox/messagebox.service
 import { RouteFromService } from "../../../shared/routefrom.service";
 import { ENUM_DateTimeFormat } from "../../../shared/shared-enums";
 import { CostCenterModel } from "../../settings/shared/cost-center.model";
+import { Hospital_DTO } from "../../settings/shared/dto/hospitals.dto";
+import { LedgerModel } from "../../settings/shared/ledger.model";
 import { ledgerGroupModel } from "../../settings/shared/ledgerGroup.model";
 import { AccountingService } from '../../shared/accounting.service';
 import { LedgerReportRequest_DTO } from "../shared/DTOs/ledger-report-request.dto";
@@ -21,7 +23,7 @@ import { AccountingReportsBLService } from '../shared/accounting-reports.bl.serv
 export class LedgerReportComponent {
   public ledgerResult: any;
   public IsOpeningBalance: boolean = false;
-  public ledgerList: Array<{ LedgerId: number, LedgerName: string, LedgerGroupId: number, Code: string }> = [];
+  public filteredLedgerList: Array<{ LedgerId: number, LedgerName: string, LedgerGroupId: number, Code: string }> = [];
   public selLedger: { LedgerId, LedgerName, Code } = null;
   public txnGridColumns: Array<any> = null;
   public transactionId: number = null;
@@ -53,7 +55,7 @@ export class LedgerReportComponent {
   public printTitle: string = "";
   public ledgergroupList: Array<ledgerGroupModel> = new Array<ledgerGroupModel>();
   public selectedLedgerGroup: any;
-  public filteredLedgerList: Array<{ LedgerId: number, LedgerName: string, LedgerGroupId: number }> = [];
+  // public filteredLedgerList: Array<{ LedgerId: number, LedgerName: string, LedgerGroupId: number }> = [];
   public selectedLedgerLists: Array<number> = [];
   public ledgerResultRawData: any;
   public ledgerDataList: any;
@@ -67,7 +69,12 @@ export class LedgerReportComponent {
   public ledgerCode: any;
   public HideZeroTxn: boolean = false;
   public costCenters: Array<CostCenterModel> = new Array<CostCenterModel>();
+  public HospitalList: Array<Hospital_DTO> = new Array<Hospital_DTO>();
   public selectedCostCenter: number = -2; // We are passing -2 to indicate all costcenter is selected in dropdown..
+  public SelectedHospital: number = 0;
+  public AllLedgerGroups: ledgerGroupModel[] = [];
+  public AllLedgers: LedgerModel[] = [];
+  public ActiveHospital: number = 0;
   constructor(
     public accReportBLService: AccountingReportsBLService,
     public routeFrom: RouteFromService,
@@ -80,9 +87,9 @@ export class LedgerReportComponent {
     this.todayDate = moment().format('YYYY-MM-DD');
     this.fromDate = moment().format('YYYY-MM-DD');
     this.toDate = moment().format('YYYY-MM-DD');
-    this.GetLedgerGroup();
+    this.AllLedgerGroups = this.accountingService.AllLedgerGroup;
+    this.AllLedgers = this.accountingService.AllLedgers;
     //this.txnGridColumns = GridColumnSettings.LedgerTransactionList;
-    this.GetLedgers();
     this.showExport();
     this.AssignCoreParameterValue();
     //this.LoadCalendarTypes();
@@ -96,6 +103,18 @@ export class LedgerReportComponent {
       this.datePref = "(AD)";
     }
     this.costCenters = this.accountingService.accCacheData.CostCenters ? this.accountingService.accCacheData.CostCenters : [];
+    this.CheckAndAssignHospital();
+
+  }
+  CheckAndAssignHospital() {
+    this.ActiveHospital = this.securityService.AccHospitalInfo.ActiveHospitalId;
+    this.HospitalList = this.accountingService.accCacheData.Hospitals ? this.accountingService.accCacheData.Hospitals : [];
+    if (this.HospitalList.length === 1) {
+      this.SelectedHospital = this.HospitalList[0].HospitalId;
+    } else {
+      this.SelectedHospital = this.ActiveHospital;
+    }
+    this.FilterLedger();
   }
   public selectedDate: string = "";
   public fiscalYearId: number = null;
@@ -140,16 +159,6 @@ export class LedgerReportComponent {
     this.calType = calendarTypeObject.AccountingModule;
   }
 
-  public GetLedgers() {
-    if (!!this.accountingService.accCacheData.Ledgers && this.accountingService.accCacheData.Ledgers.length > 0) { //mumbai-team-june2021-danphe-accounting-cache-change
-      this.ledgerList = this.accountingService.accCacheData.Ledgers; //mumbai-team-june2021-danphe-accounting-cache-change
-      this.ledgerList = this.ledgerList.slice();//mumbai-team-june2021-danphe-accounting-cache-change
-      this.filteredLedgerList = this.ledgerList;
-    }
-  }
-
-
-
   DisplayParticular() {
     this.IsDetailsView = (this.IsDetailsView == true) ? false : true;
   }
@@ -174,6 +183,7 @@ export class LedgerReportComponent {
     postData.ToDate = this.toDate;
     postData.FiscalYearId = this.fiscalYearId;
     postData.CostCenterId = this.selectedCostCenter;
+    postData.HospitalId = this.SelectedHospital;
 
     this.clicked = true;
     this.ledgerDataList = null;
@@ -215,8 +225,8 @@ export class LedgerReportComponent {
                 let OpeningBalanceCrAmt = 0;
                 this.IsOpeningBalance = false;
                 e.ledgerResult = this.ledgerResultRawData.filter(a => a.LedgerId == e.LedgerId);
-                e.LedgerName = this.ledgerList.filter(a => a.LedgerId == e.LedgerId)[0].LedgerName;
-                e.Code = this.ledgerList.filter(a => a.LedgerId == e.LedgerId)[0].Code;
+                e.LedgerName = this.filteredLedgerList.filter(a => a.LedgerId == e.LedgerId)[0].LedgerName;
+                e.Code = this.filteredLedgerList.filter(a => a.LedgerId == e.LedgerId)[0].Code;
 
                 // if (this.showTxnItemLevel != 'true') {
                 //   this.GroupViewData(res.Results.result);
@@ -294,8 +304,8 @@ export class LedgerReportComponent {
             //     let OpeningBalanceCrAmt = 0;
             //     this.IsOpeningBalance = false;
             //     e.ledgerResult = [];
-            //     e.LedgerName = this.ledgerList.filter(a=> a. LedgerId == e.LedgerId)[0].LedgerName;
-            //     e.Code = this.ledgerList.filter(a=> a.LedgerId == e.LedgerId)[0].Code;
+            //     e.LedgerName = this.filteredLedgerList.filter(a=> a. LedgerId == e.LedgerId)[0].LedgerName;
+            //     e.Code = this.filteredLedgerList.filter(a=> a.LedgerId == e.LedgerId)[0].Code;
             //     (e.AmountDr >= e.AmountCr) ? OpeningBalanceDrAmt = e.AmountDr - e.AmountCr : OpeningBalanceCrAmt = e.AmountCr - e.AmountDr;
             //     e.ledgerResult.DrNetAmount = OpeningBalanceDrAmt;
             //     e.ledgerResult.CrNetAmount = OpeningBalanceCrAmt;
@@ -328,7 +338,7 @@ export class LedgerReportComponent {
 
   HandleHideZeroTxn() {
     if (this.HideZeroTxn && this.ledgerDataList && this.ledgerDataList.length > 0) {
-      var data = this.ledgerDataList.filter(a => a.ledgerResult.some(result => (result.AmountCr !== 0 || result.AmountDr !== 0)));
+      var data = this.ledgerDataList.filter(a => a.ledgerResult.filter(result => result.Amount > 0 || result.AmountCr > 0 || result.AmountDr > 0 || result.Balance > 0 || result.LedgerCr > 0 || result.LedgerDr > 0).length > 0 || a.AmountCr > 0 || a.AmountDr > 0);
       this.ledgerDataList = data;
     }
     else {
@@ -338,7 +348,7 @@ export class LedgerReportComponent {
 
   BalanceCalculation() {
     this.ledgerDataList && this.ledgerDataList.length && this.ledgerDataList.forEach(e => {
-      if (this.ledgerList && (e.ledgerResult && e.ledgerResult.length > 0)) {
+      if (this.filteredLedgerList && (e.ledgerResult && e.ledgerResult.length > 0)) {
         //console.log(JSON.stringify(this.ledgerResult));
         //this sort is for TransactionDate ASCENDING..
         e.ledgerResult.sort(function (a, b) {
@@ -415,10 +425,10 @@ export class LedgerReportComponent {
   }
   CheckSelLedger(): boolean {
 
-    if (!this.selectedLedgerLists || typeof (this.selectedLedgerLists) != 'object' || this.selectedLedgerLists.length < 1) {
+    if (!this.selectedLedgerLists || typeof (this.selectedLedgerLists) != 'object' || this.selectedLedgerLists.length < 1 || this.SelectedHospital == 0) {
 
       this.selLedger = undefined;
-      this.msgBoxServ.showMessage("failed", ["Select ledger from the list."]);
+      this.msgBoxServ.showMessage("failed", ["Select all mandatory fields."]);
       this.clicked = false;
       return false;
     }
@@ -850,20 +860,8 @@ export class LedgerReportComponent {
     }
   }
 
-  GetLedgerGroup() {
-    if (!!this.accountingService.accCacheData.LedgerGroups && this.accountingService.accCacheData.LedgerGroups.length > 0) {
-      this.CallBackLedgerGroup(this.accountingService.accCacheData.LedgerGroups);
-    }
-  }
 
-  CallBackLedgerGroup(res) {
-    if (res) {
-      this.ledgergroupList = new Array<ledgerGroupModel>();
-      this.ledgergroupList = res.filter((lg) => lg.IsActive == true);
-      this.ledgergroupList = this.ledgergroupList.slice();
-    }
-  }
-  //format ledgergroup for autocomplete
+
   LedgerGroupListFormatter(data: any): string {
     return (
       data["LedgerGroupName"] +
@@ -875,12 +873,10 @@ export class LedgerReportComponent {
   }
 
   AssignSelectedLedgerGroup() {
-    if (typeof (this.selectedLedgerGroup) == 'object' && this.selectedLedgerGroup.LedgerGroupId > 0) {
-      var ledgerList = this.ledgerList.filter(a => a.LedgerGroupId == this.selectedLedgerGroup.LedgerGroupId);
-      this.filteredLedgerList = ledgerList;
-    }
-    else {
-      this.filteredLedgerList = this.ledgerList;
+    if (this.selectedLedgerGroup && typeof (this.selectedLedgerGroup) == 'object' && this.selectedLedgerGroup.LedgerGroupId > 0) {
+      this.filteredLedgerList = this.AllLedgers.filter(l => l.LedgerGroupId == this.selectedLedgerGroup.LedgerGroupId);
+    } else {
+      this.filteredLedgerList = this.AllLedgers;
     }
   }
 
@@ -921,5 +917,14 @@ export class LedgerReportComponent {
     //   }
     // });
     this.viewDetailPopUp = false;
+  }
+  FilterLedger() {
+    if (this.SelectedHospital > 0) {
+      this.ledgergroupList = this.AllLedgerGroups.filter(lg => lg.HospitalId == this.SelectedHospital);
+      this.filteredLedgerList = this.AllLedgers.filter(l => l.HospitalId == this.SelectedHospital);
+      this.selectedLedgerGroup = null;
+      this.selectedLedgerLists = [];
+      this.ledgerResultRawData = false;
+    }
   }
 }

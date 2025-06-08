@@ -1,17 +1,17 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { CoreService } from '../../../core/shared/core.service';
 import { InventoryService } from '../../../inventory/shared/inventory.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
-import { ReturnToVendorItem } from '../return-to-vendor-items.model';
 import { InventoryBLService } from '../../shared/inventory.bl.service';
+import { ReturnToVendorItem } from '../return-to-vendor-items.model';
 import { GeneralFieldLabels } from '../../../shared/DTOs/general-field-label.dto';
 
 @Component({
   selector: 'app-return-to-vendor-view',
   templateUrl: './return-to-vendor-view.component.html',
-  styles: []
+  styleUrls: ['./return-to-vendor-view.component.css']
 })
 export class ReturnToVendorViewComponent implements OnInit {
   CCAmount: number = 0;
@@ -33,6 +33,10 @@ export class ReturnToVendorViewComponent implements OnInit {
   public VATTotal: number = 0;
   public AllTotalAmount: number = 0;
   public PurchaseReturnNumber: string = "PI000";
+  public printDetaiils: any;
+  public showPrint: boolean = false;
+
+
   msgBoxServ: any;
 
   public GeneralFieldLabel = new GeneralFieldLabels();
@@ -42,6 +46,7 @@ export class ReturnToVendorViewComponent implements OnInit {
     public messageBoxService: MessageboxService,
     public inventoryService: InventoryService,
     public routeFrom: RouteFromService,
+    public changeDetector: ChangeDetectorRef,
     public router: Router,
     public coreService: CoreService) {
     this.LoadReturnItems(this.inventoryService.CreatedOn, this.inventoryService.VendorId);
@@ -93,13 +98,57 @@ export class ReturnToVendorViewComponent implements OnInit {
 
   //this is used to print the receipt
   print() {
-    let popupWinindow;
-    var printContents = document.getElementById("printpage").innerHTML;
-    popupWinindow = window.open('', '_blank', 'width=600,height=700,scrollbars=no,menubar=no,toolbar=no,location=no,status=no,titlebar=no');
-    popupWinindow.document.open();
-    popupWinindow.document.write('<html><head><style>.img-responsive{ position: relative;left: -65px;top: 10px;}.qr-code{position:relative;left: 93px;top: 5px;}</style><link rel="stylesheet" type="text/css" href="../../themes/theme-default/ReceiptList.css" /></head><style>.printStyle {border: dotted 1px;margin: 10px 100px;}.print-border-top {border-top: dotted 1px;}.print-border-bottom {border-bottom: dotted 1px;}.print-border {border: dotted 1px;}.center-style {text-align: center;}.border-up-down {border-top: dotted 1px;border-bottom: dotted 1px;}</style><body onload="window.print()">' + printContents + '</html>');
-    popupWinindow.document.close();
+    this.showPrint = false;
+    this.changeDetector.detectChanges();
+    this.showPrint = true;
+
+    const printContent = document.getElementById("printpage");
+
+    if (printContent) {
+      this.printDetaiils += `<style>
+      .printStyle {
+        border: dotted 1px;
+        margin: 10px 455px !important;
+      }
+      
+      .print-border-top {
+        border-top: dotted 1px;
+      }
+      
+      .print-border-bottom {
+        border-bottom: dotted 1px;
+      }
+      
+      .print-border {
+        border: dotted 1px;
+      }
+      
+      .center-style {
+        text-align: center;
+      }
+      
+      .border-up-down {
+        border-top: dotted 1px;
+        border-bottom: dotted 1px;
+      }
+      
+      .table-details-value {
+        margin-left: 10px;
+        text-align: center;
+      }
+      
+      .img-responsive {
+        position: relative;
+        top: 14px;
+      }
+      </style>`
+      this.printDetaiils = printContent.innerHTML;
+
+    }
   }
+
+
+
 
   public headerDetail: { header1, header2, header3, header4, hospitalName, address, email, PANno, tel, DDA };
 

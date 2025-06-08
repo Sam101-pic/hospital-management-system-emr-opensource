@@ -41,12 +41,17 @@ import { DispensaryEndpoint } from "./dispensary/shared/dispensary.endpoint";
 import { DispensaryService } from "./dispensary/shared/dispensary.service";
 import { DynamicReportComponent } from "./dynamic-report/dynamic-report.component";
 import { EmployeeService } from "./employee/shared/employee.service";
+import { InventorySettingBLService } from "./inventory/settings/shared/inventory-settings.bl.service";
+import { InventorySettingDLService } from "./inventory/settings/shared/inventory-settings.dl.service";
+import { OperationTheatreBLService } from "./ot/shared/ot.bl.service";
+import { OperationTheatreDLService } from "./ot/shared/ot.dl.service";
 import { PatientsDLService } from "./patients/shared/patients.dl.service";
 import { ActivateInventoryGuardService } from "./shared/activate-inventory/activate-inventory-guard.service";
 import { ActivateInventoryComponent } from "./shared/activate-inventory/activate-inventory.component";
 import { ActivateInventoryEndpoint } from "./shared/activate-inventory/activate-inventory.endpoint";
 import { ActivateInventoryService } from "./shared/activate-inventory/activate-inventory.service";
 import { LoaderComponent } from "./shared/danphe-loader-intercepter/danphe-loader";
+import { loadingInterceptorProviders } from "./shared/loading/shared/loading-interceptor.service";
 import { NavigationService } from "./shared/navigation-service";
 import { ActivateBillingCounterGuardService } from "./utilities/shared/activate-billing-counter-guard-service";
 import { ActivateBillingCounterService } from "./utilities/shared/activate-billing-counter.service";
@@ -79,7 +84,12 @@ import { ActivateBillingCounterService } from "./utilities/shared/activate-billi
     ClaimManagementDLService,
     ClaimManagementBLService,
     ActivateBillingCounterGuardService,
-    ActivateBillingCounterService
+    ActivateBillingCounterService,
+    InventorySettingBLService,
+    InventorySettingDLService,
+    OperationTheatreBLService,
+    OperationTheatreDLService,
+    loadingInterceptorProviders
   ],
   imports: [
     BrowserModule,
@@ -101,7 +111,7 @@ import { ActivateBillingCounterService } from "./utilities/shared/activate-billi
     UnAuthorizedAccessComponent,
     LoaderComponent,
     ActivateInventoryComponent,
-    DynamicReportComponent
+    DynamicReportComponent,
   ],
   bootstrap: [AppComponent],
 })

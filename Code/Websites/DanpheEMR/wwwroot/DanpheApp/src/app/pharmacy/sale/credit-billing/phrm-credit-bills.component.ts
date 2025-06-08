@@ -601,7 +601,11 @@ export class PHRMCreditBillsComponent implements OnInit {
         try {
             let check: boolean = true;
             if (check) {
-
+                let isValid: boolean =this.currSaleItems.some(item => Number.isInteger(item.ReturnedQty))
+                if(isValid){
+                    this.messageboxService.showMessage("error", ['Please verify ReturnQty should not be in decimal.']);
+                    return;
+                }
                 this.loading = true;
                 this.currSale.InvoiceItems = this.currSaleItems;
 

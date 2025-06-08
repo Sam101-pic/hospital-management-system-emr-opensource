@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { CoreService } from '../../core/shared/core.service';
+import { EditDoctor_DTO } from '../../radiology/shared/DTOs/edit-doctor.dto';
 import { SecurityService } from '../../security/shared/security.service';
 import { DanpheHTTPResponse } from '../../shared/common-models';
 import { ProvisionalDischarge_DTO } from '../ip-billing/shared/dto/provisional-discharge.dto';
@@ -9,6 +10,8 @@ import { BillItemRequisition } from './bill-item-requisition.model';
 import { BillingDeposit } from './billing-deposit.model';
 import { DiscardProvisionalItems_DTO } from './dto/bill-discard-provisional-items.dto';
 import { BillNewSettlement_DTO } from './dto/bill-new-settlement.dto';
+import { EditDoctorRequest } from './dto/edit-doctor.request';
+import { FreeVisit_DTO } from './dto/free-visit.dto';
 import { HandOverTransactionModel } from './hand-over-transaction.model';
 import { IpBillingDiscountModel } from './ip-bill-discount.model';
 
@@ -128,6 +131,10 @@ export class BillingDLService {
   //   return this.http.get<any>("/api/Billing/DuplicateBillByReceiptId?invoiceNo=" + receiptNo + "&fiscalYearId=" + fiscalYrId + "&getVisitInfo=" + getVisitInfo + "&isInsuranceReceipt=" + isInsuranceReceipt, this.options);
   // }
 
+  public GetInvoiceReceiptByInvoiceId(invoiceId: number, FiscalYearId: number, BillingTransactionId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Billing/InvoiceInfo?invoiceNo=${invoiceId}&fiscalYearId=${FiscalYearId}&billingTransactionId=${BillingTransactionId}`, this.options);
+  }
+
   public GetCreditNoteByCreditNoteNo(CreditNoteNo: number, fiscalYrId: number) {
     return this.http.get<any>("/api/BillReturn/CreditNoteInfo?creditNoteNum=" + CreditNoteNo + "&fiscalYearId=" + fiscalYrId, this.options);
   }
@@ -171,7 +178,7 @@ export class BillingDLService {
   }
 
   public GetTxnItemsForEditDoctorByDateRad(fromDate: string, toDate: string) {
-    return this.http.get<any>("/api/Billing/GetTxnItemsForEditDoctorRad?FromDate=" + fromDate + "&ToDate=" + toDate + "&search=" + null);
+    return this.http.get<any>("/api/Billing/GetTxnItemsForEditDoctorRad?FromDate=" + fromDate + "&ToDate=" + toDate + "&search=" + "");
   }
 
   //this will return only those doctors which have OPD available.
@@ -259,7 +266,7 @@ export class BillingDLService {
     let data = JSON.stringify(billingTransactionIdList);
     return this.http.put<any>("/api/BillInsurance?reqType=update-insurance-claim&counterId=" + counterId, data, this.options);
   }
-  public GetDataOfInPatient(patId: number, patVisitId: number) {
+  public GetPatientCurrentVisitContext(patId: number, patVisitId: number) {
     return this.http.get<any>("/api/Visit/PatientCurrentVisitContext?patientId=" + patId + "&visitId=" + patVisitId, this.options)
   }
   //this function is being used by other modules as well--check the dependencies while changing it
@@ -286,6 +293,7 @@ export class BillingDLService {
   }
   public PostInvoice(billTxnModel) {
     //let data = JSON.stringify(billTxnModel);
+    // return this.http.post<any>("/api/Billing/billing-transaction", billTxnModel, this.options);
     return this.http.post<any>("/api/Billing/billing-transaction", billTxnModel, this.options);
 
   }
@@ -345,6 +353,9 @@ export class BillingDLService {
   public PutPrintCount(printCount: number, billingTransactionId: number) {
     return this.http.put<any>("/api/Billing/InvoicePrintCount?PrintCount=" + printCount + "&billingTransactionId=" + billingTransactionId, this.options);
   }
+  public PutDischargeStatementPrintCount(dischargeStatementId: number) {
+    return this.http.put<DanpheHTTPResponse>("/api/DischargeBilling/DischargeStatementPrintCount?dischargeStatementId=" + dischargeStatementId, this.options);
+  }
 
   // Hom 16 Jan '19 Updating bill transaction items i.e discount %, item price
   public PutBillTxnItems(modifiedItems) {
@@ -354,7 +365,7 @@ export class BillingDLService {
 
   //Update ProcedureType in admission
   public UpdateProcedure(admissionPatId, ProcedureType) {
-    return this.http.put<any>("/api/Admission?reqType=update-Procedure" + "&AdmissionPatientId=" + admissionPatId + "&ProcedureType=" + ProcedureType, this.options);
+    return this.http.put<any>("/api/Admission/AdmissionProcedure?AdmissionPatientId=" + admissionPatId + "&ProcedureType=" + ProcedureType, this.options);
   }
 
   //// update doctor after doctor edit feature
@@ -364,19 +375,12 @@ export class BillingDLService {
   //}
 
   // update doctor after doctor edit feature
-  public PutAssignedToDoctor(BillTxnItemId: number, performerObj, prescriberObj) {
-    let data = JSON.stringify(BillTxnItemId);
-    let strPerformer = JSON.stringify(performerObj);
-    let strPrescriber = JSON.stringify(prescriberObj);
-    return this.http.put<any>("/api/Billing/BillTxnItemDoctors?PrescriberObj=" + strPrescriber + '&PerformerObj=' + strPerformer, data, this.options);
+  public ChangeDoctor(editDoctorRequest: EditDoctorRequest) {
+    return this.http.put<DanpheHTTPResponse>("/api/Billing/ChangeDoctor", editDoctorRequest, this.jsonOptions);
   }
 
-  public PutAssignedToDoctorRad(BillTxnItemId: number, RequisitionId: number, performerObj, prescriberObj) {
-    let data = JSON.stringify(BillTxnItemId);
-    let reqId = JSON.stringify(RequisitionId);
-    let strPerformer = JSON.stringify(performerObj);
-    let strPrescriber = JSON.stringify(prescriberObj);
-    return this.http.put<any>("/api/Billing/UpdateDoctorafterDoctorEditRadiology?PrescriberObj=" + strPrescriber + '&PerformerObj=' + strPerformer + '&RequisitionId=' + reqId, data, this.options);
+  public ChangeRadiologyDoctor(doctorsDetailsObj: EditDoctor_DTO) {
+    return this.http.put<DanpheHTTPResponse>("/api/Billing/ChangeRadiologyDoctor", doctorsDetailsObj, this.jsonOptions);
   }
 
   public CloseInsurancePackage(patientInsurancePkgId: number) {
@@ -465,7 +469,9 @@ export class BillingDLService {
   public GetPastTestList(patientId) {
     return this.http.get<any>("/api/Billing/PatientPastBillITxntems?patientId=" + patientId, this.options);
   }
-
+  public GetPatientPastOneYearBillITxntems(patientId) {
+    return this.http.get<any>("/api/Billing/PatientPastOneYearBillITxntems?patientId=" + patientId, this.options);
+  }
   public PostBillingDeposit(BillingDeposit: BillingDeposit) {
     let data = JSON.stringify(BillingDeposit);
     //data = CommonFunctions.EncodeRequestDataString(data);
@@ -692,10 +698,13 @@ export class BillingDLService {
     return forkJoin([totalDischargedPatients, totalAdmittedPatients, inpatientCensusWardWise]);
   }
 
-  public IsClaimed(latestClaimCode: number, patientId: number) {
+  public IsClaimed_SSF(latestClaimCode: number, patientId: number) {
     return this.http.get<any>(`/api/SSF/CheckClaimStatusLocally?latestClaimCode=${latestClaimCode}&patientId=${patientId}`, this.options);
   }
 
+  public IsClaimed_HIB(latestClaimCode: number) {
+    return this.http.get<any>(`/api/HIB/CheckIfClaimSubmitted?claimCode=${latestClaimCode}`, this.options);
+  }
   public LoadBilCfgItemsVsPriceCategoryMapping() {
     return this.http.get(`/api/Billing/BillCfgItemsVsPriceCategoryMaps`, this.options);
   }
@@ -742,6 +751,11 @@ export class BillingDLService {
   public GetPatientVisitContextForProvisionalPayment(patientId: number, patientVisitId: number) {
     return this.http.get<DanpheHTTPResponse>(`/api/Visit/PatientVisitContextForProvisionalPayment?patientId=${patientId}&patientVisitId=${patientVisitId}`, this.jsonOptions);
   }
+
+  GetAdditionalBedReservations(patientId: number, patientVisitId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/IpBilling/AdditionalBedReservations?patientId=${patientId}&patientVisitId=${patientVisitId}`, this.options);
+  }
+
   public DiscardProvisionalItems(discardProvisionalItems: DiscardProvisionalItems_DTO) {
     return this.http.put<DanpheHTTPResponse>(`/api/ProvisionalDischarge/DiscardAllItems`, discardProvisionalItems, this.jsonOptions);
   }
@@ -753,6 +767,24 @@ export class BillingDLService {
   public UpdateProvisionalItems(modifiedItems) {
     let data = JSON.stringify(modifiedItems);
     return this.http.put<any>("/api/Billing/UpdateProvisionalBillingTxnItems", data, this.options);
+  }
+
+  GetMasterServiceItems() {
+    return this.http.get<DanpheHTTPResponse>(`/api/BillingMaster/MasterServiceItems`, this.jsonOptions);
+  }
+
+  AddNewOutDoorPatientAndCreateFreeVisit(freeVisit: FreeVisit_DTO) {
+    let data = JSON.stringify(freeVisit);
+    return this.http.post<DanpheHTTPResponse>(`/api/Visit/CreateFreeVisit`, data, this.options);
+  }
+  GetPatientVisits(patientId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Billing/GetPatientVisitList?patientId=${patientId}`, this.jsonOptions);
+  }
+  GetBillingSalesSummaryReport(patientId: number, visitId: number, billingType: string, schemeId: number, priceCategoryId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Billing/GetBillingSalesSummaryReport?patientId=${patientId}&patientVisitId=${visitId}&billingType=${billingType}&schemeId=${schemeId}&priceCategoryId=${priceCategoryId}`)
+  }
+  GetBillingPreviousProvisionalAmount(patientId: number, visitId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/IpBilling/GetPreviousProvisional?patientId=${patientId}&patientVisitId=${visitId}`);
   }
 }
 

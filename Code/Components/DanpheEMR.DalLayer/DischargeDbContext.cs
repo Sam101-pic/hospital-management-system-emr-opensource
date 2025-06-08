@@ -1,19 +1,18 @@
 ﻿using Audit.EntityFramework;
-using DanpheEMR.Security;
-using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel;
-using DanpheEMR.ServerModel.MedicareModels;
-using System.Data.Entity;
-using DanpheEMR.ServerModel.PatientModels;
-using DanpheEMR.ServerModel.CommonModels;
-using DanpheEMR.ServerModel.MasterModels;
-using DanpheEMR.ServerModel.PharmacyModels;
-using System.Data.Entity.ModelConfiguration.Conventions;
-using System.Collections.Generic;
-using System.Data.SqlClient;
-using System.Data;
-using DanpheEMR.ServerModel.ReportingModels;
+using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.BillingModels.DischargeStatementModels;
+using DanpheEMR.ServerModel.CommonModels;
+using DanpheEMR.ServerModel.FonePayLog;
+using DanpheEMR.ServerModel.MasterModels;
+using DanpheEMR.ServerModel.MedicareModels;
+using DanpheEMR.ServerModel.PatientModels;
+using DanpheEMR.ServerModel.PharmacyModels;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Entity;
+using System.Data.Entity.ModelConfiguration.Conventions;
+using System.Data.SqlClient;
 
 namespace DanpheEMR.DalLayer
 {
@@ -66,8 +65,11 @@ namespace DanpheEMR.DalLayer
         public DbSet<DepositHeadModel> DepositHeadModels { get; set; }
         public DbSet<BillingSchemeModel> BillingSchemes { get; set; }
         public DbSet<PriceCategoryModel> PriceCategories { get; set; }
-
+        public DbSet<FonePayTransactionLogModel> FonePayTransactionLogs { get; set; }
+        public DbSet<CfgParameterModel> CFGParameters { get; set; }
+        public DbSet<PrintTemplateSettingsNewModel> PrintTemplateSettings { get; set; }
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
+
         {
             modelBuilder.Entity<BillingTransactionModel>().ToTable("BIL_TXN_BillingTransaction");
             modelBuilder.Entity<ServiceDepartmentModel>().ToTable("BIL_MST_ServiceDepartment");
@@ -112,6 +114,9 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<DepositHeadModel>().ToTable("BIL_MST_DepositHead");
             modelBuilder.Entity<BillingSchemeModel>().ToTable("BIL_CFG_Scheme");
             modelBuilder.Entity<PriceCategoryModel>().ToTable("BIL_CFG_PriceCategory");
+            modelBuilder.Entity<FonePayTransactionLogModel>().ToTable("LOG_FonePayTransactions");
+            modelBuilder.Entity<CfgParameterModel>().ToTable("CORE_CFG_Parameters");
+            modelBuilder.Entity<PrintTemplateSettingsNewModel>().ToTable("MST_PrintTemplateSettings");
 
             modelBuilder.Entity<PHRMStoreStockModel>()
                 .ToTable("PHRM_TXN_StoreStock")
@@ -124,12 +129,12 @@ namespace DanpheEMR.DalLayer
 
         }
 
-        public static object GetDischargeStatementInfo(int patientId, int dischargeStatementId,int patientVisitId, DischargeDbContext dischargeDbContext)
+        public static object GetDischargeStatementInfo(int patientId, int dischargeStatementId, int patientVisitId, DischargeDbContext dischargeDbContext)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                             new SqlParameter("@PatientId", patientId),
-                            new SqlParameter("@DischargeStatementId",dischargeStatementId), 
-                            new SqlParameter("@PatientVisitId",patientVisitId), 
+                            new SqlParameter("@DischargeStatementId",dischargeStatementId),
+                            new SqlParameter("@PatientVisitId",patientVisitId),
             };
             DataSet dischargeStatementDetail = DALFunctions.GetDatasetFromStoredProc("SP_BIL_DischargeStatement", paramList, dischargeDbContext);
 
@@ -160,7 +165,7 @@ namespace DanpheEMR.DalLayer
             return printInfoToReturn;
         }
 
-        public object GetItemsForBillingDischargeSummaryReceipt(int patientId, int patientVisitId,int? dischargeStatementId, string billStatus)
+        public object GetItemsForBillingDischargeSummaryReceipt(int patientId, int patientVisitId, int? dischargeStatementId, string billStatus)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                 new SqlParameter("@PatientId", patientId),

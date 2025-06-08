@@ -4,7 +4,7 @@ import * as _ from 'lodash';
 import { CoreService } from "../../../core/shared/core.service";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_DanpheHTTPResponses, ENUM_Data_Type, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_Data_Type, ENUM_MarketingReferralPreference, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { ReferralCommission_DTO } from "../../Shared/DTOs/referral-commission.dto";
 import { ReferralParty_DTO } from "../../Shared/DTOs/referral-party.dto";
 import { ReferralScheme_DTO } from "../../Shared/DTOs/referral-scheme.dto";
@@ -94,21 +94,15 @@ export class MarketingReferralAddTransactionComponent {
         this.referralSchemeObj = new ReferralScheme_DTO();
     }
     onReferralSchemeSelected(event: any) {
-        const selectedValue = event.target.value;
-        let selectedId;
-
-        if (typeof selectedValue === 'object' && selectedValue !== null) {
-            selectedId = selectedValue.id;
-        } else {
-            selectedId = parseInt(selectedValue.split(':')[0].trim(), 10);
+        if (event) {
+            const referralSchemeId = +event.target.value;
+            this.selectedReferralScheme = this.referralSchemeList.find(scheme => scheme.ReferralSchemeId === referralSchemeId && scheme.ReferralPreference.toLowerCase() === ENUM_MarketingReferralPreference.Percentage.toLowerCase());
+            if (this.selectedReferralScheme) {
+                this.referralSchemeObj.ReferralSchemeId = this.selectedReferralScheme.ReferralSchemeId;
+                this.referralSchemeObj.ReferralPercentage = this.selectedReferralScheme.ReferralPercentage;
+                this.calculateAmount();
+            }
         }
-        this.selectedReferralScheme = this.referralSchemeList.find(scheme => scheme.ReferralSchemeId === selectedId);
-        if (this.selectedReferralScheme) {
-            this.referralSchemeObj.ReferralSchemeId = this.selectedReferralScheme.ReferralSchemeId;
-            this.referralSchemeObj.ReferralPercentage = this.selectedReferralScheme.ReferralPercentage;
-            this.calculateAmount();
-        }
-
     }
 
     calculateAmount() {
@@ -306,7 +300,9 @@ export class MarketingReferralAddTransactionComponent {
             (res: DanpheHTTPResponse) => {
                 if (res.Status === ENUM_DanpheHTTPResponses.OK) {
                     if (res.Results && res.Results.length > 0) {
-                        this.referralSchemeList = res.Results;
+                        const referralSchemes = res.Results;
+                        this.referralSchemeList = referralSchemes.filter(r => r.ReferralPreference.toLowerCase() === ENUM_MarketingReferralPreference.Percentage.toLowerCase());
+
                     } else {
                         this.referralSchemeList = [];
                     }

@@ -249,7 +249,7 @@ namespace DanpheEMR.Services.ProvisionalDischarge
 
         public object PostPayProvisional(BillingDbContext billingDbContext, string postDataString, RbacUser currentUser, string connString)
         {
-            
+
             BillingTransactionModel billingTransaction = DanpheJSONConvert.DeserializeObject<BillingTransactionModel>(postDataString);
             if (billingTransaction == null)
             {
@@ -258,6 +258,40 @@ namespace DanpheEMR.Services.ProvisionalDischarge
 
             int FiscalYearId = GetFiscalYear(billingDbContext);
             DateTime currentDate = DateTime.Now;
+
+            //Step 0: Check whether the items are cleared (paid)
+            var isAlreadyCleared = false;
+            if (billingTransaction.BillingTransactionItems.Count() > 0)
+            {
+                //Make sure to read the BillingTransactionItems without tracking. If tracked it will cause issues while updating the items later in the process
+                var data = (from itmFromClient in billingTransaction.BillingTransactionItems
+                            join itmFromServer in billingDbContext.BillingTransactionItems.AsNoTracking() on itmFromClient.BillingTransactionItemId equals itmFromServer.BillingTransactionItemId
+                            where itmFromServer.PatientVisitId == billingTransaction.PatientVisitId
+                            && itmFromServer.BillStatus == ENUM_BillingStatus.provisional
+                            && itmFromServer.BillingTransactionId is null && itmFromClient.BillingTransactionId is null
+                            select new
+                            {
+                                ClientItemBillingTransactionItemId = itmFromClient.BillingTransactionItemId,
+                                ClientItemBillStatus = itmFromClient.BillStatus,
+                                ServerItemBillingTransactionItemId = itmFromServer.BillingTransactionItemId,
+                                ServerItemBillStatus = itmFromServer.BillStatus
+                            }).ToList();
+
+                if (data != null && data.Count() > 0)
+                {
+                    isAlreadyCleared = false;
+                }
+                else
+                {
+                    isAlreadyCleared = true;
+                }
+            }
+
+            if (isAlreadyCleared)
+            {
+                throw new InvalidOperationException($"This Provisional Instance is already cleared!");
+            }
+
             //Step 1: Create a Discharge Statement
             DischargeStatementModel dischargeStatement = SaveDischargeStatement(billingDbContext, currentUser, FiscalYearId, currentDate, billingTransaction);
 

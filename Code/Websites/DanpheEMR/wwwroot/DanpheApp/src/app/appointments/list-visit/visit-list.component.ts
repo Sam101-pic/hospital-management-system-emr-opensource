@@ -368,6 +368,9 @@ export class VisitListComponent {
     patient.LatestVisitId = _patient.PatientVisitId
     patient.PriceCategoryId = _patient.PriceCategoryId;
     patient.SchemeId = _patient.SchemeId;
+    patient.CareTaker.CareTakerName = _patient.CareTakerName;
+    patient.CareTaker.CareTakerContact = _patient.CareTakerContact;
+    patient.CareTaker.RelationWithPatient = _patient.RelationWithCareTaker;
 
   }
   //PrintSticker(row): void {

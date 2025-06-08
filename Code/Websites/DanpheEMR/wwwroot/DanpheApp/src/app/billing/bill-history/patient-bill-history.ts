@@ -1,17 +1,15 @@
 import { Component, EventEmitter, Input, Output } from "@angular/core";
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
+import { PatientService } from '../../patients/shared/patient.service';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { BillingBLService } from '../shared/billing.bl.service';
-import { PatientService } from '../../patients/shared/patient.service';
 
 import { CommonFunctions } from '../../shared/common.functions';
 
-import { DanpheHTTPResponse } from "../../shared/common-models";
 import { Patient } from "../../patients/shared/patient.model";
+import { DanpheHTTPResponse } from "../../shared/common-models";
 
-import { BillingService } from "../shared/billing.service";
-import * as moment from 'moment/moment';
 import { CoreService } from "../../core/shared/core.service";
+import { BillingService } from "../shared/billing.service";
 
 @Component({
   selector: "bill-history",
@@ -147,7 +145,7 @@ export class PatientBillHistoryComponent {
             // }
           });
           this.returnedPatBillHistoryDetail = res.Results.ReturnedItems;
-          
+
           this.patBillHistoryDetail.ProvisionalItems.forEach(provisional => {
             provisional.SubTotal = CommonFunctions.parseAmount(provisional.SubTotal);
             provisional.Amount = CommonFunctions.parseAmount(provisional.Amount);
@@ -169,16 +167,17 @@ export class PatientBillHistoryComponent {
   }
 
   CalculateSummaryAmounts(): void {
-    if(this.unPaidPatBillHistoryDetail && this.unPaidPatBillHistoryDetail.length > 0){
-      this.patBillHistory.PaidAmount += this.unPaidPatBillHistoryDetail.reduce((acc , curr) => acc + curr.ReceivedAmount, 0);
+    if (this.unPaidPatBillHistoryDetail && this.unPaidPatBillHistoryDetail.length > 0) {
+      this.patBillHistory.PaidAmount += this.unPaidPatBillHistoryDetail.reduce((acc, curr) => acc + curr.ReceivedAmount, 0);
+      const receivedAmount = this.unPaidPatBillHistoryDetail.reduce((acc, curr) => acc + curr.ReceivedAmount, 0);
       this.patBillHistory.PaidAmount = CommonFunctions.parseAmount(this.patBillHistory.PaidAmount);
-      this.patBillHistory.TotalDue = this.patBillHistory.TotalDue - this.patBillHistory.PaidAmount;
+      this.patBillHistory.TotalDue = this.patBillHistory.TotalDue - receivedAmount;
       this.patBillHistory.TotalDue = CommonFunctions.parseAmount(this.patBillHistory.TotalDue);
       this.patBillHistory.BalanceAmount = CommonFunctions.parseAmount(this.patBillHistory.DepositBalance - this.patBillHistory.TotalDue);
 
     }
   }
-  
+
   Close() {
     this.showPatientBillHistory = false;
     this.patient = null;

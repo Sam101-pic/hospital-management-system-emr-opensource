@@ -15,15 +15,21 @@ using DanpheEMR.ServerModel;
 using Syncfusion.XlsIO;
 using System.Data;
 using System.IO;
+using System.Web.UI.WebControls;
+using System.Data.SqlClient;
+using System.Threading.Tasks;
+using DanpheEMR.Services.Pharmacy.NarcoticLedger;
 
 namespace DanpheEMR.Controllers.Pharmacy
 {
     public class PharmacyStockController : CommonController
     {
         private readonly PharmacyDbContext _pharmacyDbContext;
-        public PharmacyStockController(IOptions<MyConfiguration> _config) : base(_config)
+        private readonly INarcoticLedgerService _narcoticLedgerService;
+        public PharmacyStockController(IOptions<MyConfiguration> _config, INarcoticLedgerService narcoticLedgerService) : base(_config)
         {
             _pharmacyDbContext = new PharmacyDbContext(connString);
+            _narcoticLedgerService = narcoticLedgerService;
         }
 
         #region Start HTTP GET APIs
@@ -103,6 +109,34 @@ namespace DanpheEMR.Controllers.Pharmacy
             Func<object> func = () => GetNarcoticStockDetails();
             return InvokeHttpGetFunction<object>(func);
         }
+        [HttpGet]
+        [Route("NarcoticsStockLedger")]
+        public async Task<IActionResult> NarcoticsStockLedger(int? genericId, int? supplierId, int? companyId, DateTime fromDate, DateTime toDate)
+        {
+            Func<Task<object>> func = async() => await _narcoticLedgerService.GetNarcoticLedger(genericId,supplierId,companyId,fromDate, toDate, _pharmacyDbContext);
+            return await InvokeHttpGetFunctionAsync(func);
+        }
+        [HttpGet]
+        [Route("GenericList")]
+        public async Task<IActionResult> GenericItemList()
+        {
+            Func<Task<object>> func = async () => await _narcoticLedgerService.GetAllGenericItemList(_pharmacyDbContext);
+            return await InvokeHttpGetFunctionAsync(func);
+        }
+        [HttpGet]
+        [Route("SupplierList")]
+        public async Task<IActionResult> SupplierList()
+        {
+            Func<Task<object>> func = async () => await _narcoticLedgerService.GetAllSupplierList(_pharmacyDbContext);
+            return await InvokeHttpGetFunctionAsync(func);
+        }
+        [HttpGet]
+        [Route("CompanyList")]
+        public async Task<IActionResult> CompanyList()
+        {
+            Func<Task<object>> func = async () => await _narcoticLedgerService.GetAllCompanyList(_pharmacyDbContext);
+            return await InvokeHttpGetFunctionAsync(func);
+        }
         #endregion
 
         #region Get WriteOff Items by WriteOffId
@@ -143,10 +177,10 @@ namespace DanpheEMR.Controllers.Pharmacy
         //items with 0 quantity or more than 0 showing in list
         [HttpGet]
         [Route("AllStockDetails")]
-        public IActionResult GetAllStockDetail()
+        public IActionResult GetAllStockDetail(int? StoreId, bool ShowZeroQuantity)
         {
             //else if (reqType == "allItemsStockDetails")
-            Func<object> func = () => GetAllItemStockDetail();
+            Func<object> func = () => GetAllItemStockDetail(StoreId, ShowZeroQuantity);
             return InvokeHttpGetFunction<object>(func);
         }
         #endregion
@@ -288,8 +322,15 @@ namespace DanpheEMR.Controllers.Pharmacy
             if (dispatchItems != null && dispatchItems.Count > 0)
             {
                 RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-                var dispatchId = PostStoreDispatchFunc.PostStoreDispatch(_pharmacyDbContext, dispatchItems, currentUser);
-                return dispatchId;
+                try
+                {
+                    var dispatchId = PostStoreDispatchFunc.PostStoreDispatch(_pharmacyDbContext, dispatchItems, currentUser);
+                    return dispatchId;
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
+                }
             }
             return new Exception("Dispatch Items Not Found");
         }
@@ -382,8 +423,19 @@ namespace DanpheEMR.Controllers.Pharmacy
 
             return File(fileByteArray, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName + ".xlsx");
         }
-
-
+        [HttpGet]
+        [Route("StoreStocksToDispatch")]
+        public IActionResult GetMainStoreStocksOfQuantityGreaterThanZero(bool ShowAllStock)
+        {
+            Func<object> func = () => GetMainStoreStocksDetails(ShowAllStock);
+            return InvokeHttpGetFunction<object>(func);
+        }
+        private DataTable GetMainStoreStocksDetails(bool ShowStockFromAllStores)
+        {
+            List<SqlParameter> paramList = new List<SqlParameter>() { new SqlParameter("@ShowStockFromAllStores", ShowStockFromAllStores) };
+            DataTable stockItems = DALFunctions.GetDataTableFromStoredProc("SP_PHRM_StoreStocksToDispatch", paramList, _pharmacyDbContext);
+            return stockItems;
+        }
         #endregion
 
         #region Start HTTP POST APIs
@@ -716,40 +768,10 @@ namespace DanpheEMR.Controllers.Pharmacy
             return result;
         }
 
-        private object GetAllItemStockDetail()
+        private object GetAllItemStockDetail(int? StoreId, bool ShowZeroQuantity)
         {
-            var totalStock = (from stk in _pharmacyDbContext.StoreStocks
-                              join store in _pharmacyDbContext.PHRMStore on stk.StoreId equals store.StoreId
-                              join itm in _pharmacyDbContext.PHRMItemMaster on stk.ItemId equals itm.ItemId
-                              join gen in _pharmacyDbContext.PHRMGenericModel on itm.GenericId equals gen.GenericId into gens
-                              from genLj in gens.DefaultIfEmpty()
-                              group new { stk, itm, genLj } by new { stk.ItemId, stk.StockMaster.BatchNo, stk.StockMaster.ExpiryDate, stk.StockMaster.CostPrice, stk.StockMaster.SalePrice, itm.ItemName, stk.StoreId, store.Name } into stkGrouped
-                              select new GetDispensaryStockVm
-                              {
-                                  StoreId = stkGrouped.Key.StoreId,
-                                  StoreName = stkGrouped.Key.Name,
-                                  ItemId = stkGrouped.Key.ItemId,
-                                  GenericName = (stkGrouped.FirstOrDefault().genLj != null) ? stkGrouped.FirstOrDefault().genLj.GenericName : "N/A",
-                                  ItemName = stkGrouped.Key.ItemName,
-                                  BatchNo = stkGrouped.Key.BatchNo,
-                                  ExpiryDate = stkGrouped.Key.ExpiryDate.Value,
-                                  SalePrice = stkGrouped.Key.SalePrice,
-                                  CostPrice = stkGrouped.Key.CostPrice,
-                                  AvailableQuantity = stkGrouped.Sum(s => s.stk.AvailableQuantity),
-                                  IsInsuranceApplicable = stkGrouped.FirstOrDefault().itm.IsInsuranceApplicable,
-                                  GovtInsurancePrice = stkGrouped.FirstOrDefault().itm.GovtInsurancePrice,
-                                  RackNo = (from itemrack in _pharmacyDbContext.PHRMRackItem.Where(ri => ri.ItemId == stkGrouped.Key.ItemId && ri.StoreId == stkGrouped.FirstOrDefault().stk.StoreId)
-                                            join rack in _pharmacyDbContext.PHRMRack on itemrack.RackId equals rack.RackId
-                                            select rack.RackNo).FirstOrDefault()
-                              }).ToList();
-            if (totalStock == null)
-            {
-                throw new Exception("Stock Not Found.");
-            }
-            else
-            {
-                return totalStock;
-            }
+            DataTable stockListVM = _pharmacyDbContext.GetAllStoreStock(StoreId, ShowZeroQuantity);
+            return stockListVM;
         }
 
         private object GetRequisitionById(int requisitionId)
@@ -848,9 +870,10 @@ namespace DanpheEMR.Controllers.Pharmacy
                                       CreatedByName = D.FirstOrDefault().CreatedBy.FullName,
                                       CreatedOn = D.FirstOrDefault().DI.DispatchedDate,
                                       DispatchedByName = D.FirstOrDefault().DispatchedBy.FullName,
-                                      ReceivedBy = (D.FirstOrDefault().DI != null) ? D.FirstOrDefault().DI.ReceivedBy : "",
+                                      ReceivedBy = (D.FirstOrDefault().DI != null) ? D.FirstOrDefault().ReceivedBy.FullName : "",
                                       SourceStore = D.FirstOrDefault().store.Name,
-                                      TargetStore = D.FirstOrDefault().st.Name
+                                      TargetStore = D.FirstOrDefault().st.Name,
+                                      IssueNo = D.FirstOrDefault().DI.IssueNo
                                   }).ToList();
 
             return requestDetails;
@@ -872,6 +895,7 @@ namespace DanpheEMR.Controllers.Pharmacy
                                    from R in _pharmacyDbContext.StoreRequisition.Where(r => r.RequisitionId == disp.RequisitionId)
                                    join emp in _pharmacyDbContext.Employees on disp.CreatedBy equals emp.EmployeeId
                                    from uom in _pharmacyDbContext.PHRMUnitOfMeasurement.Where(U => U.UOMId == item.UOMId).DefaultIfEmpty()
+                                   from ReceivedBy in _pharmacyDbContext.Employees.Where(e => e.EmployeeId == disp.ReceivedById).DefaultIfEmpty()
                                    select new
                                    {
                                        disp.DispatchId,
@@ -887,9 +911,9 @@ namespace DanpheEMR.Controllers.Pharmacy
                                        reqitm.RequisitionId,
                                        CreatedByName = emp.Salutation + ". " + emp.FirstName + " " + (string.IsNullOrEmpty(emp.MiddleName) ? "" : emp.MiddleName + " ") + emp.LastName,
                                        disp.CreatedOn,
-                                       RequisitionDate = reqitm.CreatedOn,
+                                       RequisitionDate = R.RequisitionDate,
                                        StandardRate = 0,
-                                       item.ItemName,
+                                       ItemName = item.ItemName,
                                        generic.GenericName,
                                        UOMName = uom.UOMName ?? "N/A",
                                        ItemCode = item.ItemCode ?? "N/A",
@@ -897,13 +921,14 @@ namespace DanpheEMR.Controllers.Pharmacy
                                        disp.ExpiryDate,
                                        disp.DispatchedQuantity,
                                        disp.CostPrice,
-                                       ReceivedBy = disp == null ? null : disp.ReceivedBy,
+                                       ReceivedBy = disp == null ? null : ReceivedBy.FullName,
                                        RequistionNo = R.RequisitionNo,
                                        SourceStore = store.Name,
                                        TargetStore = st.Name,
                                        DispatchedDate = disp.DispatchedDate,
-                                       DispatchedByName = emp.FullName
-                                   }).ToList();
+                                       DispatchedByName = emp.FullName,
+                                       IssueNo = disp.IssueNo
+                                   }).OrderBy(i => i.ItemName.TrimStart()).ToList();
             return dispatchDetails;
         }
 
@@ -1033,6 +1058,22 @@ namespace DanpheEMR.Controllers.Pharmacy
             {
                 throw new Exception("Invalid Input Data Supplied.");
             }
+        }
+        #endregion
+
+        #region To fetch all the available stock based on the supplier.
+        [HttpGet]
+        [Route("SupplierWiseAvailableStock")]
+        public IActionResult SupplierWiseAvailableStock()
+        {
+            Func<object> func = () => GetSupplierWiseAvailableStock();
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        private DataTable GetSupplierWiseAvailableStock()
+        {
+            DataTable stockItems = DALFunctions.GetDataTableFromStoredProc("SP_PHRM_SupplierWiseAvailableStock", _pharmacyDbContext);
+            return stockItems;
         }
         #endregion
 

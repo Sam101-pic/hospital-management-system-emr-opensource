@@ -14,6 +14,7 @@ import { BillSchemeComponent } from './Scheme/bill-scheme.component';
 import { AdditionalServiceItemsComponent } from './additional-service-items/additional-service-items.component';
 import { BillingPackageAddComponent } from './bill-packages/billing-package-add.component';
 import { BillingPackageListComponent } from './bill-packages/billing-package-list.component';
+import { BillingCounterComponent } from './billing-counter/billing-counter.component';
 import { BillingSettingsMainComponent } from './billing-settings-main.component';
 import { CreditOrganizationAddComponent } from './credit-orgs/credit-organization-add.component';
 import { CreditOrganizationListComponent } from './credit-orgs/credit-organization-list.component';
@@ -23,12 +24,18 @@ import { AddSchemePriceCategoryItemsComponent } from './map-scheme-and-pricecate
 import { MapSchemeAndPriceCategoryComponent } from './map-scheme-and-pricecategory/map-scheme-and-pricecategory.component';
 import { MembershipAddComponent } from './memberships/membership-add.component';
 import { MembershipListComponent } from './memberships/membership-list.component';
+import { RegistrationStickerAddComponent } from './registration-sticker/registration-sticker-add.component';
+import { RegistrationStickerListComponent } from './registration-sticker/registration-sticker-list.component';
+import { ManageReportGroupComponent } from './report-groups/manage-reporting-group-items/manage-reporting-group-items.component';
+import { ReportGroupComponent } from './report-groups/report-group-add.component';
+import { ReportGroupListComponent } from './report-groups/report-group-list.compnent';
 import { ReportingItemAndBillItemMapComponent } from './reporting-items-mapping/manage-reporting-items/manage-reporting-items.component';
 import { ReportingItemsAddComponent } from './reporting-items-mapping/reporting-items-add.component';
 import { ReportingItemsListComponent } from './reporting-items-mapping/reporting-items-list.component';
 import { BillServiceItemSchemeSettingComponent } from './service-item-scheme/bill-service-item-scheme-setting.component';
 import { BillServiceItemListComponent } from './service-items/bill-service-item-list.component';
 import { BillServiceItemComponent } from './service-items/bill-service-item.component';
+import { ServiceItemsFilterExportComponent } from './service-items/filter-export-service-items.component';
 
 export const billSettingsRoutes =
   [
@@ -47,10 +54,12 @@ export const billSettingsRoutes =
         { path: 'MapSchemeAndPriceCategory', component: MapSchemeAndPriceCategoryComponent, canActivate: [AuthGuardService] },
         { path: 'AdditionalServiceItems', component: AdditionalServiceItemsComponent, canActivate: [AuthGuardService] },
         { path: 'DepositHeads', component: DepositHeadListComponent, canActivate: [AuthGuardService] },
-
+        { path: 'RegistrationSticker', component: RegistrationStickerListComponent, canActivate: [AuthGuardService] },
+        { path: 'BillingCounters', component: BillingCounterComponent, canActivate: [AuthGuardService] },
+        { path: 'ReportGroups', component: ReportGroupListComponent, canActivate: [AuthGuardService] }
       ]
     }
-  ]
+  ];
 
 
 @NgModule({
@@ -90,6 +99,13 @@ export const billSettingsRoutes =
     AdditionalServiceItemsComponent,
     DepositHeadListComponent,
     DepositHeadAddComponent,
+    RegistrationStickerListComponent,
+    RegistrationStickerAddComponent,
+    BillingCounterComponent,
+    ReportGroupComponent,
+    ReportGroupListComponent,
+    ManageReportGroupComponent,
+    ServiceItemsFilterExportComponent
   ],
   bootstrap: []
 })

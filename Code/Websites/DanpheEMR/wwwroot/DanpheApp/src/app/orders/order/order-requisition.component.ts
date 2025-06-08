@@ -663,13 +663,17 @@ export class OrderRequisitionsComponent {
         let currGeneric = new PHRMGenericModel();
 
         //incase of generic, we have GenericId as Itemid.
-        if (itm.IsGeneric) {
-          currGeneric = this.ordServ.allGenericItems.find(gen => gen.GenericId == itm.ItemId);
-          //currMed = allMedItms.find(med => med.ItemId == itm.ItemId);
-        } else {
-          currMed = allMedItms.find(med => med.ItemId == itm.ItemId);
-          currGeneric = this.ordServ.allGenericItems.find(gen => gen.GenericId == itm.GenericId);
-        }
+        // if (itm.IsGeneric) {
+        //   currGeneric = this.ordServ.allGenericItems.find(gen => gen.GenericId == itm.ItemId);
+        //   //currMed = allMedItms.find(med => med.ItemId == itm.ItemId);
+        // } else {
+        //   currMed = allMedItms.find(med => med.ItemId == itm.ItemId);
+        //   currGeneric = this.ordServ.allGenericItems.find(gen => gen.GenericId == itm.GenericId);
+        // }
+
+        //No need to check, IsGeneric field. 
+        currMed = allMedItms.find(med => med.ItemId == itm.ItemId);
+        currGeneric = this.ordServ.allGenericItems.find(gen => gen.GenericId == itm.GenericId);
 
         let newReq = new PHRMPrescriptionItem();
 

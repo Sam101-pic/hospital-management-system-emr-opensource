@@ -15,5 +15,6 @@ namespace DanpheEMR.Services.Accounting.DTOs
         public bool DrCr { get; set; }
         public int HospitalId { get; set; }
         public bool IsDefault { get; set; }
+        public bool IsSystemDefault { get; set; }
     }
 }

@@ -79,6 +79,18 @@ namespace DanpheEMR.ServerModel
         public virtual PHRMTransactionCreditBillStatus CreditBillStatus { get; set; } = new PHRMTransactionCreditBillStatus();
         public int? PatientVisitId { get; set; }
         public int SchemeId { get; set; }
+        public string PaymentDetails { get; set; }
+        [NotMapped]
+        public decimal DepositReturnAmount { get; set; }
+
+        /// <summary>
+        /// This is scheme level capping flag.
+        /// </summary>
+        [NotMapped]
+        public bool IsCappingApplicable { get; set; }
+        [NotMapped]
+        public bool IsSalesForPrescription { get; set; }
+
         public static PHRMInvoiceTransactionModel GetCloneWithItems(PHRMInvoiceTransactionModel txnToClone)
         {
             PHRMInvoiceTransactionModel retTxnModel = new PHRMInvoiceTransactionModel()

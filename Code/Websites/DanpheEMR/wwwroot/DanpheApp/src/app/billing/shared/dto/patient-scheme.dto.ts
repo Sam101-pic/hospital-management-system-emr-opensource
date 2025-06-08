@@ -13,4 +13,5 @@ export class PatientScheme_DTO {
   public PolicyHolderEmployerID: string = null;
   public SubSchemeId: number = null;
   public RegistrationCase: string = "";
+  public Ins_FirstServicePoint: string = '';
 }

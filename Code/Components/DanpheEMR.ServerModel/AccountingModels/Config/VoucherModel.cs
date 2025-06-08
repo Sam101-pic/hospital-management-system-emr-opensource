@@ -21,6 +21,7 @@ namespace DanpheEMR.ServerModel
         public bool ISCopyDescription { get; set; }
         public bool ShowPayeeName { get; set; }
         public bool ShowChequeNumber { get; set; }
+        public int HospitalId { get; set; }
 
 
 

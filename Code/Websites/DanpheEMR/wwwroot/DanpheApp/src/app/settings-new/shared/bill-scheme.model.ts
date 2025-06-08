@@ -73,6 +73,24 @@ export class BillingSchemeModel {
   public RegStickerGroupCode: string = null;
   public SchemeValidator: FormGroup = null;
   public AllowProvisionalBilling: boolean = false;
+  public IsPharmacyCappingApplicable: boolean = false;
+  public UseCappingAPI: boolean = false;
+  public IsBillingCappingApplicable: boolean = false;
+  public IsPharmacySalePriceEditable: boolean = false;
+
+  public IsReferralCodeApplicable: boolean = false;
+  public IsOpReferralCodeCompulsory: boolean = false;
+  public IsIpReferralCodeCompulsory: boolean = false;
+  public IsErReferralCodeCompulsory: boolean = false;
+  public IpReferralCodeVisitLimit: number = null;
+  public OpReferralCodeVisitLimit: number = null;
+  public ErReferralCodeVisitLimit: number = null;
+  public IpReferralCodeValidityPeriod: number = null;
+  public OpReferralCodeValidityPeriod: number = null;
+  public ErReferralCodeValidityPeriod: number = null;
+
+
+
   public BillingSubSchemes: Array<BillingSubSchemeModel> = new Array<BillingSubSchemeModel>();
 
   constructor() {

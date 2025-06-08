@@ -1,6 +1,7 @@
 import { Injectable, Directive } from '@angular/core';
 import { HttpHeaders, HttpClient } from '@angular/common/http'
 import { Appointment } from "../shared/appointment.model";
+import { TelMedicineResponse_DTO } from '../online-appointment/shared/DTOs/telmedicine-response.dto';
 @Injectable()
 export class AppointmentDLService {
     public options = {
@@ -90,12 +91,12 @@ export class AppointmentDLService {
         return this.http.put<any>("/api/Appointment/AppointmentInformation", data);
     }
 
-    public getOnlineAppointmentData(url, fromDate, toDate) {
+    public getOnlineAppointmentData<T>(url, fromDate, toDate) {
         var fullUrl = url + 'api/doctor';
         var reqHeader = new HttpHeaders({
             'Authorization': 'Bearer ' + (sessionStorage.getItem('TELEMED_Token'))
         });
-        return this.http.get<any>(`${fullUrl}/getPatientListByAdmin/${fromDate}/${toDate}`, { headers: reqHeader });
+        return this.http.get<TelMedicineResponse_DTO<T>>(`${fullUrl}/getPatientListByAdmin/${fromDate}/${toDate}`, { headers: reqHeader });
     }
 
     public updateVisitStatusInTelemedicine(url, visitId, visitStatus) {

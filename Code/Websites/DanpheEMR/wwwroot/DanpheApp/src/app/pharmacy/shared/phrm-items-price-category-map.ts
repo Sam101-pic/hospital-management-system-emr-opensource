@@ -11,5 +11,7 @@ export class PHRM_MAP_MstItemsPriceCategory {
     public PriceCategoryName: string = "";
     public loading: boolean = false;
     public GenericId: number = null;
-
+    public IsCappingEnable: boolean = false;
+    public CappingDaysLimit: number = 0;
+    public CappingQuantity: number = 0;
 }

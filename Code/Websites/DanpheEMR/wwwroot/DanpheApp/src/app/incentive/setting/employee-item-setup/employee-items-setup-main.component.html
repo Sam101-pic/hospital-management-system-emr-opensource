@@ -25,7 +25,8 @@
   <div class="col-md-12 col-xs-12 col-sm-12">
     <employee-item-setup *ngIf="showEmployeeSetUpPopup" [EmployeeId]="selectedEmployee"
                          [all-employeeList]="allDoctorList" [all-BillitmList]="allBillitmList" [all-profileList]="profileList"
-                         [existing-emp-list]="EmployeeIncentiveList" (incentive-info-change)="incentiveInfoChange($event)">
+                         [existing-emp-list]="EmployeeIncentiveList" [IsViewMapping]="IsViewMapping"
+                         (incentive-info-change)="incentiveInfoChange($event)">
     </employee-item-setup>
   </div>
 </div>

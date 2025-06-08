@@ -14,5 +14,8 @@ namespace DanpheEMR.Services.Dispensary.DTOs.PharmacyInvoiceReceipt
         public DateTime? DateOfBirth { get; set; }
         public string PhoneNumber { get; set; }
         public string PANNumber { get; set; }
+        public string CountryName { get; set; }
+        public Int16? WardNumber { get; set; }
+        public string MunicipalityName { get; set; }
     }
 }

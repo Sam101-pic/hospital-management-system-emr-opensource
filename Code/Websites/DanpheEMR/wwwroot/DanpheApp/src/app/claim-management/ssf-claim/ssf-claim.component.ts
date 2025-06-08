@@ -11,7 +11,9 @@ import { PDFDocument } from "pdf-lib";
 import { VisitBLService } from "../../appointments/shared/visit.bl.service";
 import { BillingBLService } from "../../billing/shared/billing.bl.service";
 import { BillingService } from "../../billing/shared/billing.service";
+import { PatientScheme_DTO } from "../../billing/shared/dto/patient-scheme.dto";
 import { PatientWiseSSFClaimList, SSFBil_VM, SSFClaimList, SSFInvoiceReturnsList, SSF_BillingInvoiceInfoVM, SSF_BillingInvoiceItems } from "../../billing/shared/invoice-print-vms";
+import { ClinicalNoteBLService } from "../../clinical-new/shared/clinical.bl.service";
 import { CoreService } from "../../core/shared/core.service";
 import { LabReportVM } from "../../labs/reports/lab-report-vm";
 import { LabComponentModel } from "../../labs/shared/lab-component-json.model";
@@ -22,10 +24,15 @@ import { GeneralFieldLabels } from "../../shared/DTOs/general-field-label.dto";
 import { NepaliCalendarService } from "../../shared/calendar/np/nepali-calendar.service";
 import { DanpheHTTPResponse } from "../../shared/common-models";
 import { CommonFunctions } from "../../shared/common.functions";
+import { MedicalDiagnosisDto } from "../../shared/diagnosis/dto/medical-diagnosis.dto";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
 import { RouteFromService } from "../../shared/routefrom.service";
-import { ENUM_ClaimCategory, ENUM_ClaimExtensionUrl, ENUM_ClaimResourceType, ENUM_Country, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_DefaultICDCode, ENUM_FileSizeUnits, ENUM_ICDCoding, ENUM_MessageBox_Status, ENUM_SSFSchemeTypeSubProduct, ENUM_SSF_BookingStatus, ENUM_ValidFileFormats, ENUM_VisitType } from "../../shared/shared-enums";
+import { ENUM_ClaimCategory, ENUM_ClaimExtensionUrl, ENUM_ClaimResourceType, ENUM_Country, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_DiagnosisType, ENUM_FileSizeUnits, ENUM_MessageBox_Status, ENUM_SSFSchemeTypeSubProduct, ENUM_SSF_BookingStatus, ENUM_ValidFileFormats, ENUM_VisitType } from "../../shared/shared-enums";
+import { Diagnosis_DTO } from "../shared/DTOs/diagnosis.dto";
 import { Category, ClaimBillablePeriod, ClaimBookingRoot_DTO, ClaimCategory, ClaimCoding, ClaimDiagnosis, ClaimDiagnosisCodeableConcept, ClaimEnterer, ClaimExtension, ClaimFacility, ClaimItem, ClaimPatient, ClaimProductOrService, ClaimProvider, ClaimQuantity, ClaimRoot, ClaimSupportingInfo, ClaimTotal, ClaimType, ClaimUnitPrice, Coding, SSFClaimResponseInfo, SSFSchemeTypeSubProduct, ValueAttachement } from "../shared/SSF-Models";
+import { ClaimManagementBLService } from "../shared/claim-management.bl.service";
+import { CheckBookingStatus_DTO } from "./DTOs/ssf-claim-booking-status-request.dto";
+import { ClaimBookingDetailsFromSSFServer_Data_DTO, ClaimBookingDetailsFromSSFServer_Root_DTO } from "./DTOs/ssf-claim-booking-status-response.dto";
 import { SsfDlService } from "./ssf-dl.services";
 
 
@@ -138,6 +145,7 @@ export class SSFClaimComponent implements OnInit {
   public ShowClaimBooking: boolean = false;
   public TotalInvoiceAmountForClaim: number = 0;
   public Invoices = new Array<SSFClaimList>();
+  public ClaimDetailsInvoices = new Array<SSFClaimList>();
   public AlreadyBookedInvoiceAmount: number = 0;
   public RemainingInvoiceAmountToBook: number = 0;
   public ClaimBooking = new ClaimBookingRoot_DTO();
@@ -163,7 +171,16 @@ export class SSFClaimComponent implements OnInit {
   public AlreadyBookedReturnAmount: number = 0;
   public RemainingReturnAmountToBook: number = 0;
 
-
+  public ShowCheckClaimBookingStatusPopup: boolean = false;
+  public SSFPolicyNoToCheckClaimBookingStatus: string = "";
+  public CheckClaimBookingStatusResponse = new ClaimBookingDetailsFromSSFServer_Root_DTO();
+  public CheckClaimBookingStatusResponseList = new Array<ClaimBookingDetailsFromSSFServer_Data_DTO>();
+  public ShowCheckBookingStatusButton: boolean = false;
+  public PatientScheme = new PatientScheme_DTO();
+  public SelectedSubProduct = new SSFSchemeTypeSubProduct();
+  public DiagnosisList = new Array<Diagnosis_DTO>();
+  public SelectedDiagnosis = new Diagnosis_DTO();
+  public SelectedDiagnosisList = new Array<Diagnosis_DTO>();
   constructor(
     public billingBLService: BillingBLService,
     public nepaliCalendarServ: NepaliCalendarService,
@@ -179,7 +196,9 @@ export class SSFClaimComponent implements OnInit {
     public visitBlService: VisitBLService,
     public labBLService: LabsBLService,
     private _domSanitizer: DomSanitizer,
-    private _ssfDlService: SsfDlService) {
+    private _ssfDlService: SsfDlService,
+    private _claimManagementBlService: ClaimManagementBLService,
+    private _clinicalBlService: ClinicalNoteBLService) {
     this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
 
     this.taxLabel = this.billingService.taxLabel;
@@ -204,6 +223,7 @@ export class SSFClaimComponent implements OnInit {
   }
   ngOnInit() {
   }
+
 
   public readParameters(): void {
     let paramValue = this.coreService.Parameters.find(a => a.ParameterName === 'BillingHeader').ParameterValue;
@@ -238,6 +258,14 @@ export class SSFClaimComponent implements OnInit {
       if (activeIcdVersionInSSF) {
         this.ActiveIcdVersionInSSF.ActiveICD = activeIcdVersionInSSF.ActiveICD;
         this.ActiveIcdVersionInSSF.ICDCoding = activeIcdVersionInSSF.ICDCoding;
+      }
+    }
+
+    const bookingStatusParam = this.coreService.Parameters.find(p => p.ParameterGroupName === "ClaimManagement" && p.ParameterName === "CheckSSFBookingStatus");
+    if (bookingStatusParam) {
+      const checkSSFBookingStatus = JSON.parse(bookingStatusParam.ParameterValue);
+      if (checkSSFBookingStatus) {
+        this.ShowCheckBookingStatusButton = checkSSFBookingStatus;
       }
     }
 
@@ -477,22 +505,33 @@ export class SSFClaimComponent implements OnInit {
       this.SelectedPatient.LatestClaimCode = latestClaimCode;
       this.SelectedPatient.PatientId = this.PatientWiseClaimList[index].PatientId;
 
-
-      //Krishna, Map Invoice Returns with invoices.
-      //this.AssignInvoiceAndInvoiceReturnsInSingleObject();
-
+      this.GetSSFSubProduct(patientInfo.ClaimCode);
       this.GetClaimBookingDetails(latestClaimCode, "Claim");
+      this.GetDiagnosis();
       //this.ShowFileUploadPopUp = true;
     } else {
       this.ShowFileUploadPopUp = false;
     }
+  }
+  GetSSFSubProduct(claimCode: number) {
+    this.visitBlService.GetSSFSubProduct(claimCode).subscribe(
+      (res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+          const ssfSubProduct = res.Results;
+          if (ssfSubProduct) {
+            this.SelectedSubProduct = this.SchemeTypeSubProduct.find(s => s.value === +ssfSubProduct);
+          }
+        }
+      }, err => {
+        console.error(err);
+      });
   }
 
   public AssignInvoiceAndInvoiceReturnsInSingleObject(): void {
     const selectedPatientsInvoiceReturns = this.SsfInvoiceReturns.filter(a => a.PatientId === this.SelectedPatient.PatientId && a.ClaimCode === this.SelectedPatient.LatestClaimCode);
     this.SelectedPatientsInvoiceReturns = selectedPatientsInvoiceReturns;
     this.Invoices.forEach(a => {
-      if (a.InvoiceNoFormatted.substring(0, 2) === "BL") {
+      if (a.InvoiceNoFormatted.includes("BL")) {
         a.ModuleName = "Billing";
       } else {
         a.ModuleName = "Pharmacy";
@@ -503,7 +542,8 @@ export class SSFClaimComponent implements OnInit {
       let inv = new SSFClaimList();
       inv.BillingTransactionId = ret.ReturnId;
       inv.InvoiceNoFormatted = ret.CreditNoteNumberFormatted;
-      inv.InvoiceTotalAmount = -ret.TotalAmount; //Keep it negative here, SSF takes return as negative values so that they can subtract later with TotalAmount
+      inv.InvoiceTotalAmount = ret.TotalAmount;
+      inv.InvoiceTotalAmountWithoutReturn = -ret.TotalAmount;//Keep it negative here, SSF takes return as negative values so that they can subtract later with TotalAmount
       inv.ModuleName = ret.ModuleName;
       this.Invoices.push(inv);
     });
@@ -696,6 +736,13 @@ export class SSFClaimComponent implements OnInit {
   }
 
   public ProcessFinalClaim(): void {
+    if (!this.SelectedDiagnosisList || this.SelectedDiagnosisList.length === 0) {
+      this.msgBox.showMessage(ENUM_MessageBox_Status.Warning, [`There is no Diagnosis Selected, Please Select Diagnosis Of the Patient!`]);
+      return;
+    }
+
+    this.SaveMedicalDiagnosis(this.SelectedDiagnosisList);
+
     this.loading = true;
     this.disableProcessClaimButton = true;
     const startingIndex = 0;
@@ -840,6 +887,7 @@ export class SSFClaimComponent implements OnInit {
   }
 
   public GetSSFInvoiceDetail() {
+    this.SsfInvoiceReturns = [];
     this.visitBlService.GetSSFInvoiceDetail(this.fromDate, this.toDate, this.patientType).subscribe((res: DanpheHTTPResponse) => {
       if (res.Status === ENUM_DanpheHTTPResponses.OK) {
         this.SsfClaimObject = res.Results;
@@ -852,6 +900,8 @@ export class SSFClaimComponent implements OnInit {
           patInfo.PolicyNo = a.PolicyNo;
           patInfo.PatientId = a.PatientId;
           patInfo.PatientCode = a.PatientCode;
+          patInfo.SchemeType = a.SchemeType;
+          patInfo.SchemeId = a.SchemeId;
           let invoices = [];
           const billingInvoices = this.SsfClaimObject.BillingInvoiceInfo.filter(b => b.PatientId === a.PatientId && b.ClaimCode === a.ClaimCode);
           const phrmInvoices = this.SsfClaimObject.PhrmInvoices.filter(p => p.PatientId === a.PatientId && p.ClaimCode === a.ClaimCode);
@@ -859,7 +909,8 @@ export class SSFClaimComponent implements OnInit {
 
           const billingInvoiceReturns = this.SsfClaimObject.BillingInvoiceReturns.filter(b => b.PatientId === a.PatientId && b.ClaimCode === a.ClaimCode);
           const pharmacyInvoiceReturns = this.SsfClaimObject.PharmacyInvoiceReturns.filter(b => b.PatientId === a.PatientId && b.ClaimCode === a.ClaimCode);
-          this.SsfInvoiceReturns = [...billingInvoiceReturns, ...pharmacyInvoiceReturns];
+          this.SsfInvoiceReturns = [... this.SsfInvoiceReturns, ...billingInvoiceReturns, ...pharmacyInvoiceReturns];
+          patInfo.InvoiceReturnsList = this.SsfInvoiceReturns;
 
 
           invoices.forEach(c => {
@@ -869,6 +920,7 @@ export class SSFClaimComponent implements OnInit {
             SSfClaim.InvoiceTotalAmount = c.TotalAmount;
             SSfClaim.Cash = c.ReceivedAmount;
             SSfClaim.Credit = c.NetReceivableAmount;
+            SSfClaim.InvoiceTotalAmountWithoutReturn = c.TotalAmountWithoutReturn;
             //SSfClaim.ClaimCode = c.ClaimCode;
             SSfClaim.BillingTransactionId = c.BillingTransactionId ? c.BillingTransactionId : c.InvoiceId;
             patInfo.InvoiceList.push(SSfClaim);
@@ -1122,15 +1174,16 @@ export class SSFClaimComponent implements OnInit {
 
     this.ClaimRoot.extension = this.claimExtensionArray;
 
+    // assign selected Diagnosis to ClaimRoot
     let diagnosisArray = new Array<ClaimDiagnosis>();
-    let diagnosisDetailsFromServer = JSON.parse(this.SelectedClaimObject.PatientInfo[0].Diagnosis);
+    let diagnosisDetailsFromServer = this.SelectedDiagnosisList; //JSON.parse(this.SelectedClaimObject.PatientInfo[0].Diagnosis);
     if (diagnosisDetailsFromServer && diagnosisDetailsFromServer.length) {
       diagnosisDetailsFromServer.forEach((diag, index) => {
         let diagnosis = new ClaimDiagnosis();
         diagnosis.sequence = index + 1;
         let claimDiagnosisCodeAbleConcept = new ClaimDiagnosisCodeableConcept();
         let claimCoding = new ClaimCoding();
-        claimCoding.code = diag.ICD10Code; //* This is something that needs to be updated seems hardcoded in the database.
+        claimCoding.code = diag.ICDCode;
         claimDiagnosisCodeAbleConcept.coding.push(claimCoding);
         diagnosis.diagnosisCodeableConcept = claimDiagnosisCodeAbleConcept;
         let cType = new ClaimType();
@@ -1139,27 +1192,29 @@ export class SSFClaimComponent implements OnInit {
         diagnosisArray.push(diagnosis);
       });
     }
-    else {
-      if (this.ActiveIcdVersionInSSF.ICDCoding === ENUM_ICDCoding.ICD10) {
-        let diagnosis = {
-          sequence: 1,
-          type: [
-            {
-              text: ENUM_ICDCoding.ICD10
-            }
-          ],
-          diagnosisCodeableConcept: {
-            coding: [
-              {
-                code: ENUM_DefaultICDCode.A09
-              }
-            ]
-          }
-        }
-        diagnosisArray.push(diagnosis);
-      }
 
-    }
+    /*  else {
+        if (this.ActiveIcdVersionInSSF.ICDCoding === ENUM_ICDCoding.ICD10) {
+          let diagnosis = {
+            sequence: 1,
+            type: [
+              {
+                text: ENUM_ICDCoding.ICD10
+              }
+            ],
+            diagnosisCodeableConcept: {
+              coding: [
+                {
+                  code: ENUM_DefaultICDCode.A09
+                }
+              ]
+            }
+          }
+          diagnosisArray.push(diagnosis);
+        }
+      }
+    */
+
     this.ClaimRoot.diagnosis = diagnosisArray;
 
     let claimItemArray = new Array<ClaimItem>();
@@ -1591,12 +1646,15 @@ export class SSFClaimComponent implements OnInit {
     return arrayOfSSFSchemeSubProduct;
   }
 
+  InvoiceReturnForClaimBooking = new Array<SSFInvoiceReturnsList>();
   OpenClaimBooking(patientInfo: PatientWiseSSFClaimList) {
     let arrayOfSSFSchemeSubProduct = this.PrepareSchemeTypeSubProductArray();
     this.SchemeTypeSubProduct = arrayOfSSFSchemeSubProduct;
     let index = this.PatientWiseClaimList.findIndex(a => a.PatientId === patientInfo.PatientId && a.ClaimCode === patientInfo.ClaimCode);
     if (index === this.selectedIndex && (this.SelectedClaimObject.BillingInvoiceItems.length > 0 || this.SelectedClaimObject.PhrmInvoiceItems.length > 0)) {
       this.Invoices = _.cloneDeep(this.PatientWiseClaimList[index].InvoiceList);
+      const returnedInvoices = _.cloneDeep(this.PatientWiseClaimList[index].InvoiceReturnsList);
+      this.InvoiceReturnForClaimBooking = returnedInvoices;
       const latestClaimCode = this.PatientWiseClaimList[index].ClaimCode;
       this.SelectedPatient.Patient = this.PatientWiseClaimList[index].PatientName;
       this.SelectedPatient.PatientId = this.PatientWiseClaimList[index].PatientId;
@@ -1623,6 +1681,8 @@ export class SSFClaimComponent implements OnInit {
       //   this.Invoices.push(inv);
       // });
       //this.AssignInvoiceAndInvoiceReturnsInSingleObject();
+
+      this.GetSSFSubProduct(patientInfo.ClaimCode);
       this.GetClaimBookingDetails(latestClaimCode, "BookClaim");
     } else {
       this.ShowClaimBooking = false;
@@ -1648,7 +1708,8 @@ export class SSFClaimComponent implements OnInit {
   MapInvoicesForClaimBooking(invoices, requestingFrom: string) {
     if (invoices) {
       this.AssignInvoiceAndInvoiceReturnsInSingleObject();
-      this.Invoices.forEach(a => {
+      this.ClaimDetailsInvoices = _.cloneDeep(this.Invoices);
+      this.ClaimDetailsInvoices.forEach(a => {
         const booking = invoices.find(b => b.BillingInvoiceNo === a.InvoiceNoFormatted || b.PharmacyInvoiceNo === a.InvoiceNoFormatted)
         if (booking && booking.BookingStatus) {
           a.BookingStatus = booking.BookingStatus ? ENUM_SSF_BookingStatus.Booked : ENUM_SSF_BookingStatus.NotBooked;
@@ -1656,9 +1717,10 @@ export class SSFClaimComponent implements OnInit {
           a.BookingStatus = ENUM_SSF_BookingStatus.NotBooked;//"Not Booked";
         }
       });
+
       this.CalculateBookingSummary(requestingFrom);
     } else {
-      this.Invoices.forEach(a => {
+      this.ClaimDetailsInvoices.forEach(a => {
         a.BookingStatus = ENUM_SSF_BookingStatus.NotBooked;//"Not Booked";
       });
       this.CalculateBookingSummary(requestingFrom);
@@ -1669,7 +1731,7 @@ export class SSFClaimComponent implements OnInit {
     this.TotalInvoiceAmountForClaim = this.AlreadyBookedInvoiceAmount = this.RemainingInvoiceAmountToBook = 0;
     this.TotalReturnAmountForClaim = this.AlreadyBookedReturnAmount = this.RemainingReturnAmountToBook = 0;
 
-    this.Invoices.forEach(book => {
+    this.ClaimDetailsInvoices.forEach(book => {
       if (book.InvoiceTotalAmount > 0) {
         this.TotalInvoiceAmountForClaim += book.InvoiceTotalAmount;
       } else {
@@ -1720,7 +1782,6 @@ export class SSFClaimComponent implements OnInit {
         this.bookClaimClicked = true;
         this.visitBlService.BookClaim(claimBookingObj).finally(() => { this.bookClaimClicked = false; }).subscribe(res => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-            this.GetClaimBookingDetails(claimBookingObj.LatestClaimCode, "BookClaim");
             this.msgBox.showMessage(ENUM_MessageBox_Status.Success, ["Claim Booked Successfully!"]);
           } else {
             console.log(res.ErrorMessage);
@@ -1740,7 +1801,6 @@ export class SSFClaimComponent implements OnInit {
 
   PrepareClaimBookingObject(data): ClaimBookingRoot_DTO {
     let claimBooking = new ClaimBookingRoot_DTO();
-    claimBooking.BookedAmount = data.InvoiceTotalAmount;
     claimBooking.HospitalNo = this.SelectedPatient.HospitalNo;
     claimBooking.Patient = this.SelectedPatient.PolicyHolderUUID;
     claimBooking.PatientId = this.SelectedPatient.PatientId;
@@ -1748,16 +1808,163 @@ export class SSFClaimComponent implements OnInit {
     claimBooking.LatestClaimCode = this.SelectedPatient.LatestClaimCode;
     claimBooking.IsAccidentCase = this.IsAccidentalClaim;
     claimBooking.SubProduct = this.SubProductForClaimBooking;
-    if (data.InvoiceNoFormatted.substring(0, 2) === "BL") {
+    //data.InvoiceNoFormatted.substring(0, 2) === "BL"
+    if (data.ModuleName === "Billing") {
       claimBooking.BillingInvoiceNo = data.InvoiceNoFormatted;
-    } else if (data.InvoiceNoFormatted.substring(0, 3) === "CRN") {
+      claimBooking.BookedAmount = data.InvoiceTotalAmountWithoutReturn;
+    } else if (data.ModuleName === "BillingInvoiceReturn") {
       claimBooking.BillingInvoiceNo = data.InvoiceNoFormatted;
+      claimBooking.BookedAmount = -data.InvoiceTotalAmount;
+      claimBooking.IsCreditNote = true;
+    } else if (data.ModuleName === "Pharmacy") {
+      claimBooking.PharmacyInvoiceNo = data.InvoiceNoFormatted;
+      claimBooking.BookedAmount = data.InvoiceTotalAmountWithoutReturn;
     }
     else {
       claimBooking.PharmacyInvoiceNo = data.InvoiceNoFormatted;
+      claimBooking.BookedAmount = -data.InvoiceTotalAmount;
     }
     return claimBooking;
   }
+
+  OpenPopupToCheckClaimBookingStatus(): void {
+    this.ShowCheckClaimBookingStatusPopup = true;
+  }
+
+  CloseCheckClaimBookingStatusPopup(): void {
+    this.loading = false;
+    this.SSFPolicyNoToCheckClaimBookingStatus = "";
+    this.ResetClaimBookingStatusCheck();
+    this.ShowCheckClaimBookingStatusPopup = false;
+  }
+
+  CheckClaimBookingStatus(): void {
+    this.loading = true;
+    this.ResetClaimBookingStatusCheck();
+    if (this.SSFPolicyNoToCheckClaimBookingStatus && this.SSFPolicyNoToCheckClaimBookingStatus.trim()) {
+      const checkClaimBookingStatusRequest = new CheckBookingStatus_DTO(this.SSFPolicyNoToCheckClaimBookingStatus.trim());
+      this._ssfDlService.CheckClaimBookingStatus(checkClaimBookingStatusRequest).finally(() => this.loading = false).subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+          this.CheckClaimBookingStatusResponse = res.Results;
+          this.CheckClaimBookingStatusResponseList = this.CheckClaimBookingStatusResponse.response.data;
+        } else {
+          console.log(res);
+          this.msgBox.showMessage(ENUM_MessageBox_Status.Failed, [`No Bookings found for the Patient`]);
+        }
+      }, err => {
+        console.log(err);
+        this.msgBox.showMessage(ENUM_MessageBox_Status.Error, [`Something went Wrong while checking the Booking Status`]);
+      });
+    } else {
+      this.msgBox.showMessage(ENUM_MessageBox_Status.Notice, [`PolicyNo is required to Check Claim Status`]);
+      this.loading = false;
+    }
+  }
+
+  ResetClaimBookingStatusCheck(): void {
+    this.CheckClaimBookingStatusResponse = new ClaimBookingDetailsFromSSFServer_Root_DTO();
+    this.CheckClaimBookingStatusResponseList = new Array<ClaimBookingDetailsFromSSFServer_Data_DTO>();
+  }
+
+  /*START: Diagnosis Section*/
+  GetDiagnosis() {
+    this._claimManagementBlService.GetDiagnosis().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+        this.DiagnosisList = res.Results;
+        const patientInfo = this.SelectedClaimObject.PatientInfo[0];
+        if (patientInfo) {
+          this.GetMedicalDiagnosis(patientInfo.PatientId, patientInfo.PatientVisitId);
+        }
+      }
+    });
+  }
+
+  GetMedicalDiagnosis(patientId: number, patientVisitId: number): void {
+    this._clinicalBlService.GetPatientMedicalDiagnosis(patientId, patientVisitId).subscribe((res: DanpheHTTPResponse) => {
+      if (res && res.Status === ENUM_DanpheHTTPResponses.OK) {
+        const diagnosis: Array<MedicalDiagnosisDto> = res.Results;
+        if (diagnosis) {
+          if (diagnosis && diagnosis.length) {
+            const activeDiagnosis = diagnosis.filter(d => d.IsActive);
+            if (activeDiagnosis && activeDiagnosis.length) {
+              this.SelectedDiagnosisList = [];
+              activeDiagnosis.forEach(d => {
+                const diag = new Diagnosis_DTO();
+                diag.ICDCode = d.DiagnosisCode;
+                diag.ICDDescription = d.DiagnosisCodeDescription;
+                diag.Icd10Id = d.ICD10ID
+
+                this.SelectedDiagnosisList.push(diag);
+              })
+            }
+            this.changeDetector.detectChanges();
+          } else {
+            this.SelectedDiagnosisList = [];
+          }
+        }
+      } else {
+        this.msgBox.showMessage(ENUM_MessageBox_Status.Notice, ['Cannot Load Medical Diagnosis for the patient']);
+      }
+    }, err => {
+      console.error(err);
+      this.msgBox.showMessage(ENUM_MessageBox_Status.Error, ['Something Went Wrong while reading Current Visit Context for the patient']);
+    })
+  }
+  ICDCodeFormatter(data: any): string {
+    return (`${data["ICDCode"]}(${data["ICDDescription"]})`);
+  }
+
+  OnDiagnosisSelect() {
+    // Check if ICDCode is selected
+    if (this.SelectedDiagnosis && this.SelectedDiagnosis.ICDCode) {
+      // Check if the ICDCode is already selected
+      const icdCodeAlreadySelected = this.SelectedDiagnosisList.find(a => a.ICDCode === this.SelectedDiagnosis.ICDCode);
+
+      if (icdCodeAlreadySelected) {
+        this.SelectedDiagnosis = null;
+        this.msgBox.showMessage(ENUM_MessageBox_Status.Notice, ['ICD Code Already Selected']);
+        return;
+      }
+      // Add the selected ICDCode to the list
+      this.SelectedDiagnosisList.push(this.SelectedDiagnosis);
+
+      //clear SelectedDiagnosis object
+      this.SelectedDiagnosis = null;
+    }
+  }
+
+  RemoveSelectedICDCode(index: number): void {
+    this.SelectedDiagnosisList.splice(index, 1);
+  }
+
+  SaveMedicalDiagnosis(selectedDiagnosisList: Array<Diagnosis_DTO>): void {
+    const patientInfo = this.SelectedClaimObject.PatientInfo[0];
+    if (patientInfo) {
+      let medicalDiagnosisList = new Array<MedicalDiagnosisDto>();
+      selectedDiagnosisList.forEach(d => {
+        const medicalDiagnosis = new MedicalDiagnosisDto();
+        medicalDiagnosis.DiagnosisCode = d.ICDCode;
+        medicalDiagnosis.DiagnosisCodeDescription = d.ICDDescription;
+        medicalDiagnosis.IsActive = true;
+        medicalDiagnosis.PatientId = patientInfo.PatientId;
+        medicalDiagnosis.PatientVisitId = patientInfo.PatientVisitId;
+        medicalDiagnosis.DiagnosisType = ENUM_DiagnosisType.FinalDiagnosis;
+        medicalDiagnosis.ICD10ID = d.Icd10Id;
+        medicalDiagnosisList.push(medicalDiagnosis);
+      });
+
+      this._clinicalBlService.SavePatientMedicalDiagnosis(medicalDiagnosisList)
+        .finally(() => this.loading = false)
+        .subscribe((res: DanpheHTTPResponse) => {
+          if (res && res.Status && res.Results) {
+            this.msgBox.showMessage(ENUM_MessageBox_Status.Success, ['Patient Medical Diagnosis registered successfully.']);
+          }
+        }, err => {
+          console.error(err);
+        });
+    }
+  }
+  /*END: Diagnosis Section*/
 
 }
 

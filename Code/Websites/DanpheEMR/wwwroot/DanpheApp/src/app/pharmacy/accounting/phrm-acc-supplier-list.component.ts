@@ -1,17 +1,17 @@
-import { Component, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component } from "@angular/core";
 
-import PHRMGridColumns from '../shared/phrm-grid-columns';
 import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
+import PHRMGridColumns from '../shared/phrm-grid-columns';
 
-import { PHRMSupplierModel } from "../shared/phrm-supplier.model"
-import { PHRMACCSuppliersModel } from "../shared/phrm-acc-suppliers.model"
-import { PHRMGoodsReceiptItemsModel } from "../shared/phrm-goods-receipt-items.model"
-import { PharmacyBLService } from "../shared/pharmacy.bl.service"
-import { MessageboxService } from "../../shared/messagebox/messagebox.service"
-import { CommonFunctions } from "../../shared/common.functions"
 import * as moment from 'moment/moment';
 import { CoreService } from "../../core/shared/core.service";
+import { CommonFunctions } from "../../shared/common.functions";
 import { IGridFilterParameter } from "../../shared/danphe-grid/grid-filter-parameter.interface";
+import { MessageboxService } from "../../shared/messagebox/messagebox.service";
+import { PharmacyBLService } from "../shared/pharmacy.bl.service";
+import { PHRMACCSuppliersModel } from "../shared/phrm-acc-suppliers.model";
+import { PHRMGoodsReceiptItemsModel } from "../shared/phrm-goods-receipt-items.model";
+import { PHRMSupplierModel } from "../shared/phrm-supplier.model";
 import { GeneralFieldLabels } from "../../shared/DTOs/general-field-label.dto";
 
 @Component({
@@ -183,6 +183,7 @@ export class PHRMSuppliersListComponent {
           this.currentGRdetails.GoodReceiptPrintId = $event.Data.GoodReceiptPrintId;
           this.currentGRdetails.GoodReceiptDate = $event.Data.GoodReceiptDate;
           this.currentGRdetails.ContactNo = $event.Data.ContactNo;
+          this.currentGRdetails.PANNumber = $event.Data.PANNumber;
           this.innerGRdetails = $event.Data;
           if ($event.Data.GoodReceiptType == 'Returned GR') {
             this.ShowGRReturnItem(this.innerGRdetails.GoodReceiptId, this.currentGRdetails.GoodReceiptPrintId)

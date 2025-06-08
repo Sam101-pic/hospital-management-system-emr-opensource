@@ -1,6 +1,7 @@
 ﻿using Audit.EntityFramework;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.BillingModels;
+using DanpheEMR.ServerModel.ClinicalModel_New;
 using DanpheEMR.ServerModel.MedicareModels;
 using DanpheEMR.ServerModel.PatientModels;
 using System.Data.Entity;
@@ -31,7 +32,7 @@ namespace DanpheEMR.DalLayer
         public DbSet<ADTBedReservation> BedReservation { get; set; }
         public DbSet<CfgParameterModel> CFGParameters { get; set; }
         public DbSet<EmergencyPatientModel> EmergencyPatient { get; set; }
-
+        public DbSet<ClinicalTemplatesModel> ClinicalTemplates { get; set; }
         public DbSet<PatientBedInfo> PatientBedInfos { get; set; }
         public DbSet<WardModel> Wards { get; set; }
         public DbSet<BedModel> Beds { get; set; }
@@ -187,7 +188,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<MedicareMember>().ToTable("INS_MedicareMember");
             modelBuilder.Entity<MedicareMemberBalance>().ToTable("INS_MedicareMemberBalance");
             modelBuilder.Entity<PatientSchemeMapModel>().ToTable("PAT_MAP_PatientSchemes");
-
+            modelBuilder.Entity<ClinicalTemplatesModel>().ToTable("CLN_MST_ClinicalTemplates");
         }
     }
 }

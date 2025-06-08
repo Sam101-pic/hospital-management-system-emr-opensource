@@ -1,6 +1,10 @@
 
 import { Component } from "@angular/core";
-import { ENUM_ACC_ADDLedgerLedgerType } from "../../../shared/shared-enums";
+import { CoreService } from "../../../core/shared/core.service";
+import { SecurityService } from "../../../security/shared/security.service";
+import { ENUM_ACC_ADDLedgerLedgerType, ENUM_ACC_ConsumptionLevel, ENUM_ACC_SectionCodes } from "../../../shared/shared-enums";
+import { AccountingService } from "../../shared/accounting.service";
+import { SectionModel } from "../shared/section.model";
 
 // Bikash,31st March 2022, refactored ledger mapping into respective separate files 
 // i.e. Billing items, consultant, credit organization, inventory subcategory, inventory-vendor and pharmacy suppliers mappings
@@ -10,82 +14,235 @@ import { ENUM_ACC_ADDLedgerLedgerType } from "../../../shared/shared-enums";
 })
 export class LedgerMappingComponent {
 
-  public ledgerType: string;
-  public typeledger: any = true;
-  public typevendor: any = false;
-  public typesupplier: boolean = true;
-  public typeConsultant: boolean = false;
-  public typeCreditOrganization: boolean = false;
-  public typeInventoryVendor: boolean = false;
-  public typeinventorysubcategory: boolean = false;
-  public typeBillingLedger: boolean = false;
-  public typePaymentMode: boolean = false;
-  public typeBankReconciliationCategory: boolean = false;
-  public typeMedicareTypes: boolean = false;
-
-  constructor() {
+  public LedgerType: string;
+  public TypeSupplier: boolean = false;
+  public TypeConsultant: boolean = false;
+  public TypeCreditOrganization: boolean = false;
+  public TypeInventoryVendor: boolean = false;
+  public TypeInventorySubstore: boolean = false;
+  public TypeInventorySubcategory: boolean = false;
+  public TypeBillingLedger: boolean = false;
+  public TypePaymentMode: boolean = false;
+  public TypeBankReconciliationCategory: boolean = false;
+  public TypeMedicareTypes: boolean = false;
+  public SectionData: SectionModel[] = [];
+  public ActiveHopsitalId: number = 0;
+  public SubStoreAndSubCategorySetting: string = 'InventorySubStore';
+  constructor(public coreService: CoreService, public accountingService: AccountingService, public securityServ: SecurityService) {
     // initializing ledger type as 'billing income ledger' //Bikash,31st March 2022
-    this.ledgerType = ENUM_ACC_ADDLedgerLedgerType.PharmacySupplier;
+    // this.LedgerType = ENUM_ACC_ADDLedgerLedgerType.PharmacySupplier;
+    this.ActiveHopsitalId = this.securityServ.AccHospitalInfo.ActiveHospitalId;
+    this.SubStoreAndSubCategorySetting = this.coreService.GetPharmacySubstoreAndSubcategory();
+    let manualVoucherSectionId = 4;
+    this.SectionData = this.accountingService.accCacheData.Sections.filter(a => a.HospitalId === this.ActiveHopsitalId && a.SectionId !== manualVoucherSectionId);
+    this.MapDisplaySection();
   }
 
-  ToggleLedgerType(ledgerType) {
 
-    this.ledgerType = ledgerType;
+  tempLedgerDisplayList: LedgerDisplayList_DTO[] = [];
+  LedgerDisplayList: LedgerDisplayList_DTO[] = [];
+
+  MapDisplaySection() {
+    this.LedgerDisplayList = [];
+    const existingLedgerTypes = new Set(); // To track which LedgerTypes have been added
+
+    this.SectionData.forEach((s) => {
+      const itemsToAdd = [];
+
+      if (s.SectionCode === ENUM_ACC_SectionCodes.Pharmacy) {
+        if (this.SubStoreAndSubCategorySetting == ENUM_ACC_ConsumptionLevel.InventorySubStore) {
+          itemsToAdd.push(
+            {
+              "PermissionValue": "{\"name\":\"accounting-create-inventory-substore-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+              "LedgerType": "InventoryConsumption",
+              "LedgerDisplayName": "Inventory SubStore"
+            }
+          );
+        } else {
+          itemsToAdd.push(
+            {
+              "PermissionValue": "{\"name\":\"accounting-create-inventory-subcategory-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+              "LedgerType": "inventorysubcategory",
+              "LedgerDisplayName": "Inventory SubCategory"
+            }
+          );
+        }
+        itemsToAdd.push(
+          {
+            "PermissionValue": "{\"name\":\"accounting-create-phrm-supplier-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+            "LedgerType": "pharmacysupplier",
+            "LedgerDisplayName": "Pharmacy Supplier"
+          },
+          {
+            "PermissionValue": "{\"name\":\"accounting-create-credit-organization-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+            "LedgerType": "creditorganization",
+            "LedgerDisplayName": "Credit Organizations"
+          },
+          {
+            "PermissionValue": "",
+            "LedgerType": "paymentmodes",
+            "LedgerDisplayName": "Payment Modes"
+          }
+        );
+      }
+
+      if (s.SectionCode === ENUM_ACC_SectionCodes.Inventory) {
+        if (this.SubStoreAndSubCategorySetting == ENUM_ACC_ConsumptionLevel.InventorySubStore) {
+          itemsToAdd.push(
+            {
+              "PermissionValue": "{\"name\":\"accounting-create-inventory-substore-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+              "LedgerType": "InventoryConsumption",
+              "LedgerDisplayName": "Inventory SubStore"
+            }
+          );
+        } else {
+          itemsToAdd.push(
+            {
+              "PermissionValue": "{\"name\":\"accounting-create-inventory-subcategory-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+              "LedgerType": "inventorysubcategory",
+              "LedgerDisplayName": "Inventory SubCategory"
+            }
+          );
+        }
+
+        itemsToAdd.push(
+          {
+            "PermissionValue": "{\"name\":\"accounting-create-inventory-vendor-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+            "LedgerType": "inventoryvendor",
+            "LedgerDisplayName": "Inventory Vendor"
+          }
+        );
+      }
+
+      if (s.SectionCode === ENUM_ACC_SectionCodes.Billing) {
+        itemsToAdd.push(
+          {
+            "PermissionValue": "{\"name\":\"accounting-create-billing-item-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+            "LedgerType": "billingincomeledger",
+            "LedgerDisplayName": "Billing Ledgers"
+          },
+          {
+            "PermissionValue": "{\"name\":\"accounting-create-credit-organization-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+            "LedgerType": "creditorganization",
+            "LedgerDisplayName": "Credit Organizations"
+          },
+          {
+            "PermissionValue": "",
+            "LedgerType": "paymentmodes",
+            "LedgerDisplayName": "Payment Modes"
+          }
+        );
+      }
+
+      if (s.SectionCode === ENUM_ACC_SectionCodes.Incentive) {
+        itemsToAdd.push(
+          {
+            "PermissionValue": "{\"name\":\"accounting-create-consultant-credit-ledger-button-permission\",\"actionOnInvalid\":\"hidden\"}",
+            "LedgerType": "consultant",
+            "LedgerDisplayName": "Consultant (Credit A/C)"
+          }
+        );
+      }
+
+      itemsToAdd.forEach((item) => {
+        const shouldAdd = !existingLedgerTypes.has(item.LedgerType);
+
+        if (shouldAdd) {
+          this.tempLedgerDisplayList.push(item);
+          existingLedgerTypes.add(item.LedgerType);
+        }
+      });
+    });
+
+    const distinctLedgerTypes = new Set();
+    const distinctList = this.tempLedgerDisplayList.filter((item) => {
+      if (!distinctLedgerTypes.has(item.LedgerType)) {
+        distinctLedgerTypes.add(item.LedgerType);
+        return true;
+      }
+      return false;
+    });
+
+    this.LedgerDisplayList = distinctList;
+    if (this.LedgerDisplayList.length > 0) {
+      this.LedgerType = this.LedgerDisplayList[0].LedgerType;
+      this.ToggleLedgerType(this.LedgerType);
+    }
+  }
+
+  ToggleLedgerType(LedgerType) {
+
+    this.LedgerType = LedgerType;
 
 
-    if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.PharmacySupplier) {
+    if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.PharmacySupplier) {
       this.MakeAllLedgerTypeFalse();
-      this.typesupplier = true;
+      this.TypeSupplier = true;
 
     }
-    else if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.InventoryVendor) {
+    else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.InventoryVendor) {
 
       this.MakeAllLedgerTypeFalse();
-      this.typeInventoryVendor = true;
+      this.TypeInventoryVendor = true;
     }
-    else if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.Consultant) {
+    else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.Consultant) {
       this.MakeAllLedgerTypeFalse();
-      this.typeConsultant = true;
+      this.TypeConsultant = true;
     }
-    else if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.CreditOrganization) {
+    else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.CreditOrganization) {
       this.MakeAllLedgerTypeFalse();
-      this.typeCreditOrganization = true;
+      this.TypeCreditOrganization = true;
     }
-    else if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.InventorySubCategory) {
+    else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.InventoryConsumption) {
       this.MakeAllLedgerTypeFalse();
-      this.typeinventorysubcategory = true;
+      this.TypeInventorySubstore = true;
     }
-    else if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.BillingPriceItem) {
+    else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.InventorySubCategory) {
       this.MakeAllLedgerTypeFalse();
-      this.typeBillingLedger = true;
+      this.TypeInventorySubcategory = true;
     }
-    // else if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.BillingPriceItem) {
+    else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.BillingPriceItem) {
+      this.MakeAllLedgerTypeFalse();
+      this.TypeBillingLedger = true;
+    }
+    // else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.BillingPriceItem) {
     //   this.MakeAllLedgerTypeFalse();
-    //   this.typeBillingLedger = true;
+    //   this.TypeBillingLedger = true;
     // }
-    else if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.PaymentModes) {
+    else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.PaymentModes) {
       this.MakeAllLedgerTypeFalse();
-      this.typePaymentMode = true;
+      this.TypePaymentMode = true;
     }
-    else if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.BankReconciliationCategory) {
+    else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.BankReconciliationCategory) {
       this.MakeAllLedgerTypeFalse();
-      this.typeBankReconciliationCategory = true;
+      this.TypeBankReconciliationCategory = true;
     }
-    else if (ledgerType == ENUM_ACC_ADDLedgerLedgerType.MedicareTypes) {
+    else if (LedgerType == ENUM_ACC_ADDLedgerLedgerType.MedicareTypes) {
       this.MakeAllLedgerTypeFalse();
-      this.typeMedicareTypes = true;
+      this.TypeMedicareTypes = true;
     }
   }
 
   MakeAllLedgerTypeFalse() {
-    this.typesupplier = false;
-    this.typeBillingLedger = false;
-    this.typeConsultant = false;
-    this.typeCreditOrganization = false;
-    this.typeinventorysubcategory = false;
-    this.typeInventoryVendor = false;
-    this.typePaymentMode = false;
-    this.typeBankReconciliationCategory = false;
-    this.typeMedicareTypes = false;
+    this.TypeSupplier = false;
+    this.TypeBillingLedger = false;
+    this.TypeConsultant = false;
+    this.TypeCreditOrganization = false;
+    this.TypeInventorySubstore = false;
+    this.TypeInventorySubcategory = false;
+    this.TypeInventoryVendor = false;
+    this.TypePaymentMode = false;
+    this.TypeBankReconciliationCategory = false;
+    this.TypeMedicareTypes = false;
+
   }
+
 }
+class LedgerDisplayList_DTO {
+
+  public PermissionValue: string = '';
+  public CSSValue: string = '';
+  public LedgerType: string = '';
+  public LedgerDisplayName: string = '';
+}
+

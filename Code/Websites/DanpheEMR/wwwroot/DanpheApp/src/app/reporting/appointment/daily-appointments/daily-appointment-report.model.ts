@@ -1,10 +1,8 @@
 import {
-    NgForm,
-    FormGroup,
-    FormControl,
-    Validators,
     FormBuilder,
-    ReactiveFormsModule
+    FormControl,
+    FormGroup,
+    Validators
 } from '@angular/forms';
 import * as moment from 'moment/moment';
 
@@ -15,13 +13,13 @@ export class RPT_APPT_DailyAppointmentReportModel {
     public Date: string = "";
     public Patient_Name: string = "";
     public AppointmentType: string = "";
-    public Doctor_Name: string = "";
+    public DoctorId: number = 0;
     public AppointmentStatus: string = "";
     public Ins_HasInsurance: boolean;
     public IsInsurancePatient: string = '';
-
+    public SchemeId: number = null;
     public DailyAppointmentValidator: FormGroup = null;
-
+    IsFreeVisit: boolean = false;
     constructor() {
 
         var _formBuilder = new FormBuilder();

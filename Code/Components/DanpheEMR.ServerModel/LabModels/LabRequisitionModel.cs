@@ -78,8 +78,8 @@ namespace DanpheEMR.ServerModel
         public int? BillCancelledBy { get; set; }
         public DateTime? BillCancelledOn { get; set; }
         public string LabTypeName { get; set; }//pratik:9Feb2021
-        public string GoogleFileIdForCovid { get; set; }
-        public string CovidFileName { get; set; }
+        public string GoogleFileId { get; set; }
+        public string UploadedReportFileName { get; set; }
         public bool? IsFileUploaded { get; set; }
         public int? UploadedBy { get; set; }
         public DateTime? UploadedOn { get; set; }
@@ -91,7 +91,11 @@ namespace DanpheEMR.ServerModel
         public int? IMUUploadedBy { get; set; }
         public int BillingTransactionItemId { get; set; }
         public int ServiceItemId { get; set; }
-
+        public DateTime? SampleReceivedOn { get; set; }
+        public bool IsPreVerified { get; set; }
+        public int? PreVerifiedBy { get; set; }
+        public DateTime? PreVerifiedOn { get; set; }
+        public DateTime CreatedDay { get; set; } = DateTime.Now.Date;
     }
 
     public class LabTestTransactionItemVM

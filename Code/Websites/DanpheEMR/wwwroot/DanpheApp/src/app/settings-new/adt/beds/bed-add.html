@@ -19,7 +19,7 @@
                   <span class="color-red font-sm" [hidden]="CurrentBed.IsValidCheck('WardId','required') || !(CurrentBed.IsDirty('WardId'))">Ward Name
                     is Required</span>
                 </div>
-                <div class="col-md-4"> Last Bed Number of {{wardName}} is {{lastBedNumber}} </div>
+                <div *ngIf="wardName && lastBedNumber" class="col-md-4"> Last Bed Number of {{wardName}} is {{lastBedNumber}} </div>
               </div>
               <div class="form-group">
                 <div class="col-md-4"> </div>

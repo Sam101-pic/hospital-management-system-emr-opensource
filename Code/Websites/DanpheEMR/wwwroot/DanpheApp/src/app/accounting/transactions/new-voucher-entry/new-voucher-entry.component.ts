@@ -100,17 +100,9 @@ export class VoucherEntryNewComponent {
     public selectedVoucherCode: string = ENUM_ACC_VoucherCode.JournalVoucher;
     public paymentORreciptLedgerList: Array<LedgerModel> = new Array<LedgerModel>();
     public paymentORreciptSubLedgerList: Array<SubLedger_DTO> = new Array<SubLedger_DTO>();
-
-    public extraTransactionItemForPaymentOrReceiptVoucher: TransactionItem = new TransactionItem();
     public paymentModeList: typeof ENUM_ACC_PaymentMode = ENUM_ACC_PaymentMode;
     public paymentMode: string = ENUM_ACC_PaymentMode.Cash;
-    public additionalPartyDetailForPaymentOrReceiptVoucher = {
-        selectedLedgerCode: null,
-        selectedLedger: null,
-        selectedSubLedgerCode: null,
-        selectedSubLedger: null
-    }
-    public selectedLedgerCode: Array<any> = []; // Dev 9 Nov'22: We are using any here becasue use of exact type create data binding problem somewhere.
+    public selectedLedgerCode: Array<any> = []; // Dev 9 Nov'22: We are using any here because use of exact type create data binding problem somewhere.
     public calType: string = ENUM_CalanderType.NP;
     public subLedgerMaster: Array<SubLedger_DTO> = new Array<SubLedger_DTO>();
     public selectedSubLedger: Array<any> = [];
@@ -126,9 +118,11 @@ export class VoucherEntryNewComponent {
     callBackFunction: EventEmitter<Object> = new EventEmitter<Object>();
 
     public ledgerWiseSubLedgerMaster: Array<Array<SubLedger_DTO>> = new Array<Array<SubLedger_DTO>>();
-    public paymentOrReceiptPartyName: string = "";
+    //public paymentOrReceiptPartyName: string = "";
     public paymentOrReceiptPartyNameLength: number = 0;
     public SelectedFiscalYearId: number = 0;
+    public ActiveHospitalId: number = 1;
+    public DrCrErrorMargin: number = 0.01;
 
     constructor(
         public accountingBLService: AccountingBLService,
@@ -137,7 +131,9 @@ export class VoucherEntryNewComponent {
         public router: Router, public routeFromService: RouteFromService, public securityService: SecurityService,
         public accountingSettingBlService: AccountingSettingsBLService) {
         this.setParameterValues();
-        this.subLedgerMaster = this.ledgerWiseSubLedgerMaster[0] = this.accountingService.accCacheData.SubLedgerAll ? this.accountingService.accCacheData.SubLedgerAll : [];
+
+        let activeLedger = this.accountingService.accCacheData.Ledgers.filter(a => a.IsActive);
+        this.subLedgerMaster = this.ledgerWiseSubLedgerMaster[0] = this.accountingService.accCacheData.SubLedgerAll.filter(a => a.IsActive && activeLedger.some(led => led.LedgerId === a.LedgerId)) ? this.accountingService.accCacheData.SubLedgerAll.filter(a => a.IsActive && activeLedger.some(led => led.LedgerId === a.LedgerId)) : [];
         this.DrCrList = [{ 'DrCr': 'Dr' }, { 'DrCr': 'Cr' }];
         this.selDrCrArray[0] = "Dr";
         this.todaysDate = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
@@ -159,6 +155,7 @@ export class VoucherEntryNewComponent {
         if (!!this.accountingService.accCacheData.FiscalYearList && this.accountingService.accCacheData.FiscalYearList.length > 0) {//mumbai-team-june2021-danphe-accounting-cache-change
             this.coreService.SetFiscalYearList(this.accountingService.accCacheData.FiscalYearList);//mumbai-team-june2021-danphe-accounting-cache-change
         }
+        this.ActiveHospitalId = this.securityService.AccHospitalInfo.ActiveHospitalId > 0 ? this.securityService.AccHospitalInfo.ActiveHospitalId : this.ActiveHospitalId;
     }
 
     ngOnInit() {
@@ -196,6 +193,11 @@ export class VoucherEntryNewComponent {
         let subLedgerParma = Parameter.find(a => a.ParameterGroupName === "Accounting" && a.ParameterName === "SubLedgerAndCostCenter");
         if (subLedgerParma) {
             this.subLedgerAndCostCenterSetting = JSON.parse(subLedgerParma.ParameterValue);
+        }
+
+        let drCrErrorParam = Parameter.find(a => a.ParameterGroupName === "Accounting" && a.ParameterName === "DrCrErrorMargin");
+        if (drCrErrorParam) {
+            this.DrCrErrorMargin = drCrErrorParam.ParameterValue;
         }
     }
 
@@ -379,14 +381,6 @@ export class VoucherEntryNewComponent {
             }
             this.transaction.TransactionItems.push(currentTxnItem);
             let index = this.transaction.TransactionItems.length;
-            if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.PaymentVoucher) {
-                this.transaction.TransactionItems[index - 1].TransactionItemValidator.controls["DrCr"].disable();
-                this.selDrCrArray[index - 1] = "Dr";
-            }
-            else if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.ReceiptVoucher) {
-                this.transaction.TransactionItems[index - 1].TransactionItemValidator.controls["DrCr"].disable();
-                this.selDrCrArray[index - 1] = "Cr";
-            }
             this.DescriptionValChanged(this.transaction.TransactionItems.length - 1);
             this.ledgerWiseSubLedgerMaster[index - 1] = this.subLedgerMaster;
 
@@ -416,10 +410,15 @@ export class VoucherEntryNewComponent {
                 this.transaction.IsBackDateEntry = true;
                 this.transaction.TransactionDate = this.TransactionDate.concat(" 00:01:00");
             }
-            this.accountingBLService.PostToTransaction(this.transaction).
-                subscribe(res => {
+            this.HideSavebtn = true;
+            this.coreService.loading = true;
+            this.accountingBLService.PostToTransaction(this.transaction)
+                .finally(() => {
+                    this.coreService.loading = false;
+                    this.HideSavebtn = false;
+                })
+                .subscribe(res => {
                     if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
-                        this.HideSavebtn = false;
                         this.Reset();
                         this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Voucher is successfully Saved."]);
                         this.ViewTransactionDetails(res.Results);
@@ -428,42 +427,12 @@ export class VoucherEntryNewComponent {
                     else {
                         this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Failed to create transaction.']);
                         this.logError(res.ErrorMessage);
-                        this.HideSavebtn = false;
                     }
                 });
-        }
-        else {
-            if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.PaymentVoucher || this.selectedVoucherCode === ENUM_ACC_VoucherCode.ReceiptVoucher) {
-                let index = this.transaction.TransactionItems.findIndex(a => a.LedgerId === this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId);
-                if (index >= 0) {
-                    this.transaction.TransactionItems.splice(index, 1);
-                }
-            }
         }
     }
 
     public Validate(): boolean {
-        if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.PaymentVoucher || this.selectedVoucherCode === ENUM_ACC_VoucherCode.ReceiptVoucher) {
-            if (this.selectedVoucherCode == ENUM_ACC_VoucherCode.PaymentVoucher) {
-                let index = this.transaction.TransactionItems.findIndex(a => a.DrCr == false);
-                if (index >= 0)
-                    this.transaction.TransactionItems.splice(index, 1);
-                this.extraTransactionItemForPaymentOrReceiptVoucher.DrCr = false;
-            }
-            else {
-                let index = this.transaction.TransactionItems.findIndex(a => a.DrCr == true);
-                if (index >= 0)
-                    this.transaction.TransactionItems.splice(index, 1);
-                this.extraTransactionItemForPaymentOrReceiptVoucher.DrCr = true;
-            }
-            this.extraTransactionItemForPaymentOrReceiptVoucher.Amount = this.transaction.TransactionItems.reduce((a, b) => a + b.Amount, 0);
-            if (this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId <= 0 || (this.subLedgerAndCostCenterSetting.EnableSubLedger && this.extraTransactionItemForPaymentOrReceiptVoucher.SubLedgers.length <= 0)) {
-                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, [`Please select at least one ledger/sub-ledger for payment or receipt.`]);
-                return false;
-            }
-            this.transaction.TransactionItems.push(this.extraTransactionItemForPaymentOrReceiptVoucher);
-            this.CalculateLedger();
-        }
         if (this.transaction.TransactionItems.length > 2) {
             this.transaction.TransactionItems = this.transaction.TransactionItems.filter(a => a.LedgerId > 0);
         }
@@ -479,6 +448,11 @@ export class VoucherEntryNewComponent {
                     this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Default CostCenter not found.']);
                 }
             });
+        }
+        if (this.isEditVoucher && !this.transaction.Reason) {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Please Add Reason to edit the Voucher.']);
+            return false;
+
         }
 
         this.transaction.UpdateValidator("off", "PayeeName", "required");
@@ -507,22 +481,15 @@ export class VoucherEntryNewComponent {
                             txnItem.TransactionItemValidator.controls[b].markAsDirty();
                             txnItem.TransactionItemValidator.controls[b].updateValueAndValidity();
                         }
+                        if (!this.subLedgerAndCostCenterSetting.EnableSubLedger) {
+                            txnItem.TransactionItemValidator.removeControl("SubLedgerId");
+                        }
+                        console.log(txnItem.TransactionItemValidator.value);
+                        txnItem.TransactionItemValidator.controls['CostCenter'].setValue(txnItem.CostCenterId);
                         if (!txnItem.IsValidCheck(undefined, undefined)) {
-                            if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.PaymentVoucher || ENUM_ACC_VoucherCode.ReceiptVoucher) {
-                                if ((txnItem.Amount === this.extraTransactionItemForPaymentOrReceiptVoucher.Amount && txnItem.LedgerId === this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId &&
-                                    ((this.subLedgerAndCostCenterSetting.EnableSubLedger && txnItem.SubLedgers && txnItem.SubLedgers.length > 0) || !this.subLedgerAndCostCenterSetting.EnableSubLedger))) {
-                                    txnValidation = true;
-                                }
-                                else {
-                                    txnValidation = false;
-                                }
-                                this.HideSavebtn = true;
-                            }
-                            else {
-                                txnValidation = false;
-                                this.HideSavebtn = false;
-                                return false;
-                            }
+                            txnValidation = false;
+                            this.HideSavebtn = false;
+                            return false;
                         }
                     };
                 }
@@ -548,7 +515,7 @@ export class VoucherEntryNewComponent {
 
                         if (groupedData) {
                             let groupedValues = Object.values(groupedData);
-                            if (groupedValues.some(a => a["Amount"] > 0.01)) {
+                            if (groupedValues.some(a => Math.abs(a["Amount"]) >= this.DrCrErrorMargin)) {
                                 let msg = "| ";
                                 groupedValues.forEach(a => {
                                     if (a["Amount"] !== 0) {
@@ -568,7 +535,10 @@ export class VoucherEntryNewComponent {
                         this.HideSavebtn = false;
                     }
                 }
-
+                else {
+                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Validation issue, please check console for more detail...`]);
+                    return false;
+                }
             }
         } catch (ex) {
             this.ShowCatchErrMessage(ex);
@@ -663,7 +633,7 @@ export class VoucherEntryNewComponent {
                 for (let item of this.selLedgerArr) {
                     if (!item || typeof (item) != 'object') {
                         item = undefined;
-                        this.msgBoxServ.showMessage("failed", ["Invalid itemList Name. Please select itemList from the list."]);
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Invalid itemList Name. Please select itemList from the list."]);
                         this.HideSavebtn = false;
                         return false;
                     }
@@ -706,18 +676,9 @@ export class VoucherEntryNewComponent {
             this.totalCredit = 0;
             this.ChangeFocus("voucher");
             this.routeFromService.RouteFrom = "";
-            this.extraTransactionItemForPaymentOrReceiptVoucher = new TransactionItem();
-            this.SetDefaultCostCenterForExtraItem();
             this.selectedLedgerCode = [];
             this.voucherVerificationRequired = false;
             this.isEditVoucher = false;
-            this.additionalPartyDetailForPaymentOrReceiptVoucher = {
-                selectedLedgerCode: null,
-                selectedLedger: null,
-                selectedSubLedgerCode: null,
-                selectedSubLedger: null
-            };
-            this.paymentOrReceiptPartyName = "";
         } catch (ex) {
             this.ShowCatchErrMessage(ex);
         }
@@ -740,6 +701,7 @@ export class VoucherEntryNewComponent {
             this.totalDebit = CommonFunctions.parseDecimal(this.totalDebit);
             this.totalCredit = CommonFunctions.parseDecimal(this.totalCredit);
             this.totalAmount = (this.totalDebit > 0) ? this.totalDebit : this.totalCredit;
+
         } catch (ex) {
             this.ShowCatchErrMessage(ex);
         }
@@ -864,22 +826,12 @@ export class VoucherEntryNewComponent {
             }
         }
         if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.PaymentVoucher) {
-            this.extraTransactionItemForPaymentOrReceiptVoucher = new TransactionItem();
-            this.SetDefaultCostCenterForExtraItem();
-            this.transaction.TransactionItems.forEach(a => {
-                a.TransactionItemValidator.controls["DrCr"].disable();
-            });
             this.selDrCrArray.fill(ENUM_ACC_DrCr.Dr);
             setTimeout(() => {
                 this.subLedgerAndCostCenterSetting.EnableSubLedger ? this.ChangeFocus(`extra_SubLedger_Code_for_PMTV_and_Receipt`) : this.ChangeFocus(`extra_Ledger_Code_for_PMTV_and_Receipt`);
             }, 100);
         }
         else if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.ReceiptVoucher) {
-            this.extraTransactionItemForPaymentOrReceiptVoucher = new TransactionItem();
-            this.SetDefaultCostCenterForExtraItem();
-            this.transaction.TransactionItems.forEach(a => {
-                a.TransactionItemValidator.controls["DrCr"].disable();
-            });
             this.selDrCrArray.fill(ENUM_ACC_DrCr.Cr);
             setTimeout(() => {
                 this.subLedgerAndCostCenterSetting.EnableSubLedger ? this.ChangeFocus(`extra_SubLedger_Code_for_PMTV_and_Receipt`) : this.ChangeFocus(`extra_Ledger_Code_for_PMTV_and_Receipt`);
@@ -897,16 +849,10 @@ export class VoucherEntryNewComponent {
                     this.ChangeFocus('Code_1');
                 }
             }, 100);
-            this.paymentOrReceiptPartyName = "";
+            this.transaction.PayeeName = "";
             this.UpdateNarration();
         }
         this.transaction.TransactionItems.forEach((a, index) => this.onDrCrChange(index));
-        this.additionalPartyDetailForPaymentOrReceiptVoucher = {
-            selectedLedgerCode: null,
-            selectedLedger: null,
-            selectedSubLedgerCode: null,
-            selectedSubLedger: null
-        }
     }
 
     CheckAndAddNewTxnLedger($event, index) {
@@ -933,29 +879,6 @@ export class VoucherEntryNewComponent {
                     this.DrCrList = this.DrCrList.reverse();
                 }
             }
-
-            let ind = this.transaction.TransactionItems.length;
-            if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.PaymentVoucher) {
-                this.transaction.TransactionItems[ind - 1].TransactionItemValidator.controls["DrCr"].disable();
-                this.selDrCrArray[ind - 1] = "Dr";
-                if (this.subLedgerAndCostCenterSetting.EnableSubLedger) {
-                    this.ChangeFocus('SubLedger_Code_' + (i + 1));
-                }
-                else {
-                    this.ChangeFocus('Code_' + (i + 1));
-                }
-            }
-            else if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.ReceiptVoucher) {
-                this.transaction.TransactionItems[ind - 1].TransactionItemValidator.controls["DrCr"].disable();
-                this.selDrCrArray[ind - 1] = "Cr";
-                if (this.subLedgerAndCostCenterSetting.EnableSubLedger) {
-                    this.ChangeFocus('SubLedger_Code_' + (i + 1));
-                }
-                else {
-                    this.ChangeFocus('Code_' + (i + 1));
-                }
-            }
-
         }
     }
 
@@ -969,15 +892,6 @@ export class VoucherEntryNewComponent {
         this.showAddNewLedgerPage = false;
 
     }
-
-
-    SetDefaultCostCenterForExtraItem() {
-        let defaultCostCenter = this.costCenterList.find(a => a.IsDefault === true);
-        if (defaultCostCenter) {
-            this.extraTransactionItemForPaymentOrReceiptVoucher.CostCenterId = defaultCostCenter.CostCenterId;
-        }
-    }
-
     GettempVoucherNumber(voucherId: number, sectionId, transactionDate) {
         if (this.routeFromService.RouteFrom === ENUM_ACC_RouteFrom.VoucherVerify || this.routeFromService.RouteFrom === ENUM_ACC_RouteFrom.EditVoucher) {
             return;
@@ -1004,8 +918,6 @@ export class VoucherEntryNewComponent {
             }
         }
     }
-
-
     Cancel() {
         if (this.isEditVoucher) {
             this.callBackFunction.emit();
@@ -1055,74 +967,13 @@ export class VoucherEntryNewComponent {
         this.transaction.TransactionId = data.TransactionId;
         let txnItems = data.TransactionItems;
         this.selectedVoucherCode = this.voucherTypeList.find(a => a.VoucherId == this.selVoucherTypeId).VoucherCode;
-        if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.PaymentVoucher) {
-            let tempTxn = txnItems.find(a => a.DrCr == false);
-            let ledger = tempTxn && this.allLedgerList.find(a => a.LedgerId === tempTxn.LedgerId);
-            if (ledger) {
-                let ledgerGroup = this.accountingService.accCacheData.LedgerGroups.find(a => a.LedgerGroupId === ledger.LedgerGroupId);
-                if (ledgerGroup) {
-                    let codeDetail = this.accountingService.accCacheData.CodeDetails.find(a => a.Name === ledgerGroup.Name && a.Description === 'LedgerGroupName');
-                    if (codeDetail) {
-                        this.paymentMode = codeDetail.Code === '021' ? ENUM_ACC_PaymentMode.Cash : ENUM_ACC_PaymentMode.Bank;
-                        this.filterPaymentOrReceiptLedger();
-                    }
-                }
-            }
-            this.extraTransactionItemForPaymentOrReceiptVoucher.Amount = tempTxn.Amount;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.DrCr = tempTxn.DrCr;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.Description = tempTxn.Description;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId = tempTxn.LedgerId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.CostCenterId = tempTxn.CostCenterId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.TransactionItemId = tempTxn.TransactionItemId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.TransactionId = tempTxn.TransactionId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId = tempTxn.LedgerId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.SubLedgers = tempTxn.SubLedgers;
-
-            this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger = tempTxn.LedgerName;
-            this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedgerCode = tempTxn.Code;
-            if (tempTxn.SubLedgers && tempTxn.SubLedgers.length > 0) {
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedger = tempTxn.SubLedgers[0].SubLedgerName;
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode = tempTxn.SubLedgers[0].SubLedgerCode;
-            }
-            txnItems = txnItems.filter(a => a.DrCr == true);
-        }
-        else if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.ReceiptVoucher) {
-            let tempTxn = txnItems.find(a => a.DrCr == true);
-            let ledger = tempTxn && this.allLedgerList.find(a => a.LedgerId === tempTxn.LedgerId);
-            if (ledger) {
-                let ledgerGroup = this.accountingService.accCacheData.LedgerGroups.find(a => a.LedgerGroupId === ledger.LedgerGroupId);
-                if (ledgerGroup) {
-                    let codeDetail = this.accountingService.accCacheData.CodeDetails.find(a => a.Name === ledgerGroup.Name && a.Description === 'LedgerGroupName');
-                    if (codeDetail) {
-                        this.paymentMode = codeDetail.Code === '021' ? ENUM_ACC_PaymentMode.Cash : ENUM_ACC_PaymentMode.Bank;
-                        this.filterPaymentOrReceiptLedger();
-                    }
-                }
-            }
-            this.extraTransactionItemForPaymentOrReceiptVoucher.Amount = tempTxn.Amount;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.DrCr = tempTxn.DrCr;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.Description = tempTxn.Description;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId = tempTxn.LedgerId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.CostCenterId = tempTxn.CostCenterId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.TransactionItemId = tempTxn.TransactionItemId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.TransactionId = tempTxn.TransactionId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId = tempTxn.LedgerId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.SubLedgers = tempTxn.SubLedgers;
-
-            this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger = tempTxn.LedgerName;
-            this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedgerCode = tempTxn.Code;
-            if (tempTxn.SubLedgers && tempTxn.SubLedgers.length > 0) {
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedger = tempTxn.SubLedgers[0].SubLedgerName;
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode = tempTxn.SubLedgers[0].SubLedgerCode;
-            }
-            txnItems = txnItems.filter(a => a.DrCr == false);
-        }
         this.TempVoucherNumber = data.VoucherNumber;
 
         this.GettempVoucherNumber(this.transaction.VoucherId, data.SectionId, this.todaysDate);
         this.transaction.Remarks = data.Remarks;
         this.transaction.ChequeDate = data.ChequeDate;
         this.transaction.ChequeNumber = data.ChequeNumber;
+        this.transaction.PayeeName = data.PayeeName;
 
         txnItems.forEach((element, index) => {
             this.AddNewTxnLedger();
@@ -1164,103 +1015,6 @@ export class VoucherEntryNewComponent {
         this.voucherNumber = this.CopyVoucherNumber;
         this.fiscalYId = this.fiscalYearIdForCopyVoucher;
     }
-    public AssignExtraLedger(): void {
-        if (typeof this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger === ENUM_Data_Type.Object && this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger) {
-            this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId = this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger.LedgerId;
-            this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode = null;
-            this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedger = null;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.SubLedgers = [];
-            this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedgerCode = this.allLedgerList.find(a => a.LedgerId === this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger.LedgerId).Code;
-            this.paymentORreciptSubLedgerList = this.subLedgerMaster.filter(a => a.LedgerId === this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger.LedgerId);
-            if (this.subLedgerAndCostCenterSetting.EnableSubLedger) {
-                this.ChangeFocus("extra_SubLedger_Code_for_PMTV_and_Receipt");
-            }
-            else if (this.subLedgerAndCostCenterSetting.EnableCostCenter) {
-                this.ChangeFocus("id_extraTransactionItemForPaymentOrReceiptVoucher_costCenterId_voucherEntry");
-            }
-            else if (this.paymentMode !== this.paymentModeList.Bank && !this.subLedgerAndCostCenterSetting.EnableCostCenter && !this.subLedgerAndCostCenterSetting.EnableSubLedger) {
-                this.ChangeFocus("extra_Narration_for_PMTV_and_Receipt")
-            }
-            else if (this.paymentMode == this.paymentModeList.Bank && !this.subLedgerAndCostCenterSetting.EnableCostCenter && !this.subLedgerAndCostCenterSetting.EnableSubLedger) {
-                this.ChangeFocus("input_voucherEntry_chequeNumber")
-            }
-        }
-        else {
-            this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger ? this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger.trim() : true;
-            let ledger = this.paymentORreciptLedgerList.find(a => a.LedgerName === this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger);
-            if (this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger === "" || (ledger && ledger.LedgerId !== this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId))
-                this.paymentORreciptSubLedgerList = this.subLedgerMaster.filter(a => this.paymentORreciptLedgerList.some(b => a.LedgerId === b.LedgerId));
-        }
-    }
-
-    public AssignExtraSubLedger(isCode: boolean) {
-        if (isCode && typeof this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode === ENUM_Data_Type.Object) {
-            let subLedTxn = new SubLedgerTransactionModel();
-            subLedTxn.LedgerId = this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode.LedgerId;
-            subLedTxn.SubLedgerId = this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode.SubLedgerId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId = subLedTxn.LedgerId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.SubLedgers = [];
-            this.extraTransactionItemForPaymentOrReceiptVoucher.SubLedgers.push(subLedTxn)
-            let subLedger = this.subLedgerMaster.find(a => a.SubLedgerId === this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode.SubLedgerId);
-            let Ledger = this.allLedgerList.find(a => a.LedgerId === this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode.LedgerId);
-            if (subLedger) {
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedger = subLedger;
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode = subLedger.SubLedgerCode;
-            }
-            if (Ledger) {
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger = Ledger.LedgerName;
-            }
-        }
-        else if (typeof this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedger === ENUM_Data_Type.Object) {
-            let subLedTxn = new SubLedgerTransactionModel();
-            subLedTxn.LedgerId = this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedger.LedgerId;
-            subLedTxn.SubLedgerId = this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedger.SubLedgerId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId = subLedTxn.LedgerId;
-            this.extraTransactionItemForPaymentOrReceiptVoucher.SubLedgers = [];
-            this.extraTransactionItemForPaymentOrReceiptVoucher.SubLedgers.push(subLedTxn)
-            let subLedger = this.subLedgerMaster.find(a => a.SubLedgerId === this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedger.SubLedgerId);
-            let Ledger = this.allLedgerList.find(a => a.LedgerId === this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedger.LedgerId);
-            if (subLedger) {
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedSubLedgerCode = subLedger.SubLedgerCode;
-            }
-            if (Ledger) {
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger = Ledger.LedgerName;
-            }
-        }
-    }
-
-    public AssignExtraLedgerCode() {
-        if (typeof this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedgerCode === ENUM_Data_Type.Object) {
-            this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId = this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedgerCode.LedgerId;
-            let Ledger = this.allLedgerList.find(a => a.LedgerId === this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedgerCode.LedgerId);
-            if (Ledger) {
-                this.additionalPartyDetailForPaymentOrReceiptVoucher.selectedLedger = Ledger.LedgerName;
-            }
-            this.ChangeFocus("extra_Ledger_for_PMTV_and_Receipt");
-        }
-    }
-
-
-    public filterPaymentOrReceiptLedger(): void {
-        this.extraTransactionItemForPaymentOrReceiptVoucher = new TransactionItem();
-        this.additionalPartyDetailForPaymentOrReceiptVoucher = {
-            selectedLedgerCode: null,
-            selectedLedger: null,
-            selectedSubLedgerCode: null,
-            selectedSubLedger: null
-        };
-        this.SetDefaultCostCenterForExtraItem();
-        let codeDetail = this.accountingService.accCacheData.CodeDetails.find(a => a.Code === (this.paymentMode === ENUM_ACC_PaymentMode.Cash ? '021' : '022') && a.Description === 'LedgerGroupName');
-        if (codeDetail) {
-            let ledgerGroup = this.accountingService.accCacheData.LedgerGroups.find(a => a.Name === codeDetail.Name);
-            if (ledgerGroup) {
-                this.paymentORreciptLedgerList = this.allLedgerList.filter(a => a.LedgerGroupId === ledgerGroup.LedgerGroupId);
-                this.paymentORreciptSubLedgerList = this.subLedgerMaster.filter(a => this.paymentORreciptLedgerList.some(b => a.LedgerId === b.LedgerId));
-            }
-        }
-        this.subLedgerAndCostCenterSetting.EnableSubLedger ? this.ChangeFocus(`extra_SubLedger_Code_for_PMTV_and_Receipt`) : this.ChangeFocus(`extra_Ledger_Code_for_PMTV_and_Receipt`);
-    }
-
     LedgerCodeFormatter(data: LedgerModel): string {
         return data["Code"];
     }
@@ -1323,13 +1077,15 @@ export class VoucherEntryNewComponent {
         let oldSubledgerId = this.transaction.TransactionItems[index] ? (this.transaction.TransactionItems[index].SubLedgers.length > 0 ? this.transaction.TransactionItems[index].SubLedgers[0].SubLedgerId : 0) : 0;
         if (typeof this.selectedSubLedger[index] === "object" && this.selectedSubLedger[index].SubLedgerId > 0) {
             let subLedgerExists = false;
-            this.transaction.TransactionItems.forEach((item, position) => {
-                let indx = item.SubLedgers.findIndex(sub => sub.SubLedgerId === this.selectedSubLedger[index].SubLedgerId);
-                if (indx >= 0 && position != index) {
-                    subLedgerExists = true;
-                    return;
-                }
-            });
+            if (!this.IsAllowDuplicateVoucherEntry) {
+                this.transaction.TransactionItems.forEach((item, position) => {
+                    let indx = item.SubLedgers.findIndex(sub => sub.SubLedgerId === this.selectedSubLedger[index].SubLedgerId);
+                    if (indx >= 0 && position != index) {
+                        subLedgerExists = true;
+                        return;
+                    }
+                });
+            }
             if (subLedgerExists) {
                 this.selectedSubLedger[index] = new SubLedger_DTO();
                 this.transaction.TransactionItems[index].TransactionItemValidator.get("SubLedgerId").setValue("");
@@ -1362,7 +1118,10 @@ export class VoucherEntryNewComponent {
             let subledger = this.subLedgerMaster.find(a => a.LedgerId === oldLedgerId && (this.selectedSubLedger[index] ? a.SubLedgerName === this.selectedSubLedger[index] : true));
             if (!subledger || (subledger && (oldSubledgerId !== 0 && oldSubledgerId != subledger.SubLedgerId))) {
                 this.transaction.TransactionItems[index].TransactionItemValidator.get("LedgerId").setValue("");
+                this.transaction.TransactionItems[index].TransactionItemValidator.get("SubLedgerId").setValue("");
                 this.selSubLedgerCode[index] = "";
+                this.ledgerWiseSubLedgerMaster[index] = this.subLedgerMaster;
+
             }
         }
     }
@@ -1390,8 +1149,6 @@ export class VoucherEntryNewComponent {
         this.HideSavebtn = true;
 
         let txnItems = _.cloneDeep(this.transaction.TransactionItems);
-        let extraItem = _.cloneDeep(this.extraTransactionItemForPaymentOrReceiptVoucher);
-        txnItems.push(extraItem);
         let groupedData = txnItems.reduce((acc, currVal) => {
             if (acc.hasOwnProperty(currVal.CostCenterId.toString())) {
                 acc[currVal.CostCenterId.toString()].Amount += (currVal.DrCr ? currVal.Amount : -currVal.Amount);
@@ -1404,7 +1161,7 @@ export class VoucherEntryNewComponent {
 
         if (groupedData) {
             let groupedValues = Object.values(groupedData);
-            if (groupedValues.some(a => a["Amount"] > 0.01)) {
+            if (groupedValues.some(a => Math.abs(a["Amount"]) >= this.DrCrErrorMargin)) {
                 let msg = "| ";
                 groupedValues.forEach(a => {
                     if (a["Amount"] !== 0) {
@@ -1432,18 +1189,12 @@ export class VoucherEntryNewComponent {
             item.TransactionItemId = ledger.TransactionItemId
             items.push(item);
         });
-
-        let item = new VoucherLedgerInfo_DTO();
-        item.LedgerId = this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId;
-        item.Description = this.extraTransactionItemForPaymentOrReceiptVoucher.Description;
-        item.CostCenterId = this.extraTransactionItemForPaymentOrReceiptVoucher.CostCenterId;
-        item.TransactionItemId = this.extraTransactionItemForPaymentOrReceiptVoucher.TransactionItemId
-        items.push(item);
-
         voucherData.Items = items;
+        this.coreService.loading = true;
         this.accountingBLService.VerifyVoucher(voucherData)
             .finally(() => {
                 this.HideSavebtn = false;
+                this.coreService.loading = false;
                 this.Cancel();
             })
             .subscribe((res: DanpheHTTPResponse) => {
@@ -1503,6 +1254,9 @@ export class VoucherEntryNewComponent {
             }
         }
         else {
+            if (this.selSubLedgerCode[index] === undefined || this.selSubLedgerCode[index].trim() === "") {
+                return;
+            }
             this.selSubLedgerCode[index] ? this.selSubLedgerCode[index] = this.selSubLedgerCode[index].trim() : true;
             let subledger = this.subLedgerMaster.find(a => a.LedgerId === oldLedgerId && (this.selSubLedgerCode[index] ? a.SubLedgerCode === this.selSubLedgerCode[index] : true));
             if (!subledger || (subledger && (oldSubledgerId !== 0 && subledger.SubLedgerId != oldSubledgerId))) {
@@ -1545,25 +1299,16 @@ export class VoucherEntryNewComponent {
                     });
             }
         }
-        else {
-            if (this.selectedVoucherCode === ENUM_ACC_VoucherCode.PaymentVoucher || this.selectedVoucherCode === ENUM_ACC_VoucherCode.ReceiptVoucher) {
-                let index = this.transaction.TransactionItems.findIndex(a => a.LedgerId === this.extraTransactionItemForPaymentOrReceiptVoucher.LedgerId);
-                if (index >= 0) {
-                    this.transaction.TransactionItems.splice(index, 1);
-                }
-            }
-        }
     }
 
     public UpdateNarration() {
-        this.transaction.Remarks = this.paymentOrReceiptPartyName + this.transaction.Remarks.substring(this.paymentOrReceiptPartyNameLength, this.transaction.Remarks.length);
-        this.paymentOrReceiptPartyNameLength = this.paymentOrReceiptPartyName.length;
+        this.transaction.Remarks = this.transaction.PayeeName + this.transaction.Remarks.substring(this.paymentOrReceiptPartyNameLength, this.transaction.Remarks.length);
+        this.paymentOrReceiptPartyNameLength = this.transaction.PayeeName.length;
     }
 
     public PushNarration() {
         this.transaction.TransactionItems.forEach(item => {
             item.Description = this.transaction.Remarks;
         });
-        this.extraTransactionItemForPaymentOrReceiptVoucher.Description = this.transaction.Remarks;
     }
 }

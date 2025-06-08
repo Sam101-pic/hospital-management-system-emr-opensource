@@ -3,6 +3,7 @@ import { Router } from "@angular/router";
 import { CoreService } from "../../../core/shared/core.service";
 import { Patient } from "../../../patients/shared/patient.model";
 import { PatientService } from "../../../patients/shared/patient.service";
+import { SecurityService } from "../../../security/shared/security.service";
 import { CancelStatusHoldingModel, DanpheHTTPResponse } from "../../../shared/common-models";
 import { CommonFunctions } from "../../../shared/common.functions";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
@@ -16,7 +17,8 @@ import { ServiceItemDetails_DTO } from "../../shared/dto/service-item-details.dt
 
 @Component({
   selector: 'provisional-items',
-  templateUrl: './bil-provisional-items.component.html'
+  templateUrl: './bil-provisional-items.component.html',
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class ProvisionalItemsViewDetailsComponent {
 
@@ -104,12 +106,16 @@ export class ProvisionalItemsViewDetailsComponent {
     private _coreService: CoreService,
     private _changeDetector: ChangeDetectorRef,
     private _billingMasterBlService: BillingMasterBlService,
-    private _router: Router) {
+    private _router: Router,
+    private _securityService: SecurityService) {
 
   }
 
 
   ngOnInit(): void {
+    if (this._securityService.getLoggedInCounter()) {
+      this.counterId = this._securityService.getLoggedInCounter().CounterId;
+    }
     if (this.SelectedProvisionalContext.PatientId && this.SelectedProvisionalContext.SchemeId) {
       const patientId = this.SelectedProvisionalContext.PatientId;
       const schemeId = this.SelectedProvisionalContext.SchemeId;
@@ -509,4 +515,17 @@ export class ProvisionalItemsViewDetailsComponent {
   HandleCancel() {
     console.info("Discard All Items Cancelled");
   }
+
+
+  hotkeys(event) {
+    if (event.keyCode === 27) {
+      if (this.ShowEstimationBill) {
+        this.CloseEstimationPopup();
+      }
+      if (this.ShowNewItemsPopup) {
+        this.ShowNewItemsPopup = false;
+      }
+    }
+  }
+
 }

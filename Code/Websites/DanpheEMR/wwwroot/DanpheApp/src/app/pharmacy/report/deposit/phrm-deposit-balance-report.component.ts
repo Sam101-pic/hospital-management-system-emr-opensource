@@ -1,11 +1,12 @@
 import { Component } from '@angular/core';
 import * as moment from 'moment/moment';
-import { PHRMReportsModel } from "../../shared/phrm-reports-model";
+import { PHRMDepositBalanceReportModel } from '../../../dispensary/shared/dispensary-deposit-balance-report.model';
+import { ReportingService } from "../../../reporting/shared/reporting-service";
+import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
 import PHRMReportsGridColumns from "../../shared/phrm-reports-grid-columns";
-import { DLService } from "../../../shared/dl.service"
-import { ReportingService } from "../../../reporting/shared/reporting-service"
+import { PHRMReportsModel } from "../../shared/phrm-reports-model";
 @Component({
   selector: "my-app",
   templateUrl: "./phrm-deposit-balance-report.html"
@@ -13,10 +14,10 @@ import { ReportingService } from "../../../reporting/shared/reporting-service"
 
 export class PHRMDepositBalanceReport {                                        //"DepositBalanceReport"
   PHRMDepositBalanceReportColumn: Array<any> = null;
-  PHRMDepositBalanceReportData: Array<any> = new Array<PHRMReportsModel>();
+  PHRMDepositBalanceReportData: Array<PHRMDepositBalanceReportModel> = new Array<PHRMDepositBalanceReportModel>();
   public phrmReports: PHRMReportsModel = new PHRMReportsModel();
   dlService: DLService = null;
-  public pharmacy:string = "pharmacy";
+  public pharmacy: string = "pharmacy";
 
   constructor(
     public pharmacyBLService: PharmacyBLService,
@@ -26,7 +27,7 @@ export class PHRMDepositBalanceReport {                                        /
 
   ) {
     this.PHRMDepositBalanceReportColumn = PHRMReportsGridColumns.PHRMDepositBalanceReport;
-   
+
     this.dlService = _dlService;
     this.Load();
   };
@@ -37,11 +38,10 @@ export class PHRMDepositBalanceReport {                                        /
   };
 
   Load() {
-    this.pharmacyBLService.GetPHRMDepositBalanceReport()
+    this.pharmacyBLService.GetPhrmDepositBalanceReport()
       .subscribe(res => {
         if (res.Status == 'OK') {
-
-          this.PHRMDepositBalanceReportColumn = PHRMReportsGridColumns.PHRMDepositBalanceReport;
+          this.PHRMDepositBalanceReportColumn = PHRMReportsGridColumns.PHRMDepositBalanceReportColumns;;
           this.PHRMDepositBalanceReportData = res.Results;
         }
         else {

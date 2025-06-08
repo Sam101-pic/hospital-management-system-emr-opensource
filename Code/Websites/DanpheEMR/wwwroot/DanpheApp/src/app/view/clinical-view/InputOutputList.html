@@ -23,9 +23,7 @@
                                 </div>
                                 <div class="col-md-2 col-xs-12">
                                     <div class="form-group">
-                                        <button class="btn blue"
-                                                type="button"
-                                                (click)="showInputOutput = true; GetPatientInputOutputList()">
+                                        <button class="btn blue" type="button" (click)="showInputOutput = true; GetPatientInputOutputList()">
                                             <i class="fa fa-search"></i> Load
                                         </button>
                                     </div>
@@ -33,15 +31,16 @@
                             </div>
                             <div class="cstm-portlet-body">
                                 <div class="table-responsive">
-                                    <danphe-grid [grid-colDefaults]="intakeOutputGridColumns" [grid-data]="inputoutputLists" *ngIf="showInputOutput">
+                                    <danphe-grid [grid-colDefaults]="intakeOutputGridColumns" [grid-data]="inputoutputLists" *ngIf="showInputOutput"
+                                                 [report-for]="'pharmacy'" [NepaliDateInGridParams]="NepaliDateInGridSettings" [show-header]="true"
+                                                 [report-title]="'INTAKE AND OUTPUT RECORD'">
                                     </danphe-grid>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <InputOutput-add *ngIf="showIOAddBox" [showIOAddBox]="showIOAddBox"
-                                         [selected-IO]="selectedIO" [last-balance]="lastBalance"
+                        <InputOutput-add *ngIf="showIOAddBox" [showIOAddBox]="showIOAddBox" [selected-IO]="selectedIO" [last-balance]="lastBalance"
                                          (callback-ioupdate)="showInputOutput = true; callbackIoUpdate($event)">
                         </InputOutput-add>
                     </div>

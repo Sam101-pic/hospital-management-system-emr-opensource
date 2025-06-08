@@ -39,12 +39,13 @@ export class BillingOpPatientVM {
   public MunicipalityId: number = null;
   public WardNumber: number = null;
   public EthnicGroup: string = "";
-
+  public Salutation: string = "";
   public OutPatientValidator: FormGroup = null;
 
   constructor() {
     var _formBuilder = new FormBuilder();
     this.OutPatientValidator = _formBuilder.group({
+      'Salutation': [''],
       'FirstName': ['', Validators.compose([Validators.required, Validators.maxLength(30)])],
       'LastName': ['', Validators.compose([Validators.required, Validators.maxLength(30)])],
       'MiddleName': ['', Validators.compose([Validators.maxLength(30)])],

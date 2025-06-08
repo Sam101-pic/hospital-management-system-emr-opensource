@@ -3,7 +3,7 @@
 </div> -->
 
 <div class="row">
-  <div class="col-md-12" style="padding-top:10px;border:2px solid">
+  <div class="col-md-12" style="padding-top:10px; border:1px solid #dddd !important">
     <div class="row">
       <div class="col-md-10">
         <div class="row">
@@ -31,11 +31,15 @@
                      display-property-name="name"
                      value-property-name=null (focusout)="AssignSSFEmployerDetail()" onClick="this.select();" />
             </div>
-
+          </div>
+          <div class="col-md-3" *ngIf="insPatient && insPatient.Ins_FirstServicePoint && insPatient.Ins_FirstServicePoint.trim()">
+            <div class="row">
+              <label>First Service Point:<b>{{insPatient.Ins_FirstServicePoint}}</b></label>
+            </div>
           </div>
         </div>
         <div class="row" style="margin-top:10px;padding-bottom: 10px;">
-          <div class="col-md-7">
+          <div class="col-md-6">
             <div *ngIf="currentSchemeParams.ShowMemberNo">
               <label>
                 {{currentSchemeParams.MemberNoLabelName}} <sup *ngIf="this.currentRegSchemeDto.IsMemberNumberCompulsory"> *</sup> <b>:</b>
@@ -43,13 +47,20 @@
               <input *ngIf="currentSchemeParams.EnterMemberNumber; else memberNoValueLabel"
                      id="txtMembershipNo" [(ngModel)]="currentRegSchemeDto.MemberNo"
                      placeholder="Enter {{currentSchemeParams.MemberNoLabelName}}" maxlength="30" type="text"
-                     (keyup.enter)="OnMemberNumberChange();GoToNextElementFromMemberNoElement()" (focusout)="CheckAndProceedToEmit()" />
+                     (keyup.enter)="GoToNextElementFromMemberNoElement()"
+                     (focusout)="OnMemberNumberChange();CheckAndProceedToEmit()" />
               <ng-template #memberNoValueLabel> <label>{{currentRegSchemeDto.MemberNo}}</label> </ng-template>
 
               <button *ngIf="currentSchemeParams.ShowMembershipLoadButton && (IsClaimSuccessful || DisplayMembershipLoadButton)"
                       style="margin-left:10px;"
                       id="id_load_memberInfo" class="btn green btn-success" [disabled]="loading"
                       (click)="loadFromSSFServer = true;LoadMemberInformationClicked()">
+                {{currentSchemeParams.MembershipLoadButtonDisplayName}}
+              </button>
+              <button *ngIf="currentSchemeParams.ShowNGHISLoadButton && IsNSHIParameterEnabled"
+                      style="margin-left:10px;"
+                      id="id_load_memberInfo" class="btn green btn-success" [disabled]="loading"
+                      (click)="LoadFromHIBServer = true;LoadNGHISPatientInformation()">
                 {{currentSchemeParams.MembershipLoadButtonDisplayName}}
               </button>
               <span *ngIf="loading">Please Wait...</span>
@@ -65,25 +76,46 @@
                        placeholder="Enter Claim Code" type="number"
                        (keyup.enter)="GoToNextElementFromClaimCodeNoElement()" (focusout)="CheckAndProceedToEmit()" />
               </span>
-              <!-- <button *ngIf="!currentSchemeParams.ShowMembershipLoadButton" id="id_emit_button" style="margin-left: 10px;"
-                      class="btn green btn-success"
-                      (click)="CheckValidationAndEmit()">Ok</button> -->
+
             </div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-6">
+            <div class="col-md-8" *ngIf="currentSchemeParams.ShowSSFCaseSelections">
+              <label>SSF Case <sup> * </sup><b>:</b> </label>
+              <select name="schemeTypeProduct" id="id_select_schemeTypeProduct_appointment" (change)="selectSSFSchemeTypeSubProduct($event)">
+                <option value="">--Select Scheme SubProduct--</option>
+                <option *ngFor="let item of SchemeTypeSubProduct" value="{{ item.value }}"> {{ item.name }}</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <div *ngIf="currentSchemeParams.ShowOpIpBalance && !currentRegSchemeDto.IsGeneralCreditLimited">
+                <label> OPD Balance: {{currentRegSchemeDto.CreditLimitObj.OpCreditLimit}}</label>
+                <label style="margin-left:10px;"> IPD Balance: {{currentRegSchemeDto.CreditLimitObj.IpCreditLimit}}</label>
+              </div>
+              <div
+                   *ngIf="currentSchemeParams.ShowGeneralBalance && currentRegSchemeDto.IsGeneralCreditLimited">
+                <label> General Balance: {{currentRegSchemeDto.CreditLimitObj.GeneralCreditLimit}}</label>
+              </div>
+            </div>
+          </div>
+          <!-- <div class="col-md-4">
             <div *ngIf="currentSchemeParams.ShowOpIpBalance && !currentRegSchemeDto.IsGeneralCreditLimited">
               <label> OPD Balance: {{currentRegSchemeDto.CreditLimitObj.OpCreditLimit}}</label>
               <label style="margin-left:10px;"> IPD Balance: {{currentRegSchemeDto.CreditLimitObj.IpCreditLimit}}</label>
             </div>
+            <div *ngIf="currentSchemeParams.ShowAvailableBalance">
+              <label> Available Balance: {{insPatient.eligibilityInfo.AllowedMoney }}</label>
+            </div>
             <div
-                 *ngIf="currentSchemeParams.ShowGeneralBalance && currentRegSchemeDto.IsGeneralCreditLimited">
+                 *ngIf="currentSchemeParams.ShowGeneralBalance && currentRegSchemeDto.IsGeneralCreditLimited && !currentSchemeParams.ShowAvailableBalance ">
               <label> General Balance: {{currentRegSchemeDto.CreditLimitObj.GeneralCreditLimit}}</label>
             </div>
 
-          </div>
-          <div class="col-md-1">
+          </div> -->
+          <!-- <div class="col-md-1">
 
-          </div>
+          </div> -->
         </div>
         <div class="row" style="margin-top:10px;padding-bottom: 10px; display: flex;flex-direction: row;margin-left: 0px;"
              *ngIf="DisplaySubSchemeSelection">

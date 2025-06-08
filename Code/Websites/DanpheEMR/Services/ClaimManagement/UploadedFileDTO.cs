@@ -21,5 +21,6 @@ namespace DanpheEMR.Services.ClaimManagement
         public bool IsActive { get; set; }
         public string BinaryData { get; set; }
         public Int64 Size { get; set; }
+        public string FileUploadedBy { get; set; }
     }
 }

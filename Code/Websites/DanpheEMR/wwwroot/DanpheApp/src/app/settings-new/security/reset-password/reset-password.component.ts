@@ -1,10 +1,10 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
-import { SecurityService } from '../../../security/shared/security.service';
-import { Employee } from "../../../employee/shared/employee.model";
-import { User } from "../../../security/shared/user.model";
-import { SettingsBLService } from '../../shared/settings.bl.service';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 import * as moment from 'moment/moment';
+import { SecurityService } from '../../../security/shared/security.service';
+import { User } from "../../../security/shared/user.model";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { SettingsBLService } from '../../shared/settings.bl.service';
 
 @Component({
   selector: "reset-password",
@@ -15,8 +15,6 @@ import * as moment from 'moment/moment';
 export class ResetPasswordComponent {
 
   public CurrentUser: User = new User();
-
-
   public showResetPassPage: boolean = false;
   public reset: boolean = false;
 
@@ -33,29 +31,6 @@ export class ResetPasswordComponent {
     public changeDetector: ChangeDetectorRef) {
     this.GoToNextInput("newpass");
   }
-  //@Input("showResetPassPage")
-  //public set value(val: boolean) {
-  //    this.showResetPassPage = val;
-
-  //    if (this.selectedResetPassItem) {
-  //        this.reset = true;
-  //        this.CurrentUser = new User();
-  //        this.CurrentUser = Object.assign(this.CurrentUser, this.selectedResetPassItem);
-  //        this.CurrentUser.IsActive = this.selectedResetPassItem.IsActive;
-  //        this.CurrentUser.ModifiedBy = this.securityService.GetLoggedInUser().EmployeeId;
-  //        this.CurrentUser.UserId = this.selectedResetPassItem.UserId;
-  //        this.CurrentUser.UserName = this.selectedResetPassItem.UserName;
-  //        this.CurrentUser.NeedsPasswordUpdate = true;
-  //        this.CurrentUser.ModifiedOn = moment().format('YYYY-MM-DD HH:mm');
-
-  //    }
-  //    else {
-  //        this.CurrentUser = new User();
-  //        this.CurrentUser.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
-  //        this.CurrentUser.CreatedOn = moment().format('YYYY-MM-DD HH:mm');
-  //        this.reset = false;
-  //    }
-  //}
 
   ngOnInit() {
     if (this.selectedResetPassItem) {
@@ -89,22 +64,22 @@ export class ResetPasswordComponent {
     }
 
     if (this.CurrentUser.IsValidCheck(undefined, undefined)) {
-      ///if Current user is valid then only we modify the property by Loggin userid and Date by Current date property 
+      ///if Current user is valid then only we modify the property by Loggin userid and Date by Current date property
       this.CurrentUser.ModifiedBy = this.securityService.GetLoggedInUser().EmployeeId;
       this.CurrentUser.ModifiedOn = moment().format('YYYY-MM-DD HH:mm');
 
       this.settingsBLService.UpdatePassword(this.CurrentUser)
         .subscribe(
           res => {
-            if (res.Status == "OK") {
-              this.msgBoxServ.showMessage("success", ['Password Reset Successfully.']);
+            if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Password Reset Successfully.']);
               this.showResetPassPage = false;
               this.CurrentUser = new User();
               this.callbackAdd.emit({});
 
             }
             else {
-              this.msgBoxServ.showMessage("error", ["Something Wrong" + res.ErrorMessage]);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Something Wrong" + res.ErrorMessage]);
               this.logError(res.ErrorMessage);
             }
 

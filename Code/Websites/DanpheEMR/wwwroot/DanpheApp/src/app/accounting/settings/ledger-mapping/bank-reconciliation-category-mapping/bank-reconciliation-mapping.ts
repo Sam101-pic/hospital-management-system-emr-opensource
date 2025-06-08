@@ -2,6 +2,7 @@
 import { Component } from "@angular/core";
 import { AccountingService } from "../../../../accounting/shared/accounting.service";
 import { SubLedger_DTO } from "../../../../accounting/transactions/shared/DTOs/subledger-dto";
+import { CoreService } from "../../../../core/shared/core.service";
 import { DanpheHTTPResponse } from "../../../../shared/common-models";
 import { MessageboxService } from "../../../../shared/messagebox/messagebox.service";
 import { ENUM_ACC_DrCr, ENUM_DanpheHTTPResponses, ENUM_Data_Type, ENUM_MessageBox_Status } from "../../../../shared/shared-enums";
@@ -25,22 +26,29 @@ export class BankReconciliationCategoryLedgerMappingComponent {
     public ledgerWiseSubLedger: Array<Array<SubLedger_DTO>> = new Array<Array<SubLedger_DTO>>();
     public subLedgerMaster: Array<SubLedger_DTO> = new Array<SubLedger_DTO>();
 
-
+    public subLedgerAndCostCenterSetting = {
+        "EnableSubLedger": false,
+        "EnableCostCenter": false
+    };
 
 
     constructor(public accountingSettingsBLService: AccountingSettingsBLService,
-        public msgBoxServ: MessageboxService,
+        public msgBoxServ: MessageboxService, private _coreService: CoreService,
         public accountingService: AccountingService) {
         this.getLedgerList();
         this.getBankReconciliationCategory();
         this.GetSubLedgers();
+        let subLedgerParam = this._coreService.Parameters.find(a => a.ParameterGroupName === "Accounting" && a.ParameterName === "SubLedgerAndCostCenter");
+        if (subLedgerParam) {
+            this.subLedgerAndCostCenterSetting = JSON.parse(subLedgerParam.ParameterValue);
+        }
     }
     UpdateBankReconciliation() {
         let selectedBankReconciliationData = this.bankReconciliationCategoryModeLedgerList.filter(a => a.IsSelected == true);
         let emptyCheck: boolean = false;
 
         for (let i = 0; i < selectedBankReconciliationData.length; i++) {
-            if (selectedBankReconciliationData[i].MappedLedgerId === null || selectedBankReconciliationData[i].SubLedgerId === null) {
+            if (selectedBankReconciliationData[i].MappedLedgerId === null || (this.subLedgerAndCostCenterSetting.EnableSubLedger && selectedBankReconciliationData[i].SubLedgerId === null)) {
                 emptyCheck = true;
                 break;
             }

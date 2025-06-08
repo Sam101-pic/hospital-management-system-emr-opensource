@@ -72,8 +72,10 @@ export class RPT_BIL_DiscountReportComponent {
     this.dlService = _dlService;
     this.currentDiscount.fromDate = moment().format('YYYY-MM-DD');
     this.currentDiscount.toDate = moment().format('YYYY-MM-DD');
+    this.DiscountReportColumns = this._reportService.reportGridCols.DiscountReport;
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("Date", false));
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("DischargeDate", false));
+    this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("AdmissionDate", false));
     this.LoadExportOptions();
     this.LoadCounter();
     this.LoadUser();
@@ -119,7 +121,6 @@ export class RPT_BIL_DiscountReportComponent {
 
   public Success(res): void {
     if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results.length > 0) {
-      this.DiscountReportColumns = this._reportService.reportGridCols.DiscountReport;
       this.DiscountReportData = res.Results;
       //load export options to set fromDate and to date as custom headers..
       this.CurrentUser = this._securityService.loggedInUser.Employee.FullName;
@@ -128,7 +129,6 @@ export class RPT_BIL_DiscountReportComponent {
     }
     else if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results.length === 0) {
       this._messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['No Data is Available Between Selected Parameters...'])
-      this.DiscountReportColumns = this._reportService.reportGridCols.DiscountReport;
       this.DiscountReportData = res.Results;
     }
     else {

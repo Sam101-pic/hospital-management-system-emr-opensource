@@ -21,6 +21,7 @@ export class PatientScheme {
   public GeneralCreditLimit: number = 0;
   public PatientSchemeValidator: FormGroup;
   public SubSchemeId: number = null;
+  public Ins_FirstServicePoint: string = '';
 
   constructor() {
     var _formBuilder = new FormBuilder();

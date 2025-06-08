@@ -78,6 +78,11 @@ namespace DanpheEMR.ServerModel
         public decimal TicketCharge { get; set; }//sud:26Mar'23--For New BillingStructure.
         public int? SubSchemeId { get; set; }
         public bool IsFreeVisit { get; set; }
-
+        [NotMapped]
+        public bool IsManualFreeFollowup { get; set; }
+        public DateTime? FollowUpDate { get; set; }
+        public string FollowUpRemarks { get; set; }
+        public int? FollowUpDays { get; set; }
+        public string OtherInfo { get; set; }
     }
 }

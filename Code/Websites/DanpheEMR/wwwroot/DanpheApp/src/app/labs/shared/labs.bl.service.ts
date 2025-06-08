@@ -16,9 +16,10 @@ import { LabsDLService } from "./labs.dl.service";
 
 import { VisitDLService } from "../../appointments/shared/visit.dl.service";
 import { PatientsDLService } from "../../patients/shared/patients.dl.service";
+import { CommonEmailModel } from "../../shared/DTOs/common-email_DTO";
 import { ExternalLabStatus_DTO } from "./DTOs/external-lab-sample-satatus.dto";
+import { LabReportSendSMS_DTO } from "./DTOs/lab-report-send-sms.dto";
 import { InPatientLabTest } from "./InpatientLabTest";
-import { LabEmailModel } from "./lab-email.model";
 import { LabReport } from "./lab-report";
 //Note: mapping is done here by blservice, component will only do the .subscribe().
 @Injectable()
@@ -527,9 +528,9 @@ export class LabsBLService {
   //     });
   // }
 
-  UndoSampleCode(requisitionlist: Array<number>) {
+  UndoSampleCode(requisitionlist: Array<number>, undoFromPageAction?: string) {
     return this.labDLService
-      .UndoSampleCode(requisitionlist)
+      .UndoSampleCode(requisitionlist, undoFromPageAction)
       .map((responseData) => {
         return responseData;
       });
@@ -554,8 +555,8 @@ export class LabsBLService {
   }
 
   //Update ReferredBy Doctor
-  PutDoctor(id: number, reqList: number[]) {
-    return this.labDLService.PutDoctor(id, reqList).map((res) => {
+  PutDoctor(id: number, reqList: number[], updateMode?: string) {
+    return this.labDLService.PutDoctor(id, reqList, updateMode).map((res) => {
       return res;
     });
   }
@@ -759,10 +760,16 @@ export class LabsBLService {
       return res;
     })
   }
-  public sendEmail(email: LabEmailModel) {
-    let data: LabEmailModel = new LabEmailModel();
+
+  public UploadToGoogleDrive(doc, reqId: number) {
+    return this.labDLService.UploadToGoogleDrive(doc, reqId).map(res => {
+      return res;
+    })
+  }
+  public sendEmail(email: CommonEmailModel) {
+    let data: CommonEmailModel = new CommonEmailModel();
     data = Object.assign(data, email);
-    var omited = _.omit(data, ['LabEmailValidator']);
+    var omited = _.omit(data, ['EmailValidator']);
     return this.labDLService.SendEmail(omited)
       .map(res => res);
   }
@@ -857,5 +864,44 @@ export class LabsBLService {
     return this.labDLService.UpdateExternalLabStatus(externalLabDataStatus).
       map(res => { return res });
   }
+  GetAllSMSApplicablePatientList(fromDate: string, toDate: string) {
+    return this.labDLService.GetAllSMSApplicablePatientList(fromDate, toDate).map((res) => {
+      return res;
+    });
+  }
+  SendGeneralLabReportSMS(data: LabReportSendSMS_DTO) {
+    return this.labDLService.SendGeneralLabReportSMS(data).map((res) => {
+      return res;
+    });
+  }
 
+  public GetSampleReceivePatientList(fromDate: string, toDate: string, categoryIdList: Array<number> = []) {
+    var catListStr = JSON.stringify(categoryIdList);
+    return this.labDLService.GetSampleReceivePatientList(fromDate, toDate, catListStr).map((res) => {
+      return res;
+    });
+  }
+
+  public ReceiveSample(RequisitionIdList: Array<number> = []) {
+    return this.labDLService.ReceiveSample(RequisitionIdList).map((res) => {
+      return res;
+    });
+  }
+  public GetSampleItemsByRequisitionId(RequisitionIdList: Array<number> = []) {
+    return this.labDLService.GetSampleItemsByRequisitionId(RequisitionIdList).map((res) => {
+      return res;
+    });
+  }
+
+  public UndoFinalReport(RequisitionIdList: Array<number> = []) {
+    return this.labDLService.UndoFinalReport(RequisitionIdList).map((res) => {
+      return res;
+    });
+  }
+
+  public UndoPendingReport(RequisitionIdList: Array<number> = []) {
+    return this.labDLService.UndoPendingReport(RequisitionIdList).map((res) => {
+      return res;
+    });
+  }
 }

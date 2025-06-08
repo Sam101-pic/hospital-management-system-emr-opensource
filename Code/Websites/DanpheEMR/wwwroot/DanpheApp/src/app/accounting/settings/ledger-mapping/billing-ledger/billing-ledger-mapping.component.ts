@@ -113,9 +113,9 @@ export class BillingLedgerMappingComponent {
       this.CurrentLedger.LedgerGroupName = billingLedgerGroup.LedgerGroupName;
       this.CurrentLedger.LedgerGroupId = billingLedgerGroup.LedgerGroupId;
       this.ledgerListAutoComplete = this.sourceLedgerList.filter(emp => emp.LedgerGroupId == this.CurrentLedger.LedgerGroupId && emp.LedgerName != "");
-      if (this.billingType === ENUM_BillingType.outpatient) {
-        this.ledgerListAutoComplete = this.ledgerListAutoComplete.filter(a => a.LedgerId !== (this.billingInpatientCollectionLedger ? this.billingInpatientCollectionLedger.LedgerId : 0));
-      }
+      // if (this.billingType === ENUM_BillingType.outpatient) {
+      //   this.ledgerListAutoComplete = this.ledgerListAutoComplete.filter(a => a.LedgerId !== (this.billingInpatientCollectionLedger ? this.billingInpatientCollectionLedger.LedgerId : 0));
+      // }
       this.subLedgerListForBillingItems = this.subLedgerMaster.filter(a => this.ledgerListAutoComplete.some(b => a.LedgerId === b.LedgerId));
 
     }

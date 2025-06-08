@@ -17,7 +17,8 @@ import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from "../shared-e
 
 export class AddInvoiceHeaderComponent implements OnInit {
 
-
+  @Input("allInvoiceHeaderList")
+  public AllInvoiceHeaderList = new Array<InvoiceHeaderModel>();
   @ViewChild("fileInput") fileInput;
 
   public showAddPage: boolean = false;
@@ -156,6 +157,35 @@ export class AddInvoiceHeaderComponent implements OnInit {
   }
 
   PostInvoiceHeader(formToPost): void {
+
+    if (this.AllInvoiceHeaderList && this.AllInvoiceHeaderList.length) {
+
+      // Assuming formToPost is a FormData object, extracting data from it
+      let hospitalName = '';
+
+      if (formToPost instanceof FormData) {
+        const fileDetails = formToPost.get("fileDetails");
+        if (fileDetails) {
+          const details = JSON.parse(fileDetails as string);
+          hospitalName = details.HospitalName ? details.HospitalName.toLowerCase() : '';
+        }
+      } else {
+        hospitalName = formToPost.HospitalName ? formToPost.HospitalName.toLowerCase() : '';
+      }
+
+      // Checking for duplicates
+      const isHospitalNameAlreadyExists = this.AllInvoiceHeaderList.some(a =>
+        a.HospitalName && a.HospitalName.toLowerCase() === hospitalName
+      );
+
+      if (isHospitalNameAlreadyExists) {
+        this.msgBoxSrv.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Invoice Header as the Header Name "${hospitalName}" already exists.`]);
+        this.loading = false;
+        return;
+      }
+
+    }
+
     try {
       /*Bikash: 12July'20 :
          * this component can be used billing, inventory and pharmacy and
@@ -190,6 +220,35 @@ export class AddInvoiceHeaderComponent implements OnInit {
   }
 
   PutInvoiceHeader(formToPost): void {
+    if (this.AllInvoiceHeaderList && this.AllInvoiceHeaderList.length) {
+
+      // Extracting data from formToPost
+      let hospitalName = '';
+      let currentId = 0;
+
+      if (formToPost instanceof FormData) {
+        const fileDetails = formToPost.get("fileDetails");
+        if (fileDetails) {
+          const details = JSON.parse(fileDetails as string);
+          hospitalName = details.HospitalName ? details.HospitalName.toLowerCase() : '';
+          currentId = details.InvoiceHeaderId;
+        }
+      } else {
+        hospitalName = formToPost.HospitalName ? formToPost.HospitalName.toLowerCase() : '';
+        currentId = formToPost.InvoiceHeaderId;
+      }
+
+      // Check for duplicates excluding the current record
+      const isHospitalNameAlreadyExists = this.AllInvoiceHeaderList.some(a =>
+        a.HospitalName && a.HospitalName.toLowerCase() === hospitalName && a.InvoiceHeaderId !== currentId
+      );
+
+      if (isHospitalNameAlreadyExists) {
+        this.msgBoxSrv.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Invoice Header as the Header Name "${hospitalName}" already exists.`]);
+        this.loading = false;
+        return;
+      }
+    }
     try {
       /*Bikash: 12July'20 :
        * this component can be used billing, inventory and pharmacy and

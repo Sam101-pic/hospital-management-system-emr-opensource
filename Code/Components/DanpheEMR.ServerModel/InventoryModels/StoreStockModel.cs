@@ -98,12 +98,15 @@ namespace DanpheEMR.ServerModel.InventoryModels
         }
         public void ConfirmStockReceived(double quantity)
         {
-            UnConfirmedQty_In -= quantity;
+            if (UnConfirmedQty_In > 0)
+            {
+                UnConfirmedQty_In = Math.Max(UnConfirmedQty_In - quantity, 0);
+            }
             AvailableQuantity += quantity;
         }
         public void ConfirmStockDispatched(double quantity)
         {
-            UnConfirmedQty_Out -= quantity;
+            UnConfirmedQty_Out = Math.Max(UnConfirmedQty_Out - quantity, 0);
         }
         public void ConfirmStockDecrease(double quantity)
         {
@@ -113,6 +116,11 @@ namespace DanpheEMR.ServerModel.InventoryModels
         public void UpdateCostPrice(decimal newCP)
         {
             CostPrice = newCP;
+        }
+
+        public void UpdateAvailableQuantity(double quantity)
+        {
+            AvailableQuantity -= quantity;
         }
     }
 }

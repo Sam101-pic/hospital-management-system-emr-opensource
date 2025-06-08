@@ -16,11 +16,13 @@
   .dont-show {
     display: none;
   }
-	.doc-pagecontainer .portlet table.doc-tbl td a, table.doc-tbl td a {
-		padding: 5px 15px;
-		border: none;
-		text-decoration: none;
-	}
+
+  .doc-pagecontainer .portlet table.doc-tbl td a,
+  table.doc-tbl td a {
+    padding: 5px 15px;
+    border: none;
+    text-decoration: none;
+  }
 </style>
 
 <div class="row">
@@ -72,7 +74,9 @@
                               <td *ngFor="let vitals of vitalsList; let i=index;">
                                 <div *ngIf="vitals.HeightUnit!='inch'">
                                   <!--{{vitals.Height |HasValue: vitals.HeightUnit}}-->
-                                  <span class="tooltip" title="{{heightFoot[i] | number}} feet &#013;{{heightMeter[i] | number}} meter &#013;{{heightCm[i] | number}} cm" style="display: inline; white-space:pre-line;">{{vitals.Height |HasValue: vitals.HeightUnit}}</span>
+                                  <span class="tooltip"
+                                        title="{{heightFoot[i] | number}} feet &#013;{{heightMeter[i] | number}} meter &#013;{{heightCm[i] | number}} cm"
+                                        style="display: inline; white-space:pre-line;">{{vitals.Height |HasValue: vitals.HeightUnit}}</span>
                                 </div>
                                 <div *ngIf="vitals.HeightUnit=='inch'">
                                   {{vitals.Height}}
@@ -83,7 +87,8 @@
                               <td>Weight</td>
                               <td *ngFor="let vitals of vitalsList; let i = index;">
                                 <!--{{vitals.Weight | HasValue: vitals.WeightUnit}}-->
-                                <span class="tooltip" title="{{weightkg[i] | number: '1.2-2'}} kg &#013;{{weightPound[i] | number}}  lbs" style="display: inline; white-space:pre-line;">{{vitals.Weight | HasValue: vitals.WeightUnit}}</span>
+                                <span class="tooltip" title="{{weightkg[i] | number: '1.2-2'}} kg &#013;{{weightPound[i] | number}}  lbs"
+                                      style="display: inline; white-space:pre-line;">{{vitals.Weight | HasValue: vitals.WeightUnit}}</span>
                               </td>
                             </tr>
                             <tr>
@@ -96,7 +101,8 @@
                               <td>Temperature</td>
                               <td *ngFor="let vitals of vitalsList; let i=index;">
                                 <!--{{vitals.Temperature | HasValue: vitals.TemperatureUnit}}-->
-                                <span class="tooltip" title="{{degFarenheit[i] | number}} F&#013;{{degCelsius[i] | number}} C" style="display: inline; white-space:pre-line;">{{vitals.Temperature | HasValue: vitals.TemperatureUnit}}</span>
+                                <span class="tooltip" title="{{degFarenheit[i] | number}} F&#013;{{degCelsius[i] | number}} C"
+                                      style="display: inline; white-space:pre-line;">{{vitals.Temperature | HasValue: vitals.TemperatureUnit}}</span>
                               </td>
                             </tr>
                             <tr>
@@ -109,19 +115,29 @@
                               <td>Blood Pressure</td>
                               <td *ngFor="let vitals of vitalsList">
                                 {{
-vitals.BPSystolic |
+                                vitals.BPSystolic |
                                 HasValue:'/'
                                 }}{{vitals.BPDiastolic}}
                               </td>
                             </tr>
                             <tr>
+                            <tr>
                               <td>Respiratory Rate</td>
                               <td *ngFor="let vitals of vitalsList">
                                 {{
-vitals.RespiratoryRatePerMin |
+                                vitals.RespiratoryRatePerMin |
                                 HasValue:'/min'
                                 }}
                               </td>
+                            </tr>
+                            <tr>
+                              <td>GCS</td>
+                              <ng-container *ngFor="let vitals of vitalsList">
+                                <td *ngIf="!vitals.GCS">
+                                  {{ vitals.Eyes|HasValue:'E'}} {{ vitals.Verbal|HasValue:'V'}} {{ vitals.Motor|HasValue:'M'}}
+                                </td>
+                              </ng-container>
+
                             </tr>
                             <tr>
                               <td>SpO2</td>
@@ -145,7 +161,13 @@ vitals.RespiratoryRatePerMin |
                                 </div>
                               </td>
                             </tr>
-
+                            <tr>
+                              <td>Remarks</td>
+                              <td *ngFor="let vitals of vitalsList">
+                                {{
+                                vitals.Remarks}}
+                              </td>
+                            </tr>
                             <tr>
                               <td>Action</td>
                               <td *ngFor="let vitals of vitalsList;let i = index">

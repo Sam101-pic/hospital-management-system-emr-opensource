@@ -1,20 +1,14 @@
 ﻿using DanpheEMR.DalLayer;
-using System.Collections.Generic;
-using System.Data.SqlClient;
-using System;
-using System.Data;
-using DanpheEMR.Services.Utilities.DTOs;
-using System.Linq;
 using DanpheEMR.Security;
-using DanpheEMR.Services.MarketingReferral.DTOs;
-using DanpheEMR.Enums;
-using DanpheEMR.ServerModel.Utilities;
-using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.MarketingReferralModel;
-using DanpheEMR.Services.BillSettings.DTOs;
-using DocumentFormat.OpenXml.Wordprocessing;
-using DanpheEMR.Controllers.Billing;
-using iTextSharp.text.pdf;
+using DanpheEMR.Services.MarketingReferral.DTOs;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Entity;
+using System.Data.SqlClient;
+using System.Diagnostics;
+using System.Linq;
 
 namespace DanpheEMR.Services.MarketingReferral
 {
@@ -38,17 +32,55 @@ namespace DanpheEMR.Services.MarketingReferral
             DataTable dt = DALFunctions.GetDataTableFromStoredProc("[SP_MKT_Transaction_Bill_Details]", paramList, marketingReferralDbContext);
             return dt;
         }
-        public object GetMarketingreferralDetailReport(MarketingReferralDbContext marketingReferralDbContext, DateTime fromDate, DateTime toDate, int? referringPartyId)
+        public object GetMarketingreferralDetailReport(MarketingReferralDbContext marketingReferralDbContext, DateTime fromDate, DateTime toDate, int? referringPartyId, int? referringPartyGroupId, string areaCode, int? referringOrganizationId)
         {
 
             List<SqlParameter> paramList = new List<SqlParameter>() {
                   new SqlParameter("@FromDate", fromDate),
                         new SqlParameter("@ToDate", toDate),
-                        new SqlParameter("@ReferringPartyId", referringPartyId)
+                        new SqlParameter("@ReferringPartyId", referringPartyId),
+                        new SqlParameter("@ReferringPartyGroupId", referringPartyGroupId),
+                        new SqlParameter("@AreaCode", areaCode == "null" ? null : areaCode),
+                        new SqlParameter("@ReferringOrganizationId", referringOrganizationId)
                     };
-            DataTable dt = DALFunctions.GetDataTableFromStoredProc("[SP_Marketing_Referral_Detail_Report]", paramList, marketingReferralDbContext);
-            return dt;
+            DataSet ds = DALFunctions.GetDatasetFromStoredProc("[SP_Marketing_Referral_Report]", paramList, marketingReferralDbContext);
+            var result = new
+            {
+                MarketingReferralDetailedReport = ds.Tables[0],
+                MarketingReferralSummaryReport = ds.Tables[1]
+            };
+            return result;
         }
+
+        public object GetMasterDataForFilter(MarketingReferralDbContext marketingReferralDbContext)
+        {
+            var referringPartyGroup = (from partyGroup in marketingReferralDbContext.ReferringPartyGroup
+                                       where partyGroup.IsActive == true
+                                       orderby partyGroup.CreatedOn descending
+                                       select new ReferringPartyGroup_DTO
+                                       {
+                                           ReferringPartyGroupId = partyGroup.ReferringPartyGroupId,
+                                           GroupName = partyGroup.GroupName,
+                                           IsActive = partyGroup.IsActive,
+                                       }).ToList();
+
+            var referringOrganizations = (from reforg in marketingReferralDbContext.ReferringOrganization
+                                          where reforg.IsActive == true
+                                          orderby reforg.CreatedOn descending
+                                          select new ReferringOrganization_DTO
+                                          {
+                                              ReferringOrganizationId = reforg.ReferringOrganizationId,
+                                              ReferringOrganizationName = reforg.ReferringOrganizationName,
+                                              IsActive = reforg.IsActive
+                                          }).ToList();
+            var result = new
+            {
+                ReferringPartyGroup = referringPartyGroup,
+                ReferringOrganizations = referringOrganizations
+            };
+            return result;
+        }
+
         public object GetReferralScheme(MarketingReferralDbContext marketingReferralDbContext)
         {
             var referralSchemeList = (from refr in marketingReferralDbContext.ReferralScheme
@@ -57,7 +89,11 @@ namespace DanpheEMR.Services.MarketingReferral
                                       {
                                           ReferralSchemeId = refr.ReferralSchemeId,
                                           ReferralSchemeName = refr.ReferralSchemeName,
-                                          ReferralPercentage = (int)refr.ReferralPercentage
+                                          ReferralPercentage = refr.ReferralPercentage,
+                                          ReferralAmount = refr.ReferralAmount,
+                                          ReferralPreference = refr.ReferralPreference,
+                                          IsActive = refr.IsActive,
+                                          Description = refr.Description
                                       }).ToList();
             return referralSchemeList;
 
@@ -90,37 +126,37 @@ namespace DanpheEMR.Services.MarketingReferral
         }
         public object GetReferringPartyGroup(MarketingReferralDbContext marketingReferralDbContext)
         {
-            var referringParties = (from partyGroup in marketingReferralDbContext.ReferringPartyGroup
-                                    orderby partyGroup.CreatedOn descending
-                                    select new ReferringPartyGroup_DTO
-                                    {
-                                        ReferringPartyGroupId = partyGroup.ReferringPartyGroupId,
-                                        GroupName = partyGroup.GroupName,
-                                        Description = partyGroup.Description,
-                                        CreatedBy = partyGroup.CreatedBy,
-                                        CreatedOn = partyGroup.CreatedOn,
-                                        ModifiedBy = partyGroup.ModifiedBy,
-                                        ModifiedOn = partyGroup.ModifiedOn,
-                                        IsActive = partyGroup.IsActive,
-                                    }).ToList();
-            return referringParties;
+            var referringPartyGroup = (from partyGroup in marketingReferralDbContext.ReferringPartyGroup
+                                       orderby partyGroup.CreatedOn descending
+                                       select new ReferringPartyGroup_DTO
+                                       {
+                                           ReferringPartyGroupId = partyGroup.ReferringPartyGroupId,
+                                           GroupName = partyGroup.GroupName,
+                                           Description = partyGroup.Description,
+                                           CreatedBy = partyGroup.CreatedBy,
+                                           CreatedOn = partyGroup.CreatedOn,
+                                           ModifiedBy = partyGroup.ModifiedBy,
+                                           ModifiedOn = partyGroup.ModifiedOn,
+                                           IsActive = partyGroup.IsActive,
+                                       }).ToList();
+            return referringPartyGroup;
         }
         public Object GetReferringOrganizationList(MarketingReferralDbContext marketingReferralDbContext)
         {
-            var referringParties = (from reforg in marketingReferralDbContext.ReferringOrganization
-                                    orderby reforg.CreatedOn descending
-                                    select new ReferringOrganization_DTO
-                                    {
-                                        ReferringOrganizationId = reforg.ReferringOrganizationId,
-                                        ReferringOrganizationName = reforg.ReferringOrganizationName,
-                                        Address = reforg.Address,
-                                        ContactNo = reforg.ContactNo,
-                                        ContactPersons = reforg.ContactPersons,
-                                        CreatedOn = reforg.CreatedOn,
-                                        CreatedBy = reforg.CreatedBy,
-                                        IsActive = reforg.IsActive
-                                    }).ToList();
-            return referringParties;
+            var referringOrganizations = (from reforg in marketingReferralDbContext.ReferringOrganization
+                                          orderby reforg.CreatedOn descending
+                                          select new ReferringOrganization_DTO
+                                          {
+                                              ReferringOrganizationId = reforg.ReferringOrganizationId,
+                                              ReferringOrganizationName = reforg.ReferringOrganizationName,
+                                              Address = reforg.Address,
+                                              ContactNo = reforg.ContactNo,
+                                              ContactPersons = reforg.ContactPersons,
+                                              CreatedOn = reforg.CreatedOn,
+                                              CreatedBy = reforg.CreatedBy,
+                                              IsActive = reforg.IsActive
+                                          }).ToList();
+            return referringOrganizations;
         }
 
         public object GetAlreadyAddedCommission(MarketingReferralDbContext marketingReferralDbContext, int billTransactionId)
@@ -148,7 +184,7 @@ namespace DanpheEMR.Services.MarketingReferral
                                      Percentage = commission.Percentage,
                                      InvoiceTotalAmount = commission.InvoiceTotalAmount,
                                      Remarks = commission.Remarks,
-                                     ReferralAmount= commission.ReferralAmount,
+                                     ReferralAmount = commission.ReferralAmount,
                                  }).ToList();
             return addedComision;
         }
@@ -325,7 +361,7 @@ namespace DanpheEMR.Services.MarketingReferral
         {
             if (referringParty_DTO == null)
             {
-                return new Exception("Provided data should not be null");
+                throw new ArgumentNullException("Provided data should not be null");
             }
 
             var refParty = marketingReferralDbContext.ReferringParty.Where(x => x.ReferringPartyId == referringParty_DTO.ReferringPartyId).FirstOrDefault();
@@ -344,6 +380,181 @@ namespace DanpheEMR.Services.MarketingReferral
             refParty.PANNumber = referringParty_DTO.PANNumber;
             marketingReferralDbContext.SaveChanges();
             return referringParty_DTO;
+        }
+
+        public object GetPatientVisitWiseReferralCommission(MarketingReferralDbContext marketingReferralDbContext, string fromDate, string toDate)
+        {
+            List<SqlParameter> paramList = new List<SqlParameter>() {
+                        new SqlParameter("@FromDate", fromDate),
+                        new SqlParameter("@ToDate", toDate),
+                    };
+            DataTable dt = DALFunctions.GetDataTableFromStoredProc("SP_MKT_PatientVisitWiseReferralCommission", paramList, marketingReferralDbContext);
+            return dt;
+        }
+
+        public object AddNewReferralScheme(RbacUser currentUser, ReferralScheme_DTO referralScheme, MarketingReferralDbContext marketingReferralDbContext)
+        {
+            using (var dbContextTransaction = marketingReferralDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    if (referralScheme == null)
+                    {
+                        throw new ArgumentNullException($"Nothing to save as {nameof(referralScheme)} is null.");
+                    }
+
+                    var referralSchemeModel = new ReferralSchemeModel()
+                    {
+                        ReferralSchemeName = referralScheme.ReferralSchemeName,
+                        Description = referralScheme.Description,
+                        ReferralPercentage = referralScheme.ReferralPercentage,
+                        ReferralAmount = referralScheme.ReferralAmount,
+                        ReferralPreference = referralScheme.ReferralPreference,
+                        IsActive = true,
+                        CreatedBy = currentUser.EmployeeId,
+                        CreatedOn = System.DateTime.Now
+                    };
+                    marketingReferralDbContext.ReferralScheme.Add(referralSchemeModel);
+                    marketingReferralDbContext.SaveChanges();
+
+                    dbContextTransaction.Commit();
+                    return referralScheme;
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    throw ex;
+                }
+            }
+        }
+
+        public object UpdateReferralScheme(RbacUser currentUser, ReferralScheme_DTO referralScheme, MarketingReferralDbContext marketingReferralDbContext)
+        {
+            if (referralScheme == null)
+            {
+                throw new ArgumentNullException($"{nameof(referralScheme)} is null");
+            }
+            if (referralScheme != null && referralScheme.ReferralSchemeId == 0)
+            {
+                throw new ArgumentNullException($"{nameof(referralScheme.ReferralSchemeId)} is not provided to update the Referral Scheme");
+            }
+            var refScheme = marketingReferralDbContext.ReferralScheme.Where(x => x.ReferralSchemeId == referralScheme.ReferralSchemeId).FirstOrDefault();
+            if (refScheme == null)
+            {
+                throw new Exception($"No Referral Scheme is found for {nameof(referralScheme.ReferralSchemeId)}");
+            }
+
+            refScheme.ModifiedOn = DateTime.Now;
+            refScheme.ModifiedBy = currentUser.EmployeeId;
+            refScheme.IsActive = true;
+            refScheme.ReferralSchemeName = referralScheme.ReferralSchemeName;
+            refScheme.ReferralPreference = referralScheme.ReferralPreference;
+            refScheme.ReferralPercentage = referralScheme.ReferralPercentage;
+            refScheme.ReferralAmount = referralScheme.ReferralAmount;
+
+            marketingReferralDbContext.Entry(refScheme).State = EntityState.Modified;
+            marketingReferralDbContext.SaveChanges();
+            return referralScheme;
+        }
+
+        public object ActivateDeactivateReferralScheme(RbacUser currentUser, int referralSchemeId, MarketingReferralDbContext marketingReferralDbContext)
+        {
+            if(referralSchemeId == 0)
+            {
+                throw new InvalidOperationException($"{nameof(referralSchemeId)} is not provided");
+            }
+
+            var referralScheme = marketingReferralDbContext.ReferralScheme.FirstOrDefault(r => r.ReferralSchemeId == referralSchemeId);
+            if(referralScheme == null)
+            {
+                throw new InvalidOperationException($"There is no referral Scheme to update with ReferralSchemeId {nameof(referralSchemeId)}");
+            }
+
+            referralScheme.IsActive = !referralScheme.IsActive;
+            referralScheme.ModifiedBy =currentUser.EmployeeId;
+            referralScheme.ModifiedOn = DateTime.Now;
+
+            marketingReferralDbContext.Entry(referralScheme).State = EntityState.Modified;
+            marketingReferralDbContext.SaveChanges();
+            return referralScheme;
+        }
+
+        public object SavePatientReferralCommission(RbacUser currentUser, PatientVisitLevelReferralCommission_DTO patientVisitLevelReferral, MarketingReferralDbContext marketingReferralDbContext)
+        {
+            if (patientVisitLevelReferral == null)
+            {
+                throw new ArgumentNullException($"{nameof(patientVisitLevelReferral)} is null, cannot proceed further");
+            }
+
+            var referralCommission = new PatientReferralCommissionModel()
+            {
+                CreatedBy = currentUser.EmployeeId,
+                CreatedOn = DateTime.Now,
+                PatientId = patientVisitLevelReferral.PatientId,
+                PatientVisitId = patientVisitLevelReferral.PatientVisitId,
+                VisitDate = patientVisitLevelReferral.VisitDate,
+                ReferringPartyId = patientVisitLevelReferral.ReferringPartyId,
+                ReferralSchemeId = patientVisitLevelReferral.ReferralSchemeId,
+                ReferralAmount = patientVisitLevelReferral.ReferralAmount,
+                Remarks = patientVisitLevelReferral.Remarks,
+                IsActive = true
+            };
+            marketingReferralDbContext.PatientReferralCommissions.Add(referralCommission);
+            marketingReferralDbContext.SaveChanges();
+            return patientVisitLevelReferral;
+        }
+
+        public object GetPatientReferralCommissionDetails(MarketingReferralDbContext marketingReferralDbContext, int patientVisitId)
+        {
+            if (patientVisitId == 0)
+            {
+                throw new ArgumentNullException($"{nameof(patientVisitId)} is not mentioned.");
+            }
+
+            var patientReferralCommissions = (from commission in marketingReferralDbContext.PatientReferralCommissions.Where(c => c.IsActive == true && c.PatientVisitId == patientVisitId)
+                                              join sch in marketingReferralDbContext.ReferralScheme
+                                              on commission.ReferralSchemeId equals sch.ReferralSchemeId
+                                              join refParty in marketingReferralDbContext.ReferringParty
+                                              on commission.ReferringPartyId equals refParty.ReferringPartyId
+                                              join org in marketingReferralDbContext.ReferringOrganization
+                                              on refParty.ReferringOrgId equals org.ReferringOrganizationId
+                                              orderby commission.CreatedOn descending
+                                              select new ReferralCommission_DTO
+                                              {
+                                                  ReferralCommissionId = commission.PatientReferralCommissionId,
+                                                  ReferralSchemeName = sch.ReferralSchemeName,
+                                                  ReferralSchemeId = sch.ReferralSchemeId,
+                                                  ReferringPartyName = refParty.ReferringPartyName,
+                                                  ReferralAmount = commission.ReferralAmount,
+                                                  ReferringPartyId = refParty.ReferringPartyId,
+                                                  AreaCode = refParty.AreaCode,
+                                                  ReferringOrganizationName = org.ReferringOrganizationName,
+                                                  VehicleNumber = refParty.VehicleNumber,
+                                                  Remarks = commission.Remarks
+                                              }).ToList();
+            return patientReferralCommissions;
+        }
+
+        public object DeletePatientReferralCommission(RbacUser currentUser, int patientReferralCommissionId, MarketingReferralDbContext marketingReferralDbContext)
+        {
+            if(patientReferralCommissionId == 0)
+            {
+                throw new ArgumentNullException($"{nameof(patientReferralCommissionId)} is required to remove the patient referral commissions");
+            }
+
+            var patientReferralCommission = marketingReferralDbContext.PatientReferralCommissions.FirstOrDefault(r => r.PatientReferralCommissionId == patientReferralCommissionId);
+            if(patientReferralCommission == null)
+            {
+                throw new InvalidOperationException($"{nameof(patientReferralCommission)} is not found to remove");
+            }
+
+            patientReferralCommission.IsActive = false;
+            patientReferralCommission.ModifiedBy = currentUser.EmployeeId;
+            patientReferralCommission.ModifiedOn = DateTime.Now;
+
+            marketingReferralDbContext.Entry(patientReferralCommission).State = EntityState.Modified;
+            marketingReferralDbContext.SaveChanges();
+            return patientReferralCommission;
         }
     }
 }

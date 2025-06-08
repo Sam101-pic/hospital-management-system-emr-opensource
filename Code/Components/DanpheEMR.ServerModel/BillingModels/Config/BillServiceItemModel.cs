@@ -40,6 +40,9 @@ namespace DanpheEMR.ServerModel
         [NotMapped]
         public List<BillMapPriceCategoryServiceItemModel> BilCfgItemsVsPriceCategoryMap { get; set; }
 
+        public bool IsInsurancePackage { get; set; }
+        public string OTCategory { get; set; }
+        public int? DynamicReportGroupId { get; set; } //new column (need to have a FK relation with BIL_MST_DynamicReportGroup table)
 
 
     }

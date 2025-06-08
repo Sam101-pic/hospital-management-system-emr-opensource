@@ -9,8 +9,11 @@ using DanpheEMR.Services.Pharmacy.DTOs.PurchaseOrder;
 using DanpheEMR.Services.Verification.DTOs;
 using DanpheEMR.Utilities;
 using DanpheEMR.ViewModel.Pharmacy;
+using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
@@ -23,11 +26,14 @@ namespace DanpheEMR.Controllers.Pharmacy
         private readonly PharmacyDbContext _pharmacyDbContext;
         private readonly RbacDbContext _rbacDbContext;
         private readonly IMapper _mapper;
-        public PharmacyPurchaseController(IOptions<MyConfiguration> _config, IMapper mapper) : base(_config)
+        private readonly IValidator<PHRMGoodsReceiptModel> _validator;
+
+        public PharmacyPurchaseController(IOptions<MyConfiguration> _config, IMapper mapper, IValidator<PHRMGoodsReceiptModel> validator) : base(_config)
         {
             _pharmacyDbContext = new PharmacyDbContext(connString);
             _mapper = mapper;
             _rbacDbContext = new RbacDbContext(connString);
+            _validator = validator;
 
         }
 
@@ -41,6 +47,7 @@ namespace DanpheEMR.Controllers.Pharmacy
             Func<object> func = () => (from po in _pharmacyDbContext.PHRMPurchaseOrder
                                        join supp in _pharmacyDbContext.PHRMSupplier on po.SupplierId equals supp.SupplierId
                                        join stats in poSelectedStatus on po.POStatus equals stats
+                                       where DbFunctions.TruncateTime(po.PODate) >= DbFunctions.TruncateTime(fromDate) && DbFunctions.TruncateTime(po.PODate) <= DbFunctions.TruncateTime(toDate)
                                        orderby po.PODate descending
                                        select new
                                        {
@@ -65,7 +72,7 @@ namespace DanpheEMR.Controllers.Pharmacy
                                            CurrentVerificationLevelCount = po.VerificationId != null ? _pharmacyDbContext.VerificationModels.Where(V => V.VerificationId == po.VerificationId)
                                                                                                     .Select(V => V.CurrentVerificationLevelCount).FirstOrDefault() : 0,
                                            VerifierIds = po.VerifierIds
-                                       }).Where(a => DbFunctions.TruncateTime(a.PODate) >= DbFunctions.TruncateTime(fromDate) && DbFunctions.TruncateTime(a.PODate) <= DbFunctions.TruncateTime(toDate)).OrderByDescending(a => a.PurchaseOrderId).ToList();
+                                       }).ToList();
             return InvokeHttpGetFunction(func);
         }
 
@@ -303,7 +310,8 @@ namespace DanpheEMR.Controllers.Pharmacy
             var supplierDettail = _pharmacyDbContext.PHRMSupplier.Where(supplier => supplier.SupplierId == supplierId).Select(s => new
             {
                 s.ContactNo,
-                s.SupplierName
+                s.SupplierName,
+                s.PANNumber
             }).FirstOrDefault();
 
             List<PHRMGoodReceiptVM> goodReciptList = new List<PHRMGoodReceiptVM>();
@@ -325,6 +333,7 @@ namespace DanpheEMR.Controllers.Pharmacy
                                                         GoodReceiptPrintId = a.GoodReceiptPrintId,
                                                         GoodReceiptType = "Purchased GR",
                                                         ContactNo = supplierDettail.ContactNo,
+                                                        PANNumber = supplierDettail.PANNumber
                                                     }).ToList();
 
             int? CreditPeriod = null;
@@ -346,6 +355,7 @@ namespace DanpheEMR.Controllers.Pharmacy
                                                                          GoodReceiptPrintId = a.CreditNotePrintId,
                                                                          GoodReceiptType = "Returned GR",
                                                                          ContactNo = supplierDettail.ContactNo,
+                                                                         PANNumber = supplierDettail.PANNumber
                                                                      }).ToList();
 
             goodReciptList.AddRange(goodReceiptReturn);
@@ -389,6 +399,9 @@ namespace DanpheEMR.Controllers.Pharmacy
                                           join item in _pharmacyDbContext.PHRMItemMaster on oi.ItemId equals item.ItemId
                                           join g in _pharmacyDbContext.PHRMGenericModel on oi.GenericId equals g.GenericId
                                           join uom in _pharmacyDbContext.PHRMUnitOfMeasurement on item.UOMId equals uom.UOMId
+                                          join packing in _pharmacyDbContext.PHRMPackingType on oi.PackingTypeId equals packing.PackingTypeId
+                                          into packgroup
+                                          from packingTemp in packgroup.DefaultIfEmpty()
                                           select new PHRMPurchaseOrderItemForGoodReceiptVM
                                           {
                                               PurchaseOrderId = oi.PurchaseOrderId,
@@ -396,10 +409,10 @@ namespace DanpheEMR.Controllers.Pharmacy
                                               ItemId = oi.ItemId,
                                               ItemName = item.ItemName,
                                               UOMName = uom.UOMName,
-                                              Quantity = oi.Quantity,
-                                              SalePrice = oi.StandardRate,
+                                              Quantity = oi.IsPacking ? (double)oi.PackingQty : oi.Quantity,
+                                              SalePrice = oi.IsPacking ? oi.StripRate : oi.StandardRate,
                                               ReceivedQuantity = oi.ReceivedQuantity,
-                                              PendingQuantity = oi.Quantity - oi.ReceivedQuantity,
+                                              PendingQuantity = oi.IsPacking ? (double)oi.PackingQty : oi.Quantity - oi.ReceivedQuantity,
                                               SubTotal = oi.SubTotal,
                                               DiscountPercentage = oi.DiscountPercentage,
                                               DiscountAmount = oi.DiscountAmount,
@@ -415,8 +428,14 @@ namespace DanpheEMR.Controllers.Pharmacy
                                               GenericName = g.GenericName,
                                               FreeQuantity = oi.FreeQuantity,
                                               PendingFreeQuantity = oi.PendingFreeQuantity,
-                                              TotalQuantity = (float)(oi.Quantity + (float)oi.FreeQuantity),
-                                              CreatedBy = oi.CreatedBy
+                                              TotalQuantity = (float)(oi.IsPacking ? (double)oi.PackingQty : oi.Quantity + (float)oi.FreeQuantity),
+                                              CreatedBy = oi.CreatedBy,
+                                              MRP = item.MRP,
+                                              StripRate = oi.StripRate,
+                                              PackingQty = oi.PackingQty,
+                                              PackingTypeId = oi.PackingTypeId,
+                                              PackingName = packingTemp.PackingName,
+                                              IsPacking = oi.IsPacking
                                           }).ToList();
             return new
             {
@@ -435,6 +454,7 @@ namespace DanpheEMR.Controllers.Pharmacy
                                            select gritems).ToList();
             foreach (var gritm in GoodReceipt.GoodReceiptItem)
             {
+                gritm.DiscountAmount = gritm.GrPerItemDisAmt;
                 var stockTxn = _pharmacyDbContext.StockTransactions.Where(a => a.StockId == gritm.StockId);
                 //ramesh: check if each grItem is altered ie transfered or dispatched; 
                 var grItemTxnEnum = ENUM_PHRM_StockTransactionType.PurchaseItem;
@@ -530,8 +550,7 @@ namespace DanpheEMR.Controllers.Pharmacy
             {
                 grViewModelData.goodReceipt.FiscalYearId = PharmacyBL.GetFiscalYearGoodsReceipt(_pharmacyDbContext, grViewModelData.goodReceipt.GoodReceiptDate).FiscalYearId;
                 grViewModelData.goodReceipt.GoodReceiptPrintId = PharmacyBL.GetGoodReceiptPrintNo(_pharmacyDbContext, grViewModelData.goodReceipt.FiscalYearId);
-
-                bool flag = PharmacyBL.GoodReceiptTransaction(grViewModelData, _pharmacyDbContext, currentUser);
+                bool flag = PharmacyBL.GoodReceiptTransaction(grViewModelData, _pharmacyDbContext, currentUser, _validator);
                 if (flag)
                 {
                     return grViewModelData.goodReceipt.GoodReceiptId;
@@ -577,6 +596,11 @@ namespace DanpheEMR.Controllers.Pharmacy
                 {
                     try
                     {
+                        var IsDuplicateInvoice = _pharmacyDbContext.PHRMGoodsReceipt.Any(g => g.GoodReceiptId != goodsReceipt.GoodReceiptId && g.SupplierId == goodsReceipt.SupplierId && g.InvoiceNo == goodsReceipt.InvoiceNo && g.FiscalYearId == goodsReceipt.FiscalYearId && !g.IsCancel);
+                        if (IsDuplicateInvoice)
+                        {
+                            throw new Exception("Duplicate InvoiceNo and Supplier is not allowed");
+                        }
                         var GRId = goodsReceipt.GoodReceiptId;
                         var storeId = goodsReceipt.StoreId;
                         var currentDate = DateTime.Now;
@@ -817,6 +841,9 @@ namespace DanpheEMR.Controllers.Pharmacy
                                      join item in _pharmacyDbContext.PHRMItemMaster on oi.ItemId equals item.ItemId
                                      join g in _pharmacyDbContext.PHRMGenericModel on oi.GenericId equals g.GenericId
                                      join uom in _pharmacyDbContext.PHRMUnitOfMeasurement on item.UOMId equals uom.UOMId
+                                     join packing in _pharmacyDbContext.PHRMPackingType on oi.PackingTypeId equals packing.PackingTypeId
+                                     into packgroup
+                                     from packingTemp in packgroup.DefaultIfEmpty()
                                      select new PHRMPurchaseOrderItemVM
                                      {
                                          PurchaseOrderId = oi.PurchaseOrderId,
@@ -846,8 +873,13 @@ namespace DanpheEMR.Controllers.Pharmacy
                                          GenericId = oi.GenericId,
                                          GenericName = g.GenericName,
                                          FreeQuantity = oi.FreeQuantity,
-                                         TotalQuantity = (float)(oi.Quantity + (float)oi.FreeQuantity),
-                                         CreatedBy = oi.CreatedBy
+                                         TotalQuantity = (float)((packingTemp != null && oi.IsPacking ? (float)oi.PackingQty : oi.Quantity) + (float)oi.FreeQuantity),
+                                         CreatedBy = oi.CreatedBy,
+                                         PackingQty = oi.PackingQty,
+                                         IsPacking = oi.IsPacking,
+                                         StripRate = oi.StripRate,
+                                         PackingName = packingTemp != null ? packingTemp.PackingName : "",
+                                         PackingTypeId = oi.PackingTypeId
                                      }).ToList();
 
             var Signatories = GetPharacyVerificationSignatories(OrderDetails.VerificationId);
@@ -914,7 +946,7 @@ namespace DanpheEMR.Controllers.Pharmacy
                             item.Quantity = item1.Quantity;
                             item.StandardRate = item1.StandardRate;
                             item.ReceivedQuantity = item1.ReceivedQuantity;
-                            item.PendingQuantity = item1.PendingQuantity;
+                            item.PendingQuantity = item1.IsPacking ? (double)item1.PackingQty : item1.PendingQuantity;
                             item.SubTotal = item1.SubTotal;
                             item.DiscountPercentage = item1.DiscountPercentage;
                             item.DiscountAmount = item1.DiscountAmount;
@@ -931,8 +963,11 @@ namespace DanpheEMR.Controllers.Pharmacy
                             item.ModifiedOn = item1.ModifiedOn;
                             item.GenericId = item1.GenericId;
                             item.FreeQuantity = item1.FreeQuantity;
+                            item.PendingFreeQuantity = item1.FreeQuantity;
                             item.ModifiedBy = currentUser.EmployeeId;
                             item.ModifiedOn = currentDate;
+                            item.StripRate = item1.StripRate;
+                            item.PackingQty = item1.PackingQty;
                             if (item1.IsCancel == true)
                             {
                                 item.CancelledBy = currentUser.EmployeeId;
@@ -947,7 +982,7 @@ namespace DanpheEMR.Controllers.Pharmacy
                         item.PurchaseOrderId = purchaseOrderFromClient.PurchaseOrderId;
                         item.CreatedOn = currentDate;
                         item.CreatedBy = currentUser.EmployeeId;
-                        item.PendingQuantity = item.Quantity;
+                        item.PendingQuantity = item.IsPacking ? (double)item.PackingQty : item.Quantity;
                         item.POItemStatus = ENUM_PharmacyPurchaseOrderStatus.Active;
                         item.PendingFreeQuantity = item.FreeQuantity;
                     });
@@ -973,8 +1008,18 @@ namespace DanpheEMR.Controllers.Pharmacy
                     purchaseOrderFromServer.ModifiedBy = purchaseOrderFromClient.ModifiedBy;
                     purchaseOrderFromServer.TermsId = purchaseOrderFromClient.TermsId;
                     purchaseOrderFromServer.DiscountPercentage = purchaseOrderFromClient.DiscountPercentage;
-                    purchaseOrderFromServer.DeliveryDays = purchaseOrderFromClient.DeliveryDays;
-                    purchaseOrderFromServer.VerifierIds = PharmacyBL.SerializePHRMPOVerifiers(purchaseOrderDTO.VerifierList);
+                    purchaseOrderFromServer.DeliveryDate = purchaseOrderFromClient.DeliveryDate;
+                    purchaseOrderFromServer.VerifierIds = purchaseOrderDTO.VerifierList.Count > 0 ? PharmacyBL.SerializePHRMPOVerifiers(purchaseOrderDTO.VerifierList) : null;
+                    purchaseOrderFromServer.IsVerificationEnabled = purchaseOrderFromClient.IsVerificationEnabled;
+                    if (!purchaseOrderFromClient.IsVerificationEnabled)
+                    {
+                        purchaseOrderFromServer.POStatus = "active";
+                    }
+                    else
+                    {
+                        purchaseOrderFromServer.POStatus = "pending";
+                    }
+                    purchaseOrderFromServer.TermsConditions = purchaseOrderFromClient.TermsConditions;
                     _pharmacyDbContext.SaveChanges();
                     dbTransaction.Commit();
                     return purchaseOrderFromClient.PurchaseOrderId;
@@ -1020,7 +1065,8 @@ namespace DanpheEMR.Controllers.Pharmacy
                              ABCCategory = I.ABCCategory,
                              VED = I.VED,
                              IsActive = I.IsActive,
-                             RackNoDetails = rackDetails
+                             RackNoDetails = rackDetails,
+                             MRP = I.MRP
                          })
               .OrderByDescending(a => a.ItemId)
               .ToList();

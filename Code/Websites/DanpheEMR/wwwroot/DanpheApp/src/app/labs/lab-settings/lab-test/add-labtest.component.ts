@@ -227,7 +227,7 @@ export class AddLabTestComponent {
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           let allVendorList = res.Results;
-          this.ExternalVendorList = allVendorList.filter(vendor => vendor.IsExternal === true);
+          this.ExternalVendorList = allVendorList.filter(vendor => vendor.IsExternal === true && vendor.IsActive === true);
         } else {
           this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Cannot get the Lab Vendor List, Please Try Later!"])
           this.ExternalVendorList = new Array<LabVendorsModel>();

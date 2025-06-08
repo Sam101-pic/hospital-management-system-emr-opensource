@@ -38,10 +38,18 @@
                          [(ngModel)]="selCategory" [source]="categoryList" placeholder="  Category Type"
                          formControlName="CategoryId" display-property-name="CategoryName" value-property-name="CategoryId"
                          (valueChanged)="AssignSelectedCategory()" [list-formatter]="CategoryListFormatter"
-                         max-num-list="100" (keyup.enter)="setFocusById('categoryno')" style="width:100%;" />
+                         max-num-list="100" (keyup.enter)="setFocusById('itemcode')" style="width:100%;" />
                   <div class="color-red font-sm"
                        [hidden]="currentGeneric.IsValidCheck('CategoryId','required') || !(currentGeneric.IsDirty('CategoryId'))">
                     Category is required</div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="control-label col-md-5">ItemCode:</label>
+                <div class="col-md-7">
+                  <input id="itemcode" class="form-control" type="text" [(ngModel)]="currentGeneric.ItemCode"
+                         [ngModelOptions]="{standalone: true}" value="" (keyup.enter)="setFocusById('categoryno')"
+                         placeholder="Enter ItemCode" />
                 </div>
               </div>
               <div class="form-group">

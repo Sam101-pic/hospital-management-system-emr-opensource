@@ -1,27 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Microsoft.AspNetCore.Mvc;
-using DanpheEMR.Core.Configuration;
-using DanpheEMR.ServerModel;
-using DanpheEMR.DalLayer;
-using System.Data.Entity;
-using Microsoft.Extensions.Options;
-using DanpheEMR.Utilities;
-using DanpheEMR.CommonTypes;
-using DanpheEMR.Core.Caching;
-using System.Xml;
-using Newtonsoft.Json;
-using DanpheEMR.Security;
+﻿using DanpheEMR.CommonTypes;
 using DanpheEMR.Controllers.Billing;
-using System.Threading.Tasks;
+using DanpheEMR.Core.Configuration;
+using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
+using DanpheEMR.Security;
+using DanpheEMR.ServerModel;
+using DanpheEMR.ServerModel.BillingModels;
+using DanpheEMR.ServerModel.MedicareModels;
+using DanpheEMR.Services.Billing.Invoice;
+using DanpheEMR.Services.SSF.DTO;
+using DanpheEMR.Utilities;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using DanpheEMR.ServerModel.BillingModels;
-using Microsoft.EntityFrameworkCore;
-using DanpheEMR.ServerModel.MedicareModels;
-using DanpheEMR.Services.SSF.DTO;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Serilog;
 
 namespace DanpheEMR.Controllers
 {
@@ -122,7 +121,7 @@ namespace DanpheEMR.Controllers
             {
                 var billCreditStatusObj = billingDbContext.BillingTransactionCreditBillStatuses.Where(a => a.BillingTransactionId == billInvoiceRet.BillingTransactionId).FirstOrDefault();
 
-                billCreditStatusObj.CoPayReturnAmount += billTxnReturnData.IsCoPayment == true ? ((decimal)billInvoiceRet.TotalAmount - billInvoiceRet.ReturnCashAmount) : 0;
+                billCreditStatusObj.CoPayReturnAmount += billInvoiceRet.IsCoPayment == true ? ((decimal)billInvoiceRet.TotalAmount - billInvoiceRet.ReturnCreditAmount) : 0;
                 billCreditStatusObj.ReturnTotalBillAmount += (decimal)billInvoiceRet.TotalAmount;
                 billCreditStatusObj.NetReceivableAmount = billCreditStatusObj.SalesTotalBillAmount - billCreditStatusObj.CoPayReceivedAmount - (billCreditStatusObj.ReturnTotalBillAmount - billCreditStatusObj.CoPayReturnAmount); //Krishna, 21stApril'23 Need think again for this calculation.4
                 billCreditStatusObj.ModifiedOn = DateTime.Now;
@@ -459,6 +458,7 @@ namespace DanpheEMR.Controllers
 
         private object GetCreditNoteInfo(int CreditNoteNo, int fiscalYrId)
         {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             var ReturnReceipt = (from billRtn in _billingDbContext.BillInvoiceReturns.Include("Patient")
                                  join pat in _billingDbContext.Patient
                                         on billRtn.PatientId equals pat.PatientId
@@ -471,17 +471,81 @@ namespace DanpheEMR.Controllers
                                      BillReturnTxn = billRtn,
                                      ReferenceInvoiceDate = billTxn.CreatedOn,
                                      BillReturnTxnItm = _billingDbContext.BillInvoiceReturnItems.Where(itm => itm.BillReturnId == billRtn.BillReturnId)
-
                                  }).FirstOrDefault();
 
+            //preparing dynamic template for Return Invoice:
+            string template = GetPrintTempleteAndFormat(ReturnReceipt.Patient, ReturnReceipt.BillReturnTxn, ReturnReceipt.ReferenceInvoiceDate, ReturnReceipt.BillReturnTxnItm, currentUser);
             return new
             {
                 //Patient = ReturnReceipt.Patient,
                 BillReturnTransaction = ReturnReceipt.BillReturnTxn,
                 BillReturnTransactionItems = ReturnReceipt.BillReturnTxnItm,
                 ReferenceInvoiceDate = ReturnReceipt.ReferenceInvoiceDate,
-                UserName = _rbacDbContext.Users.Where(usr => usr.EmployeeId == ReturnReceipt.BillReturnTxn.CreatedBy).FirstOrDefault().UserName
+                UserName = _rbacDbContext.Users.Where(usr => usr.EmployeeId == ReturnReceipt.BillReturnTxn.CreatedBy).FirstOrDefault().UserName,
+                InvoicePrintTemplate = template
             };
+        }
+
+        private string GetPrintTempleteAndFormat(PatientModel patient, BillInvoiceReturnModel billReturn, DateTime invoiceDate, IQueryable<BillInvoiceReturnItemsModel> billReturnItems, RbacUser currentUser)
+        {
+
+            var invoicePrintTemplate = _billingDbContext.PrintTemplateSettings
+                                                       .FirstOrDefault(p => p.PrintType == "return-invoice"
+                                                                       && p.FieldSettingsName == "General");
+
+            // StringBuilder detailsTemplate = new StringBuilder();
+            StringBuilder tempDetailsTemplate = new StringBuilder();
+            StringBuilder printDetailsTemplate = new StringBuilder();
+            int InvoiceItemSn = 0;
+            StringBuilder template = new StringBuilder();
+            if (invoicePrintTemplate != null)
+            {
+                template.Append(invoicePrintTemplate.PrintTemplateMainFormat);
+                //template.Replace("{image}",)
+
+                //BillReturnTransaction Details
+                template.Replace("{CreditNoteNumber}", billReturn.FiscalYear.ToString() + "-CRN" + billReturn.CreditNoteNumber.ToString());
+                template.Replace("{CrnDate}", billReturn.CreatedOn.ToString());
+                template.Replace("{RefInvoiceNo}", billReturn.RefInvoiceNum != null ? billReturn.FiscalYear.ToString() + "-" + billReturn.InvoiceCode.ToString() + billReturn.RefInvoiceNum.ToString() : "");
+                var localDate = DanpheDateConvertor.ConvertEngToNepDate(billReturn.CreatedOn);
+                string localDateString = localDate != null ? localDate.Year + "-" + localDate.Month + "-" + localDate.Day : "";
+                template.Replace("{CrnDateBs}", localDateString);
+                template.Replace("{ReturnCashAmount}", billReturn.ReturnCashAmount != null ? billReturn.ReturnCashAmount.ToString() : "");
+                template.Replace("{TotalAmount}", billReturn.TotalAmount != null ? billReturn.TotalAmount.ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{TotalAmountInWords}", BillingInvoiceService.ConvertNumbersInWords((decimal)billReturn.TotalAmount).ToUpper());
+                template.Replace("{Time}", BillingInvoiceService.Transform(billReturn.CreatedOn.ToString("HH:mm:ss"), "format-time", ""));
+                template.Replace("{Remarks}", billReturn.Remarks != null ? billReturn.Remarks.ToString() : "");
+
+
+                //Patient Details
+                template.Replace("{HospitalNo}", patient.PatientCode.ToString());
+                template.Replace("{ReferenceInvoiceDate}", invoiceDate != null ? invoiceDate.ToString() : "");
+                var RefInvoieDateBs= DanpheDateConvertor.ConvertEngToNepDate(invoiceDate);
+                string RefInvoiceDataString= RefInvoieDateBs != null ? RefInvoieDateBs.Year + "-" + RefInvoieDateBs.Month + "-" + RefInvoieDateBs.Day : "";
+                template.Replace("{ReferenceInvoiceDateBs}", invoiceDate != null ? invoiceDate.ToString() : "");
+                template.Replace("{ShortName}", patient.ShortName != null ? patient.ShortName.ToString() : "");
+                template.Replace("{ContactNo}", patient.PhoneNumber != null ? patient.PhoneNumber.ToString() : "");
+                template.Replace("{Age/Sex}", patient.Age != null ? patient.Gender.ToString() : "");
+                template.Replace("{CurrentUserName}", currentUser != null ? currentUser.UserName : "");
+                var PrintdateBS = DanpheDateConvertor.ConvertEngToNepDate(DateTime.Now);
+                string PrintDateFormatedBS = PrintdateBS != null ? PrintdateBS.Year + "-" + PrintdateBS.Month + "-" + PrintdateBS.Day : "";
+                template.Replace("{PrintTime}", DateTime.Now.ToString("HH:mm"));
+                template.Replace("{PrintDate}", DateTime.Now.ToString("yyyy-MM-dd"));
+                template.Replace("{PrintDateBs}", PrintDateFormatedBS);
+
+                foreach (var billReturnItem in billReturnItems)
+                {
+                    InvoiceItemSn = InvoiceItemSn + 1;
+                    tempDetailsTemplate = new StringBuilder(invoicePrintTemplate.PrintTemplateDetailsFormat);
+                    tempDetailsTemplate.Replace("{SN}", InvoiceItemSn.ToString());
+                    tempDetailsTemplate.Replace("{ItemName}", billReturnItem.ItemName.ToString());
+                    tempDetailsTemplate.Replace("{RetQuantity}", billReturnItem.RetQuantity.ToString());
+                    tempDetailsTemplate.Replace("{RetTotalAmount}", billReturnItem.RetTotalAmount.ToString());
+                    printDetailsTemplate.Append(tempDetailsTemplate);
+                }
+                template.Replace("{InvoiceDetails}", printDetailsTemplate.ToString());
+            }
+            return template.ToString();
         }
 
 
@@ -631,25 +695,34 @@ namespace DanpheEMR.Controllers
                             //end--section-6: Send Return Information to IRD SERVER
 
                             //start: --section 7: Send Return To SSF Server for SSF Patients
+                            var invoice = _billingDbContext.BillingTransactions.FirstOrDefault(b => b.BillingTransactionId == billInvoiceRet.BillingTransactionId);
+
                             var patientSchemes = _billingDbContext.PatientSchemeMaps.Where(a => a.SchemeId == billInvoiceRet.SchemeId && a.PatientId == billInvoiceRet.PatientId).FirstOrDefault();
                             if (patientSchemes != null)
                             {
-                                int priceCategoryId = billInvoiceRet.ReturnInvoiceItems[0].PriceCategoryId;
-                                var priceCategory = _billingDbContext.PriceCategoryModels.Where(a => a.PriceCategoryId == priceCategoryId).FirstOrDefault();
-                                if (priceCategory != null && priceCategory.PriceCategoryName.ToLower() == "ssf" && RealTimeSSFClaimBooking)
+                                //int priceCategoryId = billInvoiceRet.ReturnInvoiceItems[0].PriceCategoryId;
+                                //var priceCategory = _billingDbContext.PriceCategoryModels.Where(a => a.PriceCategoryId == priceCategoryId).FirstOrDefault();
+                                var scheme = _billingDbContext.BillingSchemes.FirstOrDefault(s => s.SchemeId == patientSchemes.SchemeId);
+                                if (scheme != null && scheme.ApiIntegrationName != null && scheme.ApiIntegrationName.ToLower() == "ssf")
                                 {
+                                    Log.Information($"The Real Time SSF Claim Booking is started from BillReturn and is in process to book,Credit Note CRN{billInvoiceRet.CreditNoteNumber} with ClaimCode {invoice.ClaimCode}");
+                                    var fiscalYear = _billingDbContext.BillingFiscalYears.FirstOrDefault(f => f.FiscalYearId == billInvoiceRet.FiscalYearId);
+                                    var fiscalYearFormatted = fiscalYear != null ? fiscalYear.FiscalYearFormatted : "";
                                     //making parallel thread call (asynchronous) to post to SSF Server. so that it won't stop the normal BillingFlow.
                                     SSFDbContext ssfDbContext = new SSFDbContext(connString);
                                     var billObj = new SSF_ClaimBookingBillDetail_DTO()
                                     {
-                                        InvoiceNoFormatted = $"CRN{billInvoiceRet.CreditNoteNumber}",
+                                        InvoiceNoFormatted = $"{fiscalYearFormatted}-CRN{billInvoiceRet.CreditNoteNumber}",
                                         TotalAmount = -(decimal)billInvoiceRet.TotalAmount, //Keep it negative here, SSF takes return as negative values so that they can subtract later with TotalAmount
-                                        ClaimCode = (long)patientSchemes.LatestClaimCode
+                                        ClaimCode = (long)invoice.ClaimCode,
+                                        VisitType = invoice.TransactionType
                                     };
 
                                     SSF_ClaimBookingService_DTO claimBooking = SSF_ClaimBookingService_DTO.GetMappedToBookClaim(billObj, patientSchemes);
 
-                                    Task.Run(() => BillingBL.SyncToSSFServer(claimBooking, "billing", ssfDbContext, patientSchemes, currentUser));
+                                    Task.Run(() => BillingBL.SyncToSSFServer(claimBooking, "billing", ssfDbContext, patientSchemes, currentUser, RealTimeSSFClaimBooking));
+
+                                    Log.Information($"Parallel thread is created from BillReturn to book, ssf CreditNote CRN{billInvoiceRet.CreditNoteNumber} with ClaimCode {invoice.ClaimCode}");
                                 }
                             }
                             //end: --section 7: Send Return To SSF Server for SSF Patients

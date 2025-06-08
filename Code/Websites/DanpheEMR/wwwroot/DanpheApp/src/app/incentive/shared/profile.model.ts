@@ -1,4 +1,5 @@
-import { FormGroup, FormBuilder, Validators, FormControl } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ProfileItemMapModel } from './profile-item-map.model';
 
 export class ProfileModel {
   ProfileId: number = 0;
@@ -9,7 +10,7 @@ export class ProfileModel {
   Description: string = null;
   public CreatedBy: number = null;
   public CreatedOn: string = null;
-
+  ProfileBillItemMap: Array<ProfileItemMapModel> = []
   // display purpose
   PriceCategoryName: string = null;
   AttachedProfileId: number = null;
@@ -19,7 +20,7 @@ export class ProfileModel {
   constructor() {
     const _fb = new FormBuilder();
     this.ProfileValidator = _fb.group({
-      'ProfileName': ['', Validators.required], 
+      'ProfileName': ['', Validators.required],
       //'PriceCategoryId': [null, Validators.required],
       //'TDSPercentage': [null, Validators.required]
     });

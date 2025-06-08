@@ -30,10 +30,12 @@
         <form [formGroup]="currentInpatientOutcome.DyanamicValidator" class="form-horizontal">
           <div class="form-body">
             <div class="col-md-12">
-              <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject">Inpatient Service Report</span> </div>
+              <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject">Inpatient Service
+                  Report</span> </div>
               <div class="row">
                 <div class="col-md-6 col-xs-12">
-                  <from-to-date-select (on-change)="OnFromToDateChange($event)">
+                  <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                                       [date-settings-name]="'common-range-with-today'">
                   </from-to-date-select>
                 </div>
                 <div class="col-md-2 col-xs-12">
@@ -156,7 +158,8 @@
                       </table>
                       <table border="1" class="Selected" style="width:100%;" align="center">
                         <tr>
-                          <td rowspan="4" class="Selected" align="center" class="rotate90" style="width: 77px; -webkit-transform: rotate(-90.0deg);">Maternal Age (Yrs)</td>
+                          <td rowspan="4" class="Selected" align="center" class="rotate90" style="width: 77px; -webkit-transform: rotate(-90.0deg);">
+                            Maternal Age (Yrs)</td>
                           <td colspan="5" class="blank_row"></td>
                         </tr>
                         <tr *ngFor="let o of InpatientServiceSummary.GestationalWeek_MaternalAge">
@@ -174,8 +177,10 @@
                           <td>Female</td>
                         </tr>
                         <tr>
-                          <td class="Selected" align="center">{{InpatientServiceSummary.MedicoLegalCases[0]? InpatientServiceSummary.MedicoLegalCases[0].caseCount:0}}</td>
-                          <td class="Selected" align="center">{{InpatientServiceSummary.MedicoLegalCases[1]? InpatientServiceSummary.MedicoLegalCases[1].caseCount:0}}</td>
+                          <td class="Selected" align="center">{{InpatientServiceSummary.MedicoLegalCases[0]?
+                            InpatientServiceSummary.MedicoLegalCases[0].caseCount:0}}</td>
+                          <td class="Selected" align="center">{{InpatientServiceSummary.MedicoLegalCases[1]?
+                            InpatientServiceSummary.MedicoLegalCases[1].caseCount:0}}</td>
                         </tr>
                       </table>
                     </td>
@@ -428,7 +433,8 @@
           </table>
           <p style="text-align:center;">
             <button class="btn blue" (click)="Print()"> Print Report <i class="glyphicon glyphicon-print"></i> </button>
-            <button class="blue btn" type="button" title="Export to Excel" (click)="ExportToExcel('wholeTable')"> <i class="fa fa-file-excel-o"></i> Export </button>
+            <button class="blue btn" type="button" title="Export to Excel" (click)="ExportToExcel('wholeTable')"> <i class="fa fa-file-excel-o"></i>
+              Export </button>
           </p>
         </div>
       </div>

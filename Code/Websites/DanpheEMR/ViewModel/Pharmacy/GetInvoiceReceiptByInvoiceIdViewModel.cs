@@ -202,5 +202,6 @@ namespace DanpheEMR.ViewModel.Pharmacy
     {
         public string PaymentSubCategoryName { get; set; }
         public decimal InAmount { get; set; }
+        public string PaymentDetails {  get; set; }
     }
 }

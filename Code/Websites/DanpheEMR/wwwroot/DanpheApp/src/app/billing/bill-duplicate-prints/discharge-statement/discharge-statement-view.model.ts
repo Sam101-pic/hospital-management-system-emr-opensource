@@ -7,5 +7,8 @@ export class DischargeStatementViewModel {
     StatementDate: string = '';
     StatementTime: string = '';
     PatientVisitId: number = 0;
+    DateOfBirth: string = '';
+    Age: string = '';
+    AgeSex: string = '';
 
 }

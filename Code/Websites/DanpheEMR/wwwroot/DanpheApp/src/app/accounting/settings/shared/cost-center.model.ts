@@ -19,6 +19,7 @@ export class CostCenterModel {
     public CostCenterValidator: FormGroup = null;
     public HierarchyLevel: number = 0;
     public IsDefault: boolean = false;
+    public HospitalId: number = 0;
 
     constructor() {
         this.CreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);

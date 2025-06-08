@@ -9,4 +9,5 @@ export class RequisitionDispatchItem_DTO {
     PendingQuantity: number = 0;
     RequisitionItemStatus: string = '';
     ItemRemarks: string = '';
+    DispatchedDate: string = '';
 }

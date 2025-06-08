@@ -38,7 +38,7 @@ namespace DanpheEMR.ServerModel
         public bool? showreopen { get; set; }
 
         //sud-nagesh: 20June'20-- for Acc-Hospital Separation.
-        public int? HospitalId { get; set; }
+        public int HospitalId { get; set; }
 
         [NotMapped]
         public DateTime? CurrentDate { get; set; } //sud-nagesh:21Jun'20--only for local usage, not available in database.

@@ -8,10 +8,12 @@ import { PharmacyBLService } from '../../../../pharmacy/shared/pharmacy.bl.servi
 import { SecurityService } from '../../../../security/shared/security.service';
 import { GeneralFieldLabels } from '../../../../shared/DTOs/general-field-label.dto';
 import { CallbackService } from '../../../../shared/callback.service';
+import { DanpheHTTPResponse } from '../../../../shared/common-models';
 import { GridEmitModel } from '../../../../shared/danphe-grid/grid-emit.model';
 import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../../shared/routefrom.service';
 import { APIsByType } from '../../../../shared/search.service';
+import { ENUM_DanpheHTTPResponses } from '../../../../shared/shared-enums';
 import DispensaryGridColumns from '../../../shared/dispensary-grid.column';
 
 @Component({
@@ -84,9 +86,15 @@ export class PatientListComponent implements OnInit {
   //Load patients
   Load(searchTxt): void {
     this.pharmacyBLService.GetPatients(searchTxt, this.IsCurrentDispensaryInsurace)
-      .subscribe(res => {
-        if (res.Status == 'OK') {
-          this.patients = res.Results;
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.patients = res.Results.map(patient => {
+            const sortedAddress = this.coreService.SortPatientAddress(patient);
+            return {
+              ...patient,
+              SortedAddress: sortedAddress
+            }
+          });
         }
         else {
           this.msgBoxServ.showMessage("error", [res.ErrorMessage]);

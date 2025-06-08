@@ -8,9 +8,11 @@ import { CoreService } from "../../core/shared/core.service";
 import { SecurityService } from "../../security/shared/security.service";
 import { ENUM_PrintingType, PrinterSettingsModel } from "../../settings-new/printers/printer-settings.model";
 import { NepaliCalendarService } from "../../shared/calendar/np/nepali-calendar.service";
+import { DanpheHTTPResponse } from "../../shared/common-models";
 import { CommonFunctions } from "../../shared/common.functions";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
-import { ENUM_Country, ENUM_DanpheHTTPResponseText, ENUM_DateTimeFormat, ENUM_MembershipTypeName, ENUM_PriceCategory } from "../../shared/shared-enums";
+import { ENUM_Country, ENUM_DanpheHTTPResponseText, ENUM_DateTimeFormat, ENUM_MembershipTypeName, ENUM_MessageBox_Status, ENUM_PriceCategory, ENUM_PrintSheetTemplateCodes, ENUM_PrintSheetTemplateVisitType, ENUM_VisitType } from "../../shared/shared-enums";
+import { Visit } from "../shared/patient-vist-data.dto";
 import { PatientSticketViewModel } from "./patient-sticker.model";
 
 
@@ -69,10 +71,14 @@ export class PatientStickerComponent {
   public CountryNepal: string = null;
   public SSFPriceCategoryName: string = (ENUM_PriceCategory.SSF).toUpperCase();
   public ECHSMembershipTypeName: string = ENUM_MembershipTypeName.ECHS;
+  IsEnglishCalendarType: boolean = false;
+  public PrintSheetTemplate: string = '';
+  public PatientVisitDetails: Visit = null;
+
 
   constructor(
     public http: HttpClient,
-    public msgBoxServ: MessageboxService,
+    public _msgBoxServ: MessageboxService,
     public router: Router,
     public nepaliCalendarServ: NepaliCalendarService,
     public coreService: CoreService,
@@ -80,6 +86,7 @@ export class PatientStickerComponent {
     public billingService: BillingService,
     public securityService: SecurityService
   ) {
+    this.IsEnglishCalendarType = this.coreService.IsEnableEnglishCalendarOnly();
     this.showHidePrintButton();
 
     this.hospitalCode = this.coreService.GetHospitalCode();
@@ -99,6 +106,7 @@ export class PatientStickerComponent {
 
   ngOnInit() {
     this.GetPatientStickerDetails(this.patientId);
+    this.LoadPatientLatestVistDetails(this.patientId);
     this.PrintedBy = this.securityService.GetLoggedInUser().UserName;
   }
 
@@ -118,11 +126,15 @@ export class PatientStickerComponent {
         res => this.Error(res));
   }
   CallBackStickerOnly(res: any) {
-    if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results.length !== 0) {
-      this.PatientStickerDetails = { ...res.Results[0] };
-      this.PatientStickerDetails.MunicipalityName = ((res.Results[0].MunicipalityName !== null) || (res.Results[0].MunicipalityName !== "")) ? res.Results[0].MunicipalityName : "";
-      this.PatientStickerDetails.CountrySubDivisionName = ((res.Results[0].CountrySubDivisionName !== null || res.Results[0].CountrySubDivisionName !== "")) ? res.Results[0].CountrySubDivisionName : "";
-      this.localDateTime = this.GetLocalDate() + " BS";
+    if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results && res.Results.length !== 0) {
+      this.PatientStickerDetails = { ...res.Results };
+      this.PatientStickerDetails.MunicipalityName = ((res.Results.MunicipalityName !== null) || (res.Results.MunicipalityName !== "")) ? res.Results.MunicipalityName : "";
+      this.PatientStickerDetails.CountrySubDivisionName = ((res.Results.CountrySubDivisionName !== null || res.Results.CountrySubDivisionName !== "")) ? res.Results.CountrySubDivisionName : "";
+      if (!this.IsEnglishCalendarType) {
+        this.localDateTime = this.GetLocalDate() + "BS";
+      } else {
+        this.localDateTime = new Date().toLocaleDateString('en-GB');
+      }
       this.ageSex = CommonFunctions.GetFormattedAgeSexforSticker(this.PatientStickerDetails.DateOfBirth, this.PatientStickerDetails.Gender, this.PatientStickerDetails.Age);
       this.patientQRCodeInfo = `Name: ` + this.PatientStickerDetails.PatientName + `
   Hospital No: `+ this.PatientStickerDetails.HospitalNo + `
@@ -138,7 +150,7 @@ export class PatientStickerComponent {
     else {
       this.showPatientSticker = false;
       this.AfterPrintAction();
-      this.msgBoxServ.showMessage("error", ["Sorry!!! not able to get date for opd-sticker of this patient"]);
+      this._msgBoxServ.showMessage("error", ["Sorry!!! not able to get date for opd-sticker of this patient"]);
     }
   }
 
@@ -200,7 +212,7 @@ export class PatientStickerComponent {
     this.showPatientSticker = false;
   }
   Error(err) {
-    this.msgBoxServ.showMessage("error", ["Sorry!!! not able to get for patient- sticker"]);
+    this._msgBoxServ.showMessage("error", ["Sorry!!! not able to get for patient- sticker"]);
     console.log(err.ErrorMessage);
   }
   AfterPrintAction() {
@@ -302,7 +314,7 @@ export class PatientStickerComponent {
       }
     }
     else {
-      this.msgBoxServ.showMessage("error", ["Please set local date view configuration."]);
+      this._msgBoxServ.showMessage("error", ["Please set local date view configuration."]);
       return null;
     }
   }
@@ -350,7 +362,7 @@ export class PatientStickerComponent {
       this.coreService.loading = false;
     }
     else {
-      this.msgBoxServ.showMessage('error', ["Printer Not Supported."]);
+      this._msgBoxServ.showMessage('error', ["Printer Not Supported."]);
       this.coreService.loading = true;
       return;
     }
@@ -425,4 +437,92 @@ export class PatientStickerComponent {
   OnPrinterChanged($event) {
     this.selectedPrinter = $event;
   }
+
+
+
+  PrintSheet() {
+    let documentContent = "<html><head>";
+    documentContent += '</head>';
+    documentContent += '<body onload="window.print()">' + this.PrintSheetTemplate + '</body></html>'
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.contentWindow.document.open();
+    iframe.contentWindow.document.write(documentContent);
+    iframe.contentWindow.document.close();
+
+    setTimeout(function () {
+      document.body.removeChild(iframe);
+    }, 500);
+  }
+
+  LoadPatientLatestVistDetails(patientId: number) {
+    this.http.get<any>('/api/Stickers/GetPatientVisitDetails?PatientId=' + patientId, this.options)
+      .map((res: DanpheHTTPResponse) => res)
+      .subscribe(res => {
+        if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
+          if (res.Results) {
+            this.PatientVisitDetails = res.Results;
+            this.ChoosePrintSheetTemplate();
+          }
+        }
+      },
+        err => {
+          this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [err]);
+        });
+  }
+
+  ChoosePrintSheetTemplate() {
+    if (this.PatientVisitDetails && this.PatientVisitDetails.VisitType) {
+      switch (this.PatientVisitDetails.VisitType) {
+        case ENUM_VisitType.inpatient:
+          this.SetPrintSheetTemplate(ENUM_PrintSheetTemplateVisitType.Inpatient, this.PatientVisitDetails.DepartmentCode);
+          break;
+        case ENUM_VisitType.outdoor:
+        case ENUM_VisitType.outpatient:
+          this.SetPrintSheetTemplate(ENUM_PrintSheetTemplateVisitType.Outpatient, this.PatientVisitDetails.DepartmentCode);
+          break;
+        case ENUM_VisitType.emergency:
+          this.SetPrintSheetTemplate(ENUM_PrintSheetTemplateVisitType.Emergency, '');
+          break;
+      }
+    }
+
+  }
+  SetPrintSheetTemplate(department: string, departmentCode: string) {
+    //if department code is present then load department template else load default template
+    //if department template is not present then load default template
+
+    const defaultTemplateCode = (ENUM_PrintSheetTemplateCodes.TemplatePrefix + "_" + department + "_" + ENUM_PrintSheetTemplateCodes.DefaultTemplateSuffix);
+    const departmentTemplateCode = (ENUM_PrintSheetTemplateCodes.TemplatePrefix + "_" + department + "_" + departmentCode);
+    (async (): Promise<void> => {
+      try {
+        if (departmentCode) {
+          await this.GetTemplateByTemplateCode(departmentTemplateCode, this.PatientVisitDetails.PatientVisitId);
+          if (!this.PrintSheetTemplate) {
+            await this.GetTemplateByTemplateCode(defaultTemplateCode, this.PatientVisitDetails.PatientVisitId);
+          }
+        }
+        else
+          await this.GetTemplateByTemplateCode(defaultTemplateCode, this.PatientVisitDetails.PatientVisitId);
+      } catch (err) {
+        this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Error: ${err.ErrorMessage}`]);
+      }
+    })();
+  }
+
+  async GetTemplateByTemplateCode(templateCode: string, patientVisitId: number): Promise<void> {
+    try {
+      const res: DanpheHTTPResponse = await this.http.get<DanpheHTTPResponse>(`/api/NewClinical/Template?templateCode=${templateCode}&patientVisitId=${patientVisitId}`, this.options).toPromise();
+      if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
+        if (res.Results && res.Results.TemplateHTML)
+          this.PrintSheetTemplate = res.Results.TemplateHTML;
+        else
+          this.PrintSheetTemplate = '';
+      }
+    }
+    catch (err) {
+      this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [err]);
+    }
+  }
 }
+

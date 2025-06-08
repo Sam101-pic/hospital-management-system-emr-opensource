@@ -1,18 +1,15 @@
-import {
-  Component,
-  Directive,
-  ViewChild,
-  ChangeDetectorRef,
-} from "@angular/core";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { RPT_ADT_DischargedPatientModel } from "../../shared/discharged-patient.model";
-import { DLService } from "../../../shared/dl.service";
 import { HttpClient } from "@angular/common/http";
+import {
+  ChangeDetectorRef,
+  Component
+} from "@angular/core";
 import * as moment from "moment/moment";
 import { ReportingService } from "../../../reporting/shared/reporting-service";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import { Patient } from "../../../patients/shared/patient.model";
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { DLService } from "../../../shared/dl.service";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { RPT_ADT_DischargedPatientModel } from "../../shared/discharged-patient.model";
 
 @Component({
   templateUrl: "./discharged-patient.html",
@@ -67,9 +64,10 @@ export class RPT_ADT_DischargedPatientComponent {
     } else {
       this.msgBoxServ.showMessage("error", ['Dates Provided is not Proper']);
     }
-    
+
   }
   Error(err) {
+    this.DischargedPatientData = new Array<any>();
     this.msgBoxServ.showMessage("error", [err.ErrorMessage]);
   }
   Success(res) {
@@ -77,10 +75,12 @@ export class RPT_ADT_DischargedPatientComponent {
       this.DischargedPatientColumns = this.reportServ.reportGridCols.DischargedPatient;
       this.DischargedPatientData = res.Results;
     } else if (res.Status == "OK" && res.Results.length == 0) {
+      this.DischargedPatientData = new Array<any>();
       this.msgBoxServ.showMessage("notice-message", [
         "Data is Not Available Between Selected dates...Try Different Dates",
       ]);
     } else {
+      this.DischargedPatientData = new Array<any>();
       this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
     }
   }

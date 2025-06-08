@@ -1,6 +1,5 @@
-import { Injectable, Directive } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { _ } from 'ag-grid-community';
+import { Injectable } from '@angular/core';
 
 @Injectable()
 export class LabLISDLService {
@@ -32,8 +31,8 @@ export class LabLISDLService {
         return this.http.get<any>("/api/LIS/GetAllMachines", this.options);
     }
 
-    GetAllMachineResult(id: number, fromDate : Date , toDate : Date) {
-        return this.http.get<any>("/api/LIS/GetAllMachineResult?machineId=" + id+"&fromDate=" + fromDate + "&toDate=" + toDate, this.options);
+    GetAllMachineResult(id: number, fromDate: Date, toDate: Date) {
+        return this.http.get<any>("/api/LIS/GetAllMachineResult?machineId=" + id + "&fromDate=" + fromDate + "&toDate=" + toDate, this.options);
     }
 
     public AddUpdateLisMapping(data) {
@@ -46,5 +45,9 @@ export class LabLISDLService {
 
     public RemoveLisMapping(id: number) {
         return this.http.delete<any>("/api/LIS/RemoveMapping?id=" + id, this.options);
+    }
+
+    public ActivateMapping(id: number) {
+        return this.http.delete<any>("/api/LIS/ActivateMapping?id=" + id, this.options);
     }
 }

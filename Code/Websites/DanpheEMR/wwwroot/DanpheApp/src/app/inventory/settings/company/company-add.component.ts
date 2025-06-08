@@ -1,11 +1,11 @@
-﻿import { Component, Input, Output, EventEmitter } from "@angular/core";
+﻿import { Component, EventEmitter, Input, Output } from "@angular/core";
 
 //Parse, validate, manipulate, and display dates and times in JS.
-import * as moment from 'moment/moment';
-import { CompanyService } from "../shared/company/company.service";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { SecurityService } from "../../../security/shared/security.service";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { CompanyModel } from "../shared/company/company.model";
+import { CompanyService } from "../shared/company/company.service";
 
 
 @Component({
@@ -18,7 +18,11 @@ export class CompanyAddComponent {
     @Input("selected-company")
     public CurrentCompany: CompanyModel;
     public showAddPage: boolean = false;
+
     public loading: boolean = false;
+
+    @Input("companyList")
+    public CompanyList = new Array<CompanyModel>();
 
     @Output("callback-add")
     callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
@@ -50,6 +54,34 @@ export class CompanyAddComponent {
             this.CurrentCompany.CompanyValidator.controls[i].updateValueAndValidity();
         }
 
+
+        if (this.CompanyList && this.CompanyList.length) {
+            const currentCompanyName = this.CurrentCompany.CompanyName ? this.CurrentCompany.CompanyName.toLowerCase() : '';
+            const currentCompanyCode = this.CurrentCompany.Code ? this.CurrentCompany.Code.toLowerCase() : '';
+
+            // Checking if CompanyName already exists
+            const isCompanyNameAlreadyExists = this.CompanyList.some(a =>
+                a.CompanyName && a.CompanyName.toLowerCase() === currentCompanyName
+            );
+
+            // Checking if Company Code already exists
+            const isCompanyCodeAlreadyExists = this.CompanyList.some(a =>
+                a.Code && a.Code.toLowerCase() === currentCompanyCode
+            );
+
+            if (isCompanyNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add Company as the Company Name "${this.CurrentCompany.CompanyName}" already exists.`]);
+                return;
+            }
+
+            if (isCompanyCodeAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add Company as the Code "${this.CurrentCompany.Code}" already exists.`]);
+                return;
+            }
+        }
+
+
+
         if (this.CurrentCompany.IsValidCheck(undefined, undefined)) {
             this.loading = true;
             this.companyService.AddCompany(this.CurrentCompany)
@@ -76,6 +108,33 @@ export class CompanyAddComponent {
             this.CurrentCompany.CompanyValidator.controls[i].markAsDirty();
             this.CurrentCompany.CompanyValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.CompanyList && this.CompanyList.length) {
+            // Ensuring that the properties are defined before comparing
+            const currentCompanyName = this.CurrentCompany.CompanyName ? this.CurrentCompany.CompanyName.toLowerCase() : '';
+            const currentCompanyCode = this.CurrentCompany.Code ? this.CurrentCompany.Code.toLowerCase() : '';
+
+            const isCompanyNameAlreadyExists = this.CompanyList.some(a =>
+                a.CompanyName && a.CompanyName.toLowerCase() === currentCompanyName &&
+                a.CompanyId !== this.CurrentCompany.CompanyId
+            );
+
+            const isCompanyCodeAlreadyExists = this.CompanyList.some(a =>
+                a.Code && a.Code.toLowerCase() === currentCompanyCode &&
+                a.CompanyId !== this.CurrentCompany.CompanyId
+            );
+
+            if (isCompanyNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Company as the Company Name "${this.CurrentCompany.CompanyName}" already exists.`]);
+                return;
+            }
+
+            if (isCompanyCodeAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Company as the Code "${this.CurrentCompany.Code}" already exists.`]);
+                return;
+            }
+        }
+
 
         if (this.CurrentCompany.IsValidCheck(undefined, undefined)) {
             this.loading = true;
@@ -111,14 +170,14 @@ export class CompanyAddComponent {
     }
     FocusElementById(id: string) {
         window.setTimeout(function () {
-          let itmNameBox = document.getElementById(id);
-          if (itmNameBox) {
-            itmNameBox.focus();
-          }
+            let itmNameBox = document.getElementById(id);
+            if (itmNameBox) {
+                itmNameBox.focus();
+            }
         }, 600);
-      }
-    hotkeys(event){
-        if(event.keyCode==27){
+    }
+    hotkeys(event) {
+        if (event.keyCode == 27) {
             this.Close()
         }
     }

@@ -136,7 +136,7 @@ export class SignatoriesComponent {
       this.selEmployees.splice(index, 1);
     }
     this.ngModelChange.emit(JSON.stringify(this.GetItems()));
-    this.selectedEmployee.emit(false);
+    this.selectedEmployee.emit(true);
   }
 
   onSelectAll(items: any) {
@@ -154,6 +154,7 @@ export class SignatoriesComponent {
       this.selEmployees.splice(index, 1);
       // this.selEmployees = this.selEmployees.slice();
       this.ngModelChange.emit(JSON.stringify(this.GetItems()));
+      this.selectedEmployee.emit(true);
     }
   }
 

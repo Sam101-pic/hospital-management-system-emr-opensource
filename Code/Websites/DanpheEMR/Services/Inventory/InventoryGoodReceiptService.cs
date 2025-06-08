@@ -6,6 +6,7 @@ using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.InventoryModels;
 using DanpheEMR.ServerModel.NotificationModels;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
@@ -20,14 +21,16 @@ namespace DanpheEMR.Services
         public NotiFicationDbContext notificationDb;
         public RbacDbContext rbacDb;
         private readonly string connString = null;
+        private readonly ILogger<InventoryGoodReceiptService> _logger;
 
         public IInventoryReceiptNumberService ReceiptNumberService { get; }
 
-        public InventoryGoodReceiptService(IOptions<MyConfiguration> _config, IInventoryReceiptNumberService receiptNumberService)
+        public InventoryGoodReceiptService(IOptions<MyConfiguration> _config, IInventoryReceiptNumberService receiptNumberService, ILogger<InventoryGoodReceiptService> logger)
         {
             connString = _config.Value.Connectionstring;
             db = new InventoryDbContext(connString);
             ReceiptNumberService = receiptNumberService;
+            _logger = logger;
         }
 
         public List<GoodsReceiptModel> ListGoodsReceipt()
@@ -50,12 +53,18 @@ namespace DanpheEMR.Services
             {
                 try
                 {
-                    model.CreatedOn = DateTime.Now;
+                    var currentDate = DateTime.Now;
+                    int FiscalYearId = InventoryBL.GetFiscalYear(db).FiscalYearId;
+                    var IsGRAlreadyExist = db.GoodsReceipts.Any(g => g.BillNo == model.BillNo && g.VendorId == model.VendorId && g.FiscalYearId == FiscalYearId && g.IsCancel == false);
+                    if (IsGRAlreadyExist == true)
+                    {
+                        throw new Exception("Duplicate BillNo for the same Vendor is not allowed");
+                    }
+                    model.CreatedOn = currentDate;
                     //GoodsArrivalNo max+1 increment logic with fiscal year.
                     //removed from here as it is set only when all the verifications are completed.
-                    model.FiscalYearId = InventoryBL.GetFiscalYear(db, model.GoodsReceiptDate).FiscalYearId;
                     model.GoodsArrivalNo = ReceiptNumberService.GenerateGAN(model.GoodsArrivalDate, model.GRGroupId);
-                    model.FiscalYearId = InventoryBL.GetFiscalYear(db).FiscalYearId;
+                    model.FiscalYearId = FiscalYearId;
                     model.GoodsReceiptNo = ReceiptNumberService.GenerateGAN(model.GoodsReceiptDate, model.GRGroupId);
 
                     //check if verification enabled
@@ -64,7 +73,7 @@ namespace DanpheEMR.Services
                     {
                         item.OtherChargesModelList.ForEach(charge =>
                         {
-                            charge.CreatedOn = DateTime.Now;
+                            charge.CreatedOn = currentDate;
                             charge.CreatedBy = item.CreatedBy;
                         });
                     });
@@ -79,7 +88,7 @@ namespace DanpheEMR.Services
                         var CheckForPOCompletion = true;
                         model.GoodsReceiptItem.ForEach(item =>
                         {
-                            item.CreatedOn = DateTime.Now;  //Assign Today's date as CreatedOn
+                            item.CreatedOn = currentDate;  //Assign Today's date as CreatedOn
                             item.CreatedBy = model.CreatedBy;
                             item.GRItemDate = model.GoodsReceiptDate;
                             item.ArrivalQuantity = item.ReceivedQuantity;
@@ -198,7 +207,7 @@ namespace DanpheEMR.Services
             {
                 if (grItem.GoodsReceiptItemId == 0)
                 {
-                    grItem.CreatedOn = DateTime.Now;
+                    grItem.CreatedOn = currentDate;
                     db.GoodsReceiptItems.Add(grItem);
                     db.SaveChanges();
                 }
@@ -457,7 +466,8 @@ namespace DanpheEMR.Services
             {
                 try
                 {
-                    GoodsReceipt.ModifiedOn = DateTime.Now;
+                    var currentDate = DateTime.Now;
+                    GoodsReceipt.ModifiedOn = currentDate;
                     GoodsReceipt.ModifiedBy = currentUser.EmployeeId;
                     var grId = GoodsReceipt.GoodsReceiptID;
                     //if any old item has been deleted, we need to compare grItemList
@@ -469,7 +479,7 @@ namespace DanpheEMR.Services
                         {
                             //for updating old element
                             item.ModifiedBy = currentUser.EmployeeId;
-                            item.ModifiedOn = DateTime.Now;
+                            item.ModifiedOn = currentDate;
                             db.GoodsReceiptItems.Attach(item);
 
                             //sud:20Sept'21--Attaching the Object coming from frontend and Making the Entity.Modified will update all properties of the object.. 
@@ -506,7 +516,7 @@ namespace DanpheEMR.Services
                         else //new items wont have GRItemId
                         {
                             //for adding new gritems
-                            item.CreatedOn = DateTime.Now;
+                            item.CreatedOn = currentDate;
                             item.CreatedBy = currentUser.EmployeeId;
                             item.GoodsReceiptId = grId;
                             db.GoodsReceiptItems.Add(item);
@@ -535,13 +545,24 @@ namespace DanpheEMR.Services
                     GoodsReceipt.OtherChargesList = null;
                     GoodsReceipt.VerifierIds = (GoodsReceipt.IsVerificationEnabled) ? InventoryBL.SerializeProcurementVerifiers(GoodsReceipt.VerifierList) : "";
                     //To avoid referential integrity constraint violation. --Rohit
+                    if (GoodsReceipt.VerifierList.Count > 0)
+                    {
+                        GoodsReceipt.GRStatus = ENUM_GRVerificationStatus.pending;
+                    }
+                    else
+                    {
+                        GoodsReceipt.GRStatus = ENUM_GRVerificationStatus.verified;
+                    }
+                    GoodsReceipt.VerificationId = null;
                     db.GoodsReceipts.Attach(GoodsReceipt);
 
                     //sud:20Sept'21--Attaching the Object coming from client and Making the Entity.Modified will update all properties of the object.. 
                     //Very RISKY operation when attaching the object from frontend.
                     //Correct way: Attach the object then Mention IsModified=true to only required properties.
                     //db.Entry(GoodsReceipt).State = EntityState.Modified;
-
+                    db.Entry(GoodsReceipt).Property(a => a.VerificationId).IsModified = true;
+                    db.Entry(GoodsReceipt).Property(a => a.GRStatus).IsModified = true;
+                    db.Entry(GoodsReceipt).Property(a => a.IsVerificationEnabled).IsModified = true;
                     db.Entry(GoodsReceipt).Property(a => a.VendorBillDate).IsModified = true;
                     db.Entry(GoodsReceipt).Property(a => a.BillNo).IsModified = true;
                     db.Entry(GoodsReceipt).Property(a => a.VendorId).IsModified = true;
@@ -562,51 +583,85 @@ namespace DanpheEMR.Services
             }
 
         }
+
         public bool ReceiveGoodsReceipt(int GRId, RbacUser currentUser, string ReceiveRemarks = "")
         {
             using (var dbTransaction = db.Database.BeginTransaction())
             {
                 try
                 {
-                    var GoodsReceipt = db.GoodsReceipts.Include(g => g.GoodsReceiptItem).FirstOrDefault(gr => gr.GoodsReceiptID == GRId);
-                    if (GoodsReceipt == null || GoodsReceipt.IsCancel == true)
+                    var currentDate = DateTime.Now;
+
+                    var goodsReceipt = db.GoodsReceipts
+                        .Include(gr => gr.GoodsReceiptItem)
+                        .SingleOrDefault(gr => gr.GoodsReceiptID == GRId);
+
+                    if (goodsReceipt is null)
                     {
-                        dbTransaction.Rollback();
-                        return false;
+                        _logger.LogError($"Goods Receipt not found with GoodsReceiptId = {GRId}");
+                        throw new Exception("Goods Receipt not found");
                     }
-                    else
+
+                    goodsReceipt.GRStatus = "active";
+                    goodsReceipt.ReceivedBy = currentUser.EmployeeId;
+                    goodsReceipt.ReceivedOn = currentDate;
+                    goodsReceipt.ReceivedRemarks = ReceiveRemarks;
+
+                    int currentFiscalYearId = InventoryBL.GetFiscalYear(db).FiscalYearId;
+
+                    var itemIds = goodsReceipt.GoodsReceiptItem.Select(grItem => grItem.ItemId).ToList();
+                    var items = db.Items.Where(x => itemIds.Contains(x.ItemId)).ToDictionary(x => x.ItemId);
+
+                    var goodsReceiptItemIds = goodsReceipt.GoodsReceiptItem.Select(grItem => grItem.GoodsReceiptItemId).ToList();
+                    var stockTransactions = db.StockTransactions
+                        .Where(st => goodsReceiptItemIds.Contains((int)st.ReferenceNo) && st.TransactionType == ENUM_INV_StockTransactionType.PurchaseItem)
+                        .ToDictionary(st => st.ReferenceNo);
+
+                    var storeStockIds = goodsReceipt.GoodsReceiptItem.Select(grItem => grItem.StoreStockId).Where(id => id > 0).Distinct().ToList();
+                    var storeStocks = db.StoreStocks.Where(ss => storeStockIds.Contains(ss.StoreStockId)).ToDictionary(ss => ss.StoreStockId);
+
+                    foreach (var grItem in goodsReceipt.GoodsReceiptItem)
                     {
-                        GoodsReceipt.GRStatus = "active";
-                        GoodsReceipt.ReceivedBy = currentUser.EmployeeId;
-                        GoodsReceipt.ReceivedOn = DateTime.Now;
-                        GoodsReceipt.ReceivedRemarks = ReceiveRemarks;
-
-                        var currentFiscalYearId = InventoryBL.GetFiscalYear(db).FiscalYearId;
-                        var currentDate = DateTime.Now;
-
-                        GoodsReceipt.GoodsReceiptItem.ForEach(goodsReceiptItem =>
+                        if (items.TryGetValue(grItem.ItemId, out var item))
                         {
-                            //if(goodsReceiptItem.Cance)
-                            var itm = db.Items.Where(x => x.ItemId == goodsReceiptItem.ItemId).FirstOrDefault();
-                            goodsReceiptItem.IsFixedAssets = itm.IsFixedAssets;
-                            goodsReceiptItem.DonationId = GoodsReceipt.DonationId;
-                            //Sud:17Sept'21: sending category from GrItem instead of GR.
-                            var stockIds = AddtoInventoryStock(goodsReceiptItem, goodsReceiptItem.ItemCategory, GoodsReceipt.StoreId, currentUser, currentDate, currentFiscalYearId);
-                            goodsReceiptItem.StockId = stockIds.StockId;
-                            goodsReceiptItem.StoreStockId = stockIds.StoreStockId;
+                            grItem.IsFixedAssets = item.IsFixedAssets;
+                        }
+                        grItem.DonationId = goodsReceipt.DonationId;
 
-                        });
-                        db.SaveChanges();
+                        var stockIds = new InventoryStockIds();
 
-                        dbTransaction.Commit();
-                        return true;
+                        if (stockTransactions.TryGetValue(grItem.GoodsReceiptItemId, out var stockTransaction))
+                        {
+                            if (grItem.StoreStockId > 0 && storeStocks.TryGetValue(grItem.StoreStockId, out var storeStock))
+                            {
+                                storeStock.UpdateAvailableQuantity(grItem.ReceivedQuantity - stockTransaction.InQty);
+                                stockIds.StoreStockId = grItem.StoreStockId;
+                            }
+
+                            stockIds.StockId = stockTransaction.StockId;
+                            stockTransaction.SetInQuantity(grItem.ReceivedQuantity);
+                        }
+                        else
+                        {
+                            if (grItem.StoreStockId == 0 || grItem.StoreStockId == null)
+                            {
+                                stockIds = AddtoInventoryStock(grItem, grItem.ItemCategory, goodsReceipt.StoreId, currentUser, currentDate, currentFiscalYearId);
+                                grItem.StockId = stockIds.StockId;
+                            }
+                        }
+
+                        grItem.StoreStockId = stockIds.StoreStockId;
                     }
 
+                    db.SaveChanges();
+                    dbTransaction.Commit();
+                    return true;
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogError($"Error in ReceiveGoodsReceipt: {ex}");
                     dbTransaction.Rollback();
-                    throw ex;
+                    throw;
                 }
             }
         }

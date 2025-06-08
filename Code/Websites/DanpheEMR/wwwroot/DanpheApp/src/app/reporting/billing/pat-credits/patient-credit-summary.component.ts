@@ -1,12 +1,11 @@
-import { Component, Directive, ViewChild } from '@angular/core';
-import { ReportingService } from "../../../reporting/shared/reporting-service";
-import { RPT_BIL_PatientCreditSummaryModel } from './patient-credit-summary.model';
-import { DLService } from "../../../shared/dl.service"
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { CommonFunctions } from '../../../shared/common.functions';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { Component } from '@angular/core';
 import * as moment from 'moment/moment';
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { ReportingService } from "../../../reporting/shared/reporting-service";
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { DLService } from "../../../shared/dl.service";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { RPT_BIL_PatientCreditSummaryModel } from './patient-credit-summary.model';
 
 @Component({
   templateUrl: "./patient-credit-summary.html"
@@ -29,6 +28,8 @@ export class RPT_BIL_PatientCreditSummaryComponent {
     public msgBoxServ: MessageboxService,
     public reportServ: ReportingService) {
     this.dlService = _dlService;
+    this.patientCreditSummaryColumns = this.reportServ.reportGridCols.PatientCreditSummaryColumns;
+
     this.TodayDate = moment().format('DD-MM-YYYY');;
     this.patientCreditSummary.fromDate = moment().format('YYYY-MM-DD');
     this.patientCreditSummary.toDate = moment().format('YYYY-MM-DD');
@@ -64,12 +65,17 @@ export class RPT_BIL_PatientCreditSummaryComponent {
   }
   Success(res) {
     if (res.Status == "OK" && res.Results.length > 0) {
-      this.patientCreditSummaryColumns = this.reportServ.reportGridCols.PatientCreditSummaryColumns;
-      this.patientCreditSummaryData = res.Results;
+      this.patientCreditSummaryData = res.Results.map(
+        a => {
+          return {
+            ...a,
+            CreatedOn: a.CreatedOn.split('T')[0]  // Splitting the date and keeping only the date portion
+          };
+        }
+      );
     }
     else if (res.Status == "OK" && res.Results.length == 0) {
       this.msgBoxServ.showMessage("notice-message", ['No credit record is available.'])
-      this.patientCreditSummaryColumns = this.reportServ.reportGridCols.PatientCreditSummaryColumns;
       this.patientCreditSummaryData = res.Results;
     }
     else {

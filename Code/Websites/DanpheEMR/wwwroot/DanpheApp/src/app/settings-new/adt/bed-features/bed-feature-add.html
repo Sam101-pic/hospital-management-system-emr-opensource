@@ -17,7 +17,7 @@
                          formControlName="BedFeatureCode"
                          [attr.disabled]="update ? '' : null"
                          value="" placeholder="Enter Bed Feature Code"
-                         (keyup.enter)="SetFocusById('BedFeatureName')" (ngModelChange)="CapitalizeSectionCode()" />
+                         (keyup.enter)="SetFocusById('id_bed_feature_BedFeatureName')" (ngModelChange)="CapitalizeSectionCode()" />
                   <span class="color-red font-sm"
                         [hidden]="CurrentBedFeature.IsValidCheck('BedFeatureCode','required') || !(CurrentBedFeature.IsDirty('BedFeatureCode'))">Bed
                     Feature Code is required</span>
@@ -28,12 +28,12 @@
               <div class="form-group">
                 <label class="control-label col-md-4">Feature Name<sup>*</sup><b>:</b></label>
                 <div class="col-md-8">
-                  <input class="form-control" maxlength="100" type="text" id="BedFeatureName"
+                  <input class="form-control" maxlength="100" type="text" id="id_bed_feature_BedFeatureName"
                          [(ngModel)]="CurrentBedFeature.BedFeatureName"
                          formControlName="BedFeatureName"
                          [attr.disabled]="update ? '' : null"
                          value="" placeholder="Enter Bed Feature Name"
-                         (keyup.enter)="SetFocusById('BedFeatureFullName')" />
+                         (keyup.enter)="SetFocusById('id_bed_feature_BedFeatureFullName')" />
                   <span class="color-red font-sm"
                         [hidden]="CurrentBedFeature.IsValidCheck('BedFeatureName','required') || !(CurrentBedFeature.IsDirty('BedFeatureName'))">Bed
                     Feature Name is required</span>
@@ -44,13 +44,22 @@
               <div class="form-group">
                 <label class="control-label col-md-4">Feature Full Name<b>:</b></label>
                 <div class="col-md-8">
-                  <input class="form-control" maxlength="100" type="text" id="BedFeatureFullName"
+                  <input class="form-control" maxlength="100" type="text" id="id_bed_feature_BedFeatureFullName"
                          [(ngModel)]="CurrentBedFeature.BedFeatureFullName"
                          formControlName="BedFeatureFullName"
                          value="" placeholder="Enter Bed Feature Full Name"
-                         (keyup.enter)="SetFocusById('Price')" />
+                         (keyup.enter)="SetFocusById('id_bed_feature_GroupCode')" />
                   <div class="color-red font-sm" *ngIf="CurrentBedFeature.IsDirty('BedFeatureFullName')"
                        [hidden]="CurrentBedFeature.IsValidCheck('BedFeatureFullName','maxlength')"> Length is not proper</div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="control-label col-md-4">Group Code<b>:</b></label>
+                <div class="col-md-8">
+                  <input class="form-control" type="text" id="id_bed_feature_GroupCode"
+                         [(ngModel)]="CurrentBedFeature.GroupCode"
+                         value="" placeholder="Enter Group Code"
+                         formControlName="GroupCode" />
                 </div>
               </div>
               <!-- <div class="form-group">
@@ -92,9 +101,22 @@
                   </div>
                 </div>
               </div>
-
+              <div class="form-group">
+                <label class="control-label col-md-4">Is Presentation Grouping? <b>:</b> </label>
+                <div class="col-md-8">
+                  <div class="input-group">
+                    <div class="icheck-inline">
+                      <label class="mt-checkbox mt-checkbox-outline">
+                        <input id="id_bed_feature_IsPresentationGrouping" name="IsPresentationGrouping" type="checkbox" value=""
+                               [(ngModel)]="CurrentBedFeature.IsPresentationGrouping"
+                               formControlName="IsPresentationGrouping">
+                        <span></span> </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="panel-footer">
+            <div class=" panel-footer">
               <input type="button" id="add" class="btn green btn-success margin-7-hr" *ngIf="!update" (click)="Add()" value="Add" />
 
               <input type="button" id="add" class="btn green btn-success margin-7-hr" *ngIf="update" (click)="Update()" value="Update" />

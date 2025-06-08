@@ -1,199 +1,234 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import * as moment from 'moment/moment';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { IGridFilterParameter } from '../../../shared/danphe-grid/grid-filter-parameter.interface';
 import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
 import PHRMReportsGridColumns from "../../shared/phrm-reports-grid-columns";
+import { PHRMExpiryReportData_DTO } from './phrm-expiry-report-data.dto';
 
 @Component({
   selector: 'phrm-expiry',
-  templateUrl: "./phrm-expiry-report.html",
-  styleUrls: ['./phrm-expiry-report.component.css']
-
+  templateUrl: "./phrm-expiry-report.html"
 })
 export class PHRMExpiryReportComponent implements OnInit {
 
-  /// Expiry  Report Columns variable
   PHRMExpiryReportColumns: Array<any> = null;
-  /// Expiry Report Data variable 
-  PHRMExpiryData: Array<any> = new Array<any>();
-  ////Variable to Bind Item Name
-  public ItemId: number = null;
-  public selectedItem: any;
-  storeList: any;
-  public selectedStore: any = null;
-  storeDetails: any;
-  StoreId: number;
-  fromDate: string;
-  toDate: string;
+  PHRMExpiryData: PHRMExpiryReportData_DTO[] = [];
+  ItemId: number = null;
+  SelectedItem: { ItemId: number, ItemName: string };
+  StoreList: { StoreId: number, Name: string }[] = [];
+  SelectedStore: { StoreId: number, Name: string };
+  StoreId: number = null;
+  FromDate: string = moment().format('YYYY-MM-DD');
+  ToDate: string = moment().format('YYYY-MM-DD');
   allItemList: any[] = [];
-  public dateRange: string = "";
-  public loading: boolean = false;
-  isNearlyExpired: boolean = false;
-  isExpired: boolean = false;
-  NewPHRMExpiryData: any[] = [];
+  DateRange: string = "";
+  Loading: boolean = false;
+  IsNearlyExpired: boolean = false;
+  IsExpired: boolean = false;
+  NewPHRMExpiryData: PHRMExpiryReportData_DTO[] = [];
+  GenericList: { GenericId: number, GenericName: string }[] = [];
+  SelectedGeneric: { GenericId: number, GenericName: string };
+  GenericId: number = null;
+  GenericName: string = null;
+  ItemName: string = null;
+  StoreName: string = null;
+  FilterParameters: IGridFilterParameter[] = [];
+  NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
+  TotalCostValue: number = 0;
+  TotalSalesValue: number = 0;
+  footer: string = '';
 
-  constructor(public pharmacyBLService: PharmacyBLService, public dlService: DLService, public msgBoxServ: MessageboxService, public changeDetector: ChangeDetectorRef) {
+  constructor(public pharmacyBLService: PharmacyBLService, public dlService: DLService, public messageBoxService: MessageboxService, public changeDetector: ChangeDetectorRef) {
     this.PHRMExpiryReportColumns = PHRMReportsGridColumns.PHRMExpiryReport;
-    this.fromDate = moment().format("YYYY-MM-DD");
-    this.toDate = moment().format("YYYY-MM-DD");
-    //this.toDate = moment().add(1,'M').format("YYYY-MM-DD");
+    this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("ExpiryDate", false));
+
     this.GetItemList();
+    this.GetGenericList();
     this.GetActiveStore();
   }
   ngOnInit() {
 
   }
-  ngAfterViewChecked() {
-    this.dateRange = "<b>Date:</b>&nbsp;" + this.fromDate + "&nbsp;<b>To</b>&nbsp;" + this.toDate;
-  }
   GetItemList() {
     this.pharmacyBLService.GetItemList()
-      .subscribe(res => {
-        if (res.Status == 'OK') {
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.allItemList = res.Results;
         }
         else {
-          this.msgBoxServ.showMessage("Notice-Message", ["Failed to load item data."]);
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to load item data." + res.ErrorMessage]);
         }
-      }, () => {
-        this.msgBoxServ.showMessage("Failed", ["Failed to load item data."]);
+      }, (err) => {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to load item data." + err.ErrorMessage]);
       });
   }
-  gridExportOptions = {
 
-    fileName: 'ExpiryReport_' + moment().format('YYYY-MM-DD') + '.xls',
-  };
   GetActiveStore() {
     this.pharmacyBLService.GetActiveStore()
-      .subscribe(res => {
-        if (res.Status == "OK")
-          this.storeList = res.Results;
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.StoreList = res.Results;
+        }
+        else {
+          console.log('Failed to load store list');
+        }
       });
   }
-  ShowCatchErrMessage(exception) {
-    if (exception) {
-      let ex: Error = exception;
-      console.log("Error Messsage =>  " + ex.message);
-      console.log("Stack Details =>   " + ex.stack);
-    }
-  }
 
-  //////Function Call on Button Click of Report
   GetReportData() {
-    if (this.checkDateValidation()) {
-      this.loading = true;
-      this.storeDetails = this.selectedStore;
-      this.StoreId = this.storeDetails == undefined ? null : this.storeDetails.StoreId;
-      this.pharmacyBLService.GetExpiryReport(this.ItemId, this.StoreId, this.fromDate, this.toDate).finally(() => {
-        this.loading = false;
-      }).subscribe(res => {
-        if (res.Status == 'OK' && res.Results.length > 0) {
-          this.PHRMExpiryData = res.Results;
-          this.NewPHRMExpiryData = res.Results;
-          this.isNearlyExpired = false;
-          this.isExpired = false;
-        }
-        if (res.Status == 'OK' && res.Results.length == 0) {
-          this.PHRMExpiryData = null;
-          this.msgBoxServ.showMessage("error", ["No Data is Available for Selected Record"]);
-        }
-        this.dateRange = "<b>Date:</b>&nbsp;" + this.fromDate + "&nbsp;<b>To</b>&nbsp;" + this.toDate;
-      });
+    if (this.FromDate == null || this.ToDate == null) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['Please select valid date']);
     }
 
+    this.FilterParameters = [
+      { DisplayName: 'DateRange', Value: this.DateRange },
+      { DisplayName: 'GenericName', Value: this.GenericName != null ? this.GenericName : 'All' },
+      { DisplayName: 'ItemName', Value: this.ItemName != null ? this.ItemName : 'All' },
+      { DisplayName: 'StoreName', Value: this.StoreName != null ? this.StoreName : 'All' },
+    ]
+    this.Loading = true;
+    this.pharmacyBLService.GetExpiryReport(this.ItemId, this.GenericId, this.StoreId, this.FromDate, this.ToDate).finally(() => {
+      this.Loading = false;
+      this.ResetInputFields();
+    }).subscribe(res => {
+      if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+        this.PHRMExpiryData = res.Results;
+        this.NewPHRMExpiryData = res.Results;
+        this.CalculateSummary();
+
+      }
+      else {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to retrieve data"]);
+      }
+    });
+
   }
+  private ResetInputFields() {
+    this.IsNearlyExpired = false;
+    this.IsExpired = false;
+    this.SelectedGeneric = null;
+    this.SelectedItem = null;
+    this.SelectedStore = null;
+    this.StoreId = null;
+    this.ItemId = null;
+    this.GenericId = null;
+  }
+
   ShowNearlyExpiredItem() {
-    this.isExpired = false;
+    this.IsExpired = false;
     let date = new Date();
-    let datenow = moment(date.setMonth(date.getMonth() + 0)).format('YYYY-MM-DD');
-    let datethreemonth = moment(date.setMonth(date.getMonth() + 3)).format('YYYY-MM-DD');
-    if (this.isNearlyExpired == true) {
-      this.PHRMExpiryData = this.NewPHRMExpiryData.filter(a => moment(a.ExpiryDate).format('YYYY-MM-DD') < datethreemonth && moment(a.ExpiryDate).format('YYYY-MM-DD') > datenow);
+    let dateNow = moment(date.setMonth(date.getMonth() + 0)).format('YYYY-MM-DD');
+    let dateThreeMonth = moment(date.setMonth(date.getMonth() + 3)).format('YYYY-MM-DD');
+    if (this.IsNearlyExpired == true) {
+      this.PHRMExpiryData = this.NewPHRMExpiryData.filter(a => moment(a.ExpiryDate).format('YYYY-MM-DD') < dateThreeMonth && moment(a.ExpiryDate).format('YYYY-MM-DD') > dateNow);
     } else {
       this.PHRMExpiryData = this.NewPHRMExpiryData;
     }
+    this.CalculateSummary();
   }
   ShowExpiredItem() {
-    this.isNearlyExpired = false;
+    this.IsNearlyExpired = false;
     let date = new Date();
-    let datenow = moment(date.setMonth(date.getMonth() + 0)).format('YYYY-MM-DD');
-    if (this.isExpired == true) {
-      this.PHRMExpiryData = this.NewPHRMExpiryData.filter(a => moment(a.ExpiryDate).format('YYYY-MM-DD') <= datenow);
+    let dateNow = moment(date.setMonth(date.getMonth() + 0)).format('YYYY-MM-DD');
+    if (this.IsExpired == true) {
+      this.PHRMExpiryData = this.NewPHRMExpiryData.filter(a => moment(a.ExpiryDate).format('YYYY-MM-DD') <= dateNow);
     } else {
       this.PHRMExpiryData = this.NewPHRMExpiryData;
     }
-  }
-  checkDateValidation() {
-    if (moment(this.fromDate).isBefore(this.toDate) || moment(this.fromDate).isSame(this.toDate)) {
-      return true;
-    } else {
-      this.msgBoxServ.showMessage('failed', ['Please enter valid From date and To date']);
-      return false;
-    }
+    this.CalculateSummary();
   }
 
-  myItemListFormatter(data: any): string {
-    let html = data["GenericName"] + " | " + data["ItemName"];
+  ItemListFormatter(data: any): string {
+    let html = data["ItemName"];
     return html;
   }
 
-
-  onChangeItem($event) {
-    try {
-      if ($event.ItemId != null) {
-        this.ItemId = this.selectedItem.ItemId;
-      }
-      else {
-        this.ItemId = null;
-      }
-    }
-    catch (exception) {
-      this.ShowCatchErrMessage(exception);
-    }
+  GenericListFormatter(data: any): string {
+    let html = data["GenericName"];
+    return html;
   }
-  CheckProperSelectedItem() {
-    try {
-      if ((typeof this.selectedItem !== 'object') || (typeof this.selectedItem === "undefined") || (typeof this.selectedItem === null)) {
-        this.selectedItem = null;
-        this.ItemId = null;
-      }
+  StoreListFormatter(data: any): string {
+    let html = data["Name"];
+    return html;
+  }
+
+  onItemSelect() {
+    if (this.SelectedItem) {
+      this.ItemId = this.SelectedItem.ItemId;
+      this.ItemName = this.SelectedItem.ItemName;
     }
-    catch (exception) {
-      this.ShowCatchErrMessage(exception);
+    else {
+      this.ItemId = null;
+      this.ItemName = null;
     }
   }
 
-  ////on click grid export button we are catching in component an event.. 
-  ////and in that event we are calling the server excel export....
-  OnGridExport($event: GridEmitModel) {
-    this.dlService.ReadExcel("/api/PharmacyReport/ExportToExcelPHRMExpiryReport?ItemId=" + this.ItemId + "&FromDate=" + this.fromDate + "&ToDate=" + this.toDate)
-      .map(res => res)
-      .subscribe(data => {
-        let blob = data;
-        let a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "ExpiryReport" + moment().format("DD-MMM-YYYY_HHmmA") + '.xls';
-        document.body.appendChild(a);
-        a.click();
-      },
-        res => this.ErrorMsg(res));
+  OnGenericSelect() {
+    if (this.SelectedGeneric) {
+      this.GenericId = this.SelectedGeneric.GenericId;
+      this.GenericName = this.SelectedGeneric.GenericName;
+    }
+    else {
+      this.GenericId = null;
+      this.GenericName = null;
+    }
   }
-  ErrorMsg(err) {
-    this.msgBoxServ.showMessage("error", ["Sorry!!! Not able export the excel file."]);
-    console.log(err.ErrorMessage);
+  OnStoreSelect() {
+    if (this.SelectedStore) {
+      this.StoreId = this.SelectedStore.StoreId;
+      this.StoreName = this.SelectedStore.Name;
+    }
+    else {
+      this.StoreId = null;
+      this.StoreName = null;
+    }
   }
-  refreshDate() {
-    this.dateRange = "<b>Date:</b>&nbsp;" + this.fromDate + "&nbsp;<b>To</b>&nbsp;" + this.toDate;
-    this.changeDetector.detectChanges();
+
+  OnFromToDateChange($event) {
+    if ($event) {
+      this.FromDate = $event.fromDate;
+      this.ToDate = $event.toDate;
+    }
   }
+
+  GetGenericList() {
+    this.pharmacyBLService.GetGenericList()
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.GenericList = res.Results;
+        } else {
+          console.log('Failed to get generic list');
+        }
+      });
+  }
+
+  ngAfterViewChecked() {
+    this.DateRange = "<b>From:</b>&nbsp;" + this.FromDate + "&nbsp;<b>To</b>&nbsp;" + this.ToDate;
+    if (document.getElementById("expiry-print_summary")) {
+      this.footer = document.getElementById("expiry-print_summary").innerHTML;
+    }
+  }
+  gridExportOptions = {
+
+    fileName: 'Pharmacy_ExpiryReport_' + moment().format('YYYY-MM-DD') + '.xls',
+  };
+
+
+  CalculateSummary() {
+    if (this.PHRMExpiryData && this.PHRMExpiryData.length) {
+      this.TotalCostValue = this.PHRMExpiryData.reduce((a, b) => a + b.TotalCostValue, 0);
+      this.TotalSalesValue = this.PHRMExpiryData.reduce((a, b) => a + b.TotalSalesValue, 0);
+    }
+    else {
+      this.TotalCostValue = 0;
+      this.TotalSalesValue = 0;
+    }
+  }
+
+
 }
-
-
-
-
-
-
-
-

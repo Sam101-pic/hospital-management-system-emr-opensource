@@ -1,9 +1,9 @@
-export class SubLedgerSummaryDataVM{
+export class SubLedgerSummaryDataVM {
     public LedgerName: string = "";
     public SubLedgerData: Array<SubLedgerTxnSummarVM> = new Array<SubLedgerTxnSummarVM>();
 }
 
-export class SubLedgerTxnSummarVM{
+export class SubLedgerTxnSummarVM {
     public LedgerId: number = 0;
     public SubLedgerName: string = ``;
     public SubLedgerId: number = 0;
@@ -15,21 +15,21 @@ export class SubLedgerTxnSummarVM{
     public ClosingCrAmount: number = 0;
 }
 
-export class SubLedgerDetailDataVM{
+export class SubLedgerDetailDataVM {
     public LedgerName: string = ``;
     public SubLedgerData: Array<SubLedgerDetailDataSubLedgerList> = new Array<SubLedgerDetailDataSubLedgerList>();
 }
 
-export class SubLedgerDetailDataSubLedgerList{
+export class SubLedgerDetailDataSubLedgerList {
     public SubLedgerName: string = ``;
     public OpeningDrAmount: number = 0;
     public OpeningCrAmount: number = 0;
     public ClosingDrAmount: number = 0;
     public ClosingCrAmount: number = 0;
-    public SubLedgerDetailTxn : Array<SubLedgerTxnDetailVM> = new Array<SubLedgerTxnDetailVM>(); 
+    public SubLedgerDetailTxn: Array<SubLedgerTxnDetailVM> = new Array<SubLedgerTxnDetailVM>();
 }
 
-export class SubLedgerTxnDetailVM{
+export class SubLedgerTxnDetailVM {
     public LedgerId: number = 0;
     public SubLedgerId: number = 0;
     public DrAmount: number = 0;
@@ -39,15 +39,16 @@ export class SubLedgerTxnDetailVM{
     public VoucherNumber: string = ``;
     public VoucerTypeName: string = ``;
     public AccumulatedBalance: number = 0;
+    public Description: string = ``;
 }
 
-export class SubLedgerOpeningBalanceVM{
+export class SubLedgerOpeningBalanceVM {
     public OpeningBalance: number = 0;
     public SubLedgerId: number = 0;
     public LedgerId: number = 0;
 }
 
-export class CustomerHeader{
+export class CustomerHeader {
     public hospitalName: string = ``;
     public address: string = ``;
     public email: string = ``;

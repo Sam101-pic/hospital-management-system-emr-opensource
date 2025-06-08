@@ -32,6 +32,12 @@
         border-top-width: 1px;
         margin-top: -1px;
     }
+
+    .unitlabel {
+        color: #555555 !important;
+        font-size: 13px !important;
+        margin-left: -15px;
+    }
 </style>
 
 <div class="prob-entry" style="padding: 5px 0px 15px 0px; background: #006687; width: 100%; display: table;">
@@ -90,10 +96,16 @@
                                     <td *ngFor="let vitals of vitalsList">{{vitals.BPSystolic |
                                         HasValue:'/'}}{{vitals.BPDiastolic}}</td>
                                 </tr>
+
                                 <tr>
                                     <td>Respiratory Rate</td>
                                     <td *ngFor="let vitals of vitalsList">{{vitals.RespiratoryRatePerMin |
                                         HasValue:'/min'}}</td>
+                                </tr>
+                                <tr>
+                                    <td>GCS</td>
+                                    <td *ngFor="let vitals of vitalsList">{{vitals.Eyes | HasValue:'E'}} {{vitals.Verbal | HasValue:'V'}}
+                                        {{vitals.Motor | HasValue:'M'}}</td>
                                 </tr>
                                 <tr>
                                     <td>SpO2</td>
@@ -111,7 +123,10 @@
                                         </div>
                                     </td>
                                 </tr>
-
+                                <tr>
+                                    <td>Remarks</td>
+                                    <td *ngFor="let vitals of vitalsList">{{vitals.Remarks}}</td>
+                                </tr>
 
                                 <tr>
                                     <td>Action</td>
@@ -138,14 +153,16 @@
         </h3>
 
         <div class="form-group cstm-form-group">
-            <label class="control-label cstm-control-label col-md-4">Added On:</label>
+            <label class="control-label cstm-control-label col-md-4">Added On<b
+                   style="float:right;">:</b></label>
             <div class="col-md-8">
                 <danphe-date-picker [(ngModel)]="CurrentVital.VitalsTakenOn" [showTime]="true"> </danphe-date-picker>
             </div>
         </div>
 
         <div class="form-group cstm-form-group">
-            <label class="control-label cstm-control-label col-md-4">Height:</label>
+            <label class="control-label cstm-control-label col-md-4">Height<b
+                   style="float:right;">:</b></label>
             <div class="col-md-5">
                 <input #height class="form-control cstm-form-control" maxlength="30" (keyup.enter)="GoToNext(weight)"
                        *ngIf="!footInchSelected" type="number" [(ngModel)]="CurrentVital.Height"
@@ -173,7 +190,8 @@
             </div>
         </div>
         <div class="form-group cstm-form-group">
-            <label class="control-label cstm-form-label col-md-4">Weight:</label>
+            <label class="control-label cstm-form-label col-md-4">Weight<b
+                   style="float:right;">:</b></label>
             <div class="col-md-5">
                 <input #weight class="form-control cstm-form-control" maxlength="10" type="number" name="" min="1"
                        (keyup.enter)="GoToNext(temperature)" [(ngModel)]="CurrentVital.Weight"
@@ -188,7 +206,8 @@
             </div>
         </div>
         <div class="form-group cstm-form-group">
-            <label class="control-label cstm-control-label col-md-4">BMI:</label>
+            <label class="control-label cstm-control-label col-md-4">BMI<b
+                   style="float:right;">:</b></label>
             <div class="col-md-5">
                 <input class="form-control cstm-form-control " maxlength="10" type="number"
                        [(ngModel)]="CurrentVital.BMI" disabled>
@@ -197,7 +216,8 @@
             </div>
         </div>
         <div class="form-group cstm-form-group">
-            <label class="control-label cstm-control-label col-md-4">Temperature:</label>
+            <label class="control-label cstm-control-label col-md-4">Temperature<b
+                   style="float:right;">:</b></label>
             <div class="col-md-5">
                 <input #temperature type="number" class="form-control cstm-form-control" maxlength="10" name="" min="1"
                        (keyup.enter)="GoToNext(pulse)" [(ngModel)]="CurrentVital.Temperature">
@@ -211,17 +231,19 @@
             </div>
         </div>
         <div class="form-group cstm-form-group">
-            <label class="control-label cstm-control-label col-md-4">Pulse:</label>
+            <label class="control-label cstm-control-label col-md-4">Pulse<b
+                   style="float:right;">:</b></label>
             <div class="col-md-5">
                 <input #pulse type="number" class="form-control cstm-form-control" maxlength="50" min="1" name=""
                        (keyup.enter)="GoToNext(bpSystolic)" [(ngModel)]="CurrentVital.Pulse">
             </div>
             <div class="col-md-3">
-                <b class="white">per minute</b>
+                <b class="unitlabel">per minute</b>
             </div>
         </div>
         <div class="form-group cstm-form-group">
-            <label class="control-label cstm-control-label col-md-4">Blood Pressure:</label>
+            <label class="control-label cstm-control-label col-md-4">Blood Pressure<b
+                   style="float:right;">:</b></label>
             <div class="col-md-6">
                 <form [formGroup]="CurrentVital.VitalsValidator">
 
@@ -248,18 +270,57 @@
                 </form>
             </div>
             <div class="col-md-2">
-                <b class="white"> mmHg</b>
+                <b class="unitlabel"> mmHg</b>
             </div>
         </div>
+
         <div class="form-group cstm-form-group">
             <label class="control-label cstm-control-label col-md-4">Respiratory Rate<b
                    style="float:right;">:</b></label>
             <div class="col-md-5">
                 <input #respRate type="text" class="form-control cstm-form-control" maxlength="50"
-                       (keyup.enter)="GoToNext(spo2)" [(ngModel)]="CurrentVital.RespiratoryRatePerMin">
+                       (keydown.enter)="GoToNextSelect(Eyes)" [(ngModel)]="CurrentVital.RespiratoryRatePerMin">
             </div>
             <div class="col-md-3">
-                <b class="white">per minute</b>
+                <b class="unitlabel">per minute</b>
+            </div>
+        </div>
+        <div class="form-group cstm-form-group">
+            <label class="control-label cstm-control-label col-md-4">GCS<b
+                   style="float:right;">:</b></label>
+            <div class="col-md-2">
+                <select class="form-control cstm-form-control" placeholder="Eyes" name="" #Eyes (keydown.enter)="GoToNextSelect(Verbal)"
+                        (ngModelChange)="onEyeModelChange($event)" [(ngModel)]="CurrentVital.Eyes">
+                    <option value="" disabled selected>Eyes</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                </select>
+
+            </div>
+            <div class="col-md-3">
+                <select class="form-control cstm-form-control" placeholder="Verbal" name="" #Verbal (keydown.enter)="GoToNextSelect(Motor)"
+                        (ngModelChange)="onVerbalModelChange($event)" [(ngModel)]="CurrentVital.Verbal">
+                    <option value="" disabled selected>Verbal</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-control cstm-form-control" placeholder="Motor" name="" #Motor (keydown.enter)="GoToNextSelect(spo2)"
+                        (ngModelChange)="onMotorModelChange($event)" [(ngModel)]="CurrentVital.Motor">
+                    <option value="" disabled selected>Motor</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                </select>
             </div>
         </div>
         <div class="form-group cstm-form-group">
@@ -269,13 +330,13 @@
                        (keyup.enter)="GoToNextSelect(deliveryPlan)" [(ngModel)]="CurrentVital.SpO2" placeholder="SpO2">
             </div>
             <div class="col-md-3">
-                <b class="white">percent</b>
+                <b class="unitlabel">percent</b>
             </div>
         </div>
         <div class="form-group cstm-form-group">
             <label class="control-label cstm-control-label col-md-4">
-                O<sub>2</sub> Delivery Plan:
-            </label>
+                O<sub>2</sub> Delivery Plan<b
+                   style="float:right;">:</b></label>
             <div class="col-md-5">
                 <select #deliveryPlan class="form-control cstm-form-control" placeholder="Unit" (change)="change()"
                         name="" [(ngModel)]="CurrentVital.OxygenDeliveryMethod">
@@ -293,8 +354,8 @@
         </div>
         <div class="form-group cstm-form-group">
             <label class="control-label cstm-control-label col-md-4">
-                Pain Scale<b> (/10)</b>:
-            </label>
+                Pain Scale<b> (/10)</b><b
+                   style="float:right;">:</b></label>
             <div class="col-md-8">
                 <div *ngFor="let pdata of painData; let idx = index" class="col-md-12"
                      style="padding: 0; margin-bottom: 5px;">
@@ -305,7 +366,8 @@
                     </div>
                     <div class="col-md-5" style="padding:0px">
                         <div class="col-md-12" style="padding:0px">
-                            <select #painScale class="form-control cstm-form-control" name="" style="padding:0px"
+                            <select #painScale class="form-control cstm-form-control" (keyup.enter)="GoToNextSelect(Remarks)" name=""
+                                    style="padding:0px"
                                     [(ngModel)]="pdata.PainScale">
                                 <option value="1">1</option>
                                 <option value="2">2</option>
@@ -335,6 +397,17 @@
             </div>
 
         </div>
+        <div class="form-group cstm-form-group">
+            <label class="control-label cstm-control-label col-md-4">Remarks <b
+                   style="float:right;">:</b></label>
+            <div class="col-md-6">
+                <textarea #Remarks class="form-control " type="text" style="width:140%; height:50%"
+                          name="Remarks"
+                          [(ngModel)]="CurrentVital.Remarks">
+                        </textarea>
+            </div>
+        </div>
+
         <div class="cstm-form-group">
             <button type="button" style="background: #374150;margin-left:15px;" class="btn btn-primary"
                     *ngIf="!updateButton" name="name" (click)="AddVitals()">

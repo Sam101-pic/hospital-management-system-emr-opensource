@@ -35,11 +35,11 @@ export class AccountingSettingsBLService {
     }
 
     public AddSubLedger(subLedger: Array<SubLedgerModel>) {
-        let modifed = subLedger.map(led => {
+        let modifiedData = subLedger.map(led => {
             return _.omit(led, ['subLedgerValidator']);
         });
-        let temp = JSON.stringify(modifed);
-        return this.accountingSettingsDLService.AddSubLedger(temp)
+        //let temp = JSON.stringify(modifed);
+        return this.accountingSettingsDLService.AddSubLedger(modifiedData)
             .map(res => { return res });
     }
 
@@ -146,9 +146,20 @@ export class AccountingSettingsBLService {
         }
     }
     //get inventory subcategory list
-    GetInvSubcategoryList() {
+    GetInvSubStoreList() {
         try {
-            return this.accountingSettingsDLService.GetInvSubcategoryList()
+            return this.accountingSettingsDLService.GetInvSubStoreList()
+                .map((responseData) => {
+                    return responseData;
+                });
+        }
+        catch (ex) {
+            throw ex;
+        }
+    }
+    GetInvSubCategoryList() {
+        try {
+            return this.accountingSettingsDLService.GetInvSubCategoryList()
                 .map((responseData) => {
                     return responseData;
                 });
@@ -476,6 +487,10 @@ export class AccountingSettingsBLService {
 
     public AddSubLedgers(subLedgers: Array<SubLedgerForMakePayment>) {
         return this.accountingSettingsDLService.AddSubLedgers(subLedgers)
+            .map(res => { return res });
+    }
+    public GetHospitalsList() {
+        return this.accountingSettingsDLService.GetHospitalsList()
             .map(res => { return res });
     }
 }

@@ -24,16 +24,21 @@ namespace DanpheEMR.ViewModel.Pharmacy
         public decimal? SalePrice { get; set; }
         public decimal? CostPrice { get; set; }
         public decimal PendingQuantity { get; set; }
+        public decimal ExistingPendingQuantity { get; set; }
 
     }
 
     public static class PostStoreDispatchFunc
     {
-        public static async Task<int> PostStoreDispatch(this PharmacyDbContext db, IList<PostStoreDispatchViewModel> dispatchItems, RbacUser currentUser)
+        public static object PostStoreDispatch(this PharmacyDbContext db, IList<PostStoreDispatchViewModel> dispatchItems, RbacUser currentUser)
         {
-            var dispatchId = await db.StoreDispatchItems.Select(a => a.DispatchId).DefaultIfEmpty(0).MaxAsync() + 1;
+            var dispatchId = db.StoreDispatchItems.Select(a => a.DispatchId).DefaultIfEmpty(0).Max() + 1;
             var currentDate = DateTime.Now;
-            var currentFiscalYearId = db.PharmacyFiscalYears.Where(fsc => fsc.StartDate <= currentDate && fsc.EndDate >= currentDate).FirstOrDefault().FiscalYearId;
+            var currentFiscalYear = db.PharmacyFiscalYears.Where(fsc => fsc.StartDate <= currentDate && fsc.EndDate >= currentDate).FirstOrDefault();
+            if (currentFiscalYear == null) throw new Exception("Current Fiscal Not Found");
+
+            var currentFiscalYearId = currentFiscalYear.FiscalYearId;
+
             var mainStoreObj = db.PHRMStore.Where(s => s.Category == ENUM_StoreCategory.Store && s.SubCategory == ENUM_StoreSubCategory.Pharmacy).FirstOrDefault();
 
             if (mainStoreObj == null)
@@ -45,9 +50,9 @@ namespace DanpheEMR.ViewModel.Pharmacy
                 try
                 {
                     var dispatchItemList = new List<PHRMDispatchItemsModel>();
-                    await SaveDispatchItems(db, dispatchItems, currentUser, dispatchId, currentDate, mainStoreObj.StoreId, dispatchItemList);
-                    await SaveStockTransactionAndUpdateStock(db, currentUser, currentDate, currentFiscalYearId, dispatchItemList);
-                    await UpdateRequisitionStatus(db, dispatchItems);
+                    SaveDispatchItems(db, dispatchItems, currentUser, dispatchId, currentDate, mainStoreObj.StoreId, dispatchItemList);
+                    SaveStockTransactionAndUpdateStock(db, currentUser, currentDate, currentFiscalYearId, dispatchItemList);
+                    UpdateRequisitionStatus(db, dispatchItems);
 
 
                     dbContextTransaction.Commit();
@@ -61,10 +66,10 @@ namespace DanpheEMR.ViewModel.Pharmacy
             return dispatchId ?? 0;
         }
         //Here we have used StoreDispatch API for SubStoreDispatch (Copy of above method with some modification) : ROHIT/12Dec'22
-        public static async Task<int> PostSubStoreDispatch(this PharmacyDbContext db, IList<PostStoreDispatchViewModel> dispatchItems, RbacUser currentUser)
+        public static object PostSubStoreDispatch(this PharmacyDbContext db, IList<PostStoreDispatchViewModel> dispatchItems, RbacUser currentUser)
         {
             var i = 0;
-            var dispatchId = await db.StoreDispatchItems.Select(a => a.DispatchId).DefaultIfEmpty(0).MaxAsync() + 1;
+            var dispatchId = db.StoreDispatchItems.Select(a => a.DispatchId).DefaultIfEmpty(0).Max() + 1;
             var currentDate = DateTime.Now;
             var currentFiscalYearId = db.PharmacyFiscalYears.Where(fsc => fsc.StartDate <= currentDate && fsc.EndDate >= currentDate).FirstOrDefault().FiscalYearId;
             var mainStoreObj = db.PHRMStore.Where(s => s.Category == ENUM_StoreCategory.Store && s.SubCategory == ENUM_StoreSubCategory.Pharmacy).FirstOrDefault();
@@ -78,9 +83,9 @@ namespace DanpheEMR.ViewModel.Pharmacy
                 try
                 {
                     var dispatchItemList = new List<PHRMDispatchItemsModel>();
-                    await SaveDispatchItems(db, dispatchItems, currentUser, dispatchId, currentDate, mainStoreObj.StoreId, dispatchItemList);
-                    await SaveStockTransactionAndUpdateStock(db, currentUser, currentDate, currentFiscalYearId, dispatchItemList);
-                    await UpdateRequisitionStatus(db, dispatchItems);
+                    SaveDispatchItems(db, dispatchItems, currentUser, dispatchId, currentDate, mainStoreObj.StoreId, dispatchItemList);
+                    SaveStockTransactionAndUpdateStock(db, currentUser, currentDate, currentFiscalYearId, dispatchItemList);
+                    UpdateRequisitionStatus(db, dispatchItems);
 
                     dbContextTransaction.Commit();
                 }
@@ -93,19 +98,19 @@ namespace DanpheEMR.ViewModel.Pharmacy
             return dispatchId ?? 0;
         }
 
-        private static async Task SaveStockTransactionAndUpdateStock(PharmacyDbContext db, RbacUser currentUser, DateTime currentDate, int currentFiscalYearId, List<PHRMDispatchItemsModel> dispatchItemList)
+        private static void SaveStockTransactionAndUpdateStock(PharmacyDbContext db, RbacUser currentUser, DateTime currentDate, int currentFiscalYearId, List<PHRMDispatchItemsModel> dispatchItemList)
         {
             foreach (var dispatchItem in dispatchItemList)
             {
                 //Find the stock from main store and decrease
-                var stockList = await db.StoreStocks.Include(s => s.StockMaster)
+                var stockList = db.StoreStocks.Include(s => s.StockMaster)
                     .Where(s => s.StoreId == dispatchItem.SourceStoreId &&
                     s.ItemId == dispatchItem.ItemId &&
                     s.AvailableQuantity > 0 &&
                     s.StockMaster.BatchNo == dispatchItem.BatchNo &&
                     s.StockMaster.ExpiryDate == dispatchItem.ExpiryDate &&
                     s.StockMaster.SalePrice == dispatchItem.SalePrice &&
-                    s.IsActive == true).ToListAsync();
+                    s.IsActive == true).ToList();
 
                 //If no stock found, stop the process
                 if (stockList == null) throw new Exception($"Stock is not available for ItemId = {dispatchItem.ItemId}, BatchNo ={dispatchItem.BatchNo}");
@@ -127,7 +132,7 @@ namespace DanpheEMR.ViewModel.Pharmacy
 
                     //Increase Stock in Dispensary
                     //Find if the stock is available in dispensary
-                    var dispensaryStock = await db.StoreStocks.FirstOrDefaultAsync(s => s.StockId == stock.StockId && s.StoreId == dispatchItem.TargetStoreId && s.IsActive == true);
+                    var dispensaryStock = db.StoreStocks.FirstOrDefault(s => s.StockId == stock.StockId && s.StoreId == dispatchItem.TargetStoreId && s.IsActive == true);
                     // check if receive feature is enabled, to decide whether to increase in stock or increase unconfirmed quantity
                     var isReceiveFeatureEnabled = db.CFGParameters
                                                     .Where(param => param.ParameterGroupName == "Pharmacy" && param.ParameterName == "EnableReceiveItemsInDispensary")
@@ -161,7 +166,7 @@ namespace DanpheEMR.ViewModel.Pharmacy
                     {
                         totalRemainingQty -= stock.AvailableQuantity;
                         stockTxn.SetInOutQuantity(inQty: 0, outQty: stock.AvailableQuantity);
-                        if (isReceiveFeatureEnabled == true)
+                        if (isReceiveFeatureEnabled)
                         {
                             stock.IncreaseUnconfirmedQty(inQty: 0, outQty: stock.AvailableQuantity);
                             dispensaryStock.IncreaseUnconfirmedQty(inQty: stock.AvailableQuantity, outQty: 0);
@@ -178,7 +183,7 @@ namespace DanpheEMR.ViewModel.Pharmacy
                     {
                         stock.UpdateAvailableQuantity(newQty: stock.AvailableQuantity - totalRemainingQty);
                         stockTxn.SetInOutQuantity(inQty: 0, outQty: totalRemainingQty);
-                        if (isReceiveFeatureEnabled == true)
+                        if (isReceiveFeatureEnabled)
                         {
                             stock.IncreaseUnconfirmedQty(inQty: 0, outQty: totalRemainingQty);
                             dispensaryStock.IncreaseUnconfirmedQty(inQty: totalRemainingQty, outQty: 0);
@@ -199,44 +204,65 @@ namespace DanpheEMR.ViewModel.Pharmacy
                     }
                 }
             }
-            await db.SaveChangesAsync();
+            db.SaveChanges();
         }
 
 
-        private static async Task UpdateRequisitionStatus(PharmacyDbContext db, IList<PostStoreDispatchViewModel> dispatchItems)
+        private static void UpdateRequisitionStatus(PharmacyDbContext db, IList<PostStoreDispatchViewModel> dispatchItems)
         {
             var allUniqueRequisitionItemIds = dispatchItems.Select(d => d.RequisitionItemId).Distinct();
             foreach (var requisitionItemId in allUniqueRequisitionItemIds)
             {
-                //find requisition item and update the status
-                var requisitionItem = await db.StoreRequisitionItems.FindAsync(requisitionItemId);
+                var requisitionItem = db.StoreRequisitionItems.Where(item => item.RequisitionItemId == requisitionItemId).FirstOrDefault();
+
+                if (requisitionItem == null) throw new Exception("Requisition Item not found to update.");
+
                 var dispatchDetails = db.StoreDispatchItems.Where(di => di.RequisitionItemId == requisitionItemId).ToList();
-                requisitionItem.ReceivedQuantity = dispatchDetails != null ? dispatchDetails.Sum(a => a.DispatchedQuantity) : 0;
+
+                requisitionItem.ReceivedQuantity = dispatchDetails.Any() ? dispatchDetails.Sum(a => a.DispatchedQuantity) : 0;
 
                 var currentDispatchDetails = dispatchItems.Where(di => di.RequisitionItemId == requisitionItemId).ToList();
-                requisitionItem.PendingQuantity = currentDispatchDetails != null ? requisitionItem.PendingQuantity - currentDispatchDetails.Sum(di => di.DispatchedQuantity) : requisitionItem.PendingQuantity;
+
+                requisitionItem.PendingQuantity = currentDispatchDetails.Any() ? requisitionItem.PendingQuantity - currentDispatchDetails.Sum(di => di.DispatchedQuantity) : requisitionItem.PendingQuantity;
 
                 if (requisitionItem.PendingQuantity < 0)
                 {
                     requisitionItem.PendingQuantity = 0;
                 }
                 requisitionItem.RequisitionItemStatus = (requisitionItem.PendingQuantity <= 0) ? "complete" : "partial";
-                await db.SaveChangesAsync();
-                //i++;
+                db.SaveChanges();
             }
             //update requisition status
             var requisitionId = dispatchItems[0].RequisitionId;
-            var requisition = await db.StoreRequisition.FindAsync(requisitionId);
-            var isRequisitionComplete = await db.StoreRequisitionItems.Where(r => r.RequisitionId == requisitionId).AllAsync(r => r.RequisitionItemStatus == "complete" || r.RequisitionItemStatus == "cancelled");
+            var requisition = db.StoreRequisition.Where(req => req.RequisitionId == requisitionId).FirstOrDefault();
+
+            if (requisition == null) throw new Exception("Requisition Not Found to Update.");
+
+            var isRequisitionComplete = db.StoreRequisitionItems.Where(r => r.RequisitionId == requisitionId).All(r => r.RequisitionItemStatus == "complete" || r.RequisitionItemStatus == "cancelled");
+
             requisition.RequisitionStatus = isRequisitionComplete ? "complete" : "partial";
-            await db.SaveChangesAsync();
+            db.SaveChanges();
         }
 
 
-        private static async Task SaveDispatchItems(PharmacyDbContext db, IList<PostStoreDispatchViewModel> dispatchItems, RbacUser currentUser, int? dispatchId, DateTime currentDate, int mainStoreId, List<PHRMDispatchItemsModel> dispatchItemList)
+        private static void SaveDispatchItems(PharmacyDbContext db, IList<PostStoreDispatchViewModel> dispatchItems, RbacUser currentUser, int? dispatchId, DateTime currentDate, int mainStoreId, List<PHRMDispatchItemsModel> dispatchItemList)
         {
+            List<int> requisitionItemIds = dispatchItems.Select(r => r.RequisitionItemId).ToList();
+
+            var storeRequisitionItemsDictionaryFromServer = db.StoreRequisitionItems
+                                            .Where(item => requisitionItemIds.Contains(item.RequisitionItemId))
+                                            .ToDictionary(item => item.RequisitionItemId);
+
             foreach (var dispatchItem in dispatchItems)
             {
+                // Check if the requisition item exists and if its pending quantity matches the existing pending quantity in the dispatch item
+                if (storeRequisitionItemsDictionaryFromServer.TryGetValue(dispatchItem.RequisitionItemId, out var requisitionItem)
+                    && (decimal)requisitionItem.PendingQuantity != dispatchItem.ExistingPendingQuantity)
+                {
+                    throw new Exception("This Requisition is already dispatched Or Some modification has been done.");
+                }
+
+                // Create a new dispatch item
                 var newDispatchItem = new PHRMDispatchItemsModel()
                 {
                     DispatchId = dispatchId,
@@ -259,7 +285,7 @@ namespace DanpheEMR.ViewModel.Pharmacy
                 dispatchItemList.Add(newDispatchItem);
             }
             db.StoreDispatchItems.AddRange(dispatchItemList);
-            await db.SaveChangesAsync();
+            db.SaveChanges();
         }
 
     }

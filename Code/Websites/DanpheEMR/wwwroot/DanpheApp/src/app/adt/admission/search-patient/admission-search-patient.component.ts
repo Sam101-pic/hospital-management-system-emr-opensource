@@ -79,7 +79,13 @@ export class AdmissionSearchPatient {
         if (res.Status == 'OK') {
           //this.patients = res.Results;
           this.allPatientList = res.Results;
-          this.filteredPatientList = res.Results;
+          this.filteredPatientList = res.Results.map(patient => {
+            let sortedAddress = this.coreService.SortPatientAddress(patient);
+            return {
+              ...patient,
+              SortedAddress: sortedAddress
+            }
+          });
         }
         else {
           this.msgBoxServ.showMessage("error", [res.ErrorMessage]);
@@ -94,13 +100,6 @@ export class AdmissionSearchPatient {
     switch ($event.Action) {
       case "admit": {
         var data = $event.Data;
-        if (data.MunicipalityName) {
-          data.Address += ", " + data.MunicipalityName;
-        }
-
-        if (data.CountrySubDivisionName) {
-          data.Address += ", " + data.CountrySubDivisionName;
-        }
         this.patientService.setGlobal(data);
         this.AdmitPatient(data);
       }

@@ -27,7 +27,7 @@ export class PHRMPatientConsumptionItem {
     public Remarks: string = "";
     public CounterId: number = 0;
     public StoreId: number = 0;
-    public PrescriberId: number = 0;
+    public PrescriberId: number = null;
     public PriceCategoryId: number = 1;
     public SchemeId: number = 1;
     public CreatedBy: number = 0;

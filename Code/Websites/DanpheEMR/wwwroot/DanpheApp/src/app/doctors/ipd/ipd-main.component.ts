@@ -6,6 +6,8 @@ import { ADT_BLService } from "../../adt/shared/adt.bl.service";
 import { ADT_DLService } from "../../adt/shared/adt.dl.service";
 import { Visit } from "../../appointments/shared/visit.model";
 import { VisitService } from "../../appointments/shared/visit.service";
+import { ClinicalPatientService } from "../../clinical-new/shared/clinical-patient.service";
+import { PatientDetails_DTO } from "../../clinical-new/shared/dto/patient-cln-detail.dto";
 import { NoteTemplateBLService } from "../../clinical-notes/shared/note-template.bl.service";
 import { NotesModel } from "../../clinical-notes/shared/notes.model";
 import { InPatientVM } from "../../labs/shared/InPatientVM";
@@ -17,6 +19,7 @@ import GridColumnSettings from "../../shared/danphe-grid/grid-column-settings.co
 import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
 import { RouteFromService } from "../../shared/routefrom.service";
+import { ENUM_DanpheHTTPResponses } from "../../shared/shared-enums";
 import { DoctorsBLService } from "../shared/doctors.bl.service";
 
 @Component({
@@ -68,6 +71,10 @@ export class IPDMainComponent {
   showPatientRecordPage: boolean;
   toDate: any;
   fromDate: any;
+  ShowDischargeSummary: boolean = false;
+  ShowPatientList: boolean = true;
+  SelectedDischarge = new InPatientVM();
+  ShowSummaryView: boolean = false;
 
   constructor(
     public patientservice: PatientService,
@@ -83,7 +90,8 @@ export class IPDMainComponent {
     public admissionBLService: ADT_DLService,
     public securityService: SecurityService,
     public routeFromService: RouteFromService,
-    public route: ActivatedRoute
+    public route: ActivatedRoute,
+    private _selectedPatientService: ClinicalPatientService,
 
   ) {
     this.IPDPatientGridColumn = GridColumnSettings.AdmittedAppointmentList;
@@ -200,12 +208,22 @@ export class IPDMainComponent {
     switch ($event.Action) {
       case "preview":
         {
-          this.RouteToPatientOverview($event.Data);
+          this.RouteToNewPatientOverview($event.Data);
         }
         break;
       case "labs":
         {
           this.RouteToOrders($event.Data, "labs");
+        }
+        break;
+      case "addDischargeSummary":
+        {
+          this.AddSummary($event.Data,);
+        }
+        break;
+      case "viewDischargeSummary":
+        {
+          this.ViewSummary($event.Data,);
         }
         break;
       case "imaging":
@@ -227,6 +245,24 @@ export class IPDMainComponent {
           let patientId = $event.Data.PatientId;
           let itemId = JSON.stringify($event.Data.PatientId);
           let preferenceType = "Patient";
+
+          this.IDPPatientGridData.map((a) => {
+            if (a.PatientId == patientId) {
+              a.IsFavorite = true;
+            }
+          });
+          this.FilteredIDPPatientGridData.map((a) => {
+            if (a.PatientId == patientId) {
+              a.IsFavorite = true;
+            }
+          });
+
+          this.FavoritePatients = this.FavoritePatients.concat(
+            this.IDPPatientGridData.filter((a) => a.PatientId == patientId)
+          );
+
+          this.changeDetector.detectChanges();
+
           this.admissionBLService
             .AddToFavorites(itemId, preferenceType, patientId)
             .subscribe((res) => {
@@ -262,6 +298,22 @@ export class IPDMainComponent {
         let patientId = $event.Data.PatientId;
         let itemId = JSON.stringify($event.Data.PatientId);
         let preferenceType = "Patient";
+
+        this.IDPPatientGridData.map((a) => {
+          if (a.PatientId == patientId) {
+            a.IsFavorite = true;
+          }
+        });
+        this.FilteredIDPPatientGridData.map((a) => {
+          if (a.PatientId == patientId) {
+            a.IsFavorite = true;
+          }
+        });
+        this.FavoritePatients = this.FavoritePatients.filter(
+          (a) => a.PatientId != patientId
+        );
+        this.changeDetector.detectChanges();
+
         this.admissionBLService
           .RemoveFromFavorites(itemId, preferenceType)
           .subscribe((res) => {
@@ -302,54 +354,7 @@ export class IPDMainComponent {
     switch ($event.Action) {
       case "showDetails":
         {
-          //var TempType = $event.Data.TemplateName;
-          this.templatedata = $event.Data;
-          //  this.showViewNoteList = true;
-          if ($event.Data.TemplateName == "Free Text") {
-            this.notetemplateBLService
-              .GetFreetextNoteTemplateByNotesId(this.templatedata.NotesId)
-              .subscribe((res) => {
-                if (res.Status == "OK") {
-                  this.freeNotesTempData = res.Results;
-                  this.showViewNoteFreeNoteList = true;
-                } else {
-                  this.msgBoxServ.showMessage("Failed", ["No Template."]);
-                }
-              });
-            // console.log(this.templatedata.NotesId);
-            //console.log(this.patientClinicalNotes[0].NotesId);
-            // this.notetemplateBLService.GetFreetextNoteTemplate(this.patientClinicalNotes[0].NotesId)
-          }
-
-          if ($event.Data.TemplateName == "Procedure Note") {
-            this.notetemplateBLService
-              .GetProcedureNoteTemplateByNotesId(this.templatedata.NotesId)
-              .subscribe((res) => {
-                if (res.Status == "OK") {
-                  this.procedureNotesTempData = res.Results;
-                  this.showViewProcedureNoteList = true;
-                } else {
-                  this.msgBoxServ.showMessage("Failed", ["No Template."]);
-                }
-              });
-          }
-          if ($event.Data.TemplateName == "Progress Note") {
-            this.notetemplateBLService
-              .GetProgressNoteTemplateByNotesId(this.templatedata.NotesId)
-              .subscribe((res) => {
-                if (res.Status == "OK") {
-                  this.progressNotesTempData = res.Results;
-                  this.showProgressViewNoteList = true;
-                } else {
-                  this.msgBoxServ.showMessage("Failed", ["No Template."]);
-                }
-              });
-          }
-          if ($event.Data.TemplateName == "Discharge Note") {
-            var patientId = $event.Data.PatientId;
-            var patientVisitId = $event.Data.PatientVisitId;
-            this.getPatientPlusBedInfo(patientId, patientVisitId);
-          }
+          this.RouteToNewPatientOverviewForPendingList($event.Data)
         }
         break;
 
@@ -357,6 +362,18 @@ export class IPDMainComponent {
         break;
     }
   }
+
+  ConcatenateBedDetails(bedFeature: string, bedCode: string): string {
+    return `${bedFeature} /${bedCode}`;
+  }
+
+  RouteToNewPatientOverview(data) {
+    let selectedPatient: PatientDetails_DTO = data;
+    selectedPatient.WardBed = this.ConcatenateBedDetails(data.BedInformation.BedFeature, data.BedInformation.BedCode);
+    this._selectedPatientService.SelectedPatient = selectedPatient;
+    this.router.navigate(['/Doctors/Clinical-Overview']);
+  }
+
 
   RouteToOrders(selectedVisit: Visit, routeTo: string) {
     this.SelectVisit(selectedVisit);
@@ -440,5 +457,58 @@ export class IPDMainComponent {
         this.msgBoxServ.showMessage("error", [err.ErrorMessage]);
       }
     );
+  }
+  AddSummary(selPat: InPatientVM): void {
+    this.SelectedDischarge = null;
+    this.changeDetector.detectChanges();
+    this.SelectedDischarge = selPat;
+    this.ShowPatientList = false;
+    this.ShowDischargeSummary = true;
+    this.showPatientRecordPage = false;
+  }
+  HideDischargeSummary() {
+    this.ShowDischargeSummary = false;
+    this.ShowSummaryView = false;
+    this.ShowPatientList = true;
+    this.visitService.PatientVisitId = null;
+    this.showPatientRecordPage = true;
+  }
+  DischargeSummaryCallback(data) {
+    if (data.Status === ENUM_DanpheHTTPResponses.OK) {
+      this.HideDischargeSummary();
+    }
+  }
+  CallBackFromAddEdit(data): void {
+    this.ShowDischargeSummary = false;
+    this.ShowPatientList = false;
+    this.visitService.PatientVisitId = null;
+    this.ShowSummaryView = true;
+  }
+  public CallbackFromViewPage($event) {
+    this.ShowSummaryView = false;
+    this.ShowDischargeSummary = true;
+    this.ShowPatientList = false;
+  }
+  ViewSummary(selPat: InPatientVM) {
+    this.SelectedDischarge = null;
+    this.changeDetector.detectChanges();
+    this.SelectedDischarge = selPat;
+    this.ShowPatientList = false;
+    this.ShowSummaryView = true;
+    this.showPatientRecordPage = false;
+  }
+
+  //! 9-Oct-2024 Bikesh: Just adding method to remove red line in html page please do needful.
+  printTemplate() {
+
+  }
+  RouteToNewPatientOverviewForPendingList(data) {
+    let selectedPatient: PatientDetails_DTO = data;
+    selectedPatient.Name = data.PatientName;
+    selectedPatient.Address = data.Address;
+    selectedPatient.PatientCode = data.PatientCode;
+    selectedPatient.Age = data.Age;
+    this._selectedPatientService.SelectedPatient = selectedPatient;
+    this.router.navigate(['/Doctors/Clinical-Overview']);
   }
 }

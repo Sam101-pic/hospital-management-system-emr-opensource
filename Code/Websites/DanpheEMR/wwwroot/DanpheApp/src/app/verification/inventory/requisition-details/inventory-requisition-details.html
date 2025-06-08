@@ -114,6 +114,7 @@
                     <td>Unit</td>
                     <td>Specification</td>
                     <td>Requested Quantity</td>
+                    <td>Available Quantity</td>
                     <td>Status</td>
                   </tr>
                 </thead>
@@ -131,9 +132,9 @@
                     <td><span [hidden]="reqItm.IsEdited">{{reqItm.Quantity}}</span>
                       <input type="number" class="rqRowEditQty" id="rqRowEditQty{{i}}" [hidden]="!reqItm.IsEdited" [(ngModel)]="reqItm.Quantity"
                              onClick="this.select();" min="1" (wheel)="coreService.PreventNumberChangeOnScroll($event)" />
-                      <div class="error-message" *ngIf="reqItm.Quantity < 1" [hidden]="reqItm.Quantity >= 1"> Use&nbsp;<i
-                           class="fa fa-times"></i>&nbsp;instead. </div>
+                      <div class="error-message" *ngIf="reqItm.Quantity <= 0" [hidden]="reqItm.Quantity > 0">Invalid Quantity</div>
                     </td>
+                    <td>{{reqItm.AvailableQuantity}}</td>
                     <td><b>{{reqItm.RequisitionItemStatus}}</b> <span *ngIf="reqItm.IsActive == false && reqItm.CancelBy != null"
                             id="CancellationToolTip" class="tooltip"> <span class="fa fa-info"
                               style="margin-left:5px;padding: 3px 6px 3px 6px;background-color: #c8c8d2;border-radius: 9px;"> </span>

@@ -3,10 +3,15 @@ using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel.BillingModels;
+using DanpheEMR.ServerModel.BillingModels.Config;
 using DanpheEMR.Services.Billing.DTO;
+using Newtonsoft.Json;
+using Serilog;
+using Syncfusion.Calculate;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -40,6 +45,10 @@ namespace DanpheEMR.Services.Billing
             {
                 schemeList = await GetIpPharmacyContextSchemeDetails(_billingDbContext, schemeList);
 
+            }
+            else if (serviceBillingContext == ENUM_ServiceBillingContext.Registration)
+            {
+                schemeList = await GetRegistrationContextSchemesDetails(_billingDbContext, schemeList);
             }
 
             return schemeList;
@@ -75,7 +84,12 @@ namespace DanpheEMR.Services.Billing
                                     IsCreditLimited = sch.IsIpCreditLimited,
                                     GeneralCreditLimit = sch.GeneralCreditLimit,
                                     IsSystemDefault = sch.IsSystemDefault,
-                                    AllowProvisionalBilling = sch.AllowProvisionalBilling
+                                    AllowProvisionalBilling = sch.AllowProvisionalBilling,
+                                    FieldSettingParamName = sch.FieldSettingParamName,
+                                    ApiIntegrationName = sch.ApiIntegrationName,
+                                    IsPharmacyCappingApplicable = sch.IsPharmacyCappingApplicable,
+                                    UseCappingAPI = sch.UseCappingAPI
+
                                 }).OrderBy(s => s.SchemeName).AsNoTracking().ToListAsync();
             return schemeList;
         }
@@ -110,7 +124,11 @@ namespace DanpheEMR.Services.Billing
                                     IsCreditLimited = sch.IsOpCreditLimited,
                                     GeneralCreditLimit = sch.GeneralCreditLimit,
                                     IsSystemDefault = sch.IsSystemDefault,
-                                    AllowProvisionalBilling=sch.AllowProvisionalBilling
+                                    AllowProvisionalBilling = sch.AllowProvisionalBilling,
+                                    FieldSettingParamName = sch.FieldSettingParamName,
+                                    ApiIntegrationName = sch.ApiIntegrationName,
+                                    IsPharmacyCappingApplicable = sch.IsPharmacyCappingApplicable,
+                                    UseCappingAPI = sch.UseCappingAPI
                                 }).OrderBy(s => s.SchemeName).AsNoTracking().ToListAsync();
             return schemeList;
         }
@@ -149,7 +167,9 @@ namespace DanpheEMR.Services.Billing
                                     IsCreditLimited = sch.IsIpCreditLimited,
                                     GeneralCreditLimit = sch.GeneralCreditLimit,
                                     IsClaimCodeAutoGenerate = creditOrg != null ? creditOrg.IsClaimCodeAutoGenerate : false,
-                                    AllowProvisionalBilling = sch.AllowProvisionalBilling
+                                    AllowProvisionalBilling = sch.AllowProvisionalBilling,
+                                    IsBillingCappingApplicable = sch.IsBillingCappingApplicable,
+                                    UseCappingAPI = sch.UseCappingAPI,
                                 }).OrderBy(s => s.SchemeName).AsNoTracking().ToListAsync();
             return schemeList;
         }
@@ -159,7 +179,8 @@ namespace DanpheEMR.Services.Billing
             schemeList = await (from sch in _billingDbContext.BillingSchemes
                                 join priceCat in _billingDbContext.PriceCategoryModels on sch.DefaultPriceCategoryId equals priceCat.PriceCategoryId
                                 join crOrg in _billingDbContext.CreditOrganization on sch.DefaultCreditOrganizationId equals crOrg.OrganizationId
-                                into grp from creditOrg in grp.DefaultIfEmpty()
+                                into grp
+                                from creditOrg in grp.DefaultIfEmpty()
                                 where sch.IsActive == true
                                 select new BillingScheme_DTO()
                                 {
@@ -189,18 +210,68 @@ namespace DanpheEMR.Services.Billing
                                     IsClaimCodeAutoGenerate = creditOrg != null ? creditOrg.IsClaimCodeAutoGenerate : false,
                                     AllowProvisionalBilling = sch.AllowProvisionalBilling,
                                     HasSubScheme = sch.HasSubScheme,
-                                    SubSchemes =  (_billingDbContext.BillingSubSchemes.Where(subScheme => subScheme.SchemeId == sch.SchemeId && subScheme.IsActive == true)
+                                    IsBillingCappingApplicable = sch.IsBillingCappingApplicable,
+                                    UseCappingAPI = sch.UseCappingAPI,
+                                    SubSchemes = (_billingDbContext.BillingSubSchemes.Where(subScheme => subScheme.SchemeId == sch.SchemeId && subScheme.IsActive == true)
                                                                 .Select(ss => new BillingSubScheme_DTO
-                                                                 {
-                                                                    SubSchemeId= ss.SubSchemeId,
+                                                                {
+                                                                    SubSchemeId = ss.SubSchemeId,
                                                                     SubSchemeName = ss.SubSchemeName,
                                                                     SchemeId = ss.SchemeId,
                                                                     IsActive = ss.IsActive
-                                                                 }).ToList()) 
+                                                                }).ToList())
                                 }).OrderBy(s => s.SchemeName).AsNoTracking().ToListAsync();
             return schemeList;
         }
-
+        private static async Task<List<BillingScheme_DTO>> GetRegistrationContextSchemesDetails(BillingDbContext _billingDbContext, List<BillingScheme_DTO> schemeList)
+        {
+            schemeList = await (from sch in _billingDbContext.BillingSchemes
+                                join priceCat in _billingDbContext.PriceCategoryModels on sch.DefaultPriceCategoryId equals priceCat.PriceCategoryId
+                                join crOrg in _billingDbContext.CreditOrganization on sch.DefaultCreditOrganizationId equals crOrg.OrganizationId
+                                into grp
+                                from creditOrg in grp.DefaultIfEmpty()
+                                where sch.IsActive == true
+                                select new BillingScheme_DTO()
+                                {
+                                    SchemeId = sch.SchemeId,
+                                    SchemeCode = sch.SchemeCode,
+                                    SchemeName = sch.SchemeName,
+                                    CommunityName = sch.CommunityName,
+                                    IsDiscountApplicable = sch.IsRegDiscountApplicable,
+                                    DiscountPercent = sch.RegDiscountPercent,
+                                    IsDiscountEditable = sch.IsRegDiscountEditable,
+                                    IsMembershipApplicable = sch.IsMembershipApplicable,
+                                    IsMemberNumberCompulsory = sch.IsMemberNumberCompulsory,
+                                    DefaultPaymentMode = sch.DefaultPaymentMode,
+                                    IsCreditApplicable = sch.IsRegistrationCreditApplicable,
+                                    IsCreditOnlyScheme = sch.IsCreditOnlyScheme,
+                                    CreditLimit = sch.GeneralCreditLimit,
+                                    DefaultCreditOrganizationId = sch.DefaultCreditOrganizationId,
+                                    IsCoPayment = sch.IsBillingCoPayment,
+                                    DefaultPriceCategoryId = sch.DefaultPriceCategoryId,
+                                    DefaultPriceCategoryName = priceCat.PriceCategoryName,
+                                    ApiIntegrationName = sch.ApiIntegrationName,
+                                    FieldSettingParamName = sch.FieldSettingParamName,
+                                    IsSystemDefault = sch.IsSystemDefault,
+                                    IsGeneralCreditLimited = sch.IsGeneralCreditLimited,
+                                    IsCreditLimited = sch.IsOpCreditLimited,
+                                    GeneralCreditLimit = sch.GeneralCreditLimit,
+                                    IsClaimCodeAutoGenerate = creditOrg != null ? creditOrg.IsClaimCodeAutoGenerate : false,
+                                    AllowProvisionalBilling = sch.AllowProvisionalBilling,
+                                    HasSubScheme = sch.HasSubScheme,
+                                    IsBillingCappingApplicable = sch.IsBillingCappingApplicable,
+                                    UseCappingAPI = sch.UseCappingAPI,
+                                    SubSchemes = (_billingDbContext.BillingSubSchemes.Where(subScheme => subScheme.SchemeId == sch.SchemeId && subScheme.IsActive == true)
+                                                                .Select(ss => new BillingSubScheme_DTO
+                                                                {
+                                                                    SubSchemeId = ss.SubSchemeId,
+                                                                    SubSchemeName = ss.SubSchemeName,
+                                                                    SchemeId = ss.SchemeId,
+                                                                    IsActive = ss.IsActive
+                                                                }).ToList())
+                                }).OrderBy(s => s.SchemeName).AsNoTracking().ToListAsync();
+            return schemeList;
+        }
         public async Task<object> GetSchemePriceCategoriesMap(BillingDbContext _billingDbContext)
         {
             var schPriceCatMap = await (from map in _billingDbContext.PriceCategorySchemesMaps
@@ -220,7 +291,7 @@ namespace DanpheEMR.Services.Billing
                 schemeId = systemDefaultScheme != null ? systemDefaultScheme.SchemeId : 0;
                 priceCategoryId = systemDefaultPriceCategory != null ? systemDefaultPriceCategory.PriceCategoryId : 0;
 
-                if(schemeId == 0 || priceCategoryId == 0)
+                if (schemeId == 0 || priceCategoryId == 0)
                     throw new ArgumentException("Either of PriceCategory, Scheme or serviceBillingContext is invalid.");
             }
 
@@ -236,7 +307,7 @@ namespace DanpheEMR.Services.Billing
                                                                    on serviceItem.ServiceItemId equals priceCatServiceItem.ServiceItemId
                                                                    join servDept in _billingDbContext.ServiceDepartment
                                                                    on serviceItem.ServiceDepartmentId equals servDept.ServiceDepartmentId
-                                                                   where priceCatServiceItem.PriceCategoryId == priceCategoryId && serviceItem.IsActive == true
+                                                                   where priceCatServiceItem.PriceCategoryId == priceCategoryId && serviceItem.IsActive == true && priceCatServiceItem.IsActive == true
                                                                    select new ServiceItemDetails_DTO
                                                                    {
                                                                        ServiceItemId = serviceItem.ServiceItemId,
@@ -258,9 +329,13 @@ namespace DanpheEMR.Services.Billing
                                                                        CoPayCashPercent = 0,
                                                                        CoPayCreditPercent = 0,
                                                                        IntegrationItemId = serviceItem.IntegrationItemId,
-                                                                       IntegrationName = servDept.IntegrationName,
+                                                                       IntegrationName = serviceItem.IntegrationName,
                                                                        DisplaySequence = serviceItem.DisplaySeq,
-                                                                       DefaultDoctorList = serviceItem.DefaultDoctorList
+                                                                       DefaultDoctorList = serviceItem.DefaultDoctorList,
+                                                                       AllowMultipleQty = serviceItem.AllowMultipleQty,
+                                                                       IsCappingEnabled = priceCatServiceItem.IsCappingEnabled,
+                                                                       CappingLimitDays = priceCatServiceItem.CappingLimitDays,
+                                                                       CappingQuantity = priceCatServiceItem.CappingQuantity,
                                                                    }).AsNoTracking()
                                                                    .ToListAsync().ConfigureAwait(false);
 
@@ -273,7 +348,7 @@ namespace DanpheEMR.Services.Billing
                                                                             into grp
                                                                             from items in grp.DefaultIfEmpty()
                                                                             select new ServiceItemDetails_DTO
-                                                                            {   
+                                                                            {
                                                                                 ServiceItemId = servItemMst.ServiceItemId,
                                                                                 PriceCategoryId = servItemMst.PriceCategoryId,
                                                                                 SchemeId = servItemMst.SchemeId,
@@ -295,7 +370,11 @@ namespace DanpheEMR.Services.Billing
                                                                                 IntegrationItemId = servItemMst.IntegrationItemId,
                                                                                 IntegrationName = servItemMst.IntegrationName,
                                                                                 DisplaySequence = servItemMst.DisplaySequence,
-                                                                                DefaultDoctorList = servItemMst.DefaultDoctorList
+                                                                                DefaultDoctorList = servItemMst.DefaultDoctorList,
+                                                                                AllowMultipleQty = servItemMst.AllowMultipleQty,
+                                                                                IsCappingEnabled = servItemMst.IsCappingEnabled,
+                                                                                CappingLimitDays = servItemMst.CappingLimitDays,
+                                                                                CappingQuantity = servItemMst.CappingQuantity,
                                                                             }).ToList();
             return serviceItemWithCoPayAndDiscount;
         }
@@ -308,7 +387,7 @@ namespace DanpheEMR.Services.Billing
             if (serviceBillingContext.ToLower() == ENUM_ServiceBillingContext.OpBilling)
             {
                 serviceItemSchemeSettings = await _billingDbContext.ServiceItemSchemeSettings
-                                               .Where(a => a.SchemeId == schemeId)
+                                               .Where(a => a.SchemeId == schemeId && a.IsActive == true)
                                                .Select(a => new ServiceItemSchemeSettings_DTO
                                                {
                                                    ServiceItemId = a.ServiceItemId,
@@ -324,7 +403,7 @@ namespace DanpheEMR.Services.Billing
             else if (serviceBillingContext.ToLower() == ENUM_ServiceBillingContext.IpBilling)
             {
                 serviceItemSchemeSettings = await _billingDbContext.ServiceItemSchemeSettings
-                                             .Where(a => a.SchemeId == schemeId)
+                                             .Where(a => a.SchemeId == schemeId && a.IsActive == true)
                                              .Select(a => new ServiceItemSchemeSettings_DTO
                                              {
                                                  ServiceItemId = a.ServiceItemId,
@@ -340,7 +419,7 @@ namespace DanpheEMR.Services.Billing
             else if (serviceBillingContext.ToLower() == ENUM_ServiceBillingContext.Registration)
             {
                 serviceItemSchemeSettings = await _billingDbContext.ServiceItemSchemeSettings
-                                             .Where(a => a.SchemeId == schemeId)
+                                             .Where(a => a.SchemeId == schemeId && a.IsActive == true)
                                              .Select(a => new ServiceItemSchemeSettings_DTO
                                              {
                                                  ServiceItemId = a.ServiceItemId,
@@ -356,7 +435,7 @@ namespace DanpheEMR.Services.Billing
             else if (serviceBillingContext.ToLower() == ENUM_ServiceBillingContext.Admission)
             {
                 serviceItemSchemeSettings = await _billingDbContext.ServiceItemSchemeSettings
-                                             .Where(a => a.SchemeId == schemeId)
+                                             .Where(a => a.SchemeId == schemeId && a.IsActive == true)
                                              .Select(a => new ServiceItemSchemeSettings_DTO
                                              {
                                                  ServiceItemId = a.ServiceItemId,
@@ -391,7 +470,7 @@ namespace DanpheEMR.Services.Billing
 
         public async Task<object> GetadditionalServiceItems(BillingDbContext _billingDbContext, string groupName, int priceCategoryId)
         {
-            if(priceCategoryId == 0)
+            if (priceCategoryId == 0)
             {
                 var systemDefaultPriceCategory = _billingDbContext.PriceCategoryModels.FirstOrDefault(a => a.IsDefault);
                 priceCategoryId = systemDefaultPriceCategory != null ? systemDefaultPriceCategory.PriceCategoryId : 0;
@@ -414,10 +493,11 @@ namespace DanpheEMR.Services.Billing
                                                                  IsPreAnaesthesia = additional.IsPreAnaesthesia,
                                                                  WithPreAnaesthesia = additional.WithPreAnaesthesia,
                                                                  IsOpServiceItem = additional.IsOpServiceItem,
-                                                                 IsIpServiceItem= additional.IsIpServiceItem,
-                                                                 HasChildServiceItems= additional.HasChildServiceItems,
+                                                                 IsIpServiceItem = additional.IsIpServiceItem,
+                                                                 HasChildServiceItems = additional.HasChildServiceItems,
                                                                  IsActive = additional.IsActive,
-                                                                 IsMasterServiceItemActive = mstServiceItem.IsActive
+                                                                 IsMasterServiceItemActive = mstServiceItem.IsActive,
+                                                                 IntegrationName = mstServiceItem.IntegrationName
                                                              })
                                                            .Where(a => a.GroupName == groupName && a.IsActive == true && a.IsMasterServiceItemActive == true && a.PriceCategoryId == priceCategoryId)
                                                            .ToListAsync();
@@ -463,83 +543,104 @@ namespace DanpheEMR.Services.Billing
 
         public async Task<object> AddServiceItemSchemeSettings(BillingDbContext _billingDbContext, List<BillServiceItemSchemeSetting_DTO> billServiceItemSchemeSettingdto, RbacUser currentUser)
         {
-            var currentDate = DateTime.Now;
-            var billServiceItemSettings = new List<BillServiceItemSchemeSettingModel>();
-            foreach (var itmstg in billServiceItemSchemeSettingdto)
+            try
             {
-                var serviceitem = await _billingDbContext.ServiceItemSchemeSettings.Where(x => x.ServiceItemSchemeSettingId == itmstg.ServiceItemSchemeSettingId).FirstOrDefaultAsync();
+                var currentDate = DateTime.Now;
+                var billServiceItemSettings = new List<BillServiceItemSchemeSettingModel>();
+                foreach (var itmstg in billServiceItemSchemeSettingdto)
+                {
+                    var serviceitem = await _billingDbContext.ServiceItemSchemeSettings.Where(x => x.ServiceItemId == itmstg.ServiceItemId && x.SchemeId == itmstg.SchemeId).FirstOrDefaultAsync();
 
-                if (serviceitem != null)
-                {
-                    serviceitem.ServiceItemId = itmstg.ServiceItemId;
-                    serviceitem.SchemeId = itmstg.SchemeId;
-                    serviceitem.RegDiscountPercent = itmstg.RegDiscountPercent;
-                    serviceitem.OpBillDiscountPercent = itmstg.OpBillDiscountPercent;
-                    serviceitem.IpBillDiscountPercent = itmstg.IpBillDiscountPercent;
-                    serviceitem.AdmissionDiscountPercent = itmstg.AdmissionDiscountPercent;
-                    serviceitem.IsCoPayment = itmstg.IsCoPayment;
-                    serviceitem.CoPaymentCashPercent = itmstg.CoPaymentCashPercent;
-                    serviceitem.CoPaymentCreditPercent = itmstg.CoPaymentCreditPercent;
-                    serviceitem.ModifiedBy = currentUser.EmployeeId;
-                    serviceitem.ModifiedOn = currentDate;
-                    serviceitem.IsActive = itmstg.itemIsSelected;
+                    if (serviceitem != null)
+                    {
+                        serviceitem.ServiceItemId = itmstg.ServiceItemId;
+                        serviceitem.SchemeId = itmstg.SchemeId;
+                        serviceitem.RegDiscountPercent = itmstg.RegDiscountPercent;
+                        serviceitem.OpBillDiscountPercent = itmstg.OpBillDiscountPercent;
+                        serviceitem.IpBillDiscountPercent = itmstg.IpBillDiscountPercent;
+                        serviceitem.AdmissionDiscountPercent = itmstg.AdmissionDiscountPercent;
+                        serviceitem.IsCoPayment = itmstg.IsCoPayment;
+                        serviceitem.CoPaymentCashPercent = itmstg.CoPaymentCashPercent;
+                        serviceitem.CoPaymentCreditPercent = itmstg.CoPaymentCreditPercent;
+                        serviceitem.ModifiedBy = currentUser.EmployeeId;
+                        serviceitem.ModifiedOn = currentDate;
+                        serviceitem.IsActive = itmstg.itemIsSelected;
+                    }
+                    else
+                    {
+                        var billServiceItemSetting = new BillServiceItemSchemeSettingModel();
+                        billServiceItemSetting.ServiceItemSchemeSettingId = itmstg.ServiceItemSchemeSettingId;
+                        billServiceItemSetting.ServiceItemId = itmstg.ServiceItemId;
+                        billServiceItemSetting.SchemeId = itmstg.SchemeId;
+                        billServiceItemSetting.RegDiscountPercent = itmstg.RegDiscountPercent;
+                        billServiceItemSetting.OpBillDiscountPercent = itmstg.OpBillDiscountPercent;
+                        billServiceItemSetting.IpBillDiscountPercent = itmstg.IpBillDiscountPercent;
+                        billServiceItemSetting.AdmissionDiscountPercent = itmstg.AdmissionDiscountPercent;
+                        billServiceItemSetting.IsCoPayment = itmstg.IsCoPayment;
+                        billServiceItemSetting.CoPaymentCashPercent = itmstg.CoPaymentCashPercent;
+                        billServiceItemSetting.CoPaymentCreditPercent = itmstg.CoPaymentCreditPercent;
+                        billServiceItemSetting.CreatedBy = currentUser.EmployeeId;
+                        billServiceItemSetting.CreatedOn = DateTime.Now;
+                        billServiceItemSetting.IsActive = true;
+                        billServiceItemSettings.Add(billServiceItemSetting);
+                    }
                 }
-                else
-                {
-                    var billServiceItemSetting = new BillServiceItemSchemeSettingModel();
-                    billServiceItemSetting.ServiceItemSchemeSettingId = itmstg.ServiceItemSchemeSettingId;
-                    billServiceItemSetting.ServiceItemId = itmstg.ServiceItemId;
-                    billServiceItemSetting.SchemeId = itmstg.SchemeId;
-                    billServiceItemSetting.RegDiscountPercent = itmstg.RegDiscountPercent;
-                    billServiceItemSetting.OpBillDiscountPercent = itmstg.OpBillDiscountPercent;
-                    billServiceItemSetting.IpBillDiscountPercent = itmstg.IpBillDiscountPercent;
-                    billServiceItemSetting.AdmissionDiscountPercent = itmstg.AdmissionDiscountPercent;
-                    billServiceItemSetting.IsCoPayment = itmstg.IsCoPayment;
-                    billServiceItemSetting.CoPaymentCashPercent = itmstg.CoPaymentCashPercent;
-                    billServiceItemSetting.CoPaymentCreditPercent = itmstg.CoPaymentCreditPercent;
-                    billServiceItemSetting.CreatedBy = currentUser.EmployeeId;
-                    billServiceItemSetting.CreatedOn = DateTime.Now;
-                    billServiceItemSetting.IsActive = true;
-                    billServiceItemSettings.Add(billServiceItemSetting);
-                }
+
+                _billingDbContext.ServiceItemSchemeSettings.AddRange(billServiceItemSettings);
+                await _billingDbContext.SaveChangesAsync();
+
+                return "Scheme Settings Added/Updated Successfully";
             }
-            
-            _billingDbContext.ServiceItemSchemeSettings.AddRange(billServiceItemSettings);
-            await _billingDbContext.SaveChangesAsync();
-
-            return "Scheme Settings Added/Updated Successfully";
+            catch(SqlException sqlException)
+            {
+                Log.Error($"SQL Exception Caught, Exception Details: {sqlException.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Could not save SchemeItem Settings, Exception Details: {ex.InnerException.Message}");
+                throw;
+            }
         }
 
-        public async Task<object> GetServicePackages(BillingDbContext _billingDbContext, int schemeId, int priceCategoryId)
+        public async Task<object> GetServicePackages(BillingDbContext _billingDbContext, int priceCategoryId)
         {
             var servicePackages = await (from packages in _billingDbContext.BillingPackages
-                                        join pServiceItems in _billingDbContext.BillingPackageServiceItems on packages.BillingPackageId equals pServiceItems.BillingPackageId into items
-                                        where packages.SchemeId == schemeId && packages.PriceCategoryId == priceCategoryId
-                                        && packages.IsActive == true
-                                        select new BillingPackage_DTO
-                                        {
-                                            BillingPackageId = packages.BillingPackageId,
-                                            BillingPackageName = packages.BillingPackageName,
-                                            PackageCode = packages.PackageCode,
-                                            Description = packages.Description,
-                                            TotalPrice = packages.TotalPrice,
-                                            DiscountPercent = packages.DiscountPercent,
-                                            IsActive = packages.IsActive,
-                                            LabTypeName = packages.LabTypeName,
-                                            SchemeId = packages.SchemeId,
-                                            PriceCategoryId = packages.PriceCategoryId,
-                                            IsEditable = packages.IsEditable,
-                                            BillingPackageServiceItemList = items.Select(s => new BillingPackageServiceItems_DTO
-                                            {
-                                                PackageServiceItemId = s.PackageServiceItemId,
-                                                BillingPackageId = s.BillingPackageId,
-                                                ServiceItemId = s.ServiceItemId,
-                                                Quantity = s.Quantity,
-                                                DiscountPercent = s.DiscountPercent,
-                                                PerformerId = s.PerformerId,
-                                                IsActive = s.IsActive
-                                            }).Where(w => w.IsActive == true).ToList()
-                                        }).ToListAsync();
+                                         join pServiceItems in _billingDbContext.BillingPackageServiceItems on packages.BillingPackageId equals pServiceItems.BillingPackageId into items
+                                         where packages.PriceCategoryId == priceCategoryId
+                                         && packages.IsActive == true
+                                         select new BillingPackage_DTO
+                                         {
+                                             BillingPackageId = packages.BillingPackageId,
+                                             BillingPackageName = packages.BillingPackageName,
+                                             PackageCode = packages.PackageCode,
+                                             Description = packages.Description,
+                                             TotalPrice = packages.TotalPrice,
+                                             DiscountPercent = packages.DiscountPercent,
+                                             IsActive = packages.IsActive,
+                                             LabTypeName = packages.LabTypeName,
+                                             SchemeId = packages.SchemeId ?? 0,
+                                             PriceCategoryId = packages.PriceCategoryId,
+                                             IsEditable = packages.IsEditable,
+                                             IsHealthPackage = packages.IsHealthPackage,
+                                             IsItemLoadPackage = packages.IsItemLoadPackage,
+                                             IsDiscountEditableInSales = packages.IsDiscountEditableInSales,
+                                             IsItemLevelDiscount = packages.IsItemLevelDiscount,
+                                             BillingPackageServiceItemList = items.Select(s => new BillingPackageServiceItems_DTO
+                                             {
+                                                 PackageServiceItemId = s.PackageServiceItemId,
+                                                 BillingPackageId = s.BillingPackageId,
+                                                 ServiceItemId = s.ServiceItemId,
+                                                 Quantity = s.Quantity,
+                                                 DiscountPercent = s.DiscountPercent,
+                                                 PerformerId = s.PerformerId,
+                                                 IsActive = s.IsActive,
+                                                 Price = _billingDbContext.BillItemsPriceCategoryMaps
+                                              .Where(map => map.ServiceItemId == s.ServiceItemId && map.PriceCategoryId == priceCategoryId)
+                                              .Select(map => map.Price)
+                                              .FirstOrDefault()
+                                             }).Where(w => w.IsActive).ToList()
+                                         }).ToListAsync();
             return servicePackages;
         }
 
@@ -549,10 +650,10 @@ namespace DanpheEMR.Services.Billing
                                              .Select(s => new Currency_DTO
                                              {
                                                  CurrencyId = s.CurrencyId,
-                                                 CurrencyCode= s.CurrencyCode,
-                                                 CurrencyName   = s.CurrencyName,
-                                                 ExchangeRateDividend= s.ExchangeRateDividend,
-                                                 IsActive= s.IsActive,
+                                                 CurrencyCode = s.CurrencyCode,
+                                                 CurrencyName = s.CurrencyName,
+                                                 ExchangeRateDividend = s.ExchangeRateDividend,
+                                                 IsActive = s.IsActive,
                                                  ISBaseCurrency = s.ISBaseCurrency
                                              }).ToListAsync();
             return currencies;
@@ -574,11 +675,56 @@ namespace DanpheEMR.Services.Billing
                                                        ItemName = String.IsNullOrEmpty(priceCatServiceItem.ItemLegalName) ? serviceItem.ItemName : priceCatServiceItem.ItemLegalName,
                                                        ServiceDepartmentId = serviceItem.ServiceDepartmentId,
                                                        Price = priceCatServiceItem.Price,
-                                                       IntegrationItemId = serviceItem.IntegrationItemId
+                                                       IntegrationItemId = serviceItem.IntegrationItemId,
+                                                       IsDoctorMandatory = serviceItem.IsDoctorMandatory
                                                    }).AsNoTracking()
                                                     .ToListAsync().ConfigureAwait(false);
             return priceCategoryServiceItems;
         }
 
+
+        public async Task<object> GetSchemesForReport(BillingDbContext _billingDbContext)
+        {
+            var schemes = await (from scheme in _billingDbContext.BillingSchemes
+                                 select new BillSchemeForReport_DTO
+                                 {
+                                     SchemeId = scheme.SchemeId,
+                                     SchemeName = scheme.SchemeName
+                                 }).AsNoTracking()
+                                                    .ToListAsync().ConfigureAwait(false);
+            return schemes;
+        }
+
+        public async Task<object> GetMasterServiceItems(BillingDbContext billingDbContext)
+        {
+            var masterServiceItems = await (from serv in billingDbContext.BillServiceItems.Where(s => s.IsActive)
+                                            join servDep in billingDbContext.ServiceDepartment on serv.ServiceDepartmentId equals servDep.ServiceDepartmentId
+                                            select new ServiceItemsForTotalItemsReport_DTO
+                                            {
+                                                ServiceItemId = serv.ServiceItemId,
+                                                ServiceDepartmentId = serv.ServiceDepartmentId,
+                                                ItemName = serv.ItemName,
+                                                ItemCode = serv.ItemCode,
+                                                ServiceDepartmentName = servDep.ServiceDepartmentName,
+                                                IsActive = serv.IsActive
+                                            }).ToListAsync();
+
+            return masterServiceItems;
+        }
+
+        public async Task<object> GetInsuranceMasterItems(BillingDbContext billingDbContext)
+        {
+            var parameter = await billingDbContext.AdminParameters.FirstOrDefaultAsync(p => p.ParameterGroupName == "Billing" && p.ParameterName == "ValidateItemCodeAndPrice");
+            if (parameter != null)
+            {
+                var paramValue = parameter.ParameterValue;
+                if (paramValue == "true")
+                {
+                    var masterItems = await billingDbContext.InsuranceMasterItems.ToListAsync();
+                    return masterItems;
+                }
+            }
+            return new List<InsuranceMasterItemsModel>();
+        }
     }
 }

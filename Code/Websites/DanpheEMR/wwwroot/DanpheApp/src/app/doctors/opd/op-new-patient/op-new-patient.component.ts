@@ -1,31 +1,28 @@
-import { Component, ChangeDetectorRef, OnDestroy } from '@angular/core'
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
-import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs/Rx';
-import { CoreService } from '../../../core/shared/core.service';
-import * as moment from 'moment/moment';
+import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import {
-  NgForm,
-  FormGroup,
+  FormBuilder,
   FormControl,
-  Validators,
-  FormBuilder
+  FormGroup,
+  Validators
 } from '@angular/forms';
+import { Router } from '@angular/router';
+import * as moment from 'moment/moment';
 
-import { PatientService } from "../../../patients/shared/patient.service";
 import { VisitService } from '../../../appointments/shared/visit.service';
+import { PatientService } from "../../../patients/shared/patient.service";
 import { CallbackService } from '../../../shared/callback.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { DoctorsBLService } from '../../shared/doctors.bl.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
+import { DoctorsBLService } from '../../shared/doctors.bl.service';
 
+import { ADT_DLService } from '../../../adt/shared/adt.dl.service';
 import { Visit } from "../../../appointments/shared/visit.model";
+import { ClinicalPatientService } from '../../../clinical-new/shared/clinical-patient.service';
 import { Patient } from '../../../patients/shared/patient.model';
-import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { SecurityService } from '../../../security/shared/security.service';
 import { DanpheCache, MasterType } from '../../../shared/danphe-cache-service-utility/cache-services';
-import { ADT_DLService } from '../../../adt/shared/adt.dl.service';
+import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 @Component({
   selector: 'app-op-new-patient',
   templateUrl: './op-new-patient.component.html',
@@ -90,7 +87,8 @@ export class OPNewPatientComponent implements OnDestroy {
     public routeFromService: RouteFromService,
     public changeDetector: ChangeDetectorRef,
     public securityService: SecurityService,
-    public admissionBLService: ADT_DLService,) {
+    public admissionBLService: ADT_DLService,
+    private _selectedPatientService: ClinicalPatientService,) {
     this._patientservice = _patientService;
     this._visitService = _visitServ;
     this._callbackService = _callbackService;
@@ -224,6 +222,23 @@ export class OPNewPatientComponent implements OnDestroy {
     this.SelectVisit(selectedVisit);
     this.router.navigate(['/Doctors/PatientOverviewMain/PatientOverview']);
   }
+  RouteToNewPatientOverview(selectedVisit: Visit) {
+    let currPatient = this._selectedPatientService.GetGlobal();
+    currPatient.PatientId = selectedVisit.Patient.PatientId;
+    currPatient.PatientCode = selectedVisit.Patient.PatientCode;
+    currPatient.Address = selectedVisit.Patient.Address;
+    currPatient.PhoneNumber = selectedVisit.Patient.PhoneNumber;
+    currPatient.PatientVisitId = selectedVisit.PatientVisitId;
+    currPatient.FirstName = selectedVisit.Patient.FirstName;
+    currPatient.LastName = selectedVisit.Patient.LastName;
+    currPatient.Gender = selectedVisit.Patient.Gender;
+    currPatient.DateOfBirth = selectedVisit.Patient.DateOfBirth;
+    currPatient.Age = selectedVisit.Patient.Age;
+    currPatient.Name = selectedVisit.Patient.ShortName;
+    currPatient.VisitType = selectedVisit.VisitType.toLowerCase();
+    this._selectedPatientService.SelectedPatient = currPatient;
+    this.router.navigate(['/Doctors/Clinical-Overview']);
+  }
 
   //check the assignment logic below properly...
   SelectVisit(selectedVisit: Visit) {
@@ -325,7 +340,20 @@ export class OPNewPatientComponent implements OnDestroy {
     switch ($event.Action) {
       case "preview":
         {
-          this.RouteToPatientOverview($event.Data);
+          this.RouteToNewPatientOverview($event.Data);
+        }
+        break;
+      case "labs":
+        {
+
+
+        }
+        break;
+      case "imaging":
+        {
+
+
+
         }
         break;
       case "addfavorite":
@@ -334,6 +362,19 @@ export class OPNewPatientComponent implements OnDestroy {
           let patientId = $event.Data.PatientId;
           let itemId = JSON.stringify($event.Data.PatientId);
           let preferenceType = "Patient";
+
+          this.filteredVisitList.map((a) => {
+            if (a.PatientId === patientId) {
+              a.IsFavorite = true;
+            }
+          });
+          this.FavoritePatients = this.FavoritePatients.concat(
+            this.filteredVisitList.filter(
+              (a) => a.PatientId == patientId
+            )
+          );
+          this.changeDetector.detectChanges();
+
           this.admissionBLService
             .AddToFavorites(itemId, preferenceType, patientId)
             .subscribe((res) => {
@@ -369,6 +410,17 @@ export class OPNewPatientComponent implements OnDestroy {
         let patientId = $event.Data.PatientId;
         let itemId = JSON.stringify($event.Data.PatientId);
         let preferenceType = "Patient";
+
+        this.filteredVisitList.map((a) => {
+          if (a.PatientId === patientId) {
+            a.IsFavorite = false;
+          }
+        });
+        this.FavoritePatients = this.FavoritePatients.filter(
+          (a) => a.PatientId != patientId
+        );
+        this.changeDetector.detectChanges();
+
         this.admissionBLService
           .RemoveFromFavorites(itemId, preferenceType)
           .subscribe((res) => {
@@ -407,6 +459,23 @@ export class OPNewPatientComponent implements OnDestroy {
           let patientId = $event.Data.PatientId;
           let itemId = JSON.stringify($event.Data.PatientId);
           let preferenceType = "FollowUp";
+          // Immediate update to UI before waiting for backend response
+          this.OPDPatientGridData.map((a) => {
+            if (a.PatientId === patientId) {
+              a.IsFollowUp = true;
+            }
+          });
+          this.FilteredOPDPatientGridData.map((a) => {
+            if (a.PatientId === patientId) {
+              a.IsFollowUp = true;
+            }
+          });
+          this.FollowUpPatients = this.FollowUpPatients.concat(
+            this.OPDPatientGridData.filter((a) => a.PatientId == patientId)
+          );
+
+          // Trigger immediate change detection
+          this.changeDetector.detectChanges();
           this.admissionBLService
             .AddToFavorites(itemId, preferenceType, patientId)
             .subscribe((res) => {
@@ -442,6 +511,17 @@ export class OPNewPatientComponent implements OnDestroy {
         let patientId = $event.Data.PatientId;
         let itemId = JSON.stringify($event.Data.PatientId);
         let preferenceType = "FollowUp";
+        this.filteredVisitList.map((a) => {
+          if (a.PatientId === patientId) {
+            a.IsFavorite = false;
+          }
+        });
+        this.FavoritePatients = this.FavoritePatients.filter(
+          (a) => a.PatientId != patientId
+        );
+
+        // Trigger immediate change detection
+        this.changeDetector.detectChanges();
         this.admissionBLService
           .RemoveFromFavorites(itemId, preferenceType)
           .subscribe((res) => {

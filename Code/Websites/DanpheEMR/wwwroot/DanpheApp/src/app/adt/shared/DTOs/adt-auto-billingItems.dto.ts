@@ -11,6 +11,7 @@ export class AdtAutoBillingItem_DTO {
   public PercentageOfBedCharges: number = 0;
   public UsePercentageOfBedCharges: boolean = false;
   public IsRepeatable: boolean = false;
+  public AllowAutoCancellation: boolean = false;
   public Price: number = 0;
   public PriceCategoryId: number = 0;
   public ItemCode: string = "";

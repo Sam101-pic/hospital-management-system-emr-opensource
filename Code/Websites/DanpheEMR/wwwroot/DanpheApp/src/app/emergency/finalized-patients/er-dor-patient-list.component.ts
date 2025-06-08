@@ -167,13 +167,13 @@ export class ERDorPatientListComponent {
   public ReturnFromPatRegistrationEdit($event) {
     this.CloseAllERPatientPopUp();
     if ($event.submit) {
-      let itmIndex = this.allDischargedPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
-      if (itmIndex >= 0) {
-        this.allDischargedPatients.splice(itmIndex, 1, $event.ERPatient);
-        this.allDischargedPatients = this.allDischargedPatients.slice();
-      } else {
-        this.GetERDORPatientList();
-      }
+      // let itmIndex = this.allDischargedPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
+      // if (itmIndex >= 0) {
+      //   this.allDischargedPatients.splice(itmIndex, 1, $event.ERPatient);
+      //   this.allDischargedPatients = this.allDischargedPatients.slice();
+      // } else {
+      this.GetERDORPatientList();
+      // }
     }
   }
 

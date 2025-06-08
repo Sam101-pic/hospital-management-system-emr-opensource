@@ -1,5 +1,6 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { WardConsumptionType } from './ward-consumption-types.model';
 
 @Injectable()
 export class WardSupplyDLService {
@@ -70,8 +71,8 @@ export class WardSupplyDLService {
   public GetInventoryPatConsumptionItemListById(receiptId) {
     return this.http.get<any>(`${this.baseApiUrl}/GetInventoryPatConsumptionItemlistById/${receiptId}`, this.options);
   }
-  public GetInventoryComsumptionListDetails(storeId, fromDate, toDate) {
-    return this.http.get<any>(`${this.baseApiUrl}/GetInventoryConsumptionList/${storeId}/${fromDate}/${toDate}`, this.options);
+  public GetInventoryComsumptionListDetails(storeId, fromDate, toDate, consumptionTypeId) {
+    return this.http.get<any>(`${this.baseApiUrl}/GetInventoryConsumptionList?StoreId=${storeId}&FromDate=${fromDate}&ToDate=${toDate}&ConsumptionTypeId=${consumptionTypeId}`, this.options);
   }
 
   public GetSubstoreRequistionList(fromDate: string, toDate: string, storeId: number) {
@@ -95,7 +96,7 @@ export class WardSupplyDLService {
   public GetInventoryList() {
     return this.http.get<any>("/api/ActivateInventory/", this.options);
   }
-  // GET: Consumption Details 
+  // GET: Consumption Details
 
   //GET: Inventory Consumption List
 
@@ -176,8 +177,7 @@ export class WardSupplyDLService {
 
   ////GET: Get Transfer Report
   public GetConsumptionReport(wardReports) {
-    return this.http.get("/api/WardSupply/ConsumptionReport/"
-      + wardReports.FromDate + "/" + wardReports.ToDate + "/" + wardReports.StoreId, this.options)
+    return this.http.get<any>(`/api/WardSupply/Inventory/Reports/ConsumptionReport?FromDate=${wardReports.FromDate}&ToDate=${wardReports.ToDate}&StoreId=${wardReports.StoreId}&ConsumptionTypeId=${wardReports.ConsumptionTypeId}`, this.options);
   }
 
   public GetDispatchDetails(RequisitionId: number) {
@@ -199,7 +199,7 @@ export class WardSupplyDLService {
     let data = JSON.stringify(consumptiondata);
     return this.http.post<any>(this.baseApiUrl + "/InventoryConsumption", data, this.options);
   }
-  //Post to Stock table and post to Transaction table 
+  //Post to Stock table and post to Transaction table
   PostManagedStockDetails(data, ReceivedBy) {
     try {
       return this.http.post<any>("/api/WardSupply/TransferStock/" + ReceivedBy, data, this.optionsJson);
@@ -305,7 +305,7 @@ export class WardSupplyDLService {
 
   //GET: Get AllPatients
   public GetAllPatients(searchTxt) {
-    return this.http.get<any>("/api/Patient/PatientWithVisitInfo?search=" + searchTxt, this.options);
+    return this.http.get<any>(`/api/Patient/PatientWithVisitInfo?search=${searchTxt}&showIpPatinet=true`, this.options);
   }
 
   PostInventoryPatConsumptionData(consumptiondata) {
@@ -364,6 +364,20 @@ export class WardSupplyDLService {
 
   GetVerifiers() {
     return this.http.get(`/api/WardSupply/Verifiers`);
+  }
+  SaveConsumptionType(ConsumptionType: WardConsumptionType) {
+    return this.http.post(`/api/InventorySettings/ConsumptionType`, ConsumptionType, this.optionsJson);
+  }
+
+  GetActiveConsumptionTypes() {
+    return this.http.get(`/api/InventorySettings/ActiveConsumptionTypes`, this.options);
+  }
+
+  GetBarCodesOfCapitalItemByItemIdAndSubStoreId(subStoreId: number, itemId: number) {
+    return this.http.get(`/api/WardSupply/BarCodeOfCapitalItemByItemIdAndSubStoreId?SubStoreId=${subStoreId}&ItemId=${itemId}`, this.options);
+  }
+  GetWardInventoryReturnReport(FromDate: string, ToDate: string, SourceStoreId: number, TargetStoreId: number, ItemCategory: string, ItemId: number) {
+    return this.http.get(`/api/WardSupply/WardInventoryReturnReport?FromDate=${FromDate}&ToDate=${ToDate}&SourceStoreId=${SourceStoreId}&TargetStoreId=${TargetStoreId}&ItemCategory=${ItemCategory}&ItemId=${ItemId}`, this.options)
   }
 }
 

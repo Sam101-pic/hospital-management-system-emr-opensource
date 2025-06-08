@@ -9,6 +9,7 @@ using System.Data.Entity;
 using DanpheEMR.Security;
 using System.Data.Entity.ModelConfiguration.Conventions;
 using DanpheEMR.ServerModel.WardSupplyModels;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DanpheEMR.DalLayer
 {
@@ -118,8 +119,11 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<DonationItemModel>().ToTable("INV_TXN_DonationItems");
             modelBuilder.Entity<ReturnFromSubstore>().ToTable("WARD_TXN_Return");
             modelBuilder.Entity<ReturnFromSubstoreItems>().ToTable("WARD_TXN_ReturnItems");
+            modelBuilder.Entity<InventoryConsumptionTypeMasterModel>().ToTable("INV_MST_ConsumptionTypes");
 
-
+            modelBuilder.Entity<InventoryFiscalYear>()
+                .Property(e => e.FiscalYearId)
+                .HasDatabaseGeneratedOption(DatabaseGeneratedOption.None);
 
         }
         public DbSet<PurchaseOrderModel> PurchaseOrders { get; set; }
@@ -191,6 +195,6 @@ namespace DanpheEMR.DalLayer
         public DbSet<ReturnFromSubstore> SubstoreReturn { get; set; }
         public DbSet<ReturnFromSubstoreItems> SubstoreReturnItems { get; set; }
         public DbSet<EmployeeRoleModel> EmployeeRoleModels { get; set; }
-
+        public DbSet<InventoryConsumptionTypeMasterModel> ConsumptionTypes { get; set; }
     }
 }

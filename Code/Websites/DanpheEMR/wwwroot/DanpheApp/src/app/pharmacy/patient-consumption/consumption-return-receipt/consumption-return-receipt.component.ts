@@ -3,11 +3,11 @@ import { CoreService } from "../../../core/shared/core.service";
 import { DispensaryService } from "../../../dispensary/shared/dispensary.service";
 import { PrinterSettingsModel } from "../../../settings-new/printers/printer-settings.model";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
 import { PharmacyPatientConsumptionReturnInfo_DTO } from "../shared/phrm-patient-consumption-return-info.dto.";
-import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 @Component({
   selector: 'phrm-return-consumption-receipt',
   templateUrl: './consumption-return-receipt.component.html'
@@ -37,6 +37,7 @@ export class ConsumptionReturnReceiptComponent {
 
   public GeneralFieldLabel = new GeneralFieldLabels();
   @Output("call-back-print") callBackPrint: EventEmitter<object> = new EventEmitter();
+  showRackNoInPrint: boolean = false;
 
 
   constructor(public coreService: CoreService,
@@ -45,6 +46,8 @@ export class ConsumptionReturnReceiptComponent {
     public _dispensaryService: DispensaryService
   ) {
     this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
+    this.GetRackNoParameterSettings();
+
   }
 
   ngOnInit() {
@@ -165,6 +168,13 @@ export class ConsumptionReturnReceiptComponent {
 
   CallBackBillPrint($event) {
 
+  }
+  GetRackNoParameterSettings(): void {
+    let RackNoPrintSetting = this.coreService.Parameters.find(p => p.ParameterName == "ShowRackNoInPharmacyReceipt" && p.ParameterGroupName == "Pharmacy");
+    if (RackNoPrintSetting) {
+      let showRackNoInPrint = JSON.parse(RackNoPrintSetting.ParameterValue);
+      this.showRackNoInPrint = showRackNoInPrint.ShowRackNoInNormalPharmacyReceipt;
+    }
   }
 
 }

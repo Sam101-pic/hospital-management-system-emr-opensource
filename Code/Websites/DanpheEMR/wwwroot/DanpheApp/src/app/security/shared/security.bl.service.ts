@@ -1,4 +1,4 @@
-﻿import { Injectable, Directive } from '@angular/core';
+﻿import { Injectable } from '@angular/core';
 
 import { SecurityDLService } from './security.dl.service';
 
@@ -33,8 +33,8 @@ export class SecurityBLService {
         return this.securityDlService.GetActiveBillingCounter()
             .map(res => { return res })
     }
-    public GetActiveLab(){
-        return this.securityDlService.GetActiveLab().map(res => {return res; });
+    public GetActiveLab() {
+        return this.securityDlService.GetActiveLab().map(res => { return res; });
     }
     public GetActivePharmacyCounter() {
         return this.securityDlService.GetActivePharmacyCounter()
@@ -73,12 +73,16 @@ export class SecurityBLService {
     public GetINVHospitalInfo() {
         return this.securityDlService.GetINVHospitalInfo()
             .map(res => { return res })
-    }    
+    }
+    public GetCommonHospitalInfo() {
+        return this.securityDlService.GetCommonHospitalInfo()
+            .map(res => { return res })
+    }
 
-    public ActivateLab(labId: number, labName: string){
+    public ActivateLab(labId: number, labName: string) {
         return this.securityDlService.ActivateLab(labId, labName).map(res => {
-          return res;
+            return res;
         });
-      }
+    }
 
 }

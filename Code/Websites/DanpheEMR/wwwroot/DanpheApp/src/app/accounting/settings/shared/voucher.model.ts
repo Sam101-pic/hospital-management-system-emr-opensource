@@ -18,6 +18,8 @@ export class VoucherModel {
     public VoucherValidator: FormGroup = null;
     public ShowChequeNumber: boolean = false;
     public ShowPayeeName: boolean = false;
+    public HospitalId: number = 0;
+
     constructor() {
         this.CreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
         var _formBuilder = new FormBuilder();

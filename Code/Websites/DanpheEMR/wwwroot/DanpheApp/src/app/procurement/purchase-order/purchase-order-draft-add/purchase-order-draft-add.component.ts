@@ -20,7 +20,8 @@ import { PurchaseOrderDraft } from '../purchase-order-draft.model';
 @Component({
     selector: 'purchase-order-draft-add',
     templateUrl: './purchase-order-draft-add.html',
-    styles: []
+    styles: [],
+    host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class PurchaseOrderDraftAddComponent {
     public currentPOD: PurchaseOrderDraft = new PurchaseOrderDraft();
@@ -471,5 +472,12 @@ export class PurchaseOrderDraftAddComponent {
     ClosePurchaseOrderDraftListPage() {
         this.showPurchaseOrderDraftListPage = false;
     }
+
+    public hotkeys(event) {
+        if (event.keyCode == 27) {
+            this.ClosePurchaseOrderDraftAddEditPage();
+        }
+    }
+
 }
 

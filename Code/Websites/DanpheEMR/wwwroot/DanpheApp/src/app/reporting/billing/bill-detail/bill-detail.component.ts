@@ -14,6 +14,7 @@ import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses } from '../../../shared/shared-enums';
 import { BillDetailModel } from './bill-detail.model';
 
 @Component({
@@ -191,7 +192,12 @@ export class BillDetailComponent {
 
       this.summary_new.GrossSales = this.summary_new.Cash.SubTotal + this.summary_new.Credit.SubTotal;
       this.summary_new.TotalDiscount = this.summary_new.Cash.Discount + this.summary_new.Credit.Discount;
+
+      //! Bikesh: Based on User Story 5426, the 'CashReturn' and 'CreditReturn' value is already negative. and we need to calculate only positive inter value for the summary;
+      this.summary_new.CashReturn.SubTotal = - this.summary_new.CashReturn.SubTotal;
+      this.summary_new.CreditReturn.SubTotal = - this.summary_new.CreditReturn.SubTotal
       this.summary_new.TotalSalesReturn = this.summary_new.CashReturn.SubTotal + this.summary_new.CreditReturn.SubTotal;
+
       this.summary_new.TotalReturnDiscount = this.summary_new.CashReturn.Discount + this.summary_new.CreditReturn.Discount;
       this.summary_new.TotalSalesQty = this.summary_new.Cash.TotalQty + this.summary_new.Credit.TotalQty;
       this.summary_new.TotalReturnSalesQty = this.summary_new.CashReturn.TotalQty + this.summary_new.CreditReturn.TotalQty;
@@ -238,9 +244,9 @@ export class BillDetailComponent {
   }
 
   public LoadAllBillingItems(): void {
-    this.billingBlService.GetBillItemList()
+    this.billingBlService.GetMasterServiceItems()
       .subscribe((res) => {
-        if (res.Status == "OK") {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.BillItemList = res.Results;
         }
       });

@@ -4,7 +4,7 @@
       <div class="form-body">
         <div class="col-md-12">
           <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span
-              class="caption-subject">Department Wise Discount Scheme Report</span> </div>
+                  class="caption-subject">Department Wise Discount Scheme Report</span> </div>
         </div>
         <div class="row">
           <div class="col-md-6">
@@ -26,10 +26,10 @@
                 <label class="control-label col-md-3">Service Department<b style="float:right;">:</b></label>
                 <div class="col-md-6">
                   <input class="form-control" danphe-auto-complete [(ngModel)]="ServiceDepartment"
-                    [ngModelOptions]="{standalone: true}" [source]="this.ServiceDepartmentList"
-                    placeholder="Search by Service Department" display-property-name="ServiceDepartmentName" [min-chars]="1"
-                    value-property-name=null max-num-list="10" [grid-sort]="'ServiceDepartmentName'"
-                    [list-formatter]="ServiceDepartmentListFormatter" match-formatted="true" onclick="this.select()" />
+                         [ngModelOptions]="{standalone: true}" [source]="this.ServiceDepartmentList"
+                         placeholder="Search by Service Department" display-property-name="ServiceDepartmentName" [min-chars]="1"
+                         value-property-name=null max-num-list="10" [grid-sort]="'ServiceDepartmentName'"
+                         [list-formatter]="ServiceDepartmentListFormatter" match-formatted="true" onclick="this.select()" />
                 </div>
               </div>
             </div>
@@ -38,11 +38,11 @@
                 <label class="control-label col-md-3">Scheme Name<b style="float:right;">:</b></label>
                 <div class="col-md-7">
                   <input danphe-auto-complete class="form-control" [(ngModel)]="DiscountScheme"
-                    [source]="DiscountSchemeList" [list-formatter]="DiscountSchemeListFormatter"
-                    placeholder="Enter Membership Type Name" [min-chars]="1" display-property-name="MembershipTypeName"
-                    value-property-name="MembershipTypeId" onClick="this.select();"
-                    [ngModelOptions]="{standalone: true}" match-formatted="true"
-                    (keyup.enter)="this.coreService.FocusInputById('btn_showReport')" />
+                         [source]="DiscountSchemeList" [list-formatter]="DiscountSchemeListFormatter"
+                         placeholder="Scheme Name" [min-chars]="1" display-property-name="SchemeName"
+                         value-property-name="SchemeId" onClick="this.select();"
+                         [ngModelOptions]="{standalone: true}" match-formatted="true"
+                         (keyup.enter)="this.coreService.FocusInputById('btn_showReport')" />
                 </div>
               </div>
             </div>
@@ -53,7 +53,7 @@
                 <label class="control-label col-md-3">Select Payment Mode<b style="float:right;">:</b></label>
                 <div class="col-md-6">
                   <select class="comm-list" [(ngModel)]="this.PaymentMode" [ngModelOptions]="{standalone: true}"
-                    style="margin-left: 5px;">
+                          style="margin-left: 5px;">
                     <option value="All">All</option>
                     <option value="cash">Cash</option>
                     <option value="credit">Credit</option>
@@ -68,10 +68,10 @@
   </div>
   <div class="row">
     <div class="col-lg-12 col-sm-12">
-      <danphe-grid [grid-colDefaults]="DepartmentWiseDiscountSchemeGridColumns" 
-        [grid-data]="DepartmentWiseDiscountSchemeGridData" [grid-exportOptions]="gridExportOptions"
-        [grid-showExport]="true" [report-for]="'billing'" (grid-actions)="gridAction($event)"
-        [grid-date-range]="dateRange" [grid-footer-content]="footerContent">
+      <danphe-grid [grid-colDefaults]="DepartmentWiseDiscountSchemeGridColumns"
+                   [grid-data]="DepartmentWiseDiscountSchemeGridData" [grid-exportOptions]="gridExportOptions"
+                   [grid-showExport]="true" [report-for]="'billing'" (grid-actions)="gridAction($event)"
+                   [grid-date-range]="dateRange" [grid-footer-content]="footerContent">
       </danphe-grid>
     </div>
   </div>
@@ -103,7 +103,7 @@
                 </tr>
                 <tr style="border: 2px solid;">
                   <td></td>
-                  <td style="font-weight: bold;">Hospital Collection (A-(B+C)) </td>
+                  <td style="font-weight: bold;">Hospital Collection (A-B-C) </td>
                   <td style="font-weight: bold;"> {{summaryFormatted.HospitalCollection}} </td>
                 </tr>
               </table>
@@ -128,10 +128,10 @@
           </div>
           <div class="col-lg-12 col-sm-12">
             <div class="row">
-            <danphe-grid [grid-colDefaults]="DepartmentWiseDiscountSchemeItemsDetailsGridColumns"
-              [grid-data]="DepartmentWiseDiscountSchemeItemsDetailsGridData" [grid-exportOptions]="gridExportOptionsForItemLevelreport"
-              [grid-showExport]="true" [report-for]="'billing'" [grid-footer-content]="itemLevelfooterContent">
-            </danphe-grid>
+              <danphe-grid [grid-colDefaults]="DepartmentWiseDiscountSchemeItemsDetailsGridColumns"
+                           [grid-data]="DepartmentWiseDiscountSchemeItemsDetailsGridData" [grid-exportOptions]="gridExportOptionsForItemLevelreport"
+                           [grid-showExport]="true" [report-for]="'billing'" [grid-footer-content]="itemLevelfooterContent">
+              </danphe-grid>
             </div>
             <div>
               <div class="row" id="itemLevelSummaryFooter" style="margin-bottom: 60px;">
@@ -161,7 +161,7 @@
                             </tr>
                             <tr style="border: 2px solid;">
                               <td></td>
-                              <td style="font-weight: bold;">Hospital Collection (A-(B+C)) </td>
+                              <td style="font-weight: bold;">Hospital Collection (A-B-C) </td>
                               <td style="font-weight: bold;"> {{summaryFormattedForItemsReport.HospitalCollection}} </td>
                             </tr>
                           </table>

@@ -13,7 +13,9 @@ import { CoreService } from "../../../core/shared/core.service";
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 import { DanpheCache, MasterType } from "../../../shared/danphe-cache-service-utility/cache-services";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { InventoryService } from "../../shared/inventory.service";
+import { CurrencyModel } from "../shared/currency.model";
 import { ItemModel } from "../shared/item.model";
 @Component({
   selector: 'vendor-add',
@@ -39,6 +41,9 @@ export class VendorsAddComponent {
   public showAddPage: boolean = false;
   @Input("selectedVendor")
   public selectedVendor: VendorsModel;
+
+  @Input("vendorList")
+  public VendorList = new Array<VendorsModel>();
   @Output("callback-add")
   callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
   public update: boolean = false;
@@ -50,7 +55,7 @@ export class VendorsAddComponent {
   public itemList: Array<ItemModel> = new Array<ItemModel>();
   public filteredItemList: Array<ItemModel> = new Array<ItemModel>();
   public defaultItemList: Array<ItemModel> = new Array<ItemModel>();
-  public GetCurrencyCodeList: Array<VendorsModel> = new Array<VendorsModel>();
+  public GetCurrencyCodeList: Array<CurrencyModel> = new Array<CurrencyModel>();
   public showAddCurrencyCodePopUp: boolean = false;
   public isEditItem: boolean = false;
   public loading: boolean = false;
@@ -155,7 +160,7 @@ export class VendorsAddComponent {
   }
   //adding new vendor
   AddVendor() {
-    if (this.loading == false) return;
+    if (this.loading = false) return;
     //for checking validations, marking all the fields as dirty and checking the validity.
     for (var i in this.CurrentVendor.VendorsValidator.controls) {
       this.CurrentVendor.VendorsValidator.controls[i].markAsDirty();
@@ -172,13 +177,39 @@ export class VendorsAddComponent {
         this.CurrentVendor.IsTDSApplicable = false;
         this.CurrentVendor.Tds = 0;
       }
+
+      if (this.VendorList && this.VendorList.length) {
+        const isVendorNameAlreadyExists = this.VendorList.some(a => a.VendorName.toLowerCase() === this.CurrentVendor.VendorName.toLowerCase());
+
+        let isPANNoAlreadyExists = false;
+        if (this.CurrentVendor.PanNo.trim() !== '') {
+          isPANNoAlreadyExists = this.VendorList.some(a => a.PanNo === this.CurrentVendor.PanNo);
+        }
+
+        if (isVendorNameAlreadyExists) {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add Vendor as the Vendor Name "${this.CurrentVendor.VendorName}" already exists.`]);
+          this.loading = false;
+          return;
+        }
+
+
+        if (isPANNoAlreadyExists) {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add Vendor as the PANNo "${this.CurrentVendor.PanNo}" already exists.`]);
+          this.loading = false;
+          return;
+        }
+
+      }
+
+      this.loading = true;
+      this.CurrentVendor.PanNo.trim() == '';
       this.invSettingBL.AddVendor(this.CurrentVendor)
         .finally(() => this.loading = false)
         .subscribe(
           res => {
             this.showMessageBox("success", "Vendor Added");
             this.CurrentVendor = new VendorsModel();
-            this.CallBackAddVendor(res)
+            this.CallBackAddVendor(res);
           },
           err => {
             this.logError(err);
@@ -194,6 +225,7 @@ export class VendorsAddComponent {
   Update() {
     if (this.loading == false) return;
     //for checking validations, marking all the fields as dirty and checking the validity.
+
     for (var i in this.CurrentVendor.VendorsValidator.controls) {
       this.CurrentVendor.VendorsValidator.controls[i].markAsDirty();
       this.CurrentVendor.VendorsValidator.controls[i].updateValueAndValidity();
@@ -205,6 +237,27 @@ export class VendorsAddComponent {
         this.CurrentVendor.IsTDSApplicable = false;
         this.CurrentVendor.Tds = 0;
       }
+
+      if (this.VendorList && this.VendorList.length) {
+        const isVendorNameAlreadyExists = this.VendorList.some(a => a.VendorName.toLowerCase() === this.CurrentVendor.VendorName.toLowerCase() && a.VendorId !== this.CurrentVendor.VendorId);
+        //  const isPANNoAlreadyExists = this.VendorList.some(a => a.PanNo === this.CurrentVendor.PanNo && a.VendorId !== this.CurrentVendor.VendorId);
+        let isPANNoAlreadyExists = false;
+        if (this.CurrentVendor.PanNo.trim() !== '') {
+          isPANNoAlreadyExists = this.VendorList.some(a => a.PanNo === this.CurrentVendor.PanNo);
+        }
+        if (isVendorNameAlreadyExists) {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update Vendor as the Vendor Name "${this.CurrentVendor.VendorName}" already exists.`]);
+          this.loading = false;
+          return;
+        }
+        if (isPANNoAlreadyExists) {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update Vendor as the PANNo "${this.CurrentVendor.PanNo}" already exists.`]);
+          this.loading = false;
+          return;
+        }
+      }
+
+
       this.invSettingBL.UpdateVendor(this.CurrentVendor)
         .finally(() => this.loading = false)
         .subscribe(

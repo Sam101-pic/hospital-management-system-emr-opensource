@@ -329,9 +329,15 @@ export class DepartmentAddComponent {
           else {
             this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed  to get OPD Service Items list"]);
           }
-        });
+        },
+          (error) => {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [error.error.Exception]);
+          }
+        );
     }
     catch (exception) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["An unexpected error occurred."]);
+
     }
   }
 

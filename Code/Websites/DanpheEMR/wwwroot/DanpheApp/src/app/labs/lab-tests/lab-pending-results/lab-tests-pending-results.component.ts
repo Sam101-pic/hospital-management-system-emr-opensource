@@ -9,8 +9,8 @@ import LabGridColumnSettings from '../../shared/lab-gridcol-settings';
 import * as moment from 'moment/moment';
 import { CoreService } from "../../../core/shared/core.service";
 import { SecurityService } from "../../../security/shared/security.service";
-import { CommonFunctions } from "../../../shared/common.functions";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { LabCategoryModel } from "../../shared/lab-category.model";
 import { LabSticker } from '../../shared/lab-sticker.model';
 import { LabPendingResultVM } from "../../shared/lab-view.models";
@@ -89,44 +89,24 @@ export class LabTestsPendingResultsComponent {
     this.labBLService.GetPendingLabResults(frmdate, todate, categoryIdList)
       .finally(() => { this.loading = false })//re-enable button after response comes back.
       .subscribe(res => {
-        if (res.Status == "OK") {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           if (res.Results.length) {
             this.pendingResults = res.Results;
             if (!this.changeDetector['destroyed']) {
               this.changeDetector.detectChanges();
             }
             this.pendingResults = this.pendingResults.slice();
-            this.pendingResults.forEach(result => {
-              let testNameCSV: string;
-              let templateNameCSV: string;
-              result.Tests.forEach(test => {
-                if (!testNameCSV)
-                  testNameCSV = test.TestName;
-                else
-                  testNameCSV = testNameCSV + "," + test.TestName;
-                //this is removed because it didnt show the same TestName of single patient Twice
-                //testNameCSV += testNameCSV.includes(test.TestName) ? "" : "," + test.TestName;
-
-                if (!templateNameCSV)
-                  templateNameCSV = test.ReportTemplateShortName;
-                else
-                  templateNameCSV += templateNameCSV.includes(test.ReportTemplateShortName) ? "" : "," + test.ReportTemplateShortName;
-              });
-              result.LabTestCSV = testNameCSV;
-              result.TemplateName = templateNameCSV;
-            });
           }
           else {
             this.pendingResults = null;
             if (!this.changeDetector['destroyed']) {
               this.changeDetector.detectChanges();
             }
-            //this.changeDetector.detectChanges();
           }
 
         }
         else {
-          this.msgBoxServ.showMessage("failed", ["failed to get lab test of patient.. please check log for details."]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["failed to get lab test of patient.. please check log for details."]);
           console.log(res.ErrorMessage);
         }
       });
@@ -137,6 +117,9 @@ export class LabTestsPendingResultsComponent {
     switch ($event.Action) {
       case "addresult":
         {
+
+          this.patientService.setGlobal($event.Data);
+
           this.patientService.getGlobal().PatientId = $event.Data.PatientId;
           this.patientService.getGlobal().ShortName = $event.Data.PatientName;
           this.patientService.getGlobal().PatientCode = $event.Data.PatientCode;
@@ -144,17 +127,17 @@ export class LabTestsPendingResultsComponent {
           this.patientService.getGlobal().Gender = $event.Data.Gender;
           this.patientService.getGlobal().WardName = $event.Data.WardName;
           this.patientService.getGlobal().Ins_HasInsurance = $event.Data.HasInsurance;
-
           //this is removed because it didnt show the two diff. RequisitionID of same TestName of single patient Twice
           //this.requisitionIdList = $event.Data.Tests.map(test => { return test.RequisitionId });
-          $event.Data.Tests.forEach(reqId => {
+          let reqs = $event.Data.RequisitionIdCSV.split(',');
+          reqs.forEach(reqId => {
             if (this.requisitionIdList && this.requisitionIdList.length) {
-              if (!this.requisitionIdList.includes(reqId.RequisitionId)) {
-                this.requisitionIdList.push(reqId.RequisitionId);
+              if (!this.requisitionIdList.includes(+reqId)) {
+                this.requisitionIdList.push(+reqId);
               }
             }
             else {
-              this.requisitionIdList.push(reqId.RequisitionId);
+              this.requisitionIdList.push(+reqId);
             }
           });
 
@@ -174,8 +157,10 @@ export class LabTestsPendingResultsComponent {
 
           let dob = $event.Data.DateOfBirth;
           let gender: string = $event.Data.Gender;
-          this.PatientLabInfo.AgeSex = CommonFunctions.GetFormattedAgeSex(dob, gender);
-          this.PatientLabInfo.Age = CommonFunctions.GetFormattedAge(dob);
+          this.PatientLabInfo.Age = this.coreService.CalculateAge(dob);
+          if (this.PatientLabInfo.Age) {
+            this.PatientLabInfo.AgeSex = this.coreService.FormateAgeSex(this.PatientLabInfo.Age, gender);
+          }
           this.PatientLabInfo.Sex = gender;
           this.PatientLabInfo.PatientName = $event.Data.PatientName;
           this.PatientLabInfo.RunNumber = $event.Data.SampleCode;
@@ -184,14 +169,15 @@ export class LabTestsPendingResultsComponent {
           this.PatientLabInfo.BarCodeNumber = $event.Data.BarCodeNumber;
           this.PatientLabInfo.TestName = $event.Data.LabTestCSV;
 
-          $event.Data.Tests.forEach(reqId => {
+          let reqs = $event.Data.RequisitionIdCSV.split(',');
+          reqs.forEach(reqId => {
             if (this.requisitionIdList && this.requisitionIdList.length) {
-              if (!this.requisitionIdList.includes(reqId.RequisitionId)) {
-                this.requisitionIdList.push(reqId.RequisitionId);
+              if (!this.requisitionIdList.includes(+reqId)) {
+                this.requisitionIdList.push(+reqId);
               }
             }
             else {
-              this.requisitionIdList.push(reqId.RequisitionId);
+              this.requisitionIdList.push(+reqId);
             }
           });
 
@@ -206,14 +192,15 @@ export class LabTestsPendingResultsComponent {
         {
 
           this.requisitionIdList = [];
-          $event.Data.Tests.forEach(reqId => {
+          let reqs = $event.Data.RequisitionIdCSV.split(',');
+          reqs.forEach(reqId => {
             if (this.requisitionIdList && this.requisitionIdList.length) {
-              if (!this.requisitionIdList.includes(reqId.RequisitionId)) {
-                this.requisitionIdList.push(reqId.RequisitionId);
+              if (!this.requisitionIdList.includes(+reqId)) {
+                this.requisitionIdList.push(+reqId);
               }
             }
             else {
-              this.requisitionIdList.push(reqId.RequisitionId);
+              this.requisitionIdList.push(+reqId);
             }
           });
 
@@ -232,8 +219,10 @@ export class LabTestsPendingResultsComponent {
 
           let dob = $event.Data.DateOfBirth;
           let gender: string = $event.Data.Gender;
-          this.PatientLabInfo.AgeSex = CommonFunctions.GetFormattedAgeSex(dob, gender);
-          this.PatientLabInfo.Age = CommonFunctions.GetFormattedAge(dob);
+          this.PatientLabInfo.Age = this.coreService.CalculateAge(dob);
+          if (this.PatientLabInfo.Age) {
+            this.PatientLabInfo.AgeSex = this.coreService.FormateAgeSex(this.PatientLabInfo.Age, gender);
+          }
           this.PatientLabInfo.Sex = gender;
           this.PatientLabInfo.PatientName = $event.Data.PatientName;
           this.PatientLabInfo.RunNumber = $event.Data.SampleCode;
@@ -243,17 +232,17 @@ export class LabTestsPendingResultsComponent {
           this.PatientLabInfo.TestName = $event.Data.LabTestCSV;
           this.PatientLabInfo.SampleCollectedOnDateTime = moment().format("YYYY-MM-DD HH:mm");
 
-          $event.Data.Tests.forEach(reqId => {
+          let reqs = $event.Data.RequisitionIdCSV.split(',');
+          reqs.forEach(reqId => {
             if (this.requisitionIdList && this.requisitionIdList.length) {
-              if (!this.requisitionIdList.includes(reqId.RequisitionId)) {
-                this.requisitionIdList.push(reqId.RequisitionId);
+              if (!this.requisitionIdList.includes(+reqId)) {
+                this.requisitionIdList.push(+reqId);
               }
             }
             else {
-              this.requisitionIdList.push(reqId.RequisitionId);
+              this.requisitionIdList.push(+reqId);
             }
           });
-
           if (this.PatientLabInfo.VisitType.toLocaleLowerCase() == 'inpatient') {
             this.PatientLabInfo.VisitType = 'IP';
           } else {
@@ -335,7 +324,7 @@ export class LabTestsPendingResultsComponent {
       if (moment(this.fromDate).isBefore(this.toDate) || moment(this.fromDate).isSame(this.toDate)) {
         this.GetPendingLabResults(this.fromDate, this.toDate, this.catIdList);
       } else {
-        this.msgBoxServ.showMessage('failed', ['Please enter valid From date and To date']);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Please enter valid From date and To date']);
       }
     }
   }
@@ -371,5 +360,9 @@ export class LabTestsPendingResultsComponent {
     if (event.keyCode == 27) {
       this.CloseSticker();
     }
+  }
+
+  ngOnDestroy(): void {
+    this.patientService.CreateNewGlobal();
   }
 }

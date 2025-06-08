@@ -34,10 +34,12 @@ import { BillingPrintSharedModule } from '../billing/print-pages/billing-print-s
 import { InsuranceSharedModule } from '../insurance/shared/insurance-shared.module';
 import { PatientSharedModule } from '../patients/patient-shared.module';
 import { SettingsSharedModule } from '../settings-new/settings-shared.module';
+import { SettingsBLService } from '../settings-new/shared/settings.bl.service';
 import { DanpheAutoCompleteModule } from '../shared/danphe-autocomplete/danphe-auto-complete.module';
 import { SharedModule } from "../shared/shared.module";
 import { StickerSharedModule } from '../stickers/stickers-shared-module';
 import { SSFClaimComponent } from './SSFClaim/SSFClaimComponent';
+import { ManualFollowupComponent } from './manual-follow-up/manual-follow-up.component';
 import { OnlineAppointmentCompletedListComponent } from './online-appointment/completed-list/online-appt-completed';
 import { OnlineAppointmentMainComponent } from './online-appointment/online-appointment-main-component';
 import { OnlineAppointmentPendingListComponent } from './online-appointment/pending-list/online-appt-pending';
@@ -56,6 +58,7 @@ import { VisitPatientInfoComponent } from './visit/visit-patient-info.component'
     BillingDLService,
     PatientsDLService,
     ADT_DLService,
+    SettingsBLService,
     { provide: LocationStrategy, useClass: HashLocationStrategy }],
   imports: [AppointmentsRoutingModule,
     CommonModule,
@@ -91,7 +94,8 @@ import { VisitPatientInfoComponent } from './visit/visit-patient-info.component'
     OnlineAppointmentMainComponent,
     OnlineAppointmentCompletedListComponent,
     OnlineAppointmentPendingListComponent,
-    SSFClaimComponent
+    SSFClaimComponent,
+    ManualFollowupComponent
 
   ],
   bootstrap: []

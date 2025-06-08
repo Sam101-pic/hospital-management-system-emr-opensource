@@ -10,6 +10,7 @@ import { OrganizationDepositList_DTO } from "../../shared/dto/bill-organization-
 
 @Component({
   templateUrl: './bil-org-deposit-receipt-duplicate.component.html',
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 
 export class BIL_DuplicatePrint_OrganizationDepositListComponent {
@@ -57,4 +58,12 @@ export class BIL_DuplicatePrint_OrganizationDepositListComponent {
     this.showReceipt = false;
     this.depositId = null;
   }
+
+  hotkeys(event) {
+    if (event.keyCode == 27) {
+      this.CloseDepositReceiptPopUp();
+
+    }
+  }
+
 }

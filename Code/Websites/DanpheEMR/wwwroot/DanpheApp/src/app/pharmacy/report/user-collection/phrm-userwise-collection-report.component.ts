@@ -13,6 +13,8 @@ import { MessageboxService } from '../../../shared/messagebox/messagebox.service
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
 import PHRMReportsGridColumns from "../../shared/phrm-reports-grid-columns";
 import { PHRMReportsModel } from "../../shared/phrm-reports-model";
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { SettingsBLService } from '../../../settings-new/shared/settings.bl.service';
 
 
 @Component({
@@ -45,7 +47,7 @@ export class PHRMUserwiseCollectionReportComponent {
         CashDiscount: 0,
         TotalCash: 0
     }
-    public counterlist: any;
+    public CounterList: any;
     public summaryGrandTotal: any = [];
     public gridExportOptions: any;
     dlService: DLService = null;
@@ -71,11 +73,15 @@ export class PHRMUserwiseCollectionReportComponent {
     }
     showUserCollectionSummary: boolean = false;
     PaymentMethodWiseCollection: any[] = [];
+    SelectedUser: { EmployeeId: number, EmployeeName: string } = { EmployeeId: null, EmployeeName: 'All' };
+    UserList: { EmployeeId: number, EmployeeName: string }[] = [];
+
 
     constructor(public pharmacyBLService: PharmacyBLService, public _dispensaryService: DispensaryService,
         public securityService: SecurityService, public coreService: CoreService, _dlService: DLService,
         private changeDetector: ChangeDetectorRef, public msgBoxServ: MessageboxService,
-        public nepaliCalendarService: NepaliCalendarService
+        public nepaliCalendarService: NepaliCalendarService,
+        public settingBLService: SettingsBLService
     ) {
         this.dlService = _dlService
         this.checkSalesCustomization();
@@ -84,8 +90,9 @@ export class PHRMUserwiseCollectionReportComponent {
         this.phrmReports.ToDate = moment().format('YYYY-MM-DD');
         this.LoadExportOptions();
         this.LoadCounter();
-        this.GetActiveDispensarylist();
+        this.GetActiveDispensaryList();
         this.getPharmacyHeader();
+        this.LoadUser();
         this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("Date", false));
     };
     checkSalesCustomization() {
@@ -113,7 +120,7 @@ export class PHRMUserwiseCollectionReportComponent {
     // gridExportOptions = {
     //     fileName: 'PharmacyUserwiseCollectionReport_' + moment().format('YYYY-MM-DD') + '.xls',
     // };
-    GetActiveDispensarylist() {
+    GetActiveDispensaryList() {
         this._dispensaryService.GetAllDispensaryList()
             .subscribe(res => {
                 if (res.Status == "OK") {
@@ -144,23 +151,23 @@ export class PHRMUserwiseCollectionReportComponent {
         }
     }
     LoadCounter(): void {
-        this.counterlist = DanpheCache.GetData(MasterType.PhrmCounter, null);
+        this.CounterList = DanpheCache.GetData(MasterType.PhrmCounter, null);
     }
     OnGridExport($event: GridEmitModel) {
-        let jsonStrSummary = this.GetSummaryFormatedForExportExcel();
+        let jsonStrSummary = this.GetSummaryFormattedForExportExcel();
 
         let summaryHeader = "Calculation Summary";
 
         this.dlService.ReadExcel("/api/PharmacyReport/ExportToExcelPHRMDailySales?FromDate="
             + this.phrmReports.FromDate + "&ToDate=" + this.phrmReports.ToDate
-            + "&CounterId=" + this.phrmReports.CounterId + "&CreatedBy=" + this.phrmReports.CreatedBy
+            + "&CounterId=" + this.phrmReports.CounterId + "&EmployeeId=" + this.phrmReports.EmployeeId
             + "&SummaryData=" + jsonStrSummary + "&SummaryHeader=" + summaryHeader)
             .map(res => res)
             .subscribe(data => {
                 let blob = data;
                 let a = document.createElement("a");
                 a.href = URL.createObjectURL(blob);
-                a.download = "PharmacyUserwiseCollectionReport_" + moment().format("DD-MMM-YYYY_HHmmA") + '.xls';
+                a.download = "PharmacyUserWiseCollectionReport_" + moment().format("DD-MMM-YYYY_HHmmA") + '.xls';
                 document.body.appendChild(a);
                 a.click();
             },
@@ -170,7 +177,7 @@ export class PHRMUserwiseCollectionReportComponent {
     LoadExportOptions() {
 
         this.gridExportOptions = {
-            fileName: 'PharmacyUserwiseCollectionReport_' + moment().format('YYYY-MM-DD') + '.xls',
+            fileName: 'PharmacyUserWiseCollectionReport_' + moment().format('YYYY-MM-DD') + '.xls',
             customHeader: "FromDate: " + this.phrmReports.FromDate + "--ToDate:" + this.phrmReports.ToDate
         };
     }
@@ -205,7 +212,7 @@ export class PHRMUserwiseCollectionReportComponent {
             OtherPaymentsGiven: 0,
             NetCollection: 0,
         }
-        this.pharmacyBLService.GetPHRMUserwiseCollectionReport(this.phrmReports)
+        this.pharmacyBLService.GetPHRMUserWiseCollectionReport(this.phrmReports)
             .subscribe(res =>
                 this.Success(res),
                 res => this.Error(res));
@@ -220,6 +227,11 @@ export class PHRMUserwiseCollectionReportComponent {
     }
     Success(res) {
         if (res.Status == "OK") {
+            //reset summary data to Zero so that values doesn't add up on every reload.
+            this.total_SummaryView.CashSales_Amount = this.total_SummaryView.CashSales_ReturnAmount = this.total_SummaryView.CollectionFromReceivables
+                = this.total_SummaryView.Deposit_Received = this.total_SummaryView.Deposit_Refund
+                = this.total_SummaryView.Sett_CashDiscount = this.total_SummaryView.NetCollection = 0;
+            this.dailySalesReportSummaryData = [];
             let data = res.Results;
             this.PaymentMethodWiseCollection = res.Results.PaymentMethodWiseCollection;
             if (data.UserCollectionDetails.length > 0 || data.SettlementSummary.CollectionFromReceivables || data.UserCollectionSummary.length > 0) {
@@ -248,10 +260,6 @@ export class PHRMUserwiseCollectionReportComponent {
         this.loading = false;
     }
     CalculateTotalAmountsForSummaryView(collnSummaryList: Array<any>) {
-        //reset summary data to Zero so that values doesn't add up on every reload.
-        this.total_SummaryView.CashSales_Amount = this.total_SummaryView.CashSales_ReturnAmount = this.total_SummaryView.CollectionFromReceivables
-            = this.total_SummaryView.Deposit_Received = this.total_SummaryView.Deposit_Refund
-            = this.total_SummaryView.Sett_CashDiscount = this.total_SummaryView.NetCollection = 0;
         if (collnSummaryList && collnSummaryList.length > 0) {
             collnSummaryList.forEach(row => {
                 this.total_SummaryView.CashSales_Amount += row.CashSales_Amount;
@@ -358,7 +366,7 @@ export class PHRMUserwiseCollectionReportComponent {
             this.summaryFormatted.TotalCash = CommonFunctions.parseAmount(this.summaryFormatted.TotalCash + this.summaryFormatted.CreditReceived - this.summaryFormatted.CashDiscount);
         }
     }
-    GetSummaryFormatedForExportExcel(): string {
+    GetSummaryFormattedForExportExcel(): string {
         let summary = this.summaryFormatted;
 
         let summaryFormatted = {
@@ -475,6 +483,30 @@ export class PHRMUserwiseCollectionReportComponent {
         this.phrmReports.FromDate = $event ? $event.fromDate : this.phrmReports.FromDate;
         this.phrmReports.ToDate = $event ? $event.toDate : this.phrmReports.ToDate;
         this.dateRange = "<b>Date:</b>&nbsp;" + this.phrmReports.FromDate + "&nbsp;<b>To</b>&nbsp;" + this.phrmReports.ToDate;
+    }
+
+    LoadUser() {
+        this.settingBLService.GetUserList()
+            .subscribe(res => {
+                if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+                    this.UserList = res.Results;
+                    this.UserList.unshift({ EmployeeId: null, EmployeeName: 'All' })
+                    CommonFunctions.SortArrayOfObjects(this.UserList, "EmployeeName");
+                }
+                else {
+                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, res.ErrorMessage);
+                }
+            });
+    }
+
+    UserListFormatter(data: any): string {
+        return data["EmployeeName"];
+    }
+
+    OnUserChange() {
+        if (this.SelectedUser) {
+            this.phrmReports.EmployeeId = this.SelectedUser.EmployeeId;
+        }
     }
 
 }

@@ -3,10 +3,11 @@ import * as _ from 'lodash';
 import { BillingTransactionItem } from '../../billing/shared/billing-transaction-item.model';
 import { InPatientLabTest } from '../../labs/shared/InpatientLabTest';
 import { PatientsDLService } from '../../patients/shared/patients.dl.service';
+import { DanpheHTTPResponse } from '../../shared/common-models';
 import { EmergencyDischargeSummary } from './emergency-discharge-summary.model';
 import { EmergencyPatientModel } from './emergency-patient.model';
 import { EmergencyDLService } from './emergency.dl.service';
-import { UploadCosentFormModel } from './upload-consent-form.Model';
+import { UploadCosentFormModel } from './upload-consent-form.model';
 
 @Injectable()
 export class EmergencyBLService {
@@ -105,6 +106,10 @@ export class EmergencyBLService {
 
   UpdateERDischargeSummary(ERDischargeSum: EmergencyDischargeSummary) {
     return this.emergencyDLService.UpdateERDischargeSummary(ERDischargeSum)
+      .map(res => { return res });
+  }
+  UndoFinalizedpatient(ERPatientId: number) {
+    return this.emergencyDLService.UndoFinalizedpatient(ERPatientId)
       .map(res => { return res });
   }
 
@@ -221,5 +226,13 @@ export class EmergencyBLService {
   public GetPatientsWithVisitsInfo(searchTxt) {
     return this.patientDLService.GetPatientsWithVisitsInfo(searchTxt)
       .map(res => res);
+  }
+  GetEmergencyFinalizedPatientList(caseId: number, selectedErStatusType: string, dateType: string, fromDate: string, toDate: string, isPoliceCase: boolean) {
+    return this.emergencyDLService.GetEmergencyFinalizedPatientList(fromDate, toDate, selectedErStatusType, caseId, dateType, isPoliceCase).
+      map((res: DanpheHTTPResponse) => { return res });
+  }
+  GetERPatientCaseDetails(ERPatientId: number) {
+    return this.emergencyDLService.GetERPatientCaseDetails(ERPatientId).
+      map(res => { return res });
   }
 }

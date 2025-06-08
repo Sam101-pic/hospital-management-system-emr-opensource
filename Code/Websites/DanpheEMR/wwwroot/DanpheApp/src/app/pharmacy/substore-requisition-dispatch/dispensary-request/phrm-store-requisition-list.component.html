@@ -70,7 +70,8 @@
     <div class="row">
         <div class="col-md-3">
             <button class="btn btn-primary" (click)="DirectDispatch()"
-                    rbac-permission='{"name":"btn-phrm-mainstore-direct-dispatch","actionOnInvalid":"remove"}'>
+                    rbac-permission='{"name":"btn-phrm-mainstore-direct-dispatch","actionOnInvalid":"remove"}'
+                    [attr.disabled]="IsStockLoaded ? null: true" [title]="IsStockLoaded ? '' : 'Stock Loading'">
                 Direct&nbsp;Dispatch&nbsp;
                 <i class="fa fa-mail-reply-all fa-flip-horizontal"></i>
             </button>
@@ -101,7 +102,7 @@
         <div class="col-lg-12 col-sm-12">
             <danphe-grid [grid-colDefaults]="requisitionGridColumns" [grid-data]="filterRequisitionList" [rangeType]="dateRange"
                          [show-CustomDate]="true" [NepaliDateInGridParams]="NepaliDateInRequisitionGridSettings" (onDateChange)="onDateChange($event)"
-                         (grid-actions)="DeptGridAction($event)">
+                         (grid-actions)="DeptGridAction($event)" [date-settings-name]="'common-range-with-today'">
             </danphe-grid>
         </div>
     </div>
@@ -162,7 +163,8 @@
                                                 <p class="c_paragraphs" style="text-align: center;">Ph No: {{ headerDetail.tel }}</p>
                                             </td>
                                             <td colspan="3" width="25%" style="text-align: right; vertical-align: top;">
-                                                <p class="c_paragraphs" style="text-align: right; margin-top: 10px; margin: 0;"><strong>{{GeneralFieldLabel.PANNo}}
+                                                <p class="c_paragraphs" style="text-align: right; margin-top: 10px; margin: 0;">
+                                                    <strong>{{GeneralFieldLabel.PANNo}}
                                                         : {{ headerDetail.PANno }} </strong> </p>
                                             </td>
                                         </tr>
@@ -197,25 +199,31 @@
                                                                 <strong>{{innerDispatchdetails.RequisitionNo}}</strong>
                                                             </p>
                                                         </td>
+
                                                         <td colspan="6" style="text-align: right;">
                                                             <p class="c_paragraphs">Requisition Date :<strong>{{requisitionDate | date:"yyyy-MM-dd"}}
                                                                     &nbsp;
                                                                     <i *ngIf="requisitionDate">{{requisitionDate | nepaliDate:'format':'YYYY-MM-DD'}}
-                                                                        </i></strong></p>
+                                                                    </i></strong></p>
                                                         </td>
                                                     </tr>
                                                     <tr>
                                                         <td colspan="6" style="text-align: left;">
                                                             <p class="c_paragraphs">From :<strong>{{innerDispatchdetails.SourceStore}}</strong></p>
-                                                            <p class="c_paragraphs">To :<strong>{{innerDispatchdetails.TargetStore}}</strong></p>
                                                         </td>
                                                         <td colspan="6" style="text-align: right;">
-
+                                                            <p class="c_paragraphs">To :<strong>{{innerDispatchdetails.TargetStore}}</strong></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td colspan="6" style="text-align: left;" *ngIf="innerDispatchdetails.IssueNo">
+                                                            <p class="c_paragraphs">Issue No :
+                                                                <strong>{{innerDispatchdetails.IssueNo}}</strong>
+                                                            </p>
                                                         </td>
                                                     </tr>
                                                 </table>
                                             </td>
-
                                         </tr>
                                         <tr>
                                             <td colspan="12"

@@ -1,16 +1,15 @@
 
-import { Component, Directive, ViewChild } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import * as moment from 'moment/moment';
-import { OnInit } from '@angular/core';
 import { PharmacyBLService } from '../../../../pharmacy/shared/pharmacy.bl.service';
-import { DLService } from '../../../../shared/dl.service';
-import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import PHRMGridColumns from '../../../../pharmacy/shared/phrm-grid-columns';
-import { GridEmitModel } from '../../../../shared/danphe-grid/grid-emit.model';
-import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
 import PHRMReportsGridColumns from '../../../../pharmacy/shared/phrm-reports-grid-columns';
-import { DispensaryService } from '../../../shared/dispensary.service';
 import { PHRMStoreModel } from '../../../../pharmacy/shared/phrm-store.model';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { GridEmitModel } from '../../../../shared/danphe-grid/grid-emit.model';
+import { DLService } from '../../../../shared/dl.service';
+import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
+import { DispensaryService } from '../../../shared/dispensary.service';
 @Component({
   selector: 'app-disp-daily-sales-report',
   templateUrl: './disp-daily-sales-report.component.html',
@@ -157,7 +156,7 @@ export class DispDailySalesReportComponent implements OnInit {
     }
     else {
       this.loading = true;
-      this.pharmacyBLService.GetDailySalesSummaryReport(this.FromDate, this.ToDate, this.itemId, this.StoreId, null, null).finally(() => {
+      this.pharmacyBLService.GetDailySalesSummaryReport(this.FromDate, this.ToDate, this.itemId, this.StoreId, null, null, null, null).finally(() => {
         this.loading = false;
         this.selectedItem = null;
         this.itemId = null;

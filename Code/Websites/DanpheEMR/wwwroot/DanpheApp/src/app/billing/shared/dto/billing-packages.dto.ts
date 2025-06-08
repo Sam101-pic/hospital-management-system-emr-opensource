@@ -13,6 +13,10 @@ export class BillingPackages_DTO {
   public SchemeId: number = 0;
   public PriceCategoryId: number = 0;
   public IsEditable: boolean = false;
+  public IsItemLevelDiscount: boolean = false;
   public BillingPackageServiceItemList = new Array<BillingPackageServiceItems_DTO>();
+  public IsItemLoadPackage: boolean = false;
+  public IsHealthPackage: boolean = true;
+  public IsDiscountEditableInSales: boolean = false;
 }
 

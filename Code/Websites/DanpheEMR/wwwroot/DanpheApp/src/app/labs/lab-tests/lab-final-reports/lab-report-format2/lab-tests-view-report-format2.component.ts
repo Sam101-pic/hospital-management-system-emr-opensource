@@ -102,7 +102,7 @@ export class LabTestsViewReportFormat2Component {
 
   public requisitionIdList: Array<number> = new Array<number>();
   public defaultSigEmpIdList: Array<number>;
-  public enableDrEdit: boolean = false;
+  public enableDrEdit: boolean = true;
   public oldName: string = null;
   public showInterpretation: boolean = false;
   public showGap: boolean = true;
@@ -171,7 +171,16 @@ export class LabTestsViewReportFormat2Component {
   public ProfilePicSRC: string = "";
   public isCovidTest: boolean = false;
   public CovidTestName: string = "";
-  public LabReportDisplayParameter = { "ShowChangeReferredBy": false, "ShowChangeLabNumber": false, "ShowCollectionSite": true, "ShowSpecimen": false, "ShowWard": false, "ShowVerificationDate": false, "ShowPassportNo": false, "ShowProfilePic": false, "ShowChangePrescriberName": true };
+  public LabReportDisplayParameter = { "ShowChangeReferredBy": false, "ShowChangeLabNumber": false, "ShowCollectionSite": true, "ShowSpecimen": false, "ShowWard": false, "ShowVerificationDate": false, "ShowPassportNo": false, "ShowProfilePic": false, "ShowChangePrescriberName": true, "ShowPolicyNumber": false };
+  public PreVerificationEnabled: boolean = false;
+  public LabSignatoryParameter = {
+    "EnableSignatoriesEdit": false
+  };
+  @Input("showReportFromClaimScrubbing")
+  showReportFromClaimScrubbing: boolean = false;
+  @Input("ShowPrintButtonFromClaimScrubbing")
+  showPrintButtonFromClaimScrubbing = false;
+  updateMode: 'prescriber' | 'referrer';
   constructor(
     public labBLService: LabsBLService, public labService: LabService,
     public npCalendarService: NepaliCalendarService,
@@ -198,6 +207,7 @@ export class LabTestsViewReportFormat2Component {
       this.showBarCode = Boolean(JSON.parse(this.allValues.LabBarCodeInReport));
       if (!_.isEmpty(this.allValues.LabReportVerificationB4Print)) {
         this.verificationEnabled = Boolean(JSON.parse(this.allValues.LabReportVerificationB4Print.EnableVerificationStep));
+        this.PreVerificationEnabled = Boolean(JSON.parse(this.allValues.LabReportVerificationB4Print.EnablePreVerification));
         this.preliminaryText = this.allValues.LabReportVerificationB4Print.PreliminaryReportText;
         this.preliminarySignature = this.allValues.LabReportVerificationB4Print.PreliminaryReportSignature;
         this.showVerifierSignature = Boolean(JSON.parse(this.allValues.LabReportVerificationB4Print.ShowVerifierSignature));
@@ -297,7 +307,7 @@ export class LabTestsViewReportFormat2Component {
                 _templateReport.VerifiedByList.push(test.VerifiedBy);
               }
               test["Print"] = true;
-              test["PrintInterpretation"] = false;
+              test["PrintInterpretation"] = true;
               this.requisitionIdList.push(test.RequisitionId);
               if (test.Components.length) {
                 test.Components.forEach((component) => {
@@ -360,8 +370,10 @@ export class LabTestsViewReportFormat2Component {
 
         this.isCultureRptLoaded = true;
       }
-
       this.templateReport = _templateReport;
+      if (this.templateReport && this.templateReport.Lookups && this.templateReport.Lookups.DOB) {
+        this.templateReport.Lookups.Age = this.coreService.CalculateAge(this.templateReport.Lookups.DOB);
+      }
       if (!this.templateReport.Signatories) {
         if (this.templateReport.TemplateType == "html") {
           this.defaultSigEmpIdList = this.coreService.GetDefaultHistoCytoEmpIdForLabSignatories();
@@ -372,6 +384,19 @@ export class LabTestsViewReportFormat2Component {
       }
       this.oldName = this.templateReport.Lookups.PrescriberName;
       this.ParseSignatories(this.templateReport.Signatories);
+      // if (_templateReport.Lookups.ReferredById) {
+      //   const referredBy = this.doctorsList.find(
+      //     doctor => doctor.EmployeeId === _templateReport.Lookups.ReferredById
+      //   );
+
+      //   if (referredBy) {
+      //     this.templateReport.Lookups.ReferredBy = referredBy.FullName;
+      //   } else {
+      //     this.templateReport.Lookups.ReferredBy = 'Self';
+      //   }
+      // } else {
+      //   this.templateReport.Lookups.ReferredBy = 'Self';
+      // }
     }
   }
 
@@ -401,7 +426,8 @@ export class LabTestsViewReportFormat2Component {
         _signatories = JSON.stringify(_signatories);
         this.signatories = _signatories;
       } else {
-        signs = JSON.parse(_signatories);
+        if (_signatories)
+          signs = JSON.parse(_signatories);
         if (this.showReportDispatcherSignatory) {
           signs.forEach((item, index) => {
             if (item.EmployeeId == this.CreatedByUser.EmployeeId) {
@@ -420,6 +446,11 @@ export class LabTestsViewReportFormat2Component {
             }
           });
         }
+        if (this.CreateReportForClaim) {
+          signs.forEach(itm => {
+            itm.Show = true;
+          });
+        }
         signs = JSON.stringify(signs);
         this.signatories = signs;
       }
@@ -427,6 +458,11 @@ export class LabTestsViewReportFormat2Component {
       this.showSignatoriesEdit = false;
 
       this.verifierSignatureList = [];
+
+      let signatory = [];
+      if (this.signatories) {
+        signatory = JSON.parse(this.signatories);
+      }
       this.templateReport.VerifiedByList.forEach((ver) => {
         var empl = this.allEmployeeList.find((e) => e.EmployeeId == ver);
         if (empl) {
@@ -437,7 +473,9 @@ export class LabTestsViewReportFormat2Component {
             Show: true,
             SignatoryImageName: empl.SignatoryImageName,
           };
-          this.verifierSignatureList.push(singleEmp);
+          let dup = signatory.find(a => a.EmployeeId == singleEmp.EmployeeId);
+          if (!dup)
+            this.verifierSignatureList.push(singleEmp);
         }
       });
 
@@ -465,6 +503,12 @@ export class LabTestsViewReportFormat2Component {
             }
           }
         }
+      });
+
+      signArr.sort((a, b) => {
+        if (a.DisplaySequence > b.DisplaySequence) return 1;
+        if (a.DisplaySequence < b.DisplaySequence) return -1;
+        return 0;
       });
 
       this.signatories = JSON.stringify(signArr);
@@ -579,11 +623,15 @@ export class LabTestsViewReportFormat2Component {
       //this.templateReport.Lookups.ReportingDate = labReport.ReportingDate = moment(new Date(Math.max.apply(null, reportDates))).format('YYYY-MM-DD HH:mm');
 
       //Post LabSignatories with default User As well
-      if (this.showLoggedInUserSignatory) {
-        var currUser = { EmployeeId: 0, Signature: "" };
+      if (this.showLoggedInUserSignatory || !this.LabSignatoryParameter.EnableSignatoriesEdit) {
+        var currUser = { EmployeeId: 0, Signature: "", SignatoryImageName: "", Show: true, DisplaySequence: 1000 };
         currUser.EmployeeId = this.CreatedByUser.EmployeeId;
         currUser.Signature = this.CreatedByUser.LabSignature;
-        var signObj = JSON.parse(this.signatories);
+        currUser.SignatoryImageName = this.CreatedByUser.SignatoryImageName;
+        currUser.DisplaySequence = this.CreatedByUser.DisplaySequence;
+        let signObj = [];
+        if (this.signatories)
+          signObj = JSON.parse(this.signatories);
         if (
           this.CreatedByUser.LabSignature &&
           this.CreatedByUser.LabSignature.trim() != ""
@@ -642,18 +690,24 @@ export class LabTestsViewReportFormat2Component {
       labReport.Comments = this.templateReport.Comments;
 
       //Update LabSignatories with default User As well
-      if (this.showLoggedInUserSignatory) {
-        var signList = JSON.parse(this.signatories);
-        var createdby = this.templateReport.ReportCreatedBy;
-        var indx = signList.find((x) => x.EmployeeId == createdby);
+      if (this.showLoggedInUserSignatory || !this.LabSignatoryParameter.EnableSignatoriesEdit) {
+        var currUser = { EmployeeId: 0, Signature: "", SignatoryImageName: "", Show: true, DisplaySequence: 1000 };
+        currUser.EmployeeId = this.CreatedByUser.EmployeeId;
+        currUser.Signature = this.CreatedByUser.LabSignature;
+        currUser.SignatoryImageName = this.CreatedByUser.SignatoryImageName;
+        currUser.DisplaySequence = this.CreatedByUser.DisplaySequence;
+        let signObj = [];
 
-        if (!indx) {
-          var currUser = { EmployeeId: 0, Signature: "" };
-          currUser.EmployeeId = this.CreatedByUser.EmployeeId;
-          currUser.Signature = this.CreatedByUser.LabSignature;
-          signList.push(currUser);
+        if (this.signatories)
+          signObj = JSON.parse(this.signatories);
+        var dupSign = signObj.find(
+          (itm) => itm.EmployeeId == currUser.EmployeeId
+        );
+        //if currentLoggedInUser is not in the List then add It
+        if (!dupSign) {
+          signObj.push(currUser);
         }
-        this.signatories = JSON.stringify(signList);
+        this.signatories = JSON.stringify(signObj);
       }
 
       labReport.Signatories = this.signatories;
@@ -673,7 +727,7 @@ export class LabTestsViewReportFormat2Component {
   }
   CheckSignatoriesValidation() {
     //signatories component binds "[]" if empty so length >2 is checked.
-    if (this.signatories && this.signatories.length > 2) {
+    if (this.signatories && this.signatories.length > 2 || !this.LabSignatoryParameter.EnableSignatoriesEdit) {
       return true;
     } else {
       this.coreService.loading = false;
@@ -682,6 +736,15 @@ export class LabTestsViewReportFormat2Component {
     }
   }
   SubmitLabReport() {
+    let sign = [];
+    try {
+      if (this.signatories)
+        sign = JSON.parse(this.signatories);
+    }
+    catch {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Please select valid signature`]);
+      return;
+    }
     this.loading = this.coreService.loading = true;
     if (this.loading) {
       if (this.templateReport.ReportId) {
@@ -729,11 +792,13 @@ export class LabTestsViewReportFormat2Component {
             this.templateReport.IsPrinted = true;
             this.templateReport.PrintedOn = res.Results.PrintedOn;
             this.templateReport.PrintedBy = res.Results.PrintedBy;
+            let emp = this.allEmployeeList.find(a => a.EmployeeId === res.Results.PrintedBy);
+            this.templateReport.PrintedByName = emp ? emp.FullName : "";
             this.templateReport.PrintCount = res.Results.PrintCount;
             this.updatePrintStatus.emit(reqIdList);
             this.print(reqIdList);
           } else {
-            this.msgBoxServ.showMessage("failed", [
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [
               "Error In Updating Print Informations in Report Table",
             ]);
             this.loading = false;
@@ -906,10 +971,16 @@ export class LabTestsViewReportFormat2Component {
     });
   }
 
-  openPopUpBox() {
+  openPopUpBox(mode: 'prescriber' | 'referrer') {
     this.showPopUp = false;
     this.changeDetector.detectChanges();
     this.showPopUp = true;
+    this.updateMode = mode;
+    if (this.updateMode === 'referrer') {
+      this.ExtRefSettings.EnableExternal = true;
+    } else {
+      this.ExtRefSettings.EnableExternal = false;
+    }
   }
 
   closePopUpBox() {
@@ -969,13 +1040,13 @@ export class LabTestsViewReportFormat2Component {
   UpdateDoctor() {
     if (this.requisitionIdList.length) {
       this.labBLService
-        .PutDoctor(this.selectedPrescriberId, this.requisitionIdList)
+        .PutDoctor(this.selectedPrescriberId, this.requisitionIdList, this.updateMode)
         .subscribe((res) => {
           if (res.Status != "OK") {
-            this.msgBoxServ.showMessage("failed", ["Unable to update Doctor"]);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Unable to update Doctor"]);
             console.log(res.ErrorMessage);
           } else {
-            if (this.templateReport.ReportId) {
+            if (this.updateMode === 'prescriber' && this.templateReport.ReportId) {
               this.labBLService
                 .PutDoctorNameInLabReport(
                   this.templateReport.ReportId,
@@ -983,56 +1054,61 @@ export class LabTestsViewReportFormat2Component {
                 )
                 .subscribe((res) => {
                   if (res.Status == "OK") {
-                    this.msgBoxServ.showMessage("success", [
+                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, [
                       "Doctor Name Updated in your Lab Report",
                     ]);
                   } else {
-                    this.msgBoxServ.showMessage("failed", [
+                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [
                       "Doctor Name cannot be Updated in your Lab Report",
                     ]);
                   }
                 });
             }
-            this.templateReport.Lookups.PrescriberName = this.selectedPrescriberName;
-            this.templateReport.Lookups.PrescriberId = this.selectedPrescriberId;
-            this.msgBoxServ.showMessage("success", ["Doctor Updated"]);
+            if (this.updateMode === 'prescriber') {
+              this.templateReport.Lookups.PrescriberName = this.selectedPrescriberName;
+              this.templateReport.Lookups.PrescriberId = this.selectedPrescriberId;
+            } else {
+              this.templateReport.Lookups.ReferredByName = this.selectedPrescriberName;
+              this.templateReport.Lookups.ReferredById = this.selectedPrescriberId;
+            }
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Doctor Updated"]);
           }
         });
     } else {
-      this.msgBoxServ.showMessage("failed", ["There are no requisitions !!"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["There are no requisitions !!"]);
     }
   }
 
-  //makeDoctorEdit() {
-  //  if (this.enableDrEdit) {
-  //    this.enableDrEdit = true;
-  //    this.changeDetector.detectChanges();
-  //    this.enableDrEdit = false;
-  //    if (this.templateReport.ReportId && (this.oldName != this.templateReport.Lookups.ReferredBy)) {
-  //      if (this.templateReport.Lookups.ReferredBy.trim().length == 0) {
-  //        this.templateReport.Lookups.ReferredBy = "SELF";
-  //      }
-  //      this.labBLService.PutDoctorNameInLabReport(this.templateReport.ReportId, this.templateReport.Lookups.ReferredBy)
-  //        .subscribe(res => {
-  //          if (res.Status == "OK") {
-  //            this.oldName = this.templateReport.Lookups.ReferredBy;
-  //            this.msgBoxServ.showMessage("success", ["Doctor Name Updated in your Lab Report"]);
-  //          } else {
-  //            this.msgBoxServ.showMessage("failed", ["Doctor Name cannot be Updated in your Lab Report"]);
-  //          }
-  //        });
-  //    }
-  //  }
-  //  else {
-  //    this.enableDrEdit = true;
+  // makeDoctorEdit() {
+  //   if (this.enableDrEdit) {
+  //     this.enableDrEdit = true;
+  //     this.changeDetector.detectChanges();
+  //     this.enableDrEdit = false;
+  //     if (this.templateReport.ReportId && (this.oldName != this.templateReport.Lookups.ReferredBy)) {
+  //       if (this.templateReport.Lookups.ReferredBy.trim().length == 0) {
+  //         this.templateReport.Lookups.ReferredBy = "SELF";
+  //       }
+  //       this.labBLService.PutDoctorNameInLabReport(this.templateReport.ReportId, this.templateReport.Lookups.ReferredBy)
+  //         .subscribe(res => {
+  //           if (res.Status == "OK") {
+  //             this.oldName = this.templateReport.Lookups.ReferredBy;
+  //             this.msgBoxServ.showMessage("success", ["Doctor Name Updated in your Lab Report"]);
+  //           } else {
+  //             this.msgBoxServ.showMessage("failed", ["Doctor Name cannot be Updated in your Lab Report"]);
+  //           }
+  //         });
+  //     }
+  //   }
+  //   else {
+  //     this.enableDrEdit = true;
 
-  //    //Important to use detect Change otherwise cannot give the focus to input
-  //    this.changeDetector.detectChanges();
-  //    document.getElementById("docNameTextBox").blur();
-  //    document.getElementById("docNameTextBox").focus();
+  //     //Important to use detect Change otherwise cannot give the focus to input
+  //     this.changeDetector.detectChanges();
+  //     document.getElementById("docNameTextBox").blur();
+  //     document.getElementById("docNameTextBox").focus();
 
-  //  }
-  //}
+  //   }
+  // }
 
   //Code for Selective Printing Starts Here
   //called when user clicks the selective Print on the testname with More than one component in it
@@ -1277,11 +1353,16 @@ export class LabTestsViewReportFormat2Component {
       ).format("YYYY-MM-DD HH:mm");
       this.signatories = JSON.stringify(this.templateReport.Signatories);
 
-      if (this.showLoggedInUserSignatory) {
-        var currUser = { EmployeeId: 0, Signature: "" };
+      if (this.showLoggedInUserSignatory || !this.LabSignatoryParameter.EnableSignatoriesEdit) {
+        var currUser = { EmployeeId: 0, Signature: "", SignatoryImageName: "", Show: true, DisplaySequence: 1000 };
         currUser.EmployeeId = this.CreatedByUser.EmployeeId;
         currUser.Signature = this.CreatedByUser.LabSignature;
-        var signObj = JSON.parse(this.signatories);
+        currUser.SignatoryImageName = this.CreatedByUser.SignatoryImageName;
+        currUser.DisplaySequence = this.CreatedByUser.DisplaySequence;
+        let signObj = [];
+
+        if (this.signatories)
+          signObj = JSON.parse(this.signatories);
         var dupSign = signObj.find(
           (itm) => itm.EmployeeId == currUser.EmployeeId
         );
@@ -1298,15 +1379,18 @@ export class LabTestsViewReportFormat2Component {
       labReport.PrescriberName = this.templateReport.Lookups.PrescriberName;
       labReport.Comments = this.templateReport.Comments;
       labReport.VerificationEnabled = this.verificationEnabled;
+      labReport.PreVerificationEnabled = this.PreVerificationEnabled;
+
 
       this.labBLService.VerifyAllLabTests(labReport).subscribe((res) => {
         if (res.Status == "OK") {
-          if (this.routeAfterVerification && this.routeAfterVerification.trim() && this.routeAfterVerification.trim().length > 0) {
-            let route = '/Lab/' + this.routeAfterVerification;
-            this.loading = false;
-            this.router.navigate([route]);
-            return;
-          }
+          // if (this.routeAfterVerification && this.routeAfterVerification.trim() && this.routeAfterVerification.trim().length > 0) {
+          //   let route = '/Lab/' + this.routeAfterVerification;
+          //   this.loading = false;
+          //   this.router.navigate([route]);
+          //   return;
+          // }
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, [`Report is successfully verified...`]);
           this.callbackAddUpdate.emit({ verified: true });
           this.loading = false;
         } else {
@@ -1400,6 +1484,11 @@ export class LabTestsViewReportFormat2Component {
       this.LabReportDisplayParameter = JSON.parse(param.ParameterValue);
     else
       this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please enter parameter values for LabReportDisplaySettings"]);
+
+    let signatoryParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "LAB" && a.ParameterName === "LabSignatorySettings");
+    if (signatoryParam) {
+      this.LabSignatoryParameter = JSON.parse(signatoryParam.ParameterValue);
+    }
   }
 
 }

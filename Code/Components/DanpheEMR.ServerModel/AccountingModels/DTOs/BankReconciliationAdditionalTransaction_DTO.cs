@@ -10,7 +10,7 @@ namespace DanpheEMR.ServerModel.AccountingModels.DTOs
     {
         public string CategoryName { get; set; }
         public int LedgerId { get; set; }
-        public int SubLedgerId { get; set; }
+        public int? SubLedgerId { get; set; }
         public bool DrCr { get; set; }
         public decimal Amount { get; set; }
         public string Description { get; set; }

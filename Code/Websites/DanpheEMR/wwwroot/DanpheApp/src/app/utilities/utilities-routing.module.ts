@@ -3,6 +3,7 @@ import { RouterModule } from "@angular/router";
 import { PageNotFound } from "../404-error/404-not-found.component";
 import { AuthGuardService } from "../security/shared/auth-guard.service";
 import { ChangeBillingCounterComponent } from "./change-billing-counter/change-billing-counter.component";
+import { ChangePolicyNumberComponent } from "./change-policy-number/change-policy-number.component";
 import { ChangeSchemePriceCategoryComponent } from "./change-visit-scheme/change-scheme-price-category.component";
 import { OrganizationDepositComponent } from "./organization-deposit/organization-deposit/organization-deposit.component";
 import { SchemeRefundListComponent } from "./scheme-refund/list/scheme-refund-list.component";
@@ -18,7 +19,8 @@ import { UtilitiesMainComponent } from "./utilities-main.component";
           { path: 'SchemeRefund', component: SchemeRefundListComponent, canActivate: [AuthGuardService, ActivateBillingCounterGuardService], data: { currentRoute: 'Utilities/SchemeRefund' } },
           { path: 'ChangeVisitScheme', component: ChangeSchemePriceCategoryComponent, canActivate: [AuthGuardService] },
           { path: 'ChangeBillingCounter', component: ChangeBillingCounterComponent, canActivate: [AuthGuardService] },
-          { path: 'OrganizationDeposit', component: OrganizationDepositComponent, canActivate: [AuthGuardService, ActivateBillingCounterGuardService], data: { currentRoute: 'Utilities/OrganizationDeposit' } }
+          { path: 'OrganizationDeposit', component: OrganizationDepositComponent, canActivate: [AuthGuardService, ActivateBillingCounterGuardService], data: { currentRoute: 'Utilities/OrganizationDeposit' } },
+          { path: 'ChangePolicyNumber', component: ChangePolicyNumberComponent, canActivate: [AuthGuardService, ActivateBillingCounterGuardService], data: { currentRoute: 'Utilities/ChangePolicyNumber' } }
         ]
       },
       { path: "**", component: PageNotFound }

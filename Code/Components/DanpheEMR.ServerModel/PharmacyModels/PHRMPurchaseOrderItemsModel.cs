@@ -37,5 +37,9 @@ namespace DanpheEMR.ServerModel
         public int? CancelledBy { get; set; }
         public DateTime? CancelledOn { get; set; }
         public string CancelRemarks { get; set; }
+        public Boolean IsPacking { get; set; }
+        public decimal PackingQty { get; set; }
+        public int? PackingTypeId { get; set; }
+        public decimal StripRate { get; set; }
     }
 }

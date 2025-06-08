@@ -211,7 +211,7 @@
                       </div>
                     </div>
                     <div *ngIf="comp.IsSelected==true">
-                      <i *ngIf="comp.IsDirty('Value') && !comp.IsGroupValid" class="fa fa-info-circle icn-group"
+                      <i *ngIf="!comp.IsGroupValid" class="fa fa-info-circle icn-group"
                          title="{{comp.ErrorMessage}}"></i>
                     </div>
                   </td>

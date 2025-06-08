@@ -26,6 +26,22 @@
   .duplication-item {
     background-color: yellow !important;
   }
+
+  .flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .align-items-center {
+    display: flex;
+    align-items: center;
+  }
+
+  .ml-2 {
+    margin-left: 0.5rem;
+    margin-top: 1rem;
+  }
 </style>
 
 <div style="width: 100%;">
@@ -40,7 +56,7 @@
           {{currPatVisitContext.BedFeatureName}}/{{currPatVisitContext.BedCode}}
         </div>
         <div *ngIf="currPatVisitContext && currPatVisitContext.PerformerName" class="col-md-3">
-          Admitting Docor: {{currPatVisitContext.PerformerName}}
+          Admitting Doctor: {{currPatVisitContext.PerformerName}}
         </div>
         <div *ngIf="currPatVisitContext && currPatVisitContext.AdmissionDate" class="col-md-4">
           Admitted On: <date-lbl [value]="currPatVisitContext.AdmissionDate" [show-time]="true"></date-lbl>
@@ -49,35 +65,70 @@
     </div>
   </div>
   <div class="row">
-    <div class="col-md-2" *ngIf="!coreService.singleLabType">
-      Lab Type:
-      <select [(ngModel)]="LabTypeName" name="lab_type" id="lab_type" (change)="OnLabTypeChange()">
-        <option *ngFor="let labtype of coreService.labTypes" value="{{labtype.LabTypeName}}">{{labtype.DisplayName}}</option>
-      </select>
-    </div>
-    <!-- <div class="col-md-3">
+    <div class="col-md-12">
+      <div class="col-md-2" *ngIf="!coreService.singleLabType">
+        Lab Type:
+        <select [(ngModel)]="LabTypeName" name="lab_type" id="lab_type" (change)="OnLabTypeChange()">
+          <option *ngFor="let labtype of coreService.labTypes" value="{{labtype.LabTypeName}}">{{labtype.DisplayName}}</option>
+        </select>
+      </div>
+      <!-- <div class="col-md-3">
       <scheme-select [selected-id]="selectedMembershipTypeId" [show-community]="false" [disabled]="true">
       </scheme-select>
     </div>
     <div class="col-md-3">
       <price-category-select [selected-priceCategoryId]="selectedPriceCategoryId" [disable]="true"></price-category-select>
     </div> -->
-    <div class="col-md-8" style="padding:10px;"
-         *ngIf="(SchemePriCeCategoryFromVisit && SchemePriCeCategoryFromVisit.SchemeId && SchemePriCeCategoryFromVisit.PriceCategoryId)">
-      <scheme-pricecategory-select (on-change)="OnSchemePriceCategoryChanged($event)" [service-billing-context]="serviceBillingContext"
-                                   [selected-scheme-priceCategory]="SchemePriCeCategoryFromVisit" [disable-selection]="true">
-      </scheme-pricecategory-select>
+      <div class="col-md-8" style="padding:10px;"
+           *ngIf="(SchemePriCeCategoryFromVisit && SchemePriCeCategoryFromVisit.SchemeId && SchemePriCeCategoryFromVisit.PriceCategoryId)">
+        <scheme-pricecategory-select (on-change)="OnSchemePriceCategoryChanged($event)" [service-billing-context]="serviceBillingContext"
+                                     [selected-scheme-priceCategory]="SchemePriCeCategoryFromVisit" [disable-selection]="true">
+        </scheme-pricecategory-select>
+      </div>
     </div>
-    <div class="col-md-4" style="padding:10px !important;">
-      Requesting Department:
-      <select [(ngModel)]="requestingDepartmentId" [disabled]="true">
-        <option *ngFor="let dept of departmentsList" value="{{dept.DepartmentId}}">
-          {{dept.DepartmentName}}
-        </option>
-      </select>
+    <div class="col-md-12 flex-between">
+      <div class="col-md-4" style="padding:10px !important;">
+        Requesting Department:
+        <select [(ngModel)]="requestingDepartmentId" [disabled]="true">
+          <option *ngFor="let dept of departmentsList" value="{{dept.DepartmentId}}">
+            {{dept.DepartmentName}}
+          </option>
+        </select>
+      </div>
+      <div *ngIf="hasPackageBillingPermission" class="col-md-4 align-items-center d-flex">
+        <input type="checkbox" name="do-package-billing" id="id_input_do_package_billing" [(ngModel)]="IsPackageBilling"
+               (ngModelChange)="HandlePackageBillingChange()" style="zoom:2;" (keyup.enter)="GoToNextInput('id_Search_Package')">
+        <label for="id_input_do_package_billing" class="ml-2">Enable Package Billing</label>
+      </div>
+    </div>
+    <div class="col-md-12">
+      <div class="row" *ngIf="IsPackageBilling" style="padding: 0px 15px;">
+        <div
+             style="padding: 0px 0px 0px 20px; background-color:rgb(75 126 237); color: white; font-weight: bold; height: 40px; font-weight: 15px;">
+          <p style="padding: 10px; font-size: 17px;" *ngIf="!this.SelectedPackage.BillingPackageName">Package Billing Enabled </p>
+          <p style="padding: 10px; font-size: 17px;" *ngIf="this.SelectedPackage.BillingPackageName">
+            <strong>({{this.SelectedPackage.BillingPackageName}}) Package Is Selected</strong>
+        </div>
+        <div class="row col-md-6" style="display:flex;">
+          <div class="col-md-3" style=" display: flex; align-items: center;">
+            Search Packages:
+          </div>
+          <div class="col-md-6" style="padding:10px !important; align-items: center;">
+            <div class="form-group autocomplete-item">
+              <input id="id_Search_Package" (keyup.enter)=" SetFocusById();AddNewBillTxnItemRow();" class="form-control cstm-form-control"
+                     danphe-auto-complete
+                     autocomplete="off"
+                     [list-formatter]="PackageFormatter" [source]="ServicePackages" placeholder="Select Package"
+                     display-property-name="BillingPackageName" value-property-name="null" [min-chars]="1" match-formatted="true"
+                     (valueChanged)="OnPackageSelected($event)"
+                     max-num-list="20" onClick="this.select();" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="row" style="margin-top: 1rem;" *ngIf="this.BillingDetails">
+  <div class="row" style="margin-top: 1rem;" *ngIf="this.BillingDetails && IsBillingDetailsShow">
     <div class="col-md-2">
       Deposit Total: &nbsp; &nbsp; {{this.BillingDetails.TotalDepositAmount}}
     </div>
@@ -116,6 +167,7 @@
                        formControlName="ServiceDepartmentId"
                        [ngClass]="{'border-red': row.IsDirty('ServiceDepartmentId') && !row.IsValid('ServiceDepartmentId','required'), 'border-red': !row.IsValidSelDepartment }"
                        [(ngModel)]="selectedServDepts[i]" [list-formatter]="ServiceDeptListFormatter" [source]="serviceDeptList"
+                       [attr.disabled]="row.IsPackageItem?true:null"
                        placeholder="Enter Department" display-property-name="ServiceDepartmentName" value-property-name="null"
                        (focusout)="ServiceDeptOnChange(i)" onClick="this.select();" max-num-list="10" />
                 <div class="color-red font-sm" *ngIf="row.IsDirty('ServiceDepartmentId')" [hidden]="row.IsValidSelDepartment">
@@ -129,6 +181,7 @@
                        [source]="doctorsList"
                        [ngClass]="{'border-red': row.IsDirty('PrescriberId') && !row.IsValid('PrescriberId','required'), 'border-red': !row.IsValidSelPrescriberDr }"
                        [list-formatter]="DoctorListFormatter" placeholder="Enter Name" display-property-name="FullName" value-property-name="null"
+                       [attr.disabled]="row.IsPackageItem?true:null"
                        match-formatted="true" (focusout)="AssignRequestedByDoctor(i)" onClick="this.select();" max-num-list="10"
                        title="selectedRequestedByDr[i]" formControlName="PrescriberId" />
                 <div class="color-red font-sm" *ngIf="row.IsDirty('PrescriberId')" [hidden]="row.IsValid('PrescriberId','required')">
@@ -141,9 +194,12 @@
                 <input class="form-control cstm-form-control" danphe-auto-complete formControlName="PerformerId"
                        [ngClass]="{'border-red': row.IsDirty('PerformerId') && !row.IsValid('PerformerId','required'), 'border-red': !row.IsvalidSelPerformerDr }"
                        [(ngModel)]="selectedAssignedToDr[i]" [source]="row.AssignedDoctorList" [list-formatter]="DoctorListFormatter"
-                       placeholder="Enter Name" display-property-name="FullName" value-property-name="null" match-formatted="true"
+                       [attr.disabled]="row.DisableAssignedDrField?true:null" placeholder="Enter Name"
+                       display-property-name="FullName"
+                       value-property-name="null"
+                       match-formatted="true"
                        (focusout)="AssignSelectedDoctor(i)" onClick="this.select();" max-num-list="10" (focusin)="assignDocterlist(row,i)" />
-                <div class="color-red font-sm" *ngIf="row.IsDirty('PerformerId')" [hidden]="row.IsValid('PerformerId','required')">
+                <div class="color-red font-sm" *ngIf="row.IsDoctorMandatory" [hidden]="row.IsValid('PerformerId','required')">
                   Performer is mandatory
                 </div>
               </form>
@@ -162,6 +218,7 @@
                          autocomplete="off" formControlName="ItemName"
                          [ngClass]="{'border-red': row.IsDirty('ItemName') && !row.IsValid('ItemName','required'), 'border-red': !row.IsValidSelItemName}"
                          [(ngModel)]="selectedItems[i]" [list-formatter]="ItemsListFormatter" [source]="row.ItemList" placeholder="Enter Item Name"
+                         [attr.disabled]="row.IsPackageItem?true:null"
                          display-property-name="ItemName" value-property-name="null" [min-chars]="1" match-formatted="true"
                          (valueChanged)="AssignSelectedItem(i)"
                          max-num-list="20" onClick="this.select();" id="{{ 'items-box'+i }}" />
@@ -186,7 +243,8 @@
             <td>
               <form [formGroup]="row.BillingTransactionItemValidator">
                 <input [(ngModel)]="row.Quantity" style="width: 70px;" min="0" class="form-control cstm-form-control" name="quantity" type="number"
-                       onClick="this.select();" onwheel="this.blur();" (ngModelChange)="calculateTotalAmount()" formControlName="Quantity" />
+                       [attr.disabled]="row.IsPackageItem?true:null" onClick="this.select();" onwheel="this.blur();"
+                       (ngModelChange)="calculateTotalAmount()" formControlName="Quantity" />
                 <div class="color-red font-sm" *ngIf="row.IsDirty('Quantity')" [hidden]="row.IsValid('Quantity','invalidNumber')">
                   Enter valid number.
                 </div>
@@ -196,7 +254,9 @@
             <td *ngIf="ShowHidePrice">
               <form [formGroup]="row.BillingTransactionItemValidator">
                 <input [(ngModel)]="row.Price" style="width:90px" min="0" formControlName="Price" onClick="this.select();" onwheel="this.blur();"
-                       class="form-control cstm-form-control" name="price" type="number" value="row.Price">
+                       [attr.disabled]="row.IsPackageItem || !row.IsPriceChangeAllowed ?true:null" class="form-control cstm-form-control" name="price"
+                       type="number"
+                       value="row.Price">
                 <div class="color-red font-sm" *ngIf="row.IsDirty('Price')" [hidden]="row.IsValid('Price','invalidNumber')">Enter valid number.</div>
               </form>
             </td>
@@ -217,10 +277,49 @@
   <!--form ends here-->
 
   <div class="form-group">
-    <div class="col-sm-offset-5 col-sm-5">
-      <input type="submit" id="id_btn_itemRequest_nursing_ip" class="btn btn-primary" [disabled]="loading" value="Request"
-             (click)="loading=true;SubmitBillingTransaction();" />
-      <!--<button _ngcontent-c9="" class="btn btn-cancel margin-7-hr" [disabled]="loading"  type="button" (click)="Cancel();">Cancel </button>-->
+    <div class="col-sm-offset-5 col-sm-7">
+      <input DanpheConfirmationDialog
+             id="id_btn_itemRequest_print"
+             type="submit"
+             [title]="confirmationTitle"
+             [message]="confirmationMessage"
+             (confirm)="HandlePrintConfirm()"
+             (cancel)="HandlePrintCancel()"
+             style="font-weight: bold;" class="btn green btn-success"
+             [value]="'Print Slip'"
+             [disabled]="loading" />
+      <input DanpheConfirmationDialog
+             id="id_btn_itemRequest_nursing_ip"
+             type="submit"
+             [title]="confirmationTitle"
+             [message]="confirmationMessage"
+             (confirm)="handleConfirm()"
+             (cancel)="handleCancel()"
+             style="font-weight: bold; margin-right: 10px;" class="btn green btn-success"
+             [value]="'Request'"
+             [disabled]="loading" />
     </div>
   </div>
 </div>
+
+<!--Start: provisional slip Print Popup-->
+<div class="popup-static portlet box portlet-fullscreen custom_modal" *ngIf="ShowPrintProvisionalSlip">
+  <div class="portlet-body form">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        <div class="modelbox-div clearfix" style="padding: 20px;">
+          <a class="btn btn-danger del-btn" (click)="CloseProvisionalSlip()">X</a>
+          <div>
+            <bil-print-provisional-slip *ngIf="ShowPrintProvisionalSlip" [PatientId]="patientId"
+                                        [ProvFiscalYrId]="ProvisionalReceiptInputs.ProvFiscalYrId"
+                                        [ProvReceiptNo]="ProvisionalReceiptInputs.ProvReceiptNo"
+                                        [visitType]="ProvisionalReceiptInputs.visitType"
+                                        [schemeId]="SchemePriCeCategoryFromVisit.SchemeId">
+            </bil-print-provisional-slip>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!--End: provisional slip Print Popup-->

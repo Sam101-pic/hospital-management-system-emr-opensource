@@ -1,7 +1,5 @@
 //This grid is to show list of Lab Report Templates
-import * as moment from 'moment/moment';
 import { SecurityService } from '../../../security/shared/security.service';
-import { CommonFunctions } from '../../../shared/common.functions';
 
 export default class LabLISGridColumnSettings {
 
@@ -16,20 +14,48 @@ export default class LabLISGridColumnSettings {
         { headerName: "Component Name", field: "ComponentName", width: 140 },
         { headerName: "LIS Component Name", field: "LISComponentName", width: 140 },
         { headerName: "Conversion Factor", field: "ConversionFactor", width: 80 },
+        { headerName: "IsActive", width: 50, cellRenderer: LabLISGridColumnSettings.GetIsActive },
         {
             headerName: "Actions",
             width: 100,
-            template:
-                `<a danphe-grid-action="edit" class="grid-action">
-                Edit
-                </a>
-                <a danphe-grid-action="delete" class="grid-action">
-                Remove
-                </a>
-                `
+            cellRenderer: LabLISGridColumnSettings.GetLISMappingActions
         }
 
     ];
 
+    public static GetLISMappingActions(param) {
+        let template = `<a danphe-grid-action="edit" class="grid-action">
+        Edit
+        </a>`;
+        if (param.data.IsActive) {
+            template += `
+            <a danphe-grid-action="delete" class="grid-action">
+            Deactivate
+            </a>`
+        }
+        else {
+            template += `
+            <a danphe-grid-action="activate" class="grid-action">
+            Activate
+            </a>`
+        }
+        return template;
+    }
 
+    public static GetIsActive(param) {
+        let template = ``;
+        if (param.data.IsActive) {
+            template += `
+            <p style="color:green;font-weight: bold;">
+            YES
+            </p>`
+        }
+        else {
+            template += `
+            <p style="color:red;font-weight: bold;">
+            NO
+            </p>`
+        }
+        return template;
+    }
 }

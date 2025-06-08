@@ -43,6 +43,8 @@ namespace DanpheEMR.ServerModel
         [NotMapped]
         public int StockId { get; set; }
         public List<PHRMGoodsReceiptItemsModel> SelectedGRItems = new List<PHRMGoodsReceiptItemsModel>();
+        [NotMapped]
+        public string ItemName { get; set; }
 
     }
 }

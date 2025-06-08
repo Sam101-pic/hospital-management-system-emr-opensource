@@ -56,6 +56,8 @@ export class BankReconcliationModelNew {
     public ExtraTransactions: Array<BankReconciliationCategory> = new Array<BankReconciliationCategory>();
     public PartySubLedgerId: number = 0;
     public PartySubLedgerName: string = "";
+    public SubLedgerId: number = null;
+    public TransactionItemId: number = null;
 }
 export class BankReconcliationModelVM {
     public TransactionDate: string = '';

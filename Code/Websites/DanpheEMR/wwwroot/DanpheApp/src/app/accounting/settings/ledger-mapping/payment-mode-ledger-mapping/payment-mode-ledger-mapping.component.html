@@ -133,7 +133,7 @@
             <table class="table table-striped table-hover custom_table padLess_table" style="width: 150vw !important; ">
                 <thead style="text-align: center;">
                     <tr>
-                        <th> <label class="mt-checkbox mt-checkbox-outline" style="margin: 10px !important;">
+                        <th> <label class="mt-checkbox mt-checkbox-outline">
                                 <input id="isActive" type="checkbox" [(ngModel)]="isSelectAll" [ngModelOptions]="{standalone: true}"
                                        (ngModelChange)="SelectAllChkOnChange()" />
                                 <span></span> </label>
@@ -150,7 +150,7 @@
                 </thead>
                 <tbody>
                     <tr *ngFor="let led of paymentModeList; let i = index">
-                        <td style="text-align: center;">
+                        <td style="margin-left:10px;">
                             <label [ngClass]="{'mapped': led.IsMapped==true, 'mapped-outline': led.IsMapped==true, 'not-mapped': led.IsMapped==false, 'not-mapped-outline': led.IsMapped==false}"
                                    class="mt-checkbox mt-checkbox-outline">
                                 <input id="isActive" type="checkbox" [(ngModel)]="led.IsSelected" [ngModelOptions]="{standalone: true}"

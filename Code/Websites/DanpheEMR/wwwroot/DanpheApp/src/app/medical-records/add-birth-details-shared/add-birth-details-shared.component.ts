@@ -1,16 +1,13 @@
-import { Input, Output } from '@angular/core';
-import { Component, ChangeDetectorRef } from '@angular/core'
-import { EventEmitter } from '@angular/core';
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CoreService } from '../../core/shared/core.service';
 import { BabyBirthDetails } from '../../adt/shared/baby-birth-details.model';
+import { CoreService } from '../../core/shared/core.service';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 
+import { Employee } from '../../employee/shared/employee.model';
+import { DanpheCache, MasterType } from '../../shared/danphe-cache-service-utility/cache-services';
 import { MedicalRecordsMasterDataVM } from '../shared/DischargeMasterData.model';
 import { MR_BLService } from '../shared/mr.bl.service';
-import { Employee } from '../../employee/shared/employee.model';
-import { MasterType } from '../../shared/danphe-cache-service-utility/cache-services';
-import { DanpheCache } from '../../shared/danphe-cache-service-utility/cache-services';
 
 @Component({
     selector: 'add-birth-details-shared',
@@ -312,6 +309,9 @@ export class AddBirthDetailsSharedComponent {
 
     public RemoveCurrentBirthDetail(brthIndex: number) {
         this.BabyBirthDetails.splice(brthIndex, 1);
+        let NewlyBabyBirthDetails: Array<BabyBirthDetails> = new Array<BabyBirthDetails>();
+        NewlyBabyBirthDetails = this.BabyBirthDetails;
+        this.emitter1.emit(NewlyBabyBirthDetails);
     }
 
     public ResetBirthDetail() {

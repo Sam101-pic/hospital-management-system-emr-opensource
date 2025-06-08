@@ -84,6 +84,7 @@ namespace DanpheEMR.ServerModel
         public int? SubLedgerId { get; set; }
         [NotMapped]
         public string SubLedgerName { get; set; }
+        public bool IsSystemDefault { get; set; }
     }
     
 }

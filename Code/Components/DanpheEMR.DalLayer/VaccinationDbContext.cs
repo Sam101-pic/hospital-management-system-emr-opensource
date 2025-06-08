@@ -27,6 +27,7 @@ namespace DanpheEMR.DalLayer
         public DbSet<DepartmentModel> Departments { get; set; }//Sud:2-Oct'21 To Create a Visit.
         public DbSet<VisitModel> Visits { get; set; }
         public DbSet<RbacUser> RbacUsers { get; set; }
+        public DbSet<PriceCategoryModel> PriceCategories { get; set; }
 
         public VaccinationDbContext(string conn) : base(conn)
         {
@@ -50,6 +51,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<DepartmentModel>().ToTable("MST_Department");
             modelBuilder.Entity<VisitModel>().ToTable("PAT_PatientVisits");
             modelBuilder.Entity<RbacUser>().ToTable("RBAC_User");
+            modelBuilder.Entity<PriceCategoryModel>().ToTable("BIL_CFG_PriceCategory");
         }
     }
 }

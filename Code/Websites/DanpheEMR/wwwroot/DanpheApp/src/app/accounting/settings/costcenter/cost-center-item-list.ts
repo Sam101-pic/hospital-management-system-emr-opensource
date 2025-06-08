@@ -1,4 +1,5 @@
 ﻿import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
+import { SecurityService } from "../../../security/shared/security.service";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
@@ -33,7 +34,8 @@ export class CostCenterItemListComponent {
     constructor(public accountingSettingsBLService: AccountingSettingsBLService,
         public msgBox: MessageboxService,
         public changeDetector: ChangeDetectorRef, public msgBoxServ: MessageboxService,
-        public accountingService: AccountingService
+        public accountingService: AccountingService,
+        public securityServ: SecurityService,
     ) {
         this.costCenterGridColumns = GridColumnSettings.costCenterList;
         this.GetCostCenters();
@@ -130,6 +132,7 @@ export class CostCenterItemListComponent {
     }
     AddCostCenter(): void {
         if (this.CheckValidation()) {
+            this.CostCenter.HospitalId = this.securityServ.AccHospitalInfo.ActiveHospitalId;
             this.loading = true;
             this.accountingSettingsBLService.AddCostCenter(this.CostCenter).finally(() => {
                 this.loading = false;

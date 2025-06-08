@@ -3021,23 +3021,24 @@ namespace DanpheEMR.Controllers
                 {
 
                     var requestDetails = (from DI in phrmdbcontext.StoreDispatchItems.Where(d => d.RequisitionId == requisitionId)
-                                          from R in phrmdbcontext.StoreRequisition.Where(r => r.RequisitionId == DI.RequisitionId)
-                                          from CreatedBy in phrmdbcontext.Employees.Where(e => e.EmployeeId == R.CreatedBy)
-                                          from DispatchedBy in phrmdbcontext.Employees.Where(e => e.EmployeeId == DI.CreatedBy)
-                                          from ReceivedBy in phrmdbcontext.Employees.Where(e => e.EmployeeId == DI.ReceivedById).DefaultIfEmpty()
+                                          join R in phrmdbcontext.StoreRequisition on DI.RequisitionId equals R.RequisitionId
+                                          join CreatedBy in phrmdbcontext.Employees on R.CreatedBy equals CreatedBy.EmployeeId
+                                          join DispatchedBy in phrmdbcontext.Employees on DI.CreatedBy equals DispatchedBy.EmployeeId
+                                          join ReceivedBy in phrmdbcontext.Employees on DI.ReceivedById equals ReceivedBy.EmployeeId
                                           group new { DI, R, CreatedBy, DispatchedBy, ReceivedBy } by DI.DispatchId into D
                                           select new
                                           {
                                               DispatchId = D.Key,
                                               RequisitionId = D.FirstOrDefault().R.RequisitionId,
-                                              CreatedByName = D.FirstOrDefault().CreatedBy.FullName,
+                                              RequisitionNo = D.FirstOrDefault().R.RequisitionNo,
+                                              CreatedByName = D.FirstOrDefault().CreatedBy != null ? D.FirstOrDefault().CreatedBy.FullName : null,
                                               CreatedOn = D.FirstOrDefault().DI.DispatchedDate,
-                                              DispatchedByName = D.FirstOrDefault().DispatchedBy.FullName,
-                                              ReceivedBy = D.FirstOrDefault().ReceivedBy.FullName
+                                              DispatchedByName = D.FirstOrDefault().DispatchedBy != null ? D.FirstOrDefault().DispatchedBy.FullName : null,
+                                              ReceivedBy = D.FirstOrDefault().ReceivedBy != null ? D.FirstOrDefault().ReceivedBy.FullName : null
                                           }).ToList();
 
                     responseData.Results = requestDetails;
-                    responseData.Status = "OK";
+                    responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
                 }
                 #endregion
                 #region //Get dIspatch Details
@@ -3053,7 +3054,7 @@ namespace DanpheEMR.Controllers
                                            join generic in phrmdbcontext.PHRMGenericModel on item.GenericId equals generic.GenericId
                                            join reqitm in phrmdbcontext.StoreRequisitionItems on disp.RequisitionItemId equals reqitm.RequisitionItemId
                                            join emp in phrmdbcontext.Employees on disp.CreatedBy equals emp.EmployeeId
-                                           from uom in phrmdbcontext.PHRMUnitOfMeasurement.Where(U => U.UOMId == item.UOMId).DefaultIfEmpty()
+                                           join uom in phrmdbcontext.PHRMUnitOfMeasurement on item.UOMId equals uom.UOMId
                                            select new
                                            {
                                                disp.DispatchId,
@@ -3402,7 +3403,7 @@ namespace DanpheEMR.Controllers
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             try
             {
-                GetPODetailByPOIdViewModel purchaseOrderVM =  phrmDBContext.GetPODetailsByPOIdAsync(PurchaseOrderId);
+                GetPODetailByPOIdViewModel purchaseOrderVM = phrmDBContext.GetPODetailsByPOIdAsync(PurchaseOrderId);
                 responseData.Status = "OK";
                 responseData.Results = purchaseOrderVM;
             }
@@ -3464,7 +3465,7 @@ namespace DanpheEMR.Controllers
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             try
             {
-                GetMainStoreIncomingStockViewModel incomingStockListVm =  phrmDBContext.GetMainStoreIncomingStock(FromDate, ToDate);
+                GetMainStoreIncomingStockViewModel incomingStockListVm = phrmDBContext.GetMainStoreIncomingStock(FromDate, ToDate);
                 responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
                 responseData.Results = incomingStockListVm;
             }
@@ -3484,7 +3485,7 @@ namespace DanpheEMR.Controllers
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             try
             {
-                GetMainStoreIncomingStockByIdViewModel dispatchDetailVM =  phrmDBContext.GetMainStoreIncomingStockById(DispatchId);
+                GetMainStoreIncomingStockByIdViewModel dispatchDetailVM = phrmDBContext.GetMainStoreIncomingStockById(DispatchId);
                 responseData.Status = "OK";
                 responseData.Results = dispatchDetailVM;
             }
@@ -3739,28 +3740,28 @@ namespace DanpheEMR.Controllers
 
 
         // POST api/values
-        #region:POST: Direct Dispatch
-        [HttpPost]
-        [Route("~/api/Pharmacy/PostDirectDispatch")]
-        public async Task<IActionResult> PostDirectDispatch([FromBody] List<PHRMDispatchItemsModel> dispatchedItems)
-        {
-            var responseData = new DanpheHTTPResponse<object>();
-            var phrmDbContext = new PharmacyDbContext(connString);
-            var currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
-            try
-            {
-                responseData.Results = await PharmacyBL.DirectDispatch(dispatchedItems, phrmDbContext, currentUser);
-                responseData.Status = "OK";
-            }
-            catch (Exception ex)
-            {
-                responseData.Status = "Failed";
-                responseData.ErrorMessage = ex.ToString();
+        /*   #region:POST: Direct Dispatch
+           [HttpPost]
+           [Route("~/api/Pharmacy/PostDirectDispatch")]
+           public async Task<IActionResult> PostDirectDispatch([FromBody] List<PHRMDispatchItemsModel> dispatchedItems)
+           {
+               var responseData = new DanpheHTTPResponse<object>();
+               var phrmDbContext = new PharmacyDbContext(connString);
+               var currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+               try
+               {
+                   responseData.Results = await PharmacyBL.DirectDispatch(dispatchedItems, phrmDbContext, currentUser);
+                   responseData.Status = "OK";
+               }
+               catch (Exception ex)
+               {
+                   responseData.Status = "Failed";
+                   responseData.ErrorMessage = ex.ToString();
 
-            }
-            return Ok(responseData);
-        }
-        #endregion: POST: Direct Dispatch
+               }
+               return Ok(responseData);
+           }
+           #endregion: POST: Direct Dispatch*/
         [HttpPost]
         public string Post()
         {
@@ -4137,7 +4138,7 @@ namespace DanpheEMR.Controllers
                         grViewModelData.goodReceipt.FiscalYearId = PharmacyBL.GetFiscalYearGoodsReceipt(phrmdbcontext, grViewModelData.goodReceipt.GoodReceiptDate).FiscalYearId;
                         grViewModelData.goodReceipt.GoodReceiptPrintId = PharmacyBL.GetGoodReceiptPrintNo(phrmdbcontext, grViewModelData.goodReceipt.FiscalYearId);
 
-                        bool flag = PharmacyBL.GoodReceiptTransaction(grViewModelData, phrmdbcontext, currentUser);
+                        bool flag = false; //PharmacyBL.GoodReceiptTransaction(grViewModelData, phrmdbcontext, currentUser);
                         if (flag)
                         {
                             responseData.Status = "OK";
@@ -4796,9 +4797,9 @@ namespace DanpheEMR.Controllers
                 {
 
                     PHRMReturnToSupplierModel retSupplModel = DanpheJSONConvert.DeserializeObject<PHRMReturnToSupplierModel>(str);
-                    if (retSupplModel != null && retSupplModel.returnToSupplierItems != null)
+                    if (retSupplModel != null && retSupplModel.ReturnToSupplierItems != null)
                     {
-                        var maxretSupp = (from RTS in phrmdbcontext.PHRMReturnToSupplier select RTS.CreditNotePrintId).DefaultIfEmpty(0).Max() ?? 0;
+                        var maxretSupp = (from RTS in phrmdbcontext.PHRMReturnToSupplier select RTS.CreditNotePrintId).DefaultIfEmpty(0).Max();
                         retSupplModel.CreditNotePrintId = maxretSupp + 1;
 
                         int outputRTSId = PharmacyBL.ReturnItemsToSupplierTransaction(retSupplModel, currentUser, phrmdbcontext);
@@ -5295,14 +5296,14 @@ namespace DanpheEMR.Controllers
         }
         [HttpPost()]
         [Route("~/api/Pharmacy/PostStoreDispatch")]
-        public async Task<IActionResult> PostStoreDispatch([FromBody] IList<PostStoreDispatchViewModel> dispatchItems)
+        public IActionResult PostStoreDispatch([FromBody] IList<PostStoreDispatchViewModel> dispatchItems)
         {
             var responseData = new DanpheHTTPResponse<object>();
             if (dispatchItems != null && dispatchItems.Count > 0)
             {
                 var phrmdbcontext = new PharmacyDbContext(connString);
                 RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
-                var dispatchId = await PostStoreDispatchFunc.PostStoreDispatch(phrmdbcontext, dispatchItems, currentUser);
+                var dispatchId = PostStoreDispatchFunc.PostStoreDispatch(phrmdbcontext, dispatchItems, currentUser);
 
                 responseData.Status = "OK";
                 responseData.Results = dispatchId;
@@ -5314,60 +5315,60 @@ namespace DanpheEMR.Controllers
             }
             return Ok(responseData);
         }
-        [HttpPost("PostInvoice")]
-        public IActionResult PostInvoice([FromBody] PHRMInvoiceTransactionModel invoiceDataFromClient)
-        {
-            var responseData = new DanpheHTTPResponse<object>();
-            var phrmDbContext = new PharmacyDbContext(connString);
-            PatientDbContext patientDbContext = new PatientDbContext(connString);
-            CoreDbContext coreDbContext = new CoreDbContext(connString);
-            MasterDbContext masterDbContext = new MasterDbContext(connString);
-            var currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
-            try
-            {
-                if (invoiceDataFromClient == null || invoiceDataFromClient?.InvoiceItems == null) throw new Exception("Invoice Data is empty.");
+        //[HttpPost("PostInvoice")]
+        //public IActionResult PostInvoice([FromBody] PHRMInvoiceTransactionModel invoiceDataFromClient)
+        //{
+        //    var responseData = new DanpheHTTPResponse<object>();
+        //    var phrmDbContext = new PharmacyDbContext(connString);
+        //    PatientDbContext patientDbContext = new PatientDbContext(connString);
+        //    CoreDbContext coreDbContext = new CoreDbContext(connString);
+        //    MasterDbContext masterDbContext = new MasterDbContext(connString);
+        //    var currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+        //    try
+        //    {
+        //        if (invoiceDataFromClient == null || invoiceDataFromClient?.InvoiceItems == null) throw new Exception("Invoice Data is empty.");
 
-                if (invoiceDataFromClient.SelectedPatient.PatientId == 0)
-                {
-                    invoiceDataFromClient.SelectedPatient.CreatedBy = currentUser.EmployeeId;
-                    invoiceDataFromClient.PatientId = PharmacyBL.RegisterPatient(invoiceDataFromClient.SelectedPatient, phrmDbContext, patientDbContext, coreDbContext);
-                }
+        //        if (invoiceDataFromClient.SelectedPatient.PatientId == 0)
+        //        {
+        //            invoiceDataFromClient.SelectedPatient.CreatedBy = currentUser.EmployeeId;
+        //            invoiceDataFromClient.PatientId = PharmacyBL.RegisterPatient(invoiceDataFromClient.SelectedPatient, phrmDbContext, patientDbContext, coreDbContext);
+        //        }
 
 
 
-                PHRMInvoiceTransactionModel finalInvoiceData = PharmacyBL.InvoiceTransaction(invoiceDataFromClient, phrmDbContext, masterDbContext, currentUser);
+        //        PHRMInvoiceTransactionModel finalInvoiceData = PharmacyBL.InvoiceTransaction(invoiceDataFromClient, phrmDbContext, masterDbContext, currentUser);
 
-                // 27th Aug 2020:Vikas : replaced finalInvoiceData.InvoiceItems with ascending order list items.
-                //TO-DO : remove this order by itemname ---ramesh
-                var itemList = finalInvoiceData.InvoiceItems.OrderBy(s => s.ItemName).ToList();
-                finalInvoiceData.InvoiceItems = itemList;
+        //        // 27th Aug 2020:Vikas : replaced finalInvoiceData.InvoiceItems with ascending order list items.
+        //        //TO-DO : remove this order by itemname ---ramesh
+        //        var itemList = finalInvoiceData.InvoiceItems.OrderBy(s => s.ItemName).ToList();
+        //        finalInvoiceData.InvoiceItems = itemList;
 
-                responseData.Status = "OK";
-                responseData.Results = finalInvoiceData;
+        //        responseData.Status = "OK";
+        //        responseData.Results = finalInvoiceData;
 
-                if (realTimeRemoteSyncEnabled)
-                {
-                    if (invoiceDataFromClient.IsRealtime == null)
-                    {
-                        PHRMInvoiceTransactionModel invoiceSale = phrmDbContext.PHRMInvoiceTransaction.Where(p => p.InvoiceId == finalInvoiceData.InvoiceId).FirstOrDefault();
-                        finalInvoiceData = invoiceSale;
-                    }
-                    if (finalInvoiceData.IsReturn == null)
-                    {
-                        //Sud:24Dec'18--making parallel thread call (asynchronous) to post to IRD. so that it won't stop the normal execution of logic.
-                        ///PharmacyBL.SyncPHRMBillInvoiceToRemoteServer(finalInvoiceData, "phrm-invoice", phrmdbcontext);
-                        Task.Run(() => PharmacyBL.SyncPHRMBillInvoiceToRemoteServer(finalInvoiceData, "phrm-invoice", phrmDbContext));
-                    }
-                }
+        //        if (realTimeRemoteSyncEnabled)
+        //        {
+        //            if (invoiceDataFromClient.IsRealtime == null)
+        //            {
+        //                PHRMInvoiceTransactionModel invoiceSale = phrmDbContext.PHRMInvoiceTransaction.Where(p => p.InvoiceId == finalInvoiceData.InvoiceId).FirstOrDefault();
+        //                finalInvoiceData = invoiceSale;
+        //            }
+        //            if (finalInvoiceData.IsReturn == null)
+        //            {
+        //                //Sud:24Dec'18--making parallel thread call (asynchronous) to post to IRD. so that it won't stop the normal execution of logic.
+        //                ///PharmacyBL.SyncPHRMBillInvoiceToRemoteServer(finalInvoiceData, "phrm-invoice", phrmdbcontext);
+        //                Task.Run(() => PharmacyBL.SyncPHRMBillInvoiceToRemoteServer(finalInvoiceData, "phrm-invoice", phrmDbContext));
+        //            }
+        //        }
 
-            }
-            catch (Exception ex)
-            {
-                responseData.Status = "Failed";
-                responseData.ErrorMessage = ex.Message.ToString();
-            }
-            return Ok(responseData);
-        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        responseData.Status = "Failed";
+        //        responseData.ErrorMessage = ex.Message.ToString();
+        //    }
+        //    return Ok(responseData);
+        //}
         [HttpPost("PostReturnFromCustomer")]
         public IActionResult PostReturnFromCustomer([FromBody] PHRMInvoiceReturnModel retCustModel)
         {
@@ -6609,14 +6610,14 @@ namespace DanpheEMR.Controllers
 
         [HttpPost()]
         [Route("~/api/Pharmacy/PostSubStoreDispatch")]
-        public async Task<IActionResult> PostSubStoreDispatch([FromBody] IList<PostStoreDispatchViewModel> dispatchItems)
+        public IActionResult PostSubStoreDispatch([FromBody] IList<PostStoreDispatchViewModel> dispatchItems)
         {
             var responseData = new DanpheHTTPResponse<object>();
             if (dispatchItems != null && dispatchItems.Count > 0)
             {
                 var phrmdbcontext = new PharmacyDbContext(connString);
                 RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
-                var dispatchId = await phrmdbcontext.PostSubStoreDispatch(dispatchItems, currentUser);
+                var dispatchId = phrmdbcontext.PostSubStoreDispatch(dispatchItems, currentUser);
 
                 responseData.Status = ENUM_DanpheHttpResponseText.OK;
                 responseData.Results = dispatchId;
@@ -6804,7 +6805,6 @@ namespace DanpheEMR.Controllers
             }
             return priceCategory;
         }
-
     }
 
 }

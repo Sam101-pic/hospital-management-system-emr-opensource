@@ -8,7 +8,9 @@
           Filter by Result Date:
         </div>
         <div class="col-md-8" style="text-align: left;">
-          <from-to-date-select (on-change)="OnFromToDateChange($event)"> </from-to-date-select>
+          <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                               [date-settings-name]="'common-range-with-today'">
+          </from-to-date-select>
         </div>
       </div>
     </div>

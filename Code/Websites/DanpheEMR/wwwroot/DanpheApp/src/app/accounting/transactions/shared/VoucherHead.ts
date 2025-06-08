@@ -1,12 +1,4 @@
-﻿import {
-    NgForm,
-    FormGroup,
-    FormControl,
-    Validators,
-    FormBuilder,
-    ReactiveFormsModule
-} from '@angular/forms'
-
+﻿
 
 export class VoucherHead {
     public VoucherHeadId: number = 0;
@@ -15,4 +7,6 @@ export class VoucherHead {
     public CreatedBy: number = 0;
     public CreatedOn: string = null;
     public IsActive: boolean = true;
+    public HospitalId: number = 0;
+
 }

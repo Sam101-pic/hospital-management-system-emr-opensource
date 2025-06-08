@@ -8,7 +8,7 @@ import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../s
 import VerificationGridColumns from '../../shared/verification-grid-column';
 import * as moment from 'moment';
 import { GridEmitModel } from '../../../shared/danphe-grid/grid-emit.model';
-import { ENUM_Requisition_VerificationStatus } from '../../../shared/shared-enums';
+import { ENUM_INVPurchaseOrderStatus, ENUM_PHRMPurchaseOrderStatus, ENUM_Requisition_VerificationStatus } from '../../../shared/shared-enums';
 import { PurchaseOrder } from '../../../inventory/shared/purchase-order.model';
 
 @Component({
@@ -89,7 +89,7 @@ export class PurchaseOrderListComponent implements OnInit {
   public LoadPurchaseOrderListByStatus(){
     this.PurchaseOrderGridDataFiltered = new Array<PurchaseOrder>();
     if (this.VerificationStatus == ENUM_Requisition_VerificationStatus.pending) {
-      this.PurchaseOrderGridDataFiltered = this.PurchaseOrderGridData.filter(s => s.CurrentVerificationLevelCount < s.MaxVerificationLevel && s.IsVerificationAllowed == true);
+      this.PurchaseOrderGridDataFiltered = this.PurchaseOrderGridData.filter(s => s.CurrentVerificationLevelCount < s.MaxVerificationLevel && s.IsVerificationAllowed == true && s.POStatus !== ENUM_INVPurchaseOrderStatus.Cancel);
     } else if (this.VerificationStatus == ENUM_Requisition_VerificationStatus.approved) {
       this.PurchaseOrderGridDataFiltered = this.PurchaseOrderGridData.filter(s => s.VerificationStatus == "approved");
     } else if (this.VerificationStatus == ENUM_Requisition_VerificationStatus.rejected) {

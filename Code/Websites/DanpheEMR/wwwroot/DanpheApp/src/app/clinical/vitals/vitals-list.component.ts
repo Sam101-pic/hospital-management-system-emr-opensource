@@ -1,14 +1,15 @@
 // <reference path="../../radiology/imaging/imaging-requisition-list.component.ts" />
-import { Component, ChangeDetectorRef, Output, Input, EventEmitter } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 
-import { VisitService } from "../../appointments/shared/visit.service";
-import { IOAllergyVitalsBLService } from "../shared/io-allergy-vitals.bl.service";
-import { MessageboxService } from "../../shared/messagebox/messagebox.service";
 import * as moment from "moment/moment";
+import { VisitService } from "../../appointments/shared/visit.service";
+import { MessageboxService } from "../../shared/messagebox/messagebox.service";
+import { IOAllergyVitalsBLService } from "../shared/io-allergy-vitals.bl.service";
 
-import { Vitals } from "../shared/vitals.model";
-import { PatientService } from "../../patients/shared/patient.service";
 import { CoreService } from "../../core/shared/core.service";
+import { PatientService } from "../../patients/shared/patient.service";
+import { ENUM_VitalVerbalScale, ENUM_VitalsEyeScale, ENUM_VitalsMotorScale } from "../../shared/shared-enums";
+import { Vitals } from "../shared/vitals.model";
 
 @Component({
   selector: "vitals-list",
@@ -30,7 +31,7 @@ export class VitalsListComponent {
   public updateButton: boolean = false;
   public selectedIndex: number = null;
   public loading: boolean = false;
-  public showAddVitalBox: boolean = true;
+  public showAddVitalBox: boolean = false;
   public painDataList: Array<any> = new Array<any>();
   public date: string = null;
   public hospitalName: string = null;
@@ -54,7 +55,7 @@ export class VitalsListComponent {
     public msgBoxServ: MessageboxService,
     public patientService: PatientService,
     public coreService: CoreService
-  ) {    
+  ) {
     this.painData.push({ BodyPart: "", PainScale: null });
     this.date = moment().format("YYYY-MM-DD");
     this.hospitalName = this.coreService.GetHospitalName();
@@ -103,9 +104,9 @@ export class VitalsListComponent {
           if (res.Status == "OK") {
             this.CallBackGetPatientVitalList(res.Results);
             if (this.returnVitalsList) {
-              this.vitalsEmitter.emit({ vitalsList: res.Results});
+              this.vitalsEmitter.emit({ vitalsList: res.Results });
             }
-            this.changeHeight(res.Results);            
+            this.changeHeight(res.Results);
           } else {
             this.msgBoxServ.showMessage(
               "failed",
@@ -130,14 +131,78 @@ export class VitalsListComponent {
           i
         ].Height = this.ioAllergyVitalsBLService.ConvertInchToFootInch(
           _vitalsList[i].Height
-          );
+        );
       }
       var jsonData = JSON.parse(_vitalsList[i].BodyPart);
       this.painDataList.push(jsonData);
     }
     this.vitalsList = _vitalsList;
+    if (this.vitalsList.length > 0) {
+      this.MapVitalData();
+    }
   }
+  MapVitalData() {
 
+    this.vitalsList.forEach((vitals) => {
+      if (vitals.Eyes) {
+        vitals.Eyes = this.MapEyeScale(vitals.Eyes);
+      }
+      if (vitals.Motor) {
+        vitals.Motor = this.MapMotorScale(vitals.Motor);
+      }
+      if (vitals.Verbal) {
+        vitals.Verbal = this.MapVerbalScale(vitals.Verbal);
+      }
+    });
+  }
+  MapEyeScale(value: string): string {
+    switch (value) {
+      case ENUM_VitalsEyeScale.Scale1:
+        return "1";
+      case ENUM_VitalsEyeScale.Scale2:
+        return "2";
+      case ENUM_VitalsEyeScale.Scale3:
+        return "3";
+      case ENUM_VitalsEyeScale.Scale4:
+        return "4";
+      default:
+        return value;
+    }
+  }
+  MapMotorScale(value: string): string {
+    switch (value) {
+      case ENUM_VitalsMotorScale.Scale1:
+        return "1";
+      case ENUM_VitalsMotorScale.Scale2:
+        return "2";
+      case ENUM_VitalsMotorScale.Scale3:
+        return "3";
+      case ENUM_VitalsMotorScale.Scale4:
+        return "4";
+      case ENUM_VitalsMotorScale.Scale5:
+        return "5";
+      case ENUM_VitalsMotorScale.Scale6:
+        return "6";
+      default:
+        return value;
+    }
+  }
+  MapVerbalScale(value: string): string {
+    switch (value) {
+      case ENUM_VitalVerbalScale.Scale1:
+        return "1";
+      case ENUM_VitalVerbalScale.Scale2:
+        return "2";
+      case ENUM_VitalVerbalScale.Scale3:
+        return "3";
+      case ENUM_VitalVerbalScale.Scale4:
+        return "4";
+      case ENUM_VitalVerbalScale.Scale5:
+        return "5";
+      default:
+        return value;
+    }
+  }
   //change given height, weight and temperature to other units
   changeHeight(data) {
     for (var i = 0; i < data.length; i++) {
@@ -153,7 +218,7 @@ export class VitalsListComponent {
         this.heightFoot.push(data[i].Height * 3.281);
         this.heightMeter.push(data[i].Height);
         this.heightCm.push(data[i].Height * 100);
-      }      
+      }
     }
 
     for (var i = 0; i < data.length; i++) {
@@ -170,9 +235,9 @@ export class VitalsListComponent {
     for (var i = 0; i < data.length; i++) {
       if (data[i].TemperatureUnit == "F") {
         this.degFarenheit.push(data[i].Temperature);
-        this.degCelsius.push((data[i].Temperature - 32) *(5/9));
+        this.degCelsius.push((data[i].Temperature - 32) * (5 / 9));
       } if (data[i].TemperatureUnit == "C") {
-        this.degFarenheit.push((data[i].Temperature)* (9/5) + 32);
+        this.degFarenheit.push((data[i].Temperature) * (9 / 5) + 32);
         this.degCelsius.push(data[i].Temperature);
       }
     }
@@ -225,8 +290,8 @@ export class VitalsListComponent {
     popupWinindow.document.open();
     popupWinindow.document.write(
       '<html><head><link href="../../assets/global/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css" /><link rel="stylesheet" type="text/css" href="../../themes/theme-default/DanpheStyle.css" /></head><body onload="window.print()">' +
-        printContents +
-        "</body></html>"
+      printContents +
+      "</body></html>"
     );
     popupWinindow.document.close();
   }
@@ -253,6 +318,7 @@ export class VitalsListComponent {
           this.vitalsList.splice(this.selectedIndex, 1);
           this.vitalsList.splice(this.selectedIndex, 0, $event.vitals);
           this.vitalsList.slice();
+          this.MapVitalData();
         }
 
         var pData = JSON.parse($event.vitals.BodyPart);
@@ -284,6 +350,7 @@ export class VitalsListComponent {
         this.vitalsList.push($event.vitals);
         this.changeHeight(this.vitalsList);
         this.selectedIndex = null;
+        this.MapVitalData();
       }
     } else {
       this.showAddVitalBox = false;

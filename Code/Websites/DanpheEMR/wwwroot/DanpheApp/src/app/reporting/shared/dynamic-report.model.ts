@@ -15,13 +15,15 @@ export class DynamicReport {
     public departmentName: any;
     public PerformerName: string = "";
     public distProvider: string = "";
+    public SchemeId: number = null;
+    IsFreeVisit: boolean = false;
 
 
-  public DyanamicValidator: FormGroup = null;
-  constructor() {
+    public DynamicValidator: FormGroup = null;
+    constructor() {
 
         var _formBuilder = new FormBuilder();
-        this.DyanamicValidator = _formBuilder.group({
+        this.DynamicValidator = _formBuilder.group({
             //'FromDate': ['', Validators.compose([Validators.required])],
             'fromDate': ['', Validators.compose([Validators.required, this.dateValidatorsForPast])],
             'toDate': ['', Validators.compose([Validators.required, this.dateValidator])],
@@ -63,16 +65,16 @@ export class DynamicReport {
 
     public IsDirty(fieldName): boolean {
         if (fieldName == undefined)
-            return this.DyanamicValidator.dirty;
+            return this.DynamicValidator.dirty;
         else
-            return this.DyanamicValidator.controls[fieldName].dirty;
+            return this.DynamicValidator.controls[fieldName].dirty;
     }
 
-    public IsValid(): boolean { if (this.DyanamicValidator.valid) { return true; } else { return false; } }
+    public IsValid(): boolean { if (this.DynamicValidator.valid) { return true; } else { return false; } }
     public IsValidCheck(fieldName, validator): boolean {
         if (fieldName == undefined)
-            return this.DyanamicValidator.valid;
+            return this.DynamicValidator.valid;
         else
-            return !(this.DyanamicValidator.hasError(validator, fieldName));
+            return !(this.DynamicValidator.hasError(validator, fieldName));
     }
 }

@@ -37,6 +37,7 @@ namespace DanpheEMR.ServerModel.LabModels
         public bool IndentationCount { get; set; }
         [NotMapped]
         public int ComponentMapId { get; set; }
-
+        public int ValuePrecision { get; set; }
+        public bool ShowRangeDescriptionInLabReport { get; set; }
     }
 }

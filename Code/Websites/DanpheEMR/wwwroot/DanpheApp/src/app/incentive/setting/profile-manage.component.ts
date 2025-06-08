@@ -31,6 +31,7 @@ export class ProfileManageComponent {
   public showProfileRenamePage: boolean = false;
   @Output('callback-add')
   callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
+  IsViewMapping: boolean = false;
 
 
   constructor(
@@ -98,7 +99,17 @@ export class ProfileManageComponent {
         this.changeDetector.detectChanges();
         this.selectedProfile = $event.Data;
         this.showEditItemsPercentPage = true;
-
+        this.IsViewMapping = false;
+        break;
+      }
+      case 'viewMapping': {
+        this.selectedProfile = null;
+        this.showProfileRenamePage = false;
+        this.showEditItemsPercentPage = false;
+        this.changeDetector.detectChanges();
+        this.selectedProfile = $event.Data;
+        this.showEditItemsPercentPage = true;
+        this.IsViewMapping = true;
         break;
       }
       case 'deactivateProfile': {
@@ -160,7 +171,9 @@ export class ProfileManageComponent {
         res => {
           if (res.Status == 'OK') {
             this.msgBoxServ.showMessage('success', ['Profile Details Updated.']);
-            this.CallBackAddUpdate(res);
+            // this.CallBackAddUpdate(res);
+            this.Close();
+            this.GetProfileList();
             this.currentProfile = new ProfileModel();
           }
           else {

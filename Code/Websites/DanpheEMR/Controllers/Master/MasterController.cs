@@ -5,6 +5,7 @@ using DanpheEMR.Core.Configuration;
 using DanpheEMR.DalLayer;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.EmergencyModels;
+using DanpheEMR.ServerModel.MasterModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System;
@@ -216,6 +217,13 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
         }
 
+        [HttpGet]
+        [Route("GetAgeGroups")]
+        public IActionResult GetAgeGroups()
+        {
+            Func<List<AgeClassificationModel>> func = GetAgeGroupList;
+            return InvokeHttpGetFunction(func);
+        }
 
 
 
@@ -938,5 +946,22 @@ namespace DanpheEMR.Controllers
             return allParents;
 
         }
+        private List<AgeClassificationModel> GetAgeGroupList()
+        {
+            MasterDbContext masterDb = new MasterDbContext(connString);
+            List<AgeClassificationModel> ageList = masterDb.AgeClassification
+                .Where(age => age.ReportType == "AgeClassification")
+                .ToList();
+            return ageList;
+        }
+
+        [HttpGet]
+        [Route("CurrentFiscalYear")]
+        public IActionResult GetCurrentFiscalYear()
+        {
+            Func<object> func = () => _masterDbContext.MasterFiscalYears.FirstOrDefault(fy => fy.StartDate_AD <= DateTime.Now && fy.EndDate_AD >= DateTime.Now);
+            return InvokeHttpGetFunction<object>(func);
+        }
+
     }
 }

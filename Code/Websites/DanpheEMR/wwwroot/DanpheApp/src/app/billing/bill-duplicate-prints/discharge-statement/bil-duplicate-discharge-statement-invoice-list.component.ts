@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
+import { CoreService } from '../../../core/shared/core.service';
 import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
 import { GridEmitModel } from '../../../shared/danphe-grid/grid-emit.model';
-import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { BillingBLService } from '../../shared/billing.bl.service';
@@ -10,7 +11,10 @@ import { DischargeStatementViewModel } from './discharge-statement-view.model';
 
 @Component({
   selector: 'bil-duplicate-discharge-statement-invoice-list',
-  templateUrl: './bil-duplicate-discharge-statement-invoice-list.component.html'
+  templateUrl: './bil-duplicate-discharge-statement-invoice-list.component.html',
+  styleUrls: ['./bil-duplicate-discharge-statement-invoice-list.component.css'],
+  host: { '(window:keydown)': 'hotkeys($event)' }
+
 })
 export class Bil_DuplicateDischargeStatementInvoiceListComponent implements OnInit {
   dischargeStatementList: Array<DischargeStatementViewModel> = new Array<DischargeStatementViewModel>();
@@ -26,9 +30,13 @@ export class Bil_DuplicateDischargeStatementInvoiceListComponent implements OnIn
 
 
 
-  constructor(public billingBLService: BillingBLService, public messageBox: MessageboxService) {
+  constructor(
+    public billingBLService: BillingBLService,
+    public messageBox: MessageboxService,
+    public coreService: CoreService
+  ) {
     this.DischargeStatementGridCols = GridColumnSettings.DischargeStatementColumnList;
-    this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('StatementDate', true));
+    this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('StatementDate', false));
 
   }
 
@@ -43,6 +51,9 @@ export class Bil_DuplicateDischargeStatementInvoiceListComponent implements OnIn
       if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
         this.dischargeStatementList = [];
         this.dischargeStatementList = res.Results;
+        if (this.dischargeStatementList && this.dischargeStatementList.length > 0) {
+          this.dischargeStatementList = this.GetPatientsWithConsistentAge();
+        }
       }
       else {
         this.messageBox.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to get discharge statement']);
@@ -53,7 +64,12 @@ export class Bil_DuplicateDischargeStatementInvoiceListComponent implements OnIn
         console.log(err);
       })
   }
-
+  GetPatientsWithConsistentAge() {
+    return this.dischargeStatementList.map(ds => {
+      ds.Age = this.coreService.CalculateAge(ds.DateOfBirth);
+      return ds;
+    });
+  }
   DuplicateDischargeStatementGridActions($event: GridEmitModel) {
     switch ($event.Action) {
       case "show-statement-details":
@@ -96,6 +112,13 @@ export class Bil_DuplicateDischargeStatementInvoiceListComponent implements OnIn
     if ($event) {
       this.fromDate = $event.fromDate;
       this.toDate = $event.toDate;
+    }
+  }
+
+  hotkeys(event) {
+    if (event.keyCode == 27) {
+      this.ShowStatementView = false;
+      this.showBillSummary = false;
     }
   }
 

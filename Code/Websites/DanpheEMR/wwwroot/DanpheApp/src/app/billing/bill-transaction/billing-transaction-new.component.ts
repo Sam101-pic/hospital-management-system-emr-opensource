@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component } from "@angular/core";
+import { ChangeDetectorRef, Component, HostListener } from "@angular/core";
 import { FormGroup, Validators } from "@angular/forms";
 import { Router } from "@angular/router";
 import * as _ from "lodash";
@@ -6,7 +6,10 @@ import * as moment from "moment";
 import { Subscription } from "rxjs";
 import { CurrentVisitContextVM } from "../../appointments/shared/current-visit-context.model";
 import { PatientLatestVisitContext_DTO } from "../../appointments/shared/dto/patient-lastvisit-context.dto";
+import { CoreBLService } from "../../core/shared/core.bl.service";
 import { CoreService } from "../../core/shared/core.service";
+import { InsuranceCappingEntryDTO } from "../../core/shared/dto/insurance-capping-entry-info.dto";
+import { GovInsuranceBlService } from "../../insurance/nep-gov/shared/insurance.bl.service";
 import { PatientService } from "../../patients/shared/patient.service";
 import { SecurityService } from "../../security/shared/security.service";
 import { CreditOrganization } from "../../settings-new/shared/creditOrganization.model";
@@ -15,9 +18,12 @@ import { CallbackService } from "../../shared/callback.service";
 import { ServiceDepartmentVM } from "../../shared/common-masters.model";
 import { DanpheHTTPResponse } from "../../shared/common-models";
 import { CommonFunctions } from "../../shared/common.functions";
+import { InsuranceMasterItems_DTO } from "../../shared/DTOs/insurance-master-items.dto";
+import { FewaPayService } from "../../shared/fewa-pay/helpers/fewa-pay.service";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
 import { RouteFromService } from "../../shared/routefrom.service";
-import { ENUM_AdditionalServiceItemGroups, ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_BillingType, ENUM_CurrentBillingFlow, ENUM_DanpheHTTPResponses, ENUM_InvoiceType, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_ServiceBillingContext } from "../../shared/shared-enums";
+import { ENUM_AdditionalServiceItemGroups, ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_BillingType, ENUM_CurrentBillingFlow, ENUM_DanpheHTTPResponses, ENUM_FewaPayMessageTypes, ENUM_FewaPayTransactionFrom, ENUM_IntegrationNames, ENUM_InvoiceType, ENUM_LabTypes, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_POS_ResponseStatus, ENUM_PaymentModeSubCategory, ENUM_Scheme_ApiIntegrationNames, ENUM_ServiceBillingContext, ENUM_VisitType } from "../../shared/shared-enums";
+import { BillInsuranceService } from "../shared/bill-insurance.service";
 import { BillingInvoiceBlService } from "../shared/billing-invoice.bl.service";
 import { BillingMasterBlService } from "../shared/billing-master.bl.service";
 import { BillingTransactionItem } from "../shared/billing-transaction-item.model";
@@ -27,6 +33,7 @@ import { BillingService } from "../shared/billing.service";
 import { BillingAdditionalServiceItem_DTO } from "../shared/dto/bill-additional-service-item.dto";
 import { InvoiceItem_DTO } from "../shared/dto/billing-invoiceitem.dto";
 import { BillingPackages_DTO } from "../shared/dto/billing-packages.dto";
+import { InvoiceDetail } from "../shared/dto/invoice-detail.dto";
 import { SchemePriceCategory_DTO } from "../shared/dto/scheme-pricecategory.dto";
 import { ServiceItemDetails_DTO } from "../shared/dto/service-item-details.dto";
 import { ServiceItemSchemeSetting_DTO } from "../shared/dto/service-item-scheme-setting.dto";
@@ -40,7 +47,7 @@ import { PatientScheme } from "../shared/patient-map-scheme";
 
 
 export class BillingTransactionComponent_New {
-  public billingType: string = 'OutPatient';//to separate inpatient billing, outpatient billing, etc..
+  public billingType: string = ENUM_BillingType.outpatient;//to separate inpatient billing, outpatient billing, etc..
   public wardName: string = '';
   public bedNo: string = '';
   public BillingRequestDisplaySettings: any = null; //! Krishna, 19thMarch'23 Need to give a type
@@ -165,7 +172,15 @@ export class BillingTransactionComponent_New {
   public ShowOtherCurrency: boolean = false;
   public DisplayOtherCurrencyDetail: boolean = false;
   public IsPackageServiceItemDiscountChanged: boolean = false;
-
+  public ShowDynamicQr: boolean = false;
+  public DynamicQrMessage: string = "";
+  public DynamicQRThroughPOS: boolean = true;
+  public PriceOfPackageBillingchanged: boolean = false;
+  public CreditLimitToDisplay: number = 0;
+  public InsuranceMasterItems = new Array<InsuranceMasterItems_DTO>();
+  public DisablePrintProvisional: boolean = false;
+  public InsuranceCappingEntries: InsuranceCappingEntryDTO[] = [];
+  public EnableInsuranceCapping: boolean = false;
   constructor(
     public billingService: BillingService,
     public changeDetectorRef: ChangeDetectorRef,
@@ -178,7 +193,11 @@ export class BillingTransactionComponent_New {
     public routeFromService: RouteFromService,
     public patientService: PatientService,
     public billingBlService: BillingBLService,
-    public billingInvoiceBlService: BillingInvoiceBlService
+    public billingInvoiceBlService: BillingInvoiceBlService,
+    public coreBlService: CoreBLService,
+    public insuranceBLService: GovInsuranceBlService,
+    public billInsuranceService: BillInsuranceService,
+    private _fewaPayService: FewaPayService,
   ) {
     this.InvoiceItemFormGroup = this.billingInvoiceBlService.CreateFormGroupForInvoiceItems();
     this.currentCounter = this.securityService.getLoggedInCounter().CounterId;
@@ -194,7 +213,7 @@ export class BillingTransactionComponent_New {
       this.patLastVisitContext = this.billingService.PatLastVisitContext;
       //Krishna/Sud:29Mar'23--Moved from GetVisitList to here..
       this.GetVisitContext(this.patientService.getGlobal().PatientId, this.patLastVisitContext.PatientVisitId);
-      this.currentVisitType = this.patientService.getGlobal().LatestVisitType;
+      this.currentVisitType = this.patientService.getGlobal().LatestVisitType ? this.patientService.getGlobal().LatestVisitType : ENUM_VisitType.outpatient;
       this.BillingRequestDisplaySettings = this.billingInvoiceBlService.GetParam_BillingRequestDisplaySettings();
       this.Invoice_Label = this.billingInvoiceBlService.GetParam_InvoiceLabelName();
       this.bedNo = this.patientService.getGlobal().BedCode;
@@ -213,6 +232,8 @@ export class BillingTransactionComponent_New {
       this.ExtRefSettings = this.billingInvoiceBlService.GetParam_BillingExternalReferrerSettings();
       this.BillRequestDoubleEntryWarningTimeHrs = this.coreService.LoadOPBillRequestDoubleEntryWarningTimeHrs();
 
+      this.InsuranceMasterItems = this.coreService.InsuranceMasterItems;
+
       if (this.coreService.labTypes.length > 1) {
         this.hasMultipleLabType = true;
       } else {
@@ -228,6 +249,7 @@ export class BillingTransactionComponent_New {
       }
 
       this.GetParameterToShowHideOtherCurrencyOption();
+      this.GetInsuranceCappingParam();
     }
   }
 
@@ -239,7 +261,9 @@ export class BillingTransactionComponent_New {
   }
 
   GetServiceItemsForCurrentSchemeAndPriceCategory() {
-    this.ServiceItems = this.billingMasterBlService.ServiceItems;
+    this.billingMasterBlService.ServiceItems.subscribe(items => {
+      this.ServiceItems = items;
+    });
     const systemDefaultPriceCategory = this.coreService.Masters.PriceCategories.find(a => a.IsDefault);
     if (systemDefaultPriceCategory && !this.billingMasterBlService.PriceCategoryId) {
       this.old_priceCategory = systemDefaultPriceCategory.PriceCategoryId;
@@ -260,6 +284,9 @@ export class BillingTransactionComponent_New {
 
   ngOnDestroy() {
     this.ServiceItemsSubscription.unsubscribe();
+    this.billInsuranceService.cleanup();
+    //this.SignalRHubConnection.stop();
+    //this.SignalRHubConnection = undefined;
   }
   ngOnInit(): void {
     this.model.EmployeeCashTransaction = [];
@@ -278,9 +305,16 @@ export class BillingTransactionComponent_New {
   public EnablePrice: boolean = false;
   public IsPackageSelectedAsItem: boolean = false;
   public PackageDiscountAmount: number = 0;
+  public SelectedInvoiceItemNameTemp: string = "";
   AssignSelectedInvoiceItem(): void {
     if (this.selectedInvoiceItem && typeof (this.selectedInvoiceItem) === 'object') {
+      if (this.SchemePriceCategory.IsBillingCappingApplicable) {
+        const IsQuantityChanged = false;
+        const IsItemSelected = true;
+        this.billInsuranceService.ValidateCapping(this.SchemePriceCategory.UseCappingAPI, this.selectedInvoiceItem.IsCappingEnabled, this.selectedInvoiceItem, IsItemSelected, IsQuantityChanged);
+      }
       this.SelectedInvoiceItemForAdditionalItemCalculation = this.selectedInvoiceItem; //! Krishna, 4thApril, Using this variable only while calculating the Price of Additional Item (Incase selected Invoice Item has Additional Items)
+      this.SelectedInvoiceItemNameTemp = this.selectedInvoiceItem.ItemName;
       let DiscountPercent = 0;
       if (this.selectedInvoiceItem.IsPackageBilling) {
         DiscountPercent = this.selectedInvoiceItem.DiscountPercent;
@@ -301,6 +335,9 @@ export class BillingTransactionComponent_New {
       if (this.selectedInvoiceItem.IsDoctorMandatory) {
         this.AssignPerformer();
 
+      } else {
+        this.InvoiceItemFormGroup.get('PerformerId').setValidators(this.selectedInvoiceItem.IsDoctorMandatory ? Validators.required : null);
+        this.InvoiceItemFormGroup.get('PerformerId').updateValueAndValidity();
       }
 
       this.HasAdditionalServiceItem = this.HasAdditionalServiceItemSelected = this.selectedInvoiceItem.HasAdditionalBillingItems;
@@ -323,12 +360,24 @@ export class BillingTransactionComponent_New {
         CoPaymentCreditPercent: this.selectedInvoiceItem.CoPayCreditPercent,
         ServiceDepartmentId: this.selectedInvoiceItem.ServiceDepartmentId,
         ServiceDepartmentName: this.selectedInvoiceItem.ServiceDepartmentName,
-        IntegrationItemId: this.selectedInvoiceItem.IntegrationItemId
+        IntegrationItemId: this.selectedInvoiceItem.IntegrationItemId,
+        AllowMultipleQty: this.selectedInvoiceItem.AllowMultipleQty,
+        PreviouslySalesQuantity: this.selectedInvoiceItem.PreviouslySalesQuantity,
+        CappingQuantity: this.selectedInvoiceItem.CappingQuantity,
+        CappingLimitDays: this.selectedInvoiceItem.CappingLimitDays,
+        IntegrationName: this.selectedInvoiceItem.IntegrationName
       });
       this.SetInvoiceItemTotalAmountIncludingDiscountAmount();
     }
   }
 
+  //! Krishna, 7thMarch, 2024, Below method is used to validate the name of the Item selected, If the name of the item is different than the selected when adding to the invoice, it will reset the item selected.
+  ValidateItemSelected(): void {
+    if (this.selectedInvoiceItem && typeof (this.selectedInvoiceItem) === "string" && this.selectedInvoiceItem !== this.SelectedInvoiceItemNameTemp) {
+      this.ResetAddedInvoiceItemObj();
+      this.SelectedInvoiceItemNameTemp = "";
+    }
+  }
   private AssignPerformer(): void {
     /*
              !Step 1: First update validation for Performer to required it Doctor is Mandatory for the selected item.
@@ -405,6 +454,7 @@ export class BillingTransactionComponent_New {
       invoiceItemDto.PerformerName = this.AdditionalInvoiceItem.PerformerName;
       invoiceItemDto.PrescriberId = this.selectedPrescriberId;
       invoiceItemDto.IntegrationItemId = this.AdditionalInvoiceItem.IntegrationItemId;
+      invoiceItemDto.IntegrationName = this.AdditionalInvoiceItem.IntegrationName;
       this.InvoiceItemWithAdditionalItem.push(invoiceItemDto);
     }
   }
@@ -426,6 +476,9 @@ export class BillingTransactionComponent_New {
 
   CalculateAfterPriceChanged(): void {
     this.SetInvoiceItemTotalAmountIncludingDiscountAmount();
+    if (this.IsPackageServiceItemEditMode) {
+      this.PriceOfPackageBillingchanged = true;
+    }
   }
 
   OnEmptyItemNameField(): void {
@@ -464,7 +517,11 @@ export class BillingTransactionComponent_New {
         }
         else if (this.IsPackageServiceItemEditMode && this.IsPackageServiceItemDiscountChanged) {
           this.model.DiscountAmount = this.InvoiceItemsDto.reduce((acc, curr) => curr.DiscountAmount + acc, 0);
-          this.model.DiscountPercent = Math.round(this.billingInvoiceBlService.CalculatePercentage(this.model.DiscountAmount, this.model.SubTotal));
+          this.model.DiscountPercent = CommonFunctions.parseAmount(this.billingInvoiceBlService.CalculatePercentage(this.model.DiscountAmount, this.model.SubTotal), 4);
+        }
+        else if (this.isPackageBilling) {
+          this.model.DiscountAmount = this.InvoiceItemsDto.reduce((acc, curr) => curr.DiscountAmount + acc, 0);
+          this.model.DiscountPercent = CommonFunctions.parseAmount(this.billingInvoiceBlService.CalculatePercentage(this.model.DiscountAmount, this.model.SubTotal), 4);
         }
         else {
           this.model.DiscountAmount = this.PackageDiscountAmount;
@@ -549,6 +606,13 @@ export class BillingTransactionComponent_New {
   }
   AddInvoiceItems(): void {
     if (this.InvoiceItemFormValue && this.InvoiceItemFormGroup.valid) {
+      // if (!this.billInsuranceService.CheckValidQuantity(this.InvoiceItemFormValue)) {
+      //   return;
+      // }
+      if (!this.billInsuranceService.IsValidCapping && this.SchemePriceCategory.IsBillingCappingApplicable) {
+        this.msgBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`Insurance capping is applied and the remaining Quantity usage is exceeded.`]);
+        return;
+      }
       if (!this.IsPackageSelectedAsItem) {
         this.InvoiceItemDto.ServiceItemId = this.InvoiceItemFormValue.ServiceItemId;
         this.InvoiceItemDto.ItemCode = this.InvoiceItemFormValue.ItemCode;
@@ -561,6 +625,7 @@ export class BillingTransactionComponent_New {
         this.InvoiceItemDto.TotalAmount = this.InvoiceItemDto.SubTotal - this.InvoiceItemDto.DiscountAmount;
         this.InvoiceItemDto.ServiceDepartmentId = this.InvoiceItemFormValue.ServiceDepartmentId;
         this.InvoiceItemDto.ServiceDepartmentName = this.InvoiceItemFormValue.ServiceDepartmentName;
+        this.InvoiceItemDto.AllowMultipleQty = this.InvoiceItemFormValue.AllowMultipleQty;
 
         if (this.SchemePriceCategory.IsCoPayment) {
           this.InvoiceItemFormControls.IsCoPayment.setValue(true);
@@ -579,8 +644,9 @@ export class BillingTransactionComponent_New {
         this.InvoiceItemDto.PerformerId = this.InvoiceItemFormValue.PerformerId;
         this.InvoiceItemDto.PerformerName = this.InvoiceItemFormValue.PerformerName;
         this.InvoiceItemDto.PrescriberId = this.selectedPrescriberId;
+        this.InvoiceItemDto.ReferredById = this.selectedRefId;
         this.InvoiceItemDto.IntegrationItemId = this.InvoiceItemFormValue.IntegrationItemId;
-
+        this.InvoiceItemDto.IntegrationName = this.InvoiceItemFormValue.IntegrationName;
 
 
         // this.CheckForDoubleEntry();
@@ -597,7 +663,7 @@ export class BillingTransactionComponent_New {
 
         this.ResetAddedInvoiceItemObj();
         this.CalculateInvoiceTotals();
-        this.coreService.FocusInputById('id_billing_serviceItemName', 500);
+        this.coreService.FocusInputById('id_billing_serviceItemName', 100);
       } else {
         this.AssignItemsOfSelectedPackage();
       }
@@ -676,9 +742,12 @@ export class BillingTransactionComponent_New {
         billingTransactionItem.DiscountPercent = itm.DiscountPercent;
         billingTransactionItem.DiscountAmount = itm.DiscountAmount;
         billingTransactionItem.TotalAmount = itm.TotalAmount;
-        billingTransactionItem.PerformerId = itm.PerformerId;
+        billingTransactionItem.PerformerId = itm.PerformerId > 0 ? itm.PerformerId : null;
         billingTransactionItem.PerformerName = itm.PerformerName;
-        billingTransactionItem.PrescriberId = itm.PrescriberId;
+        billingTransactionItem.PrescriberId = (this.selectedPrescriberId ? this.selectedPrescriberId : null);//itm.PrescriberId ? itm.PrescriberId : (this.selectedPrescriberId ? this.selectedPrescriberId : null);
+        billingTransactionItem.ReferredById = (this.selectedRefId ? this.selectedRefId : null);//itm.ReferredById ? itm.ReferredById : (this.selectedRefId ? this.selectedRefId : null);
+        billingTransactionItem.ItemIntegrationName = itm.IntegrationName;
+        billingTransactionItem.AllowMultipleQty = itm.AllowMultipleQty;
         if (this.SelectedPrescriber) {
           billingTransactionItem.PrescriberName = this.SelectedPrescriber.ReferrerName;//! This logic needs a revision later
         } else {
@@ -694,6 +763,7 @@ export class BillingTransactionComponent_New {
         billingTransactionItem.CoPaymentCashAmount = itm.CoPaymentCashAmount;
         billingTransactionItem.CoPaymentCreditAmount = itm.CoPaymentCreditAmount;
         billingTransactionItem.IntegrationItemId = itm.IntegrationItemId;
+        billingTransactionItem.IntegrationName = itm.IntegrationName;
         billingTransactionItem.VisitType = this.currentVisitType;
         billingTransactionItem.PatientVisitId = this.currPatVisitContext.PatientVisitId;
         billingTransactionItem.BillingPackageId = itm.BillingPackageId;
@@ -714,6 +784,10 @@ export class BillingTransactionComponent_New {
   }
 
   RemoveInvoiceItem(index: number) {
+    if (this.isPackageBilling && this.SelectedPackage.IsHealthPackage) {
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Remove Items from Package!`]);
+      return;
+    }
     if (index >= 0) {
       const removedItem = this.InvoiceItemsDto[index];
       this.InvoiceItemsDto.splice(index, 1);
@@ -745,7 +819,7 @@ export class BillingTransactionComponent_New {
 
           this.patBillHistory = res.Results;
           this.patBillHistory.ProvisionalAmt = CommonFunctions.parseAmount(this.patBillHistory.ProvisionalAmt, 3);
-          this.patBillHistory.BalanceAmount = CommonFunctions.parseAmount(this.patBillHistory.BalanceAmount, 3);
+          this.patBillHistory.BalanceAmount = CommonFunctions.parseAmount(this.patBillHistory.DepositBalance - this.patBillHistory.TotalDue, 3);
           this.patBillHistory.DepositBalance = CommonFunctions.parseAmount(this.patBillHistory.DepositBalance, 3);
           this.patBillHistory.CreditAmount = CommonFunctions.parseAmount(this.patBillHistory.CreditAmount, 3);
           this.patBillHistory.TotalDue = CommonFunctions.parseAmount(this.patBillHistory.TotalDue, 3);
@@ -782,9 +856,20 @@ export class BillingTransactionComponent_New {
               this.currBillingContext = res.Results;
               const currentPatientSchemeMap = this.currBillingContext.PatientSchemeMap;
               this.CurrentPatientSchemeMap = currentPatientSchemeMap;
-              this.currentVisitType = this.currBillingContext.BillingType;
+              // this.currentVisitType = this.currBillingContext.BillingType;
               this.billingService.BillingType = this.currBillingContext.BillingType;
               this.billingType = this.currBillingContext.BillingType;
+
+              //! Manage Credit Limits to be displayed in the UI
+              if (this.SchemePriceCategory && (this.SchemePriceCategory.IsCreditLimited || this.SchemePriceCategory.IsGeneralCreditLimited)) {
+                if (this.SchemePriceCategory.IsGeneralCreditLimited) {
+                  this.CreditLimitToDisplay = this.CurrentPatientSchemeMap.GeneralCreditLimit;
+                } else {
+                  this.CreditLimitToDisplay = this.CurrentPatientSchemeMap.OpCreditLimit;
+                }
+              } else {
+                console.log('Scheme PriceCategory is not loaded Or Scheme is not Credit Limited');
+              }
             }
           }
         });
@@ -822,10 +907,11 @@ export class BillingTransactionComponent_New {
   public RequestingDepartmentId: number = null;
   GetVisitContext(patientId: number, visitId: number) {
     if (patientId && visitId) {
-      this.billingBlService.GetDataOfInPatient(patientId, visitId)
+      this.billingBlService.GetPatientCurrentVisitContext(patientId, visitId)
         .subscribe(res => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
             this.currPatVisitContext = res.Results;
+            this.billInsuranceService.SetPatientVisitContext(this.currPatVisitContext)
             this.RequestingDepartmentId = this.currPatVisitContext.RequestingDepartmentId;
             this.selectedDepartment = this.DepartmentList.find(a => a.DepartmentId === this.RequestingDepartmentId);
             this.model.PatientVisitId = this.currPatVisitContext.PatientVisitId;
@@ -834,9 +920,15 @@ export class BillingTransactionComponent_New {
 
             this.SchemePriCeCategoryFromVisitTemp = _.cloneDeep(this.SchemePriCeCategoryFromVisit);
 
-            if (this.currPatVisitContext.ClaimCode) {
-              this.isClaimed(this.currPatVisitContext.ClaimCode, this.currPatVisitContext.PatientId);
-            }
+            // if (this.currPatVisitContext.ClaimCode) {
+            //   if (this.SchemePriceCategory && this.SchemePriceCategory.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.SSF) {
+            //     this.IsClaimed_SSF(this.currPatVisitContext.ClaimCode, this.currPatVisitContext.PatientId);
+            //   }
+
+            //   if (this.SchemePriceCategory && this.SchemePriceCategory.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS) {
+            //     this.IsClaimed_HIB(this.currPatVisitContext.ClaimCode);
+            //   }
+            // }
             //sud:15Mar'19--to change VisitContext for ER patients-- moved from SearchPatient to here..
             this.ShowHideChangeVisitPopup(this.currPatVisitContext);
 
@@ -873,8 +965,23 @@ export class BillingTransactionComponent_New {
     }
   }
 
-  isClaimed(LatestClaimCode: number, PatientId: number): void {
-    this.billingBlService.IsClaimed(LatestClaimCode, PatientId)
+  IsClaimed_SSF(LatestClaimCode: number, PatientId: number): void {
+    this.billingBlService.IsClaimed_SSF(LatestClaimCode, PatientId)
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          if (res.Results === true) {
+            this.isClaimSuccessful = true;
+          }
+        }
+      },
+        (err: DanpheHTTPResponse) => {
+          this.msgBoxService.showMessage(ENUM_DanpheHTTPResponses.Failed, ["Unable to check for pending claims"]);
+        }
+      );
+  }
+
+  IsClaimed_HIB(LatestClaimCode: number): void {
+    this.billingBlService.IsClaimed_HIB(LatestClaimCode)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           if (res.Results === true) {
@@ -1142,7 +1249,7 @@ export class BillingTransactionComponent_New {
     this.SelectedPrescriber = $event;
   }
   public ItemLevelDiscountChkBoxOnChange() {
-    if (this.SchemePriceCategory.IsDiscountApplicable && this.SchemePriceCategory.IsDiscountEditable) {
+    if (this.SchemePriceCategory.IsDiscountApplicable && this.SchemePriceCategory.IsDiscountEditable && !this.isPackageBilling) {
       if (this.ShowItemLevelDiscount && this.EnableDiscountField) {
         this.ShowItemLevelDiscountAmountField = true;
         this.DisableItemLevelDiscPercent = true;
@@ -1170,12 +1277,68 @@ export class BillingTransactionComponent_New {
       }
       this.changeDetectorRef.detectChanges();
     }
+    if (this.SchemePriceCategory.IsDiscountApplicable && this.SchemePriceCategory.IsDiscountEditable && this.isPackageBilling && this.SelectedPackage.IsDiscountEditableInSales) {
+      if (this.ShowItemLevelDiscount && this.EnableDiscountField) {
+        this.ShowItemLevelDiscountAmountField = true;
+        this.DisableItemLevelDiscPercent = true;
+        this.DisableItemLevelDiscAmount = false;
+        this.DisableInvoiceDiscountAmount = true;
+        this.DisableInvoiceDiscountPercent = true;
+      } else if (this.ShowItemLevelDiscount) {
+        this.ShowItemLevelDiscountAmountField = false;
+        this.DisableItemLevelDiscPercent = false;
+        this.DisableItemLevelDiscAmount = true;
+        this.DisableInvoiceDiscountAmount = true;
+        this.DisableInvoiceDiscountPercent = true;
+      } else if (this.EnableDiscountField) {
+        this.ShowItemLevelDiscountAmountField = false;
+        this.DisableItemLevelDiscPercent = true;
+        this.DisableItemLevelDiscAmount = true;
+        this.DisableInvoiceDiscountAmount = false;
+        this.DisableInvoiceDiscountPercent = true;
+      } else {
+        this.ShowItemLevelDiscountAmountField = false;
+        this.DisableItemLevelDiscPercent = true;
+        this.DisableItemLevelDiscAmount = true;
+        this.DisableInvoiceDiscountAmount = true;
+        this.DisableInvoiceDiscountPercent = false;
+      }
+      this.changeDetectorRef.detectChanges();
+    }
+
   }
 
   // * This handles the Enable Discount Amount checkbox actions.. Krishna,27th'March'22
   EnableDiscountAmount() {
-    if (this.SchemePriceCategory.IsDiscountApplicable && this.SchemePriceCategory.IsDiscountEditable) {
+    if (this.SchemePriceCategory.IsDiscountApplicable && this.SchemePriceCategory.IsDiscountEditable && !this.isPackageBilling) {
       if (this.EnableDiscountField && this.ShowItemLevelDiscount) {
+        this.ShowItemLevelDiscountAmountField = true;
+        this.DisableItemLevelDiscPercent = true;
+        this.DisableItemLevelDiscAmount = false;
+        this.DisableInvoiceDiscountAmount = true;
+        this.DisableInvoiceDiscountPercent = true;
+      } else if (this.EnableDiscountField) {
+        this.ShowItemLevelDiscountAmountField = false;
+        this.DisableItemLevelDiscPercent = true;
+        this.DisableItemLevelDiscAmount = true;
+        this.DisableInvoiceDiscountAmount = false;
+        this.DisableInvoiceDiscountPercent = true;
+      } else if (this.ShowItemLevelDiscount) {
+        this.ShowItemLevelDiscountAmountField = false;
+        this.DisableItemLevelDiscPercent = false;
+        this.DisableItemLevelDiscAmount = true;
+        this.DisableInvoiceDiscountAmount = true;
+        this.DisableInvoiceDiscountPercent = true;
+      } else {
+        this.ShowItemLevelDiscountAmountField = false;
+        this.DisableItemLevelDiscPercent = true;
+        this.DisableItemLevelDiscAmount = true;
+        this.DisableInvoiceDiscountAmount = true;
+        this.DisableInvoiceDiscountPercent = false;
+      }
+    }
+    if (this.SchemePriceCategory.IsDiscountApplicable && this.SchemePriceCategory.IsDiscountEditable && this.isPackageBilling && this.SelectedPackage.IsDiscountEditableInSales) {
+      if (this.ShowItemLevelDiscount && this.EnableDiscountField) {
         this.ShowItemLevelDiscountAmountField = true;
         this.DisableItemLevelDiscPercent = true;
         this.DisableItemLevelDiscAmount = false;
@@ -1241,7 +1404,7 @@ export class BillingTransactionComponent_New {
             if (this.isProvisionalBilling) {
               this.PostProvisionalBilling();
             } else {
-              this.PostInvoice();
+              this.HandleInvoiceRequest();
             }
           }
           break;
@@ -1254,6 +1417,14 @@ export class BillingTransactionComponent_New {
     if (event.keyCode === 112) {
       event.preventDefault();
       this.isPackageBilling = !this.isPackageBilling;
+      if (this.isPackageBilling) {
+        this.DisableInvoiceDiscountAmount = true;
+        this.DisableInvoiceDiscountPercent = true;
+      } else {
+        if (this.SchemePriceCategory.IsDiscountApplicable && this.SchemePriceCategory.IsDiscountEditable) {
+          this.DisableInvoiceDiscountPercent = false;
+        }
+      }
       this.SelectedPackage = new BillingPackages_DTO();
       this.HandlePackageBillingChange();
     }
@@ -1267,6 +1438,33 @@ export class BillingTransactionComponent_New {
       }
     }
   }
+  private HandleInvoiceRequest() {
+    /* if (this._fewaPayService.IsFewaPayApplicable(this.model.PaymentDetails)) {
+      this.loadingScreen = true;
+      const transactionReqString = this._fewaPayService.CreateFewaPayTransactionRequest(this.model.PaymentDetails, this.model.TotalAmount, this.model.Remarks);
+      window.postMessage({
+        type: ENUM_FewaPayMessageTypes.PaymentInfoRequest,
+        data: transactionReqString,
+      }, "*");
+      console.log('Transaction Request is posted from Danphe.');
+    } else {
+      this.loadingScreen = true;
+      this.PostInvoice();
+    } */
+    if ((this.BillingRequestDisplaySettings.Prescriber || this.isEHS) && (this.BillingRequestDisplaySettings.IsPrescriberMandatory) && !this.selectedPrescriberId) {
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Prescriber is mandatory."]);
+      this.loading = false;
+      return;
+    }
+    if (this.IsRemarksMandatory && !this.model.Remarks.trim()) {
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Remarks is mandatory."]);
+      this.loading = false;
+      return;
+    }
+    this.loadingScreen = true;
+    this.PostInvoice();
+  }
+
   //sud:16May'21--Moving Invoice Printing as Popup
   public CloseInvoicePrint() {
     this.showInvoicePrintPage = false;
@@ -1404,6 +1602,7 @@ export class BillingTransactionComponent_New {
     if (this.CheckDuplicateItemEntryBeforeSubmission()) {
       this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Duplicate Items Entry is not allowed"]);
       this.loading = false;
+      this.loadingScreen = false;
       return;
     }
 
@@ -1438,7 +1637,7 @@ export class BillingTransactionComponent_New {
       a.SrvDeptIntegrationName = integrationName;
       if (integrationName) {
         if (integrationName.toLowerCase() == "lab") {
-          a.LabTypeName = this.LabTypeName;
+          a.LabTypeName = this.LabTypeName ? this.LabTypeName : ENUM_LabTypes.OpLab;
           a.OrderStatus = ENUM_OrderStatus.Active;
         }
         else if (integrationName.toLowerCase() == 'radiology') {
@@ -1455,7 +1654,7 @@ export class BillingTransactionComponent_New {
   }
 
   public SetVisitContextBeforeBillSubmit() {
-    this.model.PatientVisitId = this.patLastVisitContext.PatientVisitId;
+    this.model.PatientVisitId = this.currPatVisitContext.PatientVisitId;
     this.model.BillingTransactionItems.forEach(itm => {
       itm.PatientVisitId = this.patLastVisitContext.PatientVisitId;
     });
@@ -1466,6 +1665,8 @@ export class BillingTransactionComponent_New {
     //!Krishna, 18thMay'23, If PatientScheme is CreditLimited Scheme, We need to add some Validation logic.
     if ((this.SchemePriceCategory.IsCreditLimited || this.SchemePriceCategory.IsGeneralCreditLimited) && !this.CheckCreditLimit()) {
       this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Total Amount is greater than CreditLimit available."]);
+      this.loading = false;
+      this.loadingScreen = false;
       return;
     }
 
@@ -1473,6 +1674,7 @@ export class BillingTransactionComponent_New {
     if (this.model.DiscountPercent < 0 || this.model.DiscountPercent > 100) {
       this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["DiscountAmount is not valid"]);
       this.loading = false;
+      this.loadingScreen = false;
       return;
     }
 
@@ -1480,18 +1682,50 @@ export class BillingTransactionComponent_New {
     if (this.model.DiscountAmount && this.model.DiscountAmount > 0 && !this.model.Remarks) {
       this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Remarks is mandatory for Discounts"]);
       this.loading = false;
+      this.loadingScreen = false;
+      return;
+    }
+
+    if (this.model.PaymentMode.toLowerCase() === ENUM_BillPaymentMode.credit.toLowerCase() && (!this.model.OrganizationId || this.model.OrganizationId === 0 || this.model.OrganizationId === null)) {
+      this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Credit Organization is mandatory for Credit Billing."]);
+      this.loading = false;
+      this.loadingScreen = false;
       return;
     }
 
     if (this.isClaimSuccessful) {
       this.msgBoxService.showMessage(ENUM_DanpheHTTPResponses.Failed, ["This Visit context is claimed, create a new visit"]);
+      return;
     }
 
-    if (this.model && this.model.BillingTransactionItems.length) {
+    if (this.model && this.model.BillingTransactionItems && this.model.BillingTransactionItems.length) {
       //! Krishna, 27thMarch'23 Need to add all the validations here
+      this.model.BillingTransactionItems.forEach(billItem => {
+        if (billItem.ItemIntegrationName === ENUM_IntegrationNames.OPD && billItem.PerformerId === null) {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Performer is mandatory for ${billItem.ItemName}`]);
+          this.loading = false;
+          this.loadingScreen = false;
+          return;
+        }
+      });
+
+      //! Krishna, 15thMay, 2024, Check the ItemCode and Price of the Items loaded for Insurance.
+      if (this.SchemePriceCategory.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.SSF || this.SchemePriceCategory.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS) {
+        if (this.model && this.model.BillingTransactionItems && this.model.BillingTransactionItems.length) {
+          if (this.InsuranceMasterItems && this.InsuranceMasterItems.length) {
+            if (!this.CheckItemCodeAndItemPriceInsuranceBilling(this.model, this.model.BillingTransactionItems, this.SchemePriceCategory.SchemeApiIntegrationName)) {
+              this.loading = false;
+              this.loadingScreen = false;
+              return;
+            }
+          }
+        }
+      }
+
       this.SubmitBillingTransaction();
     } else {
       this.loading = false;
+      this.loadingScreen = false;
       this.msgBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["No Items Added To Print Invoice"]);
     }
   }
@@ -1520,13 +1754,39 @@ export class BillingTransactionComponent_New {
     if (this.loading) {
       if (this.model.PaymentMode === ENUM_BillPaymentMode.credit && !this.model.PatientVisitId) {
         this.loading = false;
+        this.loadingScreen = false;
         this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Cannot do Credit Billing without visit"]);
         return;
       }
       //this.AssignBillTxnItemsValuesForSubmit();
+
+      this.HandlePaymentTransaction();
+    }
+  }
+
+  /**This method is responsible to check whether FewaPay is applicable or not if not proceed with normal workflow else wait for the message sent by FewaPay Browser extension and decide after message is received*/
+  private HandlePaymentTransaction() {
+    if (this._fewaPayService.IsFewaPayApplicable(this.model.PaymentDetails)) {
+      this.loadingScreen = true;
+      const transactionReqString = this._fewaPayService.CreateFewaPayTransactionRequest(this.model.PaymentDetails, this.model.ReceivedAmount, this.model.Remarks);
+
+      if (transactionReqString) {
+        window.postMessage({
+          type: ENUM_FewaPayMessageTypes.PaymentInfoRequest,
+          data: transactionReqString,
+        }, "*");
+        console.log('Transaction Request is posted from Danphe.');
+      } else {
+        this.loadingScreen = false;
+        this.loading = false;
+        this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, [`Transaction Request cannot be created due to missing mandatory data like paymentDetails, totalAmount and remarks`]);
+      }
+
+    } else {
       this.PostBillingTransaction(this.model.BillingTransactionItems);
     }
   }
+
   PostBillingTransaction(billTxnItems: Array<BillingTransactionItem>, emergencyItem = null) {
     if (this.isProvisionalBilling === true) {
       if (this.model.PatientVisitId) {
@@ -1545,6 +1805,10 @@ export class BillingTransactionComponent_New {
             console.log(res.ErrorMessage)
             this.loading = false;
           }
+        }, err => {
+          this.loading = false;
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Internal Server Error`]);
+          console.log(err);
         });
       } else {
         this.msgBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Cannot do Provisional Billing Without Visit"]);
@@ -1565,11 +1829,17 @@ export class BillingTransactionComponent_New {
       }
       this.billingBlService.ProceedToBillingTransaction(this.model, billTxnItems, "active", "provisional", this.insuranceApplicableFlag, this.currPatVisitContext).subscribe(res => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-          this.bil_FiscalYrId = res.Results.FiscalYearId;
-          this.bil_BilTxnId = res.Results.BillingTransactionId;
-          this.bil_InvoiceNo = res.Results.InvoiceNo;
-          this.showInvoicePrintPage = true;
-
+          if (this.model.PaymentDetails && this.model.PaymentDetails.toLowerCase().includes(ENUM_PaymentModeSubCategory.FonePay) && this.coreService.EnableFewaPay === false && this.coreService.EnableDirectFonePay) {
+            if (res.Results !== null) {
+              this.DynamicQrMessage = res.Results.qrMessage;
+              this.ShowDynamicQr = true;
+            }
+          } else {
+            this.bil_FiscalYrId = res.Results.FiscalYearId;
+            this.bil_BilTxnId = res.Results.BillingTransactionId;
+            this.bil_InvoiceNo = res.Results.InvoiceNo;
+            this.showInvoicePrintPage = true;
+          }
         }
         else {
           if (res.ErrorMessage.match(/Invalid Deposit Amount/g)) {
@@ -1580,9 +1850,18 @@ export class BillingTransactionComponent_New {
             this.msgBoxService.showMessage("failed", [res.ErrorMessage]);
           this.loading = false;
         }
+      }, err => {
+        this.loading = false;
+        const error = err.error;
+        if (error) {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, error.Messages);
+        } else {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Internal Server Error`]);
+        }
+        console.log(err);
       });
-
     }
+    this.loadingScreen = false;
   }
   AssignValuesToBillTxn() {
     this.model.CounterId = this.currentCounter;
@@ -1601,7 +1880,7 @@ export class BillingTransactionComponent_New {
 
     this.model.DepositBalance = this.newDepositBalance;
     this.model.DepositReturnAmount = 0;
-    this.model.PatientVisitId = this.patLastVisitContext.PatientVisitId;
+    this.model.PatientVisitId = this.currPatVisitContext.PatientVisitId;
     this.model.TransactionType = this.billingType;
     this.model.SchemeId = this.SchemePriceCategory.SchemeId;
     this.OnPaymentModeChange();
@@ -1612,6 +1891,12 @@ export class BillingTransactionComponent_New {
       this.loading = false;
       return;
     }
+
+    // if (this.currentVisitType === ENUM_VisitType.outdoor) {
+    //   this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Provisional Billing Cannot be done for Outdoor Visit."]);
+    //   this.loading = false;
+    //   return;
+    // }
 
     this.AssignInvoiceItemsToBillingTransactionItems();
     if (this.model.BillingTransactionItems) {
@@ -1626,6 +1911,8 @@ export class BillingTransactionComponent_New {
         txnItm.Remarks = this.model.Remarks;
       });
     }
+
+    this.SetVisitContextBeforeBillSubmit();
 
     //Checking from parameter, allow/restrict Additional Discount for Provisional bills
     if ((!this.param_allowAdditionalDiscOnProvisional) && this.model.DiscountPercent && this.model.DiscountPercent > 0) {
@@ -1673,29 +1960,33 @@ export class BillingTransactionComponent_New {
     nextField.select();
   }
 
-  GoToQuantityOrOtherElement(currentElement: string, nextElement: string, secondNextelement: string): void {
+  GoToQuantityOrOtherElement(currentElement: string, nextElement: string, secondNextElement: string): void {
     if (this.AllowProvisionalBilling && this.DisplayPrintProvisionalButton) {
-      const value = (<HTMLInputElement>document.getElementById('id_billing_credit_remarks')).value;
+      const value = (<HTMLInputElement>document.getElementById(currentElement)).value;
       if (value) {
-        this.coreService.FocusInputById('id_billing_credit_remarks', 100);
+        this.coreService.FocusInputById(nextElement, 100);
       } else {
-        this.coreService.FocusButtonById('id_btn_print_provisional');
+        this.coreService.FocusInputById(secondNextElement);
       }
     }
     if (this.model.PaymentMode === ENUM_BillPaymentMode.credit) {
       if (!this.HasAdditionalServiceItem) {
-        if (currentElement && nextElement && secondNextelement) {
+        if (currentElement && nextElement && secondNextElement) {
           const value = (<HTMLInputElement>document.getElementById(currentElement)).value;
           if (value) {
             this.coreService.FocusInputById(nextElement, 100);
           } else {
-            this.coreService.FocusInputById(secondNextelement, 100);
+            this.coreService.FocusInputById(secondNextElement, 100);
           }
         }
       }
-    } else {
+    }
+    if (this.isPackageBilling) {
+      this.coreService.FocusButtonById('id_btn_add_serviceItem');
+    }
+    else {
       if (!this.HasAdditionalServiceItem) {
-        if (currentElement && nextElement && secondNextelement) {
+        if (currentElement && nextElement && secondNextElement) {
           const value = (<HTMLInputElement>document.getElementById(currentElement)).value;
           if (value) {
             let next = (<HTMLInputElement>document.getElementById(nextElement));
@@ -1726,12 +2017,34 @@ export class BillingTransactionComponent_New {
       console.info(schemePriceObj);
       this.SchemePriceCategory = schemePriceObj;
       this.model.Remarks = this.SchemePriceCategory.SchemeName;
-      //! This will clear the added invoice Items in the grid
-      this.InvoiceItemsDto = new Array<InvoiceItem_DTO>();
+
+      if (this.SchemePriceCategory && (this.SchemePriceCategory.IsCreditLimited || this.SchemePriceCategory.IsGeneralCreditLimited) && this.CurrentPatientSchemeMap) {
+        if (this.SchemePriceCategory.IsGeneralCreditLimited) {
+          this.CreditLimitToDisplay = this.CurrentPatientSchemeMap.GeneralCreditLimit;
+        } else {
+          this.CreditLimitToDisplay = this.CurrentPatientSchemeMap.OpCreditLimit;
+        }
+      }
+
+      if (schemePriceObj.DefaultCreditOrganizationId) {
+        const patLatestSchemeId = this.patLastVisitContext ? this.patLastVisitContext.SchemeId : null;
+        const creditOrg = this.billingService.AllCreditOrganizationsList.find(c => c.OrganizationId === schemePriceObj.DefaultCreditOrganizationId);
+        if (creditOrg && creditOrg.IsClaimManagementApplicable && schemePriceObj.SchemeId !== patLatestSchemeId) {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Same Scheme Visit is Compulsory for Claim Applicable Billing!"]);
+        }
+      }
 
       //! This will clear the InvoiceItemDto Obj only
+      // if (this.old_priceCategory !== schemePriceObj.PriceCategoryId) {
+      //! This will clear the added invoice Items in the grid
+      this.isPackageBilling = false;
+      this.SelectedPackage.BillingPackageName = null;
+      this.InvoiceItemsDto = new Array<InvoiceItem_DTO>();
       this.ResetAddedInvoiceItemObj();
       this.ResetInvoiceTotals();
+
+      this.isPackageBilling = false;
+      this.SelectedPackage.BillingPackageName = null;
 
       if (this.SchemePriceCategory.IsCreditOnlyScheme && !this.SchemePriceCategory.IsCoPayment) {
         this.DisablePaymentModeDropDown = true;
@@ -1740,7 +2053,9 @@ export class BillingTransactionComponent_New {
       }
       if (this.SchemePriceCategory.IsDiscountApplicable) {
         this.model.DiscountPercent = this.SchemePriceCategory.DiscountPercent;
+        this.ShowItemLevelDiscount = false;
       } else {
+        this.DisableItemLevelDiscPercent = true;
         this.model.DiscountPercent = 0;
       }
       this.model.IsCoPayment = this.SchemePriceCategory.IsCoPayment;
@@ -1755,6 +2070,19 @@ export class BillingTransactionComponent_New {
       }
       this.DisableInvoiceDiscountPercent = (this.SchemePriceCategory.IsDiscountApplicable && this.SchemePriceCategory.IsDiscountEditable) ? false : true;
       this.changeDetectorRef.detectChanges();
+      if (this.currPatVisitContext.ClaimCode) {
+        if (this.SchemePriceCategory && this.SchemePriceCategory.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.SSF) {
+          this.IsClaimed_SSF(this.currPatVisitContext.ClaimCode, this.currPatVisitContext.PatientId);
+        }
+
+        if (this.SchemePriceCategory && this.SchemePriceCategory.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS) {
+          this.IsClaimed_HIB(this.currPatVisitContext.ClaimCode);
+          if (this.SchemePriceCategory.UseCappingAPI) {
+            this.billInsuranceService.GetInsuranceCappingInformation(this.currPatVisitContext.MemberNo);
+          }
+        }
+      }
+      // }
 
       if (this.SchemePriCeCategoryFromVisitTemp.SchemeId && this.SchemePriCeCategoryFromVisitTemp.PriceCategoryId) {
         //For Visits
@@ -1770,7 +2098,9 @@ export class BillingTransactionComponent_New {
 
             }
           } else {
-            this.ServiceItems = this.billingMasterBlService.ServiceItems;
+            this.billingMasterBlService.ServiceItems.subscribe(items => {
+              this.ServiceItems = items;
+            });
           }
         }
       }
@@ -1780,6 +2110,8 @@ export class BillingTransactionComponent_New {
             this.GetServiceItemSchemeSetting(this.serviceBillingContext, schemePriceObj.SchemeId, schemePriceObj.PriceCategoryId);
           }
           else {
+            // this.isPackageBilling = false;
+            // this.SelectedPackage.BillingPackageName = null;
             this.old_priceCategory = schemePriceObj.PriceCategoryId;
             this.GetServiceItems(this.serviceBillingContext, schemePriceObj.SchemeId, schemePriceObj.PriceCategoryId);
             this.LoadAdditionalServiceItems(schemePriceObj.PriceCategoryId);
@@ -1792,7 +2124,6 @@ export class BillingTransactionComponent_New {
 
   GetServicePackages(schemeId: number, priceCategoryId: number): void {
     if (schemeId && priceCategoryId) {
-
       this.billingMasterBlService.GetServicePackages(schemeId, priceCategoryId).subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
           this.ServicePackages = res.Results;
@@ -1814,7 +2145,6 @@ export class BillingTransactionComponent_New {
       this.msgBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Package Billing Enabled"]);
       //! This will clear the added invoice Items in the grid
       this.InvoiceItemsDto = new Array<InvoiceItem_DTO>();
-
       //! This will clear the InvoiceItemDto Obj only
       this.ResetAddedInvoiceItemObj();
       this.ResetInvoiceTotals();
@@ -1851,37 +2181,53 @@ export class BillingTransactionComponent_New {
       serviceItem.DiscountPercent = p.DiscountPercent;
       serviceItem.DiscountAmount = Math.round(this.billingInvoiceBlService.CalculateAmountFromPercentage(serviceItem.DiscountPercent, serviceItem.Price)); //! Krishna, 15thOct'23, Rounding is used here because Package Billing Settings uses the same mechanism to calculate DiscountAmount in Settings.
       serviceItem.IsPackageBilling = true;
+      serviceItem.IsDiscountEditableInSales = p.IsDiscountEditableInSales;
+      serviceItem.IsItemLevelDiscount = p.IsItemLevelDiscount;
 
       serviceItems.push(serviceItem);
     });
-    //this.ServiceItems = [...this.ServiceItems, ...serviceItems]; //!Krishna, 2ndAug'23, Merge Package with ServiceItems so that We could search both in ItemSearch
+    //this.ServiceItems = [...this.TempServiceItemDetails, ...serviceItems]; //!Krishna, 2ndAug'23, Merge Package with ServiceItems so that We could search both in ItemSearch
     return serviceItems;
   }
 
   AssignItemsOfSelectedPackage(): void {
+    this.DisableInvoiceDiscountAmount = true;
+    this.DisableInvoiceDiscountPercent = true;
+    this.SchemePriceCategory.DiscountPercent
     this.InvoiceItemDto.ServiceItemId = this.InvoiceItemFormValue.ServiceItemId;
     this.SelectedPackage = this.ServicePackages.find(p => p.BillingPackageId === this.InvoiceItemDto.ServiceItemId);
     if (this.SelectedPackage) {
+      if (this.SelectedPackage.IsItemLoadPackage) {
+        this.ServiceItems = [...this.TempServiceItemDetails, ...this.ServiceItems]; //!Krishna, 2ndAug'23, Merge Package with ServiceItems so that We could search both in ItemSearch
+      } else {
+        this.DisablePrintProvisional = true;
+      }
+
       this.SelectedPackage.BillingPackageServiceItemList.forEach(pkg => {
         // let serviceItem = this.ServiceItems.find(s => s.ServiceItemId === pkg.ServiceItemId);
         let serviceItem = this.TempServiceItemDetails.find(s => s.ServiceItemId === pkg.ServiceItemId);
         if (serviceItem) {
-          serviceItem.DiscountPercent = pkg.DiscountPercent;
+          // serviceItem.DiscountPercent = pkg.DiscountPercent;
           this.InvoiceItemDto.ServiceItemId = serviceItem.ServiceItemId;
           this.InvoiceItemDto.ItemCode = serviceItem.ItemCode;
-          this.InvoiceItemDto.ItemName = serviceItem.ItemName;;
+          this.InvoiceItemDto.ItemName = serviceItem.ItemName;
           this.InvoiceItemDto.Quantity = pkg.Quantity;
           this.InvoiceItemDto.Price = serviceItem.Price;
           this.InvoiceItemDto.SubTotal = this.InvoiceItemDto.Price * this.InvoiceItemDto.Quantity;
-          this.InvoiceItemDto.DiscountPercent = pkg.DiscountPercent;
+          if (this.SelectedPackage.IsItemLoadPackage) {
+            this.InvoiceItemDto.DiscountPercent = serviceItem.DiscountPercent > 0 ? serviceItem.DiscountPercent : this.SchemePriceCategory.DiscountPercent;
+          } else {
+            this.InvoiceItemDto.DiscountPercent = this.SelectedPackage.DiscountPercent;
+          }
           this.InvoiceItemDto.DiscountAmount = this.billingInvoiceBlService.CalculateAmountFromPercentage(this.InvoiceItemDto.DiscountPercent, this.InvoiceItemDto.SubTotal);
           this.InvoiceItemDto.TotalAmount = this.InvoiceItemDto.SubTotal - this.InvoiceItemDto.DiscountAmount;
           this.InvoiceItemDto.ServiceDepartmentId = serviceItem.ServiceDepartmentId;
           this.InvoiceItemDto.ServiceDepartmentName = serviceItem.ServiceDepartmentName;
-
+          this.InvoiceItemDto.IntegrationName = serviceItem.IntegrationName;
           this.InvoiceItemDto.IsCoPayment = false;
           this.InvoiceItemDto.CoPaymentCashAmount = 0;
           this.InvoiceItemDto.CoPaymentCreditAmount = 0;
+          this.InvoiceItemDto.AllowMultipleQty = serviceItem.AllowMultipleQty;
           if (pkg.PerformerId) {
             this.InvoiceItemDto.PerformerId = pkg.PerformerId;
             let performer = this.doctorsList.find(p => p.EmployeeId === this.InvoiceItemDto.PerformerId);
@@ -1889,7 +2235,7 @@ export class BillingTransactionComponent_New {
           }
           this.InvoiceItemDto.PrescriberId = this.selectedPrescriberId;
           this.InvoiceItemDto.IntegrationItemId = serviceItem.IntegrationItemId;
-          this.InvoiceItemDto.BillingPackageId = this.SelectedPackage.BillingPackageId;
+          this.InvoiceItemDto.IntegrationName = serviceItem.IntegrationName;
 
           this.InvoiceItemsDto.push(this.InvoiceItemDto);
           this.ResetAddedInvoiceItemObj();
@@ -1897,6 +2243,9 @@ export class BillingTransactionComponent_New {
       });
       this.CalculateInvoiceTotals();
       this.coreService.FocusInputById('id_billing_serviceItemName', 500);
+    }
+    if (this.SchemePriceCategory.IsDiscountApplicable && this.SelectedPackage.IsDiscountEditableInSales) {
+      this.DisableInvoiceDiscountPercent = false;
     }
   }
 
@@ -1957,7 +2306,7 @@ export class BillingTransactionComponent_New {
   }
   MapServiceItemSchemeSettingsToServiceItems(serviceItemSchemeSetting: Array<ServiceItemSchemeSetting_DTO>): void {
     if (serviceItemSchemeSetting && serviceItemSchemeSetting.length) {
-      this.ServiceItems.forEach((item) => {
+      for (const item of this.ServiceItems) {
         const matchedServiceItem = serviceItemSchemeSetting.find(a => a.ServiceItemId === item.ServiceItemId);
         if (matchedServiceItem) {
           item.SchemeId = matchedServiceItem.SchemeId;
@@ -1966,12 +2315,16 @@ export class BillingTransactionComponent_New {
           item.CoPayCashPercent = matchedServiceItem.CoPaymentCashPercent;
           item.CoPayCreditPercent = matchedServiceItem.CoPaymentCreditPercent;
         }
-      });
-      this.ServiceItems = this.ServiceItems.slice();
-      this.coreService.FocusInputById('id_billing_serviceItemName', 500);
-      this.loadingScreen = false;
+      }
+      // Refresh the view to reflect the changes
+      setTimeout(() => {
+        this.ServiceItems = this.ServiceItems.slice();
+        this.coreService.FocusInputById('id_billing_serviceItemName', 500);
+        this.loadingScreen = false;
+      }, 1000);
     }
   }
+
 
   //* Krishna, 4thApril'23, Below method is triggered on the change of Additional Item Selection on the Popup
   OnAdditionalServiceItemCallBack($event: Array<BillingAdditionalServiceItem_DTO>): void {
@@ -2029,7 +2382,8 @@ export class BillingTransactionComponent_New {
       this.AdditionalInvoiceItem.CoPayCreditPercent = this.SelectedAdditionalInvoiceItem.CoPayCreditPercent;
       this.AdditionalInvoiceItem.ServiceDepartmentId = this.SelectedAdditionalInvoiceItem.ServiceDepartmentId;
       this.AdditionalInvoiceItem.ServiceDepartmentName = this.SelectedAdditionalInvoiceItem.ServiceDepartmentName;
-      this.AdditionalInvoiceItem.IntegrationItemId = this.SelectedAdditionalInvoiceItem.IntegrationItemId
+      this.AdditionalInvoiceItem.IntegrationItemId = this.SelectedAdditionalInvoiceItem.IntegrationItemId;
+      this.AdditionalInvoiceItem.IntegrationName = this.SelectedAdditionalInvoiceItem.IntegrationName;
       this.SetInvoiceItemTotalAmountIncludingDiscountAmountForAdditionalItem();
       this.AssignAdditionalInvoiceItemToInvoiceItemsArray();
     }
@@ -2069,7 +2423,7 @@ export class BillingTransactionComponent_New {
   }
   handleConfirm() {
     this.loading = true;
-    this.PostInvoice();
+    this.HandleInvoiceRequest();
   }
 
   handleProvisionalConfirmation() {
@@ -2097,11 +2451,16 @@ export class BillingTransactionComponent_New {
     }
     this.model.OtherCurrencyDetail = JSON.stringify(this.OtherCurrencyDetail);
   }
+  /**
 
+   * @summary This method is responsible to set the values of selected items and enable or disable the input field Discount Percent and discount amount
+   * @param item Item object is passed when add button is clicked from the Billing page
+   */
   EditPackageInvoiceServiceItem(item: InvoiceItem_DTO): void {
     this.SelectedServiceItemFromPackage = item;
     this.IsPackageServiceItemEditMode = true;
     this.InvoiceItemFormControls.Quantity.setValue(this.SelectedServiceItemFromPackage.Quantity);
+    this.InvoiceItemFormControls.ServiceItemId.setValue(this.SelectedServiceItemFromPackage.ServiceItemId);
     this.InvoiceItemFormControls.ItemName.setValue(this.SelectedServiceItemFromPackage.ItemName);
     this.InvoiceItemFormControls.Price.setValue(this.SelectedServiceItemFromPackage.Price);
     this.InvoiceItemFormControls.DiscountPercent.setValue(this.SelectedServiceItemFromPackage.DiscountPercent);
@@ -2109,6 +2468,15 @@ export class BillingTransactionComponent_New {
     this.InvoiceItemFormControls.SubTotal.setValue(this.SelectedServiceItemFromPackage.SubTotal);
     this.InvoiceItemFormControls.TotalAmount.setValue(this.SelectedServiceItemFromPackage.TotalAmount);
     this.InvoiceItemFormControls.PerformerName.setValue(this.SelectedServiceItemFromPackage.PerformerName ? this.SelectedServiceItemFromPackage.PerformerName : null);
+    if (this.isPackageBilling && this.ShowItemLevelDiscount && this.SelectedPackage && this.ShowItemLevelDiscount && this.SelectedPackage.IsDiscountEditableInSales) {
+      if (this.EnableDiscountField) {
+        this.DisableItemLevelDiscAmount = false;
+        this.DisableItemLevelDiscPercent = true;
+      } else {
+        this.DisableItemLevelDiscAmount = true;
+        this.DisableItemLevelDiscPercent = false;
+      }
+    }
   }
 
   UpdatePackageServiceItemInInvoice(serviceItemId: number): void {
@@ -2122,6 +2490,9 @@ export class BillingTransactionComponent_New {
     let indexOfSelectedInvoiceItem = this.InvoiceItemsDto.findIndex(item => item.ServiceItemId === serviceItemId);
     if (indexOfSelectedInvoiceItem >= 0) {
       this.InvoiceItemsDto[indexOfSelectedInvoiceItem] = this.SelectedServiceItemFromPackage;
+    }
+    if (this.PriceOfPackageBillingchanged) {
+      this.CalculateInvoiceTotals();
     }
     if (this.IsPackageServiceItemDiscountChanged) {
       this.CalculateInvoiceTotals();
@@ -2147,5 +2518,94 @@ export class BillingTransactionComponent_New {
     if ($event) {
       this.isProvisionalBilling = this.DisplayPrintProvisionalButton;
     }
+    else {
+      this.isProvisionalBilling = this.DisplayPrintProvisionalButton;
+    }
+  }
+  OnDynamicQrCallback($event: InvoiceDetail): void {
+    this.ShowDynamicQr = false;
+    if ($event && $event.paymentStatus) {
+      this.bil_FiscalYrId = $event.fiscalYearId;
+      this.bil_BilTxnId = $event.invoiceId;
+      this.bil_InvoiceNo = $event.invoiceNo;
+      this.showInvoicePrintPage = true;
+    } else {
+      this.loading = false;
+    }
+  }
+
+  /**
+   *
+   * @param event Is is a message event that is thrown by FewaPay Browser Extension.
+   * @summary This method is responsible to catch the messages thrown by FewaPay Browser extension and process accordingly.
+   * @returns void
+   */
+  @HostListener('window:message', ['$event'])
+  onMessage(event: MessageEvent): void {
+    const result = this._fewaPayService.HandleEventsFromFewaPayBrowserExtension(event);
+    if (result) {
+      if (result.resultCode === ENUM_POS_ResponseStatus.Success) { //! Krishna, 10thDec'23 "000" is success status code sent from POS device.
+        // console.log(result);
+        const transactionId = 'verifyTransId' in result && result.verifyTransId;
+        if (transactionId) {
+          this.model.PaymentDetails = `${this.model.PaymentDetails}; TransactionId: ${transactionId}`;
+        }
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.model.PatientId, ENUM_FewaPayTransactionFrom.OpBilling);
+        this.PostBillingTransaction(this.model.BillingTransactionItems);
+      } else {
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.model.PatientId, ENUM_FewaPayTransactionFrom.OpBilling);
+        this.loading = false;
+        this.loadingScreen = false;
+        this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, [`${result.message}`]);
+      }
+      return;
+    }
+  }
+
+  //! Krishna, 15thMay, 2024, This method is responsible to validate the ItemCode and Price for SSF and HIB Billing.
+  CheckItemCodeAndItemPriceInsuranceBilling(model: BillingTransaction, billingTransactionItems: BillingTransactionItem[], schemeApiIntegrationName: string): boolean {
+    if (model && billingTransactionItems && this.InsuranceMasterItems && this.InsuranceMasterItems.length) {
+      let isValid = true;
+      for (let index = 0; index < billingTransactionItems.length; index++) {
+        const element = billingTransactionItems[index];
+        const insuranceItemWithMatchingItem = this.InsuranceMasterItems.some(a => a.InsuranceType === schemeApiIntegrationName && a.InsCode === element.ItemCode);
+        if (!insuranceItemWithMatchingItem) {
+          isValid = false;
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`${element.ItemCode} ItemCode for ${element.ItemName} is not matching with Insurance Provided ItemCode, \n Please Contact your Administrator!`]);
+          break;
+        } else {
+          const matchingItem = this.InsuranceMasterItems.find(a => a.InsuranceType === schemeApiIntegrationName && a.InsCode === element.ItemCode);
+          if (element.Price !== matchingItem.Price) {
+            isValid = false;
+            this.msgBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`${element.Price} Price for ${element.ItemName} is not matching with Insurance Provided Price, It Should be ${matchingItem.Price}, \n Please contact your Administrator!`]);
+            break;
+          }
+        }
+      }
+      return isValid;
+    }
+  }
+  ValidateForCappingItems($event: any): void {
+    if ($event) {
+      const qty = Number($event.target.value);
+      const IsItemSelected = false;
+      const IsQuantityChanged = true;
+      if (!this.selectedInvoiceItem || typeof this.selectedInvoiceItem !== 'object') {
+        const itemName = this.InvoiceItemFormControls.ItemName.value;
+        //type any is used because of the selectedInvoiceItem is not object but string
+        const selectedInvoiceItem: any = this.ServiceItems.find(item => item.ItemName === itemName);
+        this.billInsuranceService.ValidateCapping(this.SchemePriceCategory.UseCappingAPI, selectedInvoiceItem.IsCappingEnabled, selectedInvoiceItem, IsItemSelected, IsQuantityChanged, qty);
+      }
+    }
+  }
+
+  GetInsuranceCappingParam(): void {
+    var param = this.coreService.Parameters.find(a => a.ParameterGroupName === "Billing" && a.ParameterName === "AllowInsuranceCapping");
+    if (param && param.ParameterValue) {
+      let currParam = JSON.parse(param.ParameterValue);
+      this.EnableInsuranceCapping = currParam;
+    }
   }
 }
+
+

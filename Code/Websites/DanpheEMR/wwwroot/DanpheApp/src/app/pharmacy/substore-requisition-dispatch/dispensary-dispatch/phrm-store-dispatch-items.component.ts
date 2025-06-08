@@ -109,23 +109,39 @@ export class PHRMStoreDispatchItemsComponent {
                   this.AddDispatchRow(requisitionItemsIndex)
       }
       SaveDispatchItems() {
-            this.loading = true;
-            //Create copy of requisition to send to DB
-            var requisitionToSend = new RequisitionForDispatchModel();
-            Object.assign(requisitionToSend, this.requisition);
-            //Clear all the not dispatching requisition, save only reuqisition items to be dispatched
-            requisitionToSend.RequisitionItems = requisitionToSend.RequisitionItems.filter(r => r.IsDispatchingNow == true);
-            //Clear all the dispatched items with 0 quantity
-            requisitionToSend.RequisitionItems.forEach(r => r.DispatchedItems = r.DispatchedItems.filter(d => d.DispatchedQuantity > 0));
-            //if no requisition items is checked, or no items is being dispatched, stop the request.
-            if (requisitionToSend.RequisitionItems.length == 0 || requisitionToSend.RequisitionItems.every(r => r.DispatchedItems.length == 0)) {
-                  this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["No items to dispatch."]);
-                  this.loading = false;
+            let requisitionToSend = Object.assign(new RequisitionForDispatchModel(), this.requisition);
+            if (requisitionToSend.RequisitionItems.every(a => !a.IsDispatchingNow)) {
+                  this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['No stock available to dispatch']);
+                  return;
             }
-            else if (requisitionToSend.RequisitionItems.some(r => r.DispatchedItems.some(d => d.DispatchedQuantity > d.AvailableQuantity))) {
+
+            let dispatchableRequisitionItems = requisitionToSend.RequisitionItems.filter(r => r.IsDispatchingNow == true);
+            if (dispatchableRequisitionItems && dispatchableRequisitionItems.length) {
+
+                  const allItemsZeroDispatchedQuantity = dispatchableRequisitionItems.every(item => {
+                        if (item.DispatchedItems.every(d => d.DispatchedQuantity <= 0)) {
+                              return true
+                        }
+                        else {
+                              return false;
+                        }
+                  });
+
+                  if (allItemsZeroDispatchedQuantity) {
+                        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Dispatched Qty should be greater than 0"]);
+                        return; // Return immediately if all DispatchedItems have DispatchedQuantity = 0
+                  }
+
+                  dispatchableRequisitionItems.forEach(r => r.DispatchedItems = r.DispatchedItems.filter(d => d.DispatchedQuantity > 0));
+            }
+
+            requisitionToSend.RequisitionItems = dispatchableRequisitionItems;
+
+            if (requisitionToSend.RequisitionItems.some(r => r.DispatchedItems.some(d => d.DispatchedQuantity > d.AvailableQuantity))) {
                   this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Dispatched Quantity can not be greater than Available Quantity"]);
             }
             else {
+                  this.loading = true;
                   var dispatchItemList: DispatchItemModel[] = [];
                   //Add all the dispatching items into a new object and send it to server side.
                   requisitionToSend.RequisitionItems.forEach(r => {
@@ -141,20 +157,22 @@ export class PHRMStoreDispatchItemsComponent {
                               dispatchedItem.DispensaryId = requisitionToSend.RequestingDispensaryId;
                               dispatchedItem.ItemId = r.ItemId;
                               dispatchedItem.ReceivedBy = this.ReceivedBy;
+                              dispatchedItem.ExistingPendingQuantity = r.PendingQuantity;
                               dispatchedItem.PendingQuantity = r.PendingQuantity - d.DispatchedQuantity - (i > 0 ? r.DispatchedItems[i - 1].DispatchedQuantity : 0);
                               dispatchItemList.push(dispatchedItem);
                         });
                   });
+
                   this.PharmacyBLService.PostDispatch(dispatchItemList).finally(() => this.loading = false)
                         .subscribe(
                               (res: DanpheHTTPResponse) => {
                                     if (res.Status === ENUM_DanpheHTTPResponses.OK) {
                                           this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Dispatch Items detail Saved."]);
-                                          this.PharmacyService._Id = res.Results.Result;
+                                          this.PharmacyService._DispatchId = res.Results.Result;
                                           this.RouteToDispatchDetailPage();
                                     }
                                     else {
-                                          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["failed to add result.. please check log for details."]);
+                                          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to dispatch items. <br>" + res.ErrorMessage]);
                                           this.logError(res.ErrorMessage);
                                     }
                               },

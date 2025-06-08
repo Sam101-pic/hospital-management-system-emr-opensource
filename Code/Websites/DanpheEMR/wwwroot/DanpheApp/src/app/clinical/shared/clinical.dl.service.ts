@@ -6,6 +6,7 @@ import { Injectable } from '@angular/core';
 
 import { NotesModel } from '../../clinical-notes/shared/notes.model';
 import { ClinicalSubjectivePrescriptionNotes } from '../../clinical-notes/shared/subjective-note.model';
+import { DanpheHTTPResponse } from '../../shared/common-models';
 import { IOPModel } from '../eye-examination/prescription-slip/shared/IOP.model';
 import { PrescriptionSlipModel } from '../eye-examination/prescription-slip/shared/PrescriptionSlip.model';
 import { TBUTModel } from '../eye-examination/prescription-slip/shared/TBUT.model';
@@ -28,7 +29,6 @@ import { RefractionModel } from '../eye-examination/shared/Refraction.model';
 import { SmileIncisionsModel } from '../eye-examination/shared/SmileIncisions.model';
 import { SmileSettingsModel } from '../eye-examination/shared/SmileSettings.model';
 import { WavefrontModel } from '../eye-examination/shared/Wavefront.model';
-import { DanpheHTTPResponse } from '../../shared/common-models';
 
 @Injectable()
 export class ClinicalDLService {

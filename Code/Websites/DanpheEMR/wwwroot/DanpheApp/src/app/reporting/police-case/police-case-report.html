@@ -8,9 +8,10 @@
   <div class="row">
     <div class="col-md-12">
       <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span
-          class="caption-subject">Police Case Report</span> </div>
+              class="caption-subject">Police Case Report</span> </div>
       <div class="col-md-6">
-        <from-to-date-select (on-change)="onDateChange($event)">
+        <from-to-date-select (on-change)="onDateChange($event)"
+                             [date-settings-name]="'common-range-with-today'">
         </from-to-date-select>
       </div>
       <div class="col-md-2 col-xs-12">
@@ -24,8 +25,8 @@
         <div style="float:right">
           <label class="lbl-discharged-only" for="dischargedOnly">Discharged Only<b>:</b> </label>
           <input id="dischargedOnly" name="dischargedOnly" style="zoom:1.5; height:auto; margin:10px;" type="checkbox"
-            (change)="checkValue(showDischargedOnly)" [(ngModel)]="showDischargedOnly"
-            [ngModelOptions]="{standalone: true}" />
+                 (change)="checkValue(showDischargedOnly)" [(ngModel)]="showDischargedOnly"
+                 [ngModelOptions]="{standalone: true}" />
         </div>
 
       </div>
@@ -33,7 +34,7 @@
 
     <div class="col-md-12 col-sm-12" *ngIf="showGrid">
       <danphe-grid [grid-colDefaults]="PoliceCaseGridColumns" [grid-data]="PoliceCaseData"
-        [NepaliDateInGridParams]="NepaliDateInGridSettings">
+                   [NepaliDateInGridParams]="NepaliDateInGridSettings">
       </danphe-grid>
     </div>
 

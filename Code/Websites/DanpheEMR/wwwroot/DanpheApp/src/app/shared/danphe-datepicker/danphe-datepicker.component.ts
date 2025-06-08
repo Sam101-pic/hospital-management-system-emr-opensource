@@ -4,6 +4,7 @@ import * as moment from 'moment/moment';
 import { CoreService } from '../../core/shared/core.service';
 import { NepaliYear } from '../../shared/calendar/np/nepali-dates';
 import { NepaliCalendarService } from '../calendar/np/nepali-calendar.service';
+import { MasterFiscalYearDto } from '../DTOs/master-fiscal-year.dto';
 import { ENUM_CalanderType } from '../shared-enums';
 
 
@@ -25,6 +26,8 @@ import { ENUM_CalanderType } from '../shared-enums';
 export class DatePickerComponent implements ControlValueAccessor, OnChanges {
   public dateModel: string = null;
   public isInitialLoad: boolean = true;
+  // CurrentFiscalYear: FiscalYearModel = new FiscalYearModel();
+  CurrentFiscalYear: MasterFiscalYearDto = new MasterFiscalYearDto();
 
   // Required for ControlValueAccessor interface
   writeValue(value: string) {
@@ -168,10 +171,14 @@ export class DatePickerComponent implements ControlValueAccessor, OnChanges {
   public nepYears: Array<NepaliYear> = [];
   public todayDateString: string = "";
   public showAdBsButton: boolean = true;
+  @Input("previous-fiscal-year")
+  public allowPreviousFiscalYear: boolean = true;
+
   public EnableEnglishCalendarOnly: boolean = false;
   constructor(public npCalendarService: NepaliCalendarService, private coreService: CoreService, public changeDetector: ChangeDetectorRef) {
     this.nepYears = NepaliYear.GetAllNepaliYears();
     this.showAdBsButton = this.coreService.showCalendarADBSButton;
+    this.CurrentFiscalYear = this.coreService.CurrentFiscalYearDetails;
     this.GetCalendarParameter();
   }
 
@@ -331,6 +338,14 @@ export class DatePickerComponent implements ControlValueAccessor, OnChanges {
         this.ngModelChange.emit(null);
         return;
       }
+      if (!this.allowPreviousFiscalYear && engDate) {
+        let isBetweenFiscalYear = moment(engDate).isBefore(this.CurrentFiscalYear.StartDate_AD);
+        if (isBetweenFiscalYear) {
+          this.isInvalid = true; this.valErrMessage = "Previous Fiscal Year is Not Allowed";
+          this.ngModelChange.emit(null);
+          return;
+        }
+      }
       if (!isBetweenMinMax) {
         this.isInvalid = true;
         let todayStr = moment().format("YYYY-MM-DD");
@@ -406,3 +421,4 @@ export class DatePickerComponent implements ControlValueAccessor, OnChanges {
     }, waitingTimeinMS);
   }
 }
+

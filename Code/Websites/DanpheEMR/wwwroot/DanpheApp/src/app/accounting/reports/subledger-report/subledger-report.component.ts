@@ -9,6 +9,7 @@ import { MessageboxService } from "../../../shared/messagebox/messagebox.service
 import { RouteFromService } from "../../../shared/routefrom.service";
 import { ENUM_DanpheHTTPResponseText, ENUM_DateFormat, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { AccountingSettingsBLService } from "../../settings/shared/accounting-settings.bl.service";
+import { Hospital_DTO } from "../../settings/shared/dto/hospitals.dto";
 import { LedgerModel } from "../../settings/shared/ledger.model";
 import { SubLedgerModel } from "../../settings/shared/sub-ledger.model";
 import { AccountingService } from "../../shared/accounting.service";
@@ -28,9 +29,10 @@ export class SubLedgerReportComponent {
     public fiscalYearId: number = 0;
     public subLedgerIds: Array<number> = [];
     public ledgerList: Array<LedgerModel> = new Array<LedgerModel>();
+    public selectedLedgerList: Array<LedgerModel> = new Array<LedgerModel>();
     public voucerType: Array<Voucher> = new Array<Voucher>();
     public subLedgerList: Array<SubLedgerModel> = new Array<SubLedgerModel>();
-    public filteredSubLedgerList: Array<SubLedgerModel> = new Array<SubLedgerModel>();
+    public FilteredSubLedgerList: Array<SubLedgerModel> = new Array<SubLedgerModel>();
     public validDate: boolean = false;
     public showSubLedgerData: boolean = false;
     public viewMode: string = `summary`;
@@ -51,6 +53,12 @@ export class SubLedgerReportComponent {
     public detailTxn: Array<SubLedgerTxnDetailVM> = new Array<SubLedgerTxnDetailVM>();
     public detailView: Array<SubLedgerDetailDataVM> = new Array<SubLedgerDetailDataVM>();
     public loading: boolean = false;
+    public HospitalList: Array<Hospital_DTO> = new Array<Hospital_DTO>();
+    public SelectedHospital: number = 0;
+    public AllLedgers: LedgerModel[] = [];
+    public FilteredLedgerList: LedgerModel[] = [];
+    public ActiveHospital: number = 0;
+
 
     constructor(public accRptBLService: AccountingReportsBLService,
         public messageBoxService: MessageboxService,
@@ -61,34 +69,58 @@ export class SubLedgerReportComponent {
         public routeFrom: RouteFromService,
         public changeDetector: ChangeDetectorRef,
         public nepaliCalendarServ: NepaliCalendarService) {
-        this.GetSubLedgerList();
-        this.ledgerList = this.accountingService.accCacheData.LedgersALL;
-        this.voucerType = this.accountingService.accCacheData.VoucherType;
+        this.Initialize();
+    }
+    Initialize() {
+        this.AllLedgers = this.accountingService.AllLedgers;
+        this.subLedgerList = this.accountingService.AllSubLedger;
+        this.CheckAndAssignHospital();
         this.ReadParam();
         this.accountingService.getCoreparameterValue();
+
+    }
+    CheckAndAssignHospital() {
+        this.ActiveHospital = this.securityService.AccHospitalInfo.ActiveHospitalId;
+        this.HospitalList = this.accountingService.accCacheData.Hospitals ? this.accountingService.accCacheData.Hospitals : [];
+        if (this.HospitalList.length === 1) {
+            this.SelectedHospital = this.HospitalList[0].HospitalId;
+        } else {
+            this.SelectedHospital = this.ActiveHospital;
+        }
+        this.FilterByHospitalId();
     }
 
     ngOnInit() {
 
     }
+    GetLedgerList() {
+        if (this.SelectedHospital > 0) {
+            this.ledgerList = this.accountingService.accCacheData.LedgersALL;
+        }
+    }
 
+    AssignHospital($event) {
+        if ($event) {
+            this.SelectedHospital = $event;
+            this.FilteredSubLedgerList = [];
+            this.showSubLedgerData = false;
+            this.subLedgerIds = [];
+            if (this.SelectedHospital > 0) {
+                this.FilterByHospitalId();
+            }
+        }
+    }
+    FilterByHospitalId() {
+        let tempLedgerList = this.AllLedgers.filter(sl => sl.HospitalId == this.SelectedHospital);
+        if (tempLedgerList) {
+            this.FilteredLedgerList = tempLedgerList;
+        }
+    }
     public ReadParam(): void {
         var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName === `Common` && a.ParameterName === `CustomerHeader`).ParameterValue;
         if (paramValue) {
             this.headerDetail = JSON.parse(paramValue);
         }
-    }
-
-    public GetSubLedgerList(): void {
-        this.accountingSettingsBLService.GetSubLedger()
-            .subscribe((res: DanpheHTTPResponse) => {
-                if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
-                    this.subLedgerList = res.Results;
-                }
-            },
-                (err: DanpheHTTPResponse) => {
-                    this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Error Occurred Detail:${err.ErrorMessage}`]);
-                })
     }
 
     selectDate(event): void {
@@ -105,14 +137,14 @@ export class SubLedgerReportComponent {
     }
 
     public GetSubLedgerReport(): void {
-        if (this.subLedgerIds.length) {
-            this.loading = true;
-            let postData = new SubLedgerReportRequest_DTO();
-            postData.SubLedgerIds = this.subLedgerIds;
-            postData.FromDate = this.fromDate;
-            postData.ToDate = this.toDate;
-            postData.FiscalYearId = this.fiscalYearId;
-
+        this.loading = true;
+        let postData = new SubLedgerReportRequest_DTO();
+        postData.SubLedgerIds = this.subLedgerIds;
+        postData.FromDate = this.fromDate;
+        postData.ToDate = this.toDate;
+        postData.FiscalYearId = this.fiscalYearId;
+        postData.HospitalId = this.SelectedHospital;
+        if (this.CheckValidation()) {
             this.accRptBLService.GetSubLedgerReport(postData)
                 .finally(() => { this.loading = false; })
                 .subscribe((res: DanpheHTTPResponse) => {
@@ -127,10 +159,23 @@ export class SubLedgerReportComponent {
                     })
         }
         else {
-            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`Please Select at least one SubLedger from the list.`]);
+            this.loading = false;
         }
-    }
 
+
+    }
+    public CheckValidation() {
+        let flag = true;
+        if (!this.subLedgerIds.length) {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ['Please Select at least one SubLedger from the list.']);
+            flag = false;
+        }
+        if (!this.SelectedHospital) {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ['Please select Account Section']);
+            flag = false;
+        }
+        return flag;
+    }
     public CalculateSubLedgerBalance(): void {
         this.summaryTxn = [];
         this.summaryView = [];
@@ -236,15 +281,16 @@ export class SubLedgerReportComponent {
 
     public OnLedgerSelected($event): void {
         if ($event) {
-            this.filteredSubLedgerList = [];
+            this.selectedLedgerList.push($event);
+            this.FilteredSubLedgerList = [];
             this.subLedgerIds = [];
             if ($event && $event.length) {
                 $event.forEach(v => {
-                    this.filteredSubLedgerList.push(...this.subLedgerList.filter(a => a.LedgerId === v.LedgerId));
+                    this.FilteredSubLedgerList.push(...this.subLedgerList.filter(a => a.LedgerId === v.LedgerId));
                 })
             }
             // else {
-            //     this.filteredSubLedgerList = this.subLedgerList;
+            //     this.FilteredSubLedgerList = this.subLedgerList;
             // }
             this.showSubLedgerData = false;
         }

@@ -23,6 +23,19 @@
     border: none;
   }
 </style>
+
+<div class="popup-static portlet box portlet-fullscreen" *ngIf="loadingScreen === true">
+  <div class="portlet-body form" style="background-color:white">
+    <div style="display: flex; height: 100vh; align-items: center; justify-content: center; flex-direction: column;gap: 10px 0;"
+         id='id_deposit_danpheLoading'>
+      <h3>Please Wait...</h3>
+      <div class="progress-bar">
+        <div class="progress-fill"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="wrapper">
   <div *ngIf="showReceipt">
     <bil-print-deposit-slip [deposit]="deposit"
@@ -96,7 +109,7 @@
                          type="number"
                          value=""
                          onclick="this.select()"
-                         (wheel)="coreService.PreventNumberChangeOnScroll($event)" (keyup.enter)="SetFocusById('txtRemarks')">
+                         (wheel)="coreService.PreventNumberChangeOnScroll($event)" (keyup.enter)="SetFocusById('CareOfName')">
                   <span class="color-red font-sm"
                         *ngIf="Amount.get('Amount').invalid && (Amount.get('Amount').dirty || Amount.get('Amount').touched)">
                     <small>Amount is Required</small></span>
@@ -121,7 +134,7 @@
                            name="outAmount"
                            type="number"
                            value=""
-                           (wheel)="coreService.PreventNumberChangeOnScroll($event)" (keyup.enter)="SetFocusById('txtRemarks')"
+                           (wheel)="coreService.PreventNumberChangeOnScroll($event)" (keyup.enter)="SetFocusById('CareOfName')"
                            [disabled]="(depositRefundUsingDepositReceiptNumber === true ? true : null)">
                     <!-- <span class="control-label col-md-12" style="font-weight:bold" *ngIf="deposit.Amount > 0"> ( In words: {{deposit.Amount | NumberInWords}} only ) </span> -->
                   </div>
@@ -135,6 +148,33 @@
               </div>
               <div class="row mb-1">
                 <div class="col-md-4">
+                  <p *ngIf="deposit.TransactionType === 'Deposit'">Depositor Name<b class="color-red"> <sup>*</sup></b></p>
+                  <p *ngIf="deposit.TransactionType === 'ReturnDeposit'">Refunded To<b class="color-red"> <sup>*</sup></b></p>
+                </div>
+                <div class="col-md-8">
+                  <input [(ngModel)]="deposit.CareOf" class="form-control pd-managed" id="CareOfName" placeholder="Name"
+                         (keyup.enter)="SetFocusById('CareOfContact')" name="Care taker name" (focusout)="ValidateDepositorNameAndContact()"
+                         type="text">
+                  <span *ngIf="depositorNameError" class="text-danger font-sm">
+                    {{ depositorNameError }}</span>
+                </div>
+              </div>
+              <div class="row mb-1">
+                <div class="col-md-4">
+                  <p *ngIf="deposit.TransactionType === 'Deposit'">Depositor Contact</p>
+                  <p *ngIf="deposit.TransactionType === 'ReturnDeposit'">Receiver Contact</p>
+                </div>
+                <div class="col-md-8">
+                  <input id="CareOfContact" [(ngModel)]="deposit.CareOfContact" class="form-control pd-managed"
+                         placeholder="eg: 1234567890 or +977-1234567890"
+                         name="CareOfContact" (focusout)="ValidateDepositorNameAndContact()"
+                         type="tel" (keyup.enter)="SetFocusById('txtRemarks')">
+                  <span *ngIf="depositorContactError" class="text-danger font-sm">
+                    {{ depositorContactError }}</span>
+                </div>
+              </div>
+              <div class="row mb-1">
+                <div class="col-md-4">
                   <p>Remarks</p>
                 </div>
                 <div class="col-md-8">
@@ -142,15 +182,7 @@
                          type="text" (keyup.enter)="SetFocusById('btnAddDeposit')">
                 </div>
               </div>
-              <div class="row mb-1">
-                <div class="col-md-4">
-                  <p>Care of Person</p>
-                </div>
-                <div class="col-md-8">
-                  <input [(ngModel)]="deposit.CareOf" class="form-control pd-managed" placeholder="Care of Person Name" name="Care taker name"
-                         type="text">
-                </div>
-              </div>
+
               <div class="row mb-1 billing-payment-option">
                 <div class="col-md-12 p-0">
                   <payment-mode-info

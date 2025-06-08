@@ -25,5 +25,8 @@ namespace DanpheEMR.ServerModel.PharmacyModels
         [JsonIgnore]
         public virtual PHRMGenericModel generic { get; set; }
         public int? GenericId { get; set; }
+        public bool IsCappingEnable { get; set; }
+        public int CappingDaysLimit { get; set; }
+        public decimal CappingQuantity { get; set; }
     }
 }

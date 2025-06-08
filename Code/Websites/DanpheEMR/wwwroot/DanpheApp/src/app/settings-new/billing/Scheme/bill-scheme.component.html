@@ -138,7 +138,7 @@
                                                             id="defaultPricecategoryupdate">
                                                         <option disabled selected>-Select Price Category-
                                                         </option>
-                                                        <option *ngFor="let pricelist of priceCategoryList"
+                                                        <option *ngFor="let pricelist of PriceCategoryList"
                                                                 [ngValue]="pricelist">
                                                             {{pricelist.PriceCategoryName}}
                                                         </option>
@@ -147,7 +147,7 @@
                                             </div>
                                             <div class="form-group col-md-12">
                                                 <label for="Name" class="control-label col-md-6">API Integration
-                                                    Name</label>
+                                                    Name :</label>
                                                 <div class="col-md-6">
                                                     <input class="form-control" maxlength="30" type="text"
                                                            id="id_bill_scheme_API_Integration_Name"
@@ -262,13 +262,30 @@
                                             </div>
                                             <div class="form-group col-md-12">
                                                 <label for="Name" class="control-label col-md-6">Field Setting Param
-                                                    Name</label>
+                                                    Name :</label>
                                                 <div class="col-md-6">
                                                     <input class="form-control" maxlength="30" type="text"
                                                            id="id_bill_scheme_field_setting_param_Name"
                                                            [(ngModel)]="billScheme.FieldSettingParamName"
                                                            [ngModelOptions]=" {standalone: true}" />
 
+                                                </div>
+                                            </div>
+                                            <div class="form-group col-md-12">
+                                                <label class="control-label col-md-8">Default Scheme? :</label>
+                                                <div class="col-md-4">
+                                                    <div class="input-group">
+                                                        <div class="icheck-inline">
+                                                            <label class="mt-checkbox mt-checkbox-outline">
+                                                                <input
+                                                                       id="id_bill_scheme_default_scheme"
+                                                                       [(ngModel)]="billScheme.IsSystemDefault"
+                                                                       type="checkbox"
+                                                                       [ngModelOptions]="{standalone: true}"
+                                                                       name="defaultScheme" /> <span></span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -335,7 +352,7 @@
                                                 <td>
                                                     <input type="checkbox"
                                                            id="id_bill_scheme_is_discount_registration_credit_applicable"
-                                                           [(ngModel)]="billScheme.IsRegistrationCreditApplicable"
+                                                           [(ngModel)]="billScheme.IsRegDiscountApplicable"
                                                            [ngModelOptions]=" {standalone: true}"
                                                            (wheel)="coreService.PreventNumberChangeOnScroll($event)"
                                                            onClick="this.select();" />
@@ -809,7 +826,7 @@
                                                     </div>
                                                     <div class="form-group col-md-12">
                                                         <label class="control-label col-md-8">Credit Applicable in
-                                                            IP Pharmacy</label>
+                                                            IP Pharmacy ?</label>
                                                         <div class="col-md-4">
                                                             <div class="input-group">
                                                                 <div class="icheck-inline">
@@ -833,6 +850,153 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- Referral Settings started-->
+                            <div class="row col-md-12 Referral-Setting">
+                                <label style=" text-decoration: underline; margin-top: 10px; margin-left:30px;">Referral
+                                    Setting</label>
+                                <div class=" ReferralSetting form-group col-md-12 main-form"
+                                     style="margin-bottom:30px">
+                                    <div class="form-group col-md-12">
+
+                                        <label class="control-label col-md-5" style="
+                                        margin-left: 30px;
+                                    ">Is Referral Code Applicable ?</label>
+                                        <div class="col-md-2">
+                                            <div class="input-group">
+                                                <div class="icheck-inline">
+                                                    <label class="mt-checkbox mt-checkbox-outline">
+                                                        <input
+                                                               name="IsReferralCodeApplicable"
+                                                               [(ngModel)]="billScheme.IsReferralCodeApplicable"
+                                                               [ngModelOptions]=" {standalone: true}" type="checkbox" />
+                                                        <span></span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div *ngIf="billScheme.IsReferralCodeApplicable" class="form-group col-md-12"
+                                         style="border: 1px solid #050505;margin-left: 22px;">
+                                        <div *ngIf="billScheme.IsReferralCodeApplicable">
+                                            <table
+                                                   class="table table-responsive " style="max-width:100%;margin-top:15px">
+                                                <tr>
+                                                    <th></th>
+                                                    <th><span style="margin-left: 35%;">IP</span></th>
+                                                    <th><span style="margin-left: 35%;">OP</span></th>
+                                                    <th><span style="margin-left: 35%;">ER</span></th>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <div style="display: flex; align-items: center;">
+
+                                                            <span style="padding: 5px;">
+                                                                Is Referral Code Compulsory?</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <input type="checkbox" id="id_bill_scheme_is_billing_IsIpReferralCodeCompulsory"
+                                                               class="IsIpReferralCodeCompulsory_applicable_table_checkbox"
+                                                               [(ngModel)]="billScheme.IsIpReferralCodeCompulsory"
+                                                               [ngModelOptions]=" {standalone: true}" style="margin-left: 35%;">
+                                                    </td>
+                                                    <td>
+                                                        <input type="checkbox" id="id_bill_scheme_is_billing_IsOpReferralCodeCompulsory"
+                                                               class="IsOpReferralCodeCompulsory_applicable_table_checkbox"
+                                                               [(ngModel)]="billScheme.IsOpReferralCodeCompulsory"
+                                                               [ngModelOptions]=" {standalone: true}" style="margin-left: 35%;">
+                                                    </td>
+                                                    <td>
+                                                        <input type="checkbox" id="id_bill_scheme_is_billing_IsErReferralCodeCompulsory"
+                                                               class="IsErReferralCodeCompulsory_applicable_table_checkbox"
+                                                               [(ngModel)]="billScheme.IsErReferralCodeCompulsory"
+                                                               [ngModelOptions]=" {standalone: true}" style="margin-left: 35%;">
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <div style="display: flex; align-items: center;">
+                                                            <span style="padding: 5px;">Referral Code Visit Limit</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                               type="number"
+                                                               id="id_bill_scheme_is_billing_IpReferralCodeVisitLimit"
+                                                               min="1"
+                                                               [ngModelOptions]="{standalone: true}"
+                                                               style="zoom: 1; margin-top: 3px;"
+                                                               [(ngModel)]="billScheme.IpReferralCodeVisitLimit" />
+
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                               type="number"
+                                                               id="id_bill_scheme_is_billing_OpReferralCodeVisitLimit"
+                                                               min="1"
+                                                               [ngModelOptions]="{standalone: true}"
+                                                               style="zoom: 1; margin-top: 3px;"
+                                                               [(ngModel)]="billScheme.OpReferralCodeVisitLimit" />
+
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                               type="number"
+                                                               id="id_bill_scheme_is_billing_ErReferralCodeVisitLimit"
+                                                               min="1"
+                                                               [ngModelOptions]="{standalone: true}"
+                                                               style="zoom: 1; margin-top: 3px;"
+                                                               [(ngModel)]="billScheme.ErReferralCodeVisitLimit" />
+
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <div style="display: flex; align-items: center;">
+                                                            <span style="padding: 5px;">Referral Code Validity Period</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                               type="number"
+                                                               id="id_bill_scheme_is_billing_IpReferralCodeValidityPeriod"
+                                                               min="1"
+                                                               [ngModelOptions]="{standalone: true}"
+                                                               style="zoom: 1; margin-top: 3px;"
+                                                               [(ngModel)]="billScheme.IpReferralCodeValidityPeriod"
+                                                               placeholder="In Days" />
+
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                               type="number"
+                                                               id="id_bill_scheme_is_billing_OpReferralCodeValidityPeriod"
+                                                               min="1"
+                                                               [ngModelOptions]="{standalone: true}"
+                                                               style="zoom: 1; margin-top: 3px;"
+                                                               [(ngModel)]="billScheme.OpReferralCodeValidityPeriod"
+                                                               placeholder="In Days" />
+
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                               type="number"
+                                                               id="id_bill_scheme_is_billing_ErReferralCodeValidityPeriod"
+                                                               min="1"
+                                                               [ngModelOptions]="{standalone: true}"
+                                                               style="zoom: 1; margin-top: 3px;"
+                                                               [(ngModel)]="billScheme.ErReferralCodeValidityPeriod"
+                                                               placeholder="In Days" />
+
+                                                    </td>
+                                                </tr>
+
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Copayment Settings started-->
                             <div class="row col-md-12 Copayment-Setting">
                                 <label
@@ -936,7 +1100,94 @@
                             </div>
                         </div>
                     </form>
+                    <!--Insurance Capping Setting-->
+                    <div class="row col-md-12" style="margin-left: 25px !important;">
+                        <label
+                               style=" text-decoration: underline; margin-top: 10px; margin-left:10px;">Insurance Capping Setting</label>
+                        <div class="col-md-12"
+                             style="margin-bottom: 65px !important;">
+                            <div class="col-md-6" style="padding: 0px !important; margin-top: 10px !important;">
+                                <label class="control-label col-md-8"
+                                       style="font-weight: 700 !important;">Capping Applicable in Billing?</label>
+                                <div class="col-md-4">
+                                    <div>
+                                        <div class="icheck-inline">
+                                            <label class="mt-checkbox mt-checkbox-outline">
+                                                <input id="id_bill_scheme_capping_applicable_in_billing"
+                                                       style="margin-left: 60px !important"
+                                                       name="IsBillingCappingApplicable"
+                                                       [(ngModel)]="billScheme.IsBillingCappingApplicable" type="checkbox"
+                                                       #IsBillingCappingApplicable />
+                                                <span></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6" style="padding: 0px !important; margin-top: 10px !important;">
+                                <label class="control-label col-md-8"
+                                       style="font-weight: 700 !important;">Capping Applicable in Pharmacy?</label>
+                                <div class="col-md-4">
+                                    <div>
+                                        <div class="icheck-inline">
+                                            <label class="mt-checkbox mt-checkbox-outline">
+                                                <input id="id_bill_scheme_capping_applicable_in_Pharmacy"
+                                                       style="margin-left: 60px !important"
+                                                       name="IsPharmacyCappingApplicable"
+                                                       [(ngModel)]="billScheme.IsPharmacyCappingApplicable" type="checkbox"
+                                                       #IsPharmacyCappingApplicable />
+                                                <span></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6" style="padding: 0px !important; margin-top: 10px !important;">
+                                <label class="control-label col-md-8"
+                                       style="font-weight: 700 !important;">Use Capping API?</label>
+                                <div class="col-md-4">
+                                    <div>
+                                        <div class="icheck-inline">
+                                            <label class="mt-checkbox mt-checkbox-outline">
+                                                <input id="id_bill_scheme_use_capping_api"
+                                                       style="margin-left: 60px !important"
+                                                       name="UseCappingAPI"
+                                                       [(ngModel)]="billScheme.UseCappingAPI"
+                                                       type="checkbox" #UseCappingAPI>
+                                                <span></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
+                    <!-- Sale Price Editable Setting -->
+                    <div class="row col-md-12 Copayment-Setting">
+                        <label
+                               style=" text-decoration: underline; margin-top: 10px; margin-left:10px;">Sale Price Editable Setting</label>
+                        <div class="form-group col-md-12 main-form"
+                             style="margin-bottom:30px">
+                            <div class="form-group col-md-12">
+
+                                <label class="control-label col-md-3"><strong>Is Pharmacy Sale Price Editable?</strong></label>
+                                <div class="col-md-2">
+                                    <div class="input-group">
+                                        <div class="icheck-inline">
+                                            <label class="mt-checkbox mt-checkbox-outline">
+                                                <input id="id_bill_scheme_is_sale-price-editable"
+                                                       name="IsSalePriceEditable"
+                                                       [(ngModel)]="billScheme.IsPharmacySalePriceEditable"
+                                                       [ngModelOptions]=" {standalone: true}" type="checkbox" />
+                                                <span></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <!-- SubScheme Setting -->
                     <div class="row col-md-12" style="margin-left: 25px !important;">
                         <label

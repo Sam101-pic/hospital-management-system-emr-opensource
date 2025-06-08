@@ -1,4 +1,4 @@
-<div class="wrapper">
+<div class="wrapper" id="id_lab_report_view">
   <!--enableResultEdit-->
   <button class="btn btn-cancel" *ngIf="enableResultEdit && !showAddEditResult && securityService.HasPermission('btn-lab-final-reports-tests-edit')"
           style="float:right"
@@ -19,16 +19,18 @@
                           [IsFileUploaded]="IsFileUploaded"
                           [printReportFromGrid]="printReportFromGrid" (callBackToReportAddUpdate)="ReportAddUpdateSuccess($event)"
                           (callbackBackToGrid)="CallBackBackToGrid($event)" (callBackUplaod)="exportToPdf()"
-                          (updatePrintStatus)="updatePrintStatus($event)">
+                          (updatePrintStatus)="updatePrintStatus($event)" [showReportFromClaimScrubbing]="showReportFromClaimScrubbing"
+                          [ShowPrintButtonFromClaimScrubbing]="showPrintButtonFromClaimScrubbing">
   </danphe-lab-view-report>
   <danphe-lab-view-report-format2 *ngIf="showReport && labReportFormat == 'format2'" [templateReport]="templateReport"
-                                  [showReport]="showReport" [showHeader]="showHeader" [showSignatories]="showSignatories" [enableEdit]="enableEdit"
+                                  [showReport]="showReport" [showSignatories]="showSignatories" [enableEdit]="enableEdit"
                                   [IsFileUploaded]="IsFileUploaded"
-                                  [hidePrintButton]="hidePrintButton" [verificationRequired]="verificationRequired"
+                                  [hidePrintButton]="hidePrintButton" [verificationRequired]="verificationRequired" [showHeader]="showHeader"
                                   [showUplaodToTeleMedicine]="showUplaodToTeleMedicine"
                                   [printReportFromGrid]="printReportFromGrid" (callbackBackToGrid)="CallBackBackToGrid($event)"
                                   (callBackUplaod)="exportToPdf()"
-                                  (updatePrintStatus)="updatePrintStatus($event)">
+                                  (updatePrintStatus)="updatePrintStatus($event)" [showReportFromClaimScrubbing]="showReportFromClaimScrubbing"
+                                  [ShowPrintButtonFromClaimScrubbing]="showPrintButtonFromClaimScrubbing">
   </danphe-lab-view-report-format2>
 
   <div class="popup-static portlet box portlet-fullscreen" *ngIf="showReUploadPopup">

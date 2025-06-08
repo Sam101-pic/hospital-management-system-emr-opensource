@@ -53,6 +53,8 @@ import { PatientIpSummaryComponent } from './ip-billing/patient/patient-ip-summa
 import { PatientsBLService } from '../patients/shared/patients.bl.service';
 import { DanpheAutoCompleteModule } from '../shared/danphe-autocomplete/danphe-auto-complete.module';
 //import { IPBillingRequestSlipComponent } from './print-pages/ip-item-request-print/ip-billing-request-slip.component';
+import { RegistrationSchemeSharedModule } from '../appointments/shared/registration-scheme/registration-scheme-shared.module';
+import { VisitBLService } from '../appointments/shared/visit.bl.service';
 import { PatientSharedModule } from '../patients/patient-shared.module';
 import { SettingsSharedModule } from '../settings-new/settings-shared.module';
 import { StickerSharedModule } from '../stickers/stickers-shared-module';
@@ -81,7 +83,7 @@ import { BillingMasterDlService } from './shared/billing-master.dl.service';
 @NgModule({
   providers: [
     BillingBLService, BillingDLService, LabsDLService,
-    VisitDLService, AppointmentDLService, PatientsDLService,
+    VisitBLService, VisitDLService, AppointmentDLService, PatientsDLService,
     ImagingDLService, OrdersBLService, ADT_DLService, PatientsBLService,
     BillingMasterBlService, BillingMasterDlService, BillingInvoiceBlService,
     BillingSelectPatientCanActivateGuard],
@@ -98,6 +100,7 @@ import { BillingMasterDlService } from './shared/billing-master.dl.service';
     BillingPrintSharedModule,
     StickerSharedModule,
     UtilitiesSharedModule,
+    RegistrationSchemeSharedModule
   ],
   declarations: [
     BillingMainComponent,

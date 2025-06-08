@@ -159,7 +159,7 @@
             </form>
           </td>
           <td *ngIf='!OtherSectionFlag'>
-            <button class="btn green btn-success margin-7-hr" title="Click To load Item" (click)="load()">load
+            <button class="btn green btn-success margin-7-hr" [disabled]="Loading" title="Click To load Item" (click)="load()">Load
             </button>
           </td>
         </tr>
@@ -190,7 +190,7 @@
                             style="color: orange;font-family: 'Quicksand', 'Open Sans', sans-serif;font-weight: 600;margin-left: 6px;">Create
                       ledger for selected vendor</strong>
                   </i></b>
-                <span *ngIf="Payment.LedgerId">|| Ledger: </span> <b><em
+                <span *ngIf="Payment.LedgerId">| Ledger: </span> <b><em
                       *ngIf="Payment.LedgerId">{{SelectedVendor.LedgerName}}</em></b></span>
 
               <span *ngIf="InvSectionFlag && SelectedVendor && SubLedgerAndCostCenterSetting.EnableSubLedger">Payment for:
@@ -201,7 +201,7 @@
                             style="color: orange;font-family: 'Quicksand', 'Open Sans', sans-serif;font-weight: 600;margin-left: 6px;">Create
                       sub-ledger for selected vendor</strong>
                   </i></b>
-                <span *ngIf="Payment.SubLedgerId">|| SubLedger:</span><b><em
+                <span *ngIf="Payment.SubLedgerId">| SubLedger:</span><b><em
                       *ngIf="Payment.SubLedgerId">{{SelectedVendor.SubLedgerName}}</em></b></span>
 
               <span *ngIf="PhrmSectionFlag && SelectedSupplier && !SubLedgerAndCostCenterSetting.EnableSubLedger">Payment for:
@@ -213,7 +213,7 @@
                       ledger for selected supplier</strong>
 
                   </i></b>
-                <span *ngIf="Payment.LedgerId">|| Ledger: </span><b><em *ngIf="Payment.LedgerId">{{SelectedSupplier.LedgerName}}</em></b></span>
+                <span *ngIf="Payment.LedgerId">| Ledger: </span><b><em *ngIf="Payment.LedgerId">{{SelectedSupplier.LedgerName}}</em></b></span>
 
               <span *ngIf="PhrmSectionFlag && SelectedSupplier && SubLedgerAndCostCenterSetting.EnableSubLedger">Payment for:
                 <b>{{SelectedSupplier.SupplierName}}
@@ -223,7 +223,7 @@
                             style="color: orange;font-family: 'Quicksand', 'Open Sans', sans-serif;font-weight: 600;margin-left: 6px;">Create
                       sub-ledger for selected supplier</strong>
                   </i></b>
-                <span *ngIf="Payment.SubLedgerId">|| SubLedger: </span>|| SubLedger: <b><em
+                <span *ngIf="Payment.SubLedgerId">| SubLedger: </span> <b><em
                       *ngIf="Payment.SubLedgerId">{{SelectedSupplier.SubLedgerName}}</em></b></span>
             </h3>
             <a class="btn btn-danger" (click)="close()" title="Cancel">X</a>
@@ -370,8 +370,8 @@
                   <!-- <input type="button" class="btn green btn-success margin-7-hr" (click)="Loading=true;makePayment()"
                     value="{{Loading == true ? 'Making Payment..': 'Make Payment'}}" [disabled]="!Payment.LedgerId"  *ngIf="!Payment.LedgerId"
                     id="MakePayment" /> -->
-                  <input type="button" class="btn btn-danger margin-7-hr" (click)="Loading=true;cancel()"
-                         [disabled]="Loading" value="Cancel" />
+                  <input type="button" class="btn btn-danger margin-7-hr" (click)="cancel()"
+                         value="Cancel" />
                 </div>
               </div>
             </div>
@@ -381,7 +381,7 @@
     </div>
   </div>
 </div>
-<transaction-view [voucherNumber]="VoucherNumber" [FiscalYearId]="FiscalYearId"></transaction-view>
+<transaction-view [voucherNumber]="VoucherNumber" [FiscalYearId]="FiscalYearId" [HospitalId]="ActiveHospitalId"></transaction-view>
 <ng-container *ngIf="ShowAddLedgerBox">
   <ledger-create-shared [show-add-ledger-page]="ShowAddLedgerBox" [ledger-type]="LedgerType"
                         [reference-id]="LedReferenceId" (callback-add)="OnNewLedgerAdded($event)"></ledger-create-shared>

@@ -11,7 +11,8 @@
     <div class="col-md-7 col-xs-12">
       <label style="vertical-align: top;margin-top: 10px; margin-right: 10px;">Request Date: </label>
       <div style="display: inline-block;">
-        <from-to-date-select (on-change)="OnFromToDateChange($event)"> </from-to-date-select>
+        <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                             [date-settings-name]="'common-range-with-today'"> </from-to-date-select>
       </div>
     </div>
     <div class="col-md-5 col-xs-12">
@@ -41,7 +42,7 @@
       <div class="row">
         <div class="col-md-5">
           <input id="searchBxLabReport" class="custom-table-search" [(ngModel)]="searchString" onclick="this.select();"
-            placeholder="Search by Hospital No. Or Patient Name">
+                 placeholder="Search by Hospital No. Or Patient Name">
         </div>
         <div class="col-md-7">
         </div>
@@ -59,9 +60,9 @@
         </thead>
         <tbody>
           <ng-container
-            *ngFor="let report of reportListFiltered | searchFilter: searchString | async| paginate: {id: 'listing_pagination', itemsPerPage: 20, currentPage: page } ; let i = index;">
+                        *ngFor="let report of reportListFiltered | searchFilter: searchString | async| paginate: {id: 'listing_pagination', itemsPerPage: 20, currentPage: page } ; let i = index;">
             <tr class="hover-effect" [ngClass]="report.IsSelected ? 'highlightbg':'donthighlight'"
-              (click)="SelectUnselectRow(report)">
+                (click)="SelectUnselectRow(report)">
               <td class="wd-60"> {{((page-1) * 20) + i+1}} </td>
               <td class="wd-130"> {{report.PatientCode}} </td>
               <td class="wd-270"> {{report.PatientName}} </td>
@@ -83,7 +84,7 @@
     </div>
     <div class="col-md-7">
       <lab-report-dispatch-detail *ngIf="showSelectedPatTestDetail" [patientId]="patientId" [fromDate]="fromDate"
-        [toDate]="toDate" [catagoryList]="catIdList"> </lab-report-dispatch-detail>
+                                  [toDate]="toDate" [catagoryList]="catIdList"> </lab-report-dispatch-detail>
     </div>
   </div>
 

@@ -1,5 +1,5 @@
 <div class="col-md-12" style="padding:2px 0px">
-  <div class="col-md-3">
+  <div class="col-md-3" style="padding-left:0px !important;">
     <button rbac-permission='{"name":"inventory-direct-dispatch-btn","actionOnInvalid":"hidden"}' class="btn btn-primary" (click)="DirectDispatch()">
       Direct&nbsp;Dispatch&nbsp;
       <i class="fa fa-mail-reply-all fa-flip-horizontal"></i>
@@ -10,21 +10,25 @@
       <div class="icheck-inline">
         List by Requisition Status: &nbsp;
         <label class="mt-radio mt-radio-outline">
-          <input type="radio" (change)="LoadRequisitionListByStatus()" checked name="RequisitionStatusFilter" [(ngModel)]="RequisitionStatusFilter" value="pending" style="width:15px;height:15px" />
+          <input type="radio" (change)="LoadRequisitionListByStatus()" checked name="RequisitionStatusFilter" [(ngModel)]="RequisitionStatusFilter"
+                 value="pending" style="width:15px;height:15px" />
           <span></span>Pending
         </label>
         <label class="mt-radio mt-radio-outline">
-          <input type="radio" (change)="LoadRequisitionListByStatus()" name="RequisitionStatusFilter" [(ngModel)]="RequisitionStatusFilter" value="complete" style="width:15px;height:15px" />
+          <input type="radio" (change)="LoadRequisitionListByStatus()" name="RequisitionStatusFilter" [(ngModel)]="RequisitionStatusFilter"
+                 value="complete" style="width:15px;height:15px" />
           <span></span>Complete
         </label>
 
         <label class="mt-radio mt-radio-outline">
-          <input type="radio" (change)="LoadRequisitionListByStatus()" name="RequisitionStatusFilter" [(ngModel)]="RequisitionStatusFilter" value="cancelled" style="width:15px;height:15px" />
+          <input type="radio" (change)="LoadRequisitionListByStatus()" name="RequisitionStatusFilter" [(ngModel)]="RequisitionStatusFilter"
+                 value="cancelled" style="width:15px;height:15px" />
           <span></span>Cancelled
         </label>
 
         <label class="mt-radio mt-radio-outline">
-          <input type="radio" (change)="LoadRequisitionListByStatus()" name="RequisitionStatusFilter" [(ngModel)]="RequisitionStatusFilter" value="all" style="width:15px;height:15px" />
+          <input type="radio" (change)="LoadRequisitionListByStatus()" name="RequisitionStatusFilter" [(ngModel)]="RequisitionStatusFilter"
+                 value="all" style="width:15px;height:15px" />
           <span></span>All
         </label>
       </div>
@@ -35,7 +39,9 @@
   <div>
     <div class="row">
       <div class="col-lg-12 col-sm-12">
-        <danphe-grid [grid-colDefaults]="deptwiseGridColumns" [grid-data]="RequisitionGridDataFiltered" [show-CustomDate]="true" [NepaliDateInGridParams]="NepaliDateInGridSettings" (onDateChange)="onDateChange($event)" (grid-actions)="DeptGridAction($event)" [date-settings-name]="'billing-reports'"></danphe-grid>
+        <danphe-grid [grid-colDefaults]="deptwiseGridColumns" [grid-data]="RequisitionGridDataFiltered" [show-CustomDate]="true"
+                     [NepaliDateInGridParams]="NepaliDateInGridSettings" (onDateChange)="onDateChange($event)" (grid-actions)="DeptGridAction($event)"
+                     [date-settings-name]="'billing-reports'"></danphe-grid>
       </div>
     </div>
   </div>
@@ -55,7 +61,9 @@
             <a style="float:right;  margin-top:-13px;" class="btn btn-danger" (click)="Close()" title="Cancel">X</a>
             <hr />
           </div>
-          <danphe-grid [grid-colDefaults]="DispatchListGridColumns" [grid-data]="dispatchList" (grid-actions)="DispatchDetailsGridAction($event)" [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" [NepaliDateInGridParams]="NepaliDateInGridSettingsForDispatchList">
+          <danphe-grid [grid-colDefaults]="DispatchListGridColumns" [grid-data]="dispatchList" (grid-actions)="DispatchDetailsGridAction($event)"
+                       [grid-exportOptions]="gridExportOptions" [grid-showExport]="true"
+                       [NepaliDateInGridParams]="NepaliDateInGridSettingsForDispatchList">
           </danphe-grid>
           <hr />
         </div>
@@ -78,7 +86,8 @@
             <a style="float:right;  margin-top:-13px;" class="btn btn-danger" (click)="Close()" title="Cancel">X</a>
             <hr />
           </div>
-          <danphe-grid [grid-colDefaults]="CancelListGridColumns" [grid-data]="cancelList" [grid-exportOptions]="gridExportOptions" [grid-showExport]="true">
+          <danphe-grid [grid-colDefaults]="CancelListGridColumns" [grid-data]="cancelList" [grid-exportOptions]="gridExportOptions"
+                       [grid-showExport]="true">
           </danphe-grid>
           <hr />
         </div>

@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { GridEmitModel } from '../../../shared/danphe-grid/grid-emit.model';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponses } from '../../../shared/shared-enums';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { SettingsService } from '../../shared/settings-service';
 import { SettingsBLService } from '../../shared/settings.bl.service';
 import { Template_DTO } from '../shared/template-dto';
@@ -271,7 +271,7 @@ export class TemplateComponent {
         this.settingsBLService.UpdateDynTemplate(this.currentTemplate)
           .subscribe((res: DanpheHTTPResponse) => {
             if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-              this.msgBoxServ.showMessage("Success", ["Template Updated."]);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Template Updated."]);
               this.CallBackAddUpdate(res, "update");
               this.GetTemplateList();
             }
@@ -289,7 +289,7 @@ export class TemplateComponent {
       if (res.Status === ENUM_DanpheHTTPResponses.OK) {
         let dynTemplate = new Template();
         this.isValidTemplate = true;
-        dynTemplate = Object.assign(dynTemplate, res.Results);
+        dynTemplate = Object.assign(dynTemplate, res.Results.Result);
         if (action == "add") {
 
           this.dynTemplateList.push(dynTemplate);
@@ -315,6 +315,7 @@ export class TemplateComponent {
     } catch (exception) {
       this.ShowCatchErrMessage(exception);
     }
+    this.GetTemplateList();
   }
   ClosePopup() {
     this.showFieldMappingPage = false;

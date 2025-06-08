@@ -30,7 +30,7 @@ import { PatientService } from "../../../patients/shared/patient.service";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { CommonFunctions } from "../../../shared/common.functions";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_DateTimeFormat, ENUM_Genders, ENUM_LabTemplateType, ENUM_LaboratoryResultValidation, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { LabReportVM, ReportLookup } from "../../reports/lab-report-vm";
 import { AutoCalculationConfig } from "../../shared/DTOs/auto-calculation-DTO";
 import { MachineResult_DTO } from "../../shared/DTOs/machine-result.dto";
@@ -174,17 +174,18 @@ export class LabTestsAddResultComponent {
   }
 
   MapMachineData() {
-    this.lisResultIdList = [];
+    //this.lisResultIdList = [];
     this.templateReport.Templates.forEach(template => {
       template.Tests.forEach(test => {
         test.Components.forEach(comp => {
           if (this.machineResult) {
             let component = this.machineResult.find(a => a.ComponentId === comp.ComponentId);
             if (component) {
-              comp.Value = (+component.Value * +component.ConversionFactor).toString();
+              let value = isNaN(component.Value) ? component.Value.toString() : (+component.Value * +component.ConversionFactor).toFixed(comp.ValuePrecision).toString();
+              comp.Value = comp.GroupName === ENUM_LaboratoryResultValidation.Check100 ? value.padStart(2, "0") : value;
               comp.MachineResultIndicator = "(M)";
               comp.IsValueValid = true;
-              this.lisResultIdList.push(component.LisResultId);
+              //this.lisResultIdList.push(component.LisResultId);
               this.CheckIfAbnormal(comp, test);
             }
           }
@@ -262,7 +263,7 @@ export class LabTestsAddResultComponent {
 
   public GetAllReportTemplates() {
     this.labBLService.GetAllReportTemplates().subscribe((res) => {
-      if (res.Status == "OK") {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
         this.reportTemplates = res.Results;
         this.changeReportTemplate = false;
         if (
@@ -272,7 +273,7 @@ export class LabTestsAddResultComponent {
         )
           this.SetTemplate();
       } else {
-        this.msgBoxServ.showMessage("failed", [
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [
           "Failed to get Report Templates. Check Log",
         ]);
         console.log(res.ErrorMessage);
@@ -280,7 +281,7 @@ export class LabTestsAddResultComponent {
     });
   }
   public SetTemplate() {
-    if (this.templateReport.TemplateType.toLowerCase() == "html") {
+    if (this.templateReport.TemplateType.toLowerCase() === ENUM_LabTemplateType.Html) {
       let template = this.reportTemplates.find(
         (a) => a.ReportTemplateID == this.templateReport.Templates[0].TemplateId
       );
@@ -344,7 +345,7 @@ export class LabTestsAddResultComponent {
                 _testComponent.ComponentName =
                   labTest.Components[i].ComponentName;
 
-                if (template.TemplateType == "html") {
+                if (template.TemplateType === ENUM_LabTemplateType.Html) {
                   this.ckHtmlContent = labTest.Components[i].Value;
                 }
 
@@ -409,7 +410,7 @@ export class LabTestsAddResultComponent {
                     _testComponent.ValueType = "string";
                     _testComponent.CultureAddedGroup = [];
 
-                    if (template.TemplateType == "culture") {
+                    if (template.TemplateType === ENUM_LabTemplateType.Culture) {
                       _testComponent.IsSelected = true;
                     }
 
@@ -457,7 +458,7 @@ export class LabTestsAddResultComponent {
                 newComp.ComponentName = cmpnt.ComponentName;
                 newComp.IsSelected = false;
 
-                if (template.TemplateType == "culture") {
+                if (template.TemplateType === ENUM_LabTemplateType.Culture) {
                   newComp.IsSelected = true;
                   newComp.Value = "";
                 }
@@ -488,7 +489,7 @@ export class LabTestsAddResultComponent {
             });
 
             //addd the extra result group of culture result
-            if (template.TemplateType == "culture") {
+            if (template.TemplateType === ENUM_LabTemplateType.Culture) {
               for (var g = 2; g <= newLabtestVm.MaxResultGroup; g++) {
                 newLabtestVm.Components.forEach((c) => {
                   c.IsSelected = true;
@@ -536,8 +537,8 @@ export class LabTestsAddResultComponent {
                 _testComponent = Object.assign(_testComponent, component);
                 _testComponent.ComponentName = component.ComponentName;
                 _testComponent.LabTestId = labTest.LabTestId;
-
-                if (template.TemplateType == "html") {
+                this.MapRangeDescription(_testComponent);
+                if (template.TemplateType === ENUM_LabTemplateType.Html) {
                   //_testComponent.Value = this.templateReport.TemplateHTML;
                   this.ckHtmlContent = this.templateReport.TemplateHTML;
                 }
@@ -550,7 +551,7 @@ export class LabTestsAddResultComponent {
                   _testComponent.IsSelected = false;
                 }
 
-                if (template.TemplateType == "culture") {
+                if (template.TemplateType === ENUM_LabTemplateType.Culture) {
                   _testComponent.IsSelected = true;
                   newLabtestVm.SelectAll = true;
                 }
@@ -576,7 +577,7 @@ export class LabTestsAddResultComponent {
     }
   }
 
-  AddNewComponent(test: LabResult_TestVM, type: string = "normal") {
+  AddNewComponent(test: LabResult_TestVM, type: string = ENUM_LabTemplateType.Normal) {
     let newComponent = new LabTestComponent();
     newComponent.RequisitionId = test.RequisitionId;
     newComponent.LabTestId = test.LabTestId;
@@ -595,14 +596,14 @@ export class LabTestsAddResultComponent {
     newComponent.CultureAddedGroup = [];
     newComponent.GroupName = null;
     newComponent.DisplaySequence = 100;
-    newComponent.CreatedOn = moment().format("YYYY-MM-DD");
+    newComponent.CreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
 
     newComponent.IsGroupValid = true;
 
-    if (type == "normal") {
+    if (type === ENUM_LabTemplateType.Normal) {
       newComponent.IsSelected = false;
       newComponent.ComponentValidator.disable();
-    } else if (type == "culture") {
+    } else if (type === ENUM_LabTemplateType.Culture) {
       let grpLen = test.MaxResultGroup ? test.MaxResultGroup : 1;
       for (let j = 2; j <= grpLen; j++) {
         let innerComp = Object.assign(
@@ -639,14 +640,14 @@ export class LabTestsAddResultComponent {
       } else {
         //component.IsGroupValid = true;
         //component.ComponentValidator.disable();
-        if (this.templateReport.TemplateType == "culture") {
+        if (this.templateReport.TemplateType === ENUM_LabTemplateType.Culture) {
         } else {
           component.IsGroupValid = true;
           component.ComponentValidator.disable();
         }
         //display unchecked warning only once.. no point in showing again and again..
         if (!this.uncheckedWarningShown) {
-          this.msgBoxServ.showMessage("warning", [
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, [
             "Unchecked items will not be saved in report.",
           ]);
           this.uncheckedWarningShown = true;
@@ -812,14 +813,14 @@ export class LabTestsAddResultComponent {
       if (actualAge > 16) {
         //Use validation according to Gender
         if (
-          patGender.toLowerCase() == "male" &&
+          patGender.toLowerCase() === ENUM_Genders.Male &&
           comp.MaleRange &&
           comp.MaleRange.trim() != "" &&
           comp.MaleRange.length
         ) {
           comp.Range = comp.MaleRange;
         } else if (
-          patGender.toLowerCase() == "female" &&
+          patGender.toLowerCase() === ENUM_Genders.Female &&
           comp.FemaleRange &&
           comp.FemaleRange.trim() != "" &&
           comp.FemaleRange.length
@@ -839,14 +840,14 @@ export class LabTestsAddResultComponent {
           comp.Range = comp.ChildRange;
         } else {
           if (
-            patGender.toLowerCase() == "male" &&
+            patGender.toLowerCase() === ENUM_Genders.Male &&
             comp.MaleRange &&
             comp.MaleRange.trim() != "" &&
             comp.MaleRange.length
           ) {
             comp.Range = comp.MaleRange;
           } else if (
-            patGender.toLowerCase() == "female" &&
+            patGender.toLowerCase() === ENUM_Genders.Female &&
             comp.FemaleRange &&
             comp.FemaleRange.trim() != "" &&
             comp.FemaleRange.length
@@ -894,7 +895,6 @@ export class LabTestsAddResultComponent {
             if (value < Number(range[0])) {
               comp.AbnormalType = "low";
             } else {
-              http://localhost:56326/Home/Index#/Patient
               comp.AbnormalType = "high";
             }
             comp.IsAbnormal = true;
@@ -965,7 +965,7 @@ export class LabTestsAddResultComponent {
     var groupValidation = { isGroupValid: true, validationMessage: "" };
     groupName = groupName ? groupName.toLowerCase() : '';
     switch (groupName) {
-      case "check100":
+      case ENUM_LaboratoryResultValidation.Check100:
         let valueArray = groupComponents.map((a) => {
           //Anish: 3 Oct, Added IsSelected Option As Well
           if (a.ValueType == "number" && a.IsSelected == true) {
@@ -1009,7 +1009,7 @@ export class LabTestsAddResultComponent {
         this.templateReport.Templates.length
       ) {
         this.templateReport.Templates.forEach((template) => {
-          if (template.TemplateType == "normal") {
+          if (template.TemplateType === ENUM_LabTemplateType.Normal) {
             template.Tests.forEach((tst) => {
               if (tst.IsNegativeResult) {
                 let negResComponent = new LabTestComponent();
@@ -1043,7 +1043,7 @@ export class LabTestsAddResultComponent {
               }
             });
           } else {
-            if (template.TemplateType == "html") {
+            if (template.TemplateType === ENUM_LabTemplateType.Html) {
               template.Tests.forEach((tst) => {
                 if (tst.IsNegativeResult) {
                   let negResComponent = new LabTestComponent();
@@ -1080,7 +1080,7 @@ export class LabTestsAddResultComponent {
               template.Tests.forEach((tst) => {
                 let singleSpecimen: LabTestSpecimenModel = new LabTestSpecimenModel();
 
-                if (template.TemplateType == "culture") {
+                if (template.TemplateType === ENUM_LabTemplateType.Culture) {
                   singleSpecimen.RequisitionId = tst.RequisitionId;
                   singleSpecimen.Specimen = tst.Specimen;
                   this.cultureSpecimen.push(singleSpecimen);
@@ -1199,7 +1199,7 @@ export class LabTestsAddResultComponent {
             }, 100);
           }
         } else {
-          this.msgBoxServ.showMessage("error", valSummary.Messages);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, valSummary.Messages);
           this.coreService.loading = this.loading = false;
         }
       }
@@ -1223,6 +1223,16 @@ export class LabTestsAddResultComponent {
   }
 
   PostComponent(components) {
+    this.lisResultIdList = [];
+    components.forEach(comp => {
+      if (this.machineResult) {
+        let component = this.machineResult.find(a => a.ComponentId === comp.ComponentId);
+        if (component) {
+          this.lisResultIdList.push(component.LisResultId);
+        }
+      }
+    });
+
     this.labBLService
       .PostComponent(components, this.cultureSpecimen)
       .subscribe((res: DanpheHTTPResponse) => {
@@ -1258,11 +1268,11 @@ export class LabTestsAddResultComponent {
       .PutLabTestResult(components, this.cultureSpecimen)
       .subscribe(
         (res) => {
-          if (res.Status == "OK") {
+          if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
             this.coreService.loading = this.loading = false;
             this.CallBackAddUpdate();
           } else {
-            this.msgBoxServ.showMessage("failed", [
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [
               "Sorry!!! Not able to update the lab result",
             ]);
             console.log(res.ErrorMessage);
@@ -1367,7 +1377,7 @@ export class LabTestsAddResultComponent {
 
       this.sampleCode.SampleCreatedOn = moment(
         this.templateReport.Lookups.SampleDate
-      ).format("YYYY-MM-DD");
+      ).format(ENUM_DateTimeFormat.Year_Month_Day);
 
       let nepaliDate = this.npCalendarService.ConvertEngToNepDate(
         this.templateReport.Lookups.SampleDate
@@ -1391,7 +1401,7 @@ export class LabTestsAddResultComponent {
           this.RunNumberType, this.hasInsurance
         )
         .subscribe((res) => {
-          if (res.Status == "OK" && res.Results) {
+          if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
             if (res.Results.Exist) {
               this.sampleCodeExistingDetail = res.Results;
               this.showConfirmationBox = true;
@@ -1408,13 +1418,13 @@ export class LabTestsAddResultComponent {
     if (this.sampleCode.RunNumber) {
       //check if user has selected future date.
       let checkFuture = moment(
-        moment(this.sampleCode.SampleCreatedOn).format("YYYY-MM-DD")
-      ).diff(moment().format("YYYY-MM-DD"));
+        moment(this.sampleCode.SampleCreatedOn).format(ENUM_DateTimeFormat.Year_Month_Day)
+      ).diff(moment().format(ENUM_DateTimeFormat.Year_Month_Day));
       if (checkFuture <= 0) {
         var checkToday = moment(
-          moment(this.sampleCode.SampleCreatedOn).format("YYYY-MM-DD")
+          moment(this.sampleCode.SampleCreatedOn).format(ENUM_DateTimeFormat.Year_Month_Day)
         ).diff(
-          moment(this.templateReport.Lookups.SampleDate).format("YYYY-MM-DD")
+          moment(this.templateReport.Lookups.SampleDate).format(ENUM_DateTimeFormat.Year_Month_Day)
         );
         //if user don't change sample code or date and press OK
         if (
@@ -1427,12 +1437,12 @@ export class LabTestsAddResultComponent {
           valid = true;
         }
       } else {
-        this.msgBoxServ.showMessage("failed", [
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [
           "Select valid sample collection date.",
         ]);
       }
     } else {
-      this.msgBoxServ.showMessage("failed", ["Enter valid run number."]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Enter valid run number."]);
     }
     return valid;
   }
@@ -1449,8 +1459,8 @@ export class LabTestsAddResultComponent {
         this.RunNumberType
       )
       .subscribe((res) => {
-        if (res.Status == "OK") {
-          this.msgBoxServ.showMessage("success", [
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, [
             "Sample code updated successfully.",
           ]);
           this.templateReport.Lookups.SampleCode = this.sampleCode.RunNumber.toString();
@@ -1462,7 +1472,7 @@ export class LabTestsAddResultComponent {
         } else {
           this.showChangeSample = false;
           this.showConfirmationBox = false;
-          this.msgBoxServ.showMessage("failed", [
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [
             "Unable to update run number.",
           ]);
         }
@@ -1474,7 +1484,7 @@ export class LabTestsAddResultComponent {
       this.sampleCode.SampleCreatedOn
     );
     if (nepaliDate) {
-      if (this.RunNumberType && this.RunNumberType.toLowerCase() == "normal") {
+      if (this.RunNumberType && this.RunNumberType.toLowerCase() === ENUM_LabTemplateType.Normal) {
         this.sampleCode.SampleCode = nepaliDate.Day;
       } else {
         this.sampleCode.SampleCode = parseInt(
@@ -1828,6 +1838,52 @@ export class LabTestsAddResultComponent {
       }
       this.CheckIfAbnormal(targetComponent, test);
     })
+  }
+
+  MapRangeDescription(comp: LabTestComponent) {
+    let dob = this.LookUpDetail.DOB;
+    let patGender = this.LookUpDetail.Gender;
+    let patAge = CommonFunctions.GetFormattedAge(dob);
+    let childAgeLimit = 16;
+
+    patAge = patAge.toUpperCase();
+
+    if (patAge.includes("Y") && !comp.ShowRangeDescriptionInLabReport) {
+      let ageArr = patAge.split("Y");
+      let actualAge = ageArr.length > 0 ? Number(ageArr[0]) : 0;
+      if (actualAge > childAgeLimit) {
+        if (patGender.toLowerCase() === ENUM_Genders.Male && comp.MaleRange && comp.MaleRange.trim() !== "" && comp.MaleRange.length) {
+          comp.RangeDescription = comp.MaleRange;
+        } else if (patGender.toLowerCase() === ENUM_Genders.Female && comp.FemaleRange && comp.FemaleRange.trim() !== "" && comp.FemaleRange.length) {
+          comp.RangeDescription = comp.FemaleRange;
+        }
+        else {
+          comp.RangeDescription = comp.Range;
+        }
+      }
+      else {
+        if (comp.ChildRange && comp.ChildRange.trim() !== "" && comp.ChildRange.length) {
+          comp.RangeDescription = comp.ChildRange;
+        } else {
+          if (patGender.toLowerCase() === ENUM_Genders.Male && comp.MaleRange && comp.MaleRange.trim() !== "" && comp.MaleRange.length) {
+            comp.RangeDescription = comp.MaleRange;
+          } else if (patGender.toLowerCase() === ENUM_Genders.Female && comp.FemaleRange && comp.FemaleRange.trim() !== "" && comp.FemaleRange.length) {
+            comp.RangeDescription = comp.FemaleRange;
+          }
+          else {
+            comp.RangeDescription = comp.Range;
+          }
+        }
+      }
+    }
+    else {
+      if (comp.ShowRangeDescriptionInLabReport) {
+        comp.RangeDescription = comp.RangeDescription;
+      }
+      else {
+        comp.RangeDescription = comp.ChildRange;
+      }
+    }
   }
 }
 

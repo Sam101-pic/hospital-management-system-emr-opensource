@@ -57,6 +57,7 @@ export class CRN_InvoiceItemsVM {
   public ItemCode: string = null;//sud:16Apr'23--added new column
   public ItemName: string = null;
   public Price: number = 0;
+  public TotalQuantity: number = 0;
   public RemainingQty: number = 0;
   public SubTotal: number = 0;
   public DiscountAmtPerUnit: number = 0;

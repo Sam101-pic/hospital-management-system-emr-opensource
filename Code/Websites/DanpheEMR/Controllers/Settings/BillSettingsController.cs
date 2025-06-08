@@ -7,17 +7,23 @@ using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.BillingModels.Config;
+using DanpheEMR.ServerModel.ClinicalModel_New;
+using DanpheEMR.ServerModel.StickerModels;
+using DanpheEMR.ServerModel.StickerModels.DTOs;
 using DanpheEMR.Services.Billing.DTO;
 using DanpheEMR.Services.BillSettings.DTOs;
+using DanpheEMR.Services.Clinical_New.DTOs;
 using DanpheEMR.Utilities;
 using DanpheEMR.ViewModel.Billing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Xml;
 
@@ -79,6 +85,13 @@ namespace DanpheEMR.Controllers
             Func<object> func = () => GettingBillingItemList(showInactiveItems);
             return InvokeHttpGetFunction(func);
         }
+        [HttpGet]
+        [Route("BillingServiceItemList")]
+        public IActionResult GetBillingServiceItems()
+        {
+            Func<object> func = () => GetBillingServiceItemList();
+            return InvokeHttpGetFunction(func);
+        }
 
         [HttpGet]
         [Route("ServiceItemList")]
@@ -86,6 +99,14 @@ namespace DanpheEMR.Controllers
         {
             //if if (reqType == "get-billing-itemList")
             Func<object> func = () => GetServiceItemList();
+            return InvokeHttpGetFunction(func);
+        }
+        [HttpGet]
+        [Route("ServiceItemListBySchemeId")]
+        public IActionResult ServiceItemListBySchemeId(int schemeId)
+        {
+            //if if (reqType == "get-billing-itemList")
+            Func<object> func = () => GetServiceItemListBySchemeId(schemeId);
             return InvokeHttpGetFunction(func);
         }
 
@@ -189,23 +210,23 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("BillingScheme")]
-        public IActionResult GetBillingSchemeById( int SchemeId)
+        public IActionResult GetBillingSchemeById(int SchemeId)
         {
             Func<object> func = () => GetBillingSchemebyId(SchemeId);
             return InvokeHttpGetFunction(func);
         }
-        private object GetBillingSchemebyId( int SchemeId)
+        private object GetBillingSchemebyId(int SchemeId)
         {
-      
+
             var Scheme = (from scheme in _billingDbContext.BillingSchemes.Where(m => m.SchemeId == SchemeId)
-                           select scheme).FirstOrDefault();
+                          select scheme).FirstOrDefault();
 
             Scheme.BillingSubSchemes = _billingDbContext.BillingSubSchemes
                                                         .Where(subScheme => subScheme.SchemeId == Scheme.SchemeId)
                                                         .ToList();
             return Scheme;
         }
-        
+
         [HttpGet]
         [Route("SchemesForBillingReport")]
         public IActionResult SchemesForBillingReport()
@@ -215,9 +236,8 @@ namespace DanpheEMR.Controllers
         }
         private object GetSchemesForBillingReport()
         {
-     
+
             var Scheme = (from scheme in _billingDbContext.BillingSchemes
-                          where scheme.IsActive == true
                           select new
                           {
                               SchemeId = scheme.SchemeId,
@@ -244,7 +264,7 @@ namespace DanpheEMR.Controllers
             Func<object> func = () => GettingBillingItems(itemId, servDeptName);
             return InvokeHttpGetFunction(func);
         }
-        
+
         [HttpGet]
         [Route("AdditionalServiceItems")]
         public IActionResult AdditionalServiceItems()
@@ -347,14 +367,34 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
         }
 
-
-
-
         [HttpGet]
         [Route("DepositHeads")]
         public IActionResult DepositHeads()
         {
             Func<object> func = () => GetDepositHeads();
+            return InvokeHttpGetFunction(func);
+        }
+        [HttpGet]
+        [Route("UserList")]
+        public IActionResult UserList()
+        {
+            Func<object> func = () => GetUserList(); // Get user list to filter the billing report : Bibek-16thJan'24
+            return InvokeHttpGetFunction(func);
+        }
+
+        [HttpGet]
+        [Route("RegistrationStickerSettingsData")]
+        public IActionResult RegistrationStickerSettingsData()
+        {
+            Func<object> func = () => GetRegistrationStickerSettingsData();
+            return InvokeHttpGetFunction(func);
+        }
+
+        [HttpGet]
+        [Route("GenerateItemCode")]
+        public IActionResult GenerateItemCode(string itemName)
+        {
+            Func<object> func = () => GenerateUniqueItemCode(itemName);
             return InvokeHttpGetFunction(func);
         }
         #endregion
@@ -453,6 +493,16 @@ namespace DanpheEMR.Controllers
             return InvokeHttpPostFunction(func);
         }
 
+
+        [HttpPost]
+        [Route("RegistrationStickerSettingsData")]
+        public IActionResult PostRegistrationStickerSettingsData([FromBody] RegistrationSticker_DTO registrationSticker_DTO)
+        {
+            Func<object> func = () => AddRegistrationStickerSettingsData(registrationSticker_DTO);
+            return InvokeHttpPostFunction(func);
+        }
+
+
         private object SaveSchemePriceCategoryMap(List<BillMapPriceCategorySchemeDTO> billMapPriceCategorySchemeDTO, RbacUser currentUser)
         {
             try
@@ -488,7 +538,8 @@ namespace DanpheEMR.Controllers
                 }
                 return Ok();
             }
-            catch (Exception ex){
+            catch (Exception ex)
+            {
                 throw ex;
             }
         }
@@ -679,8 +730,9 @@ namespace DanpheEMR.Controllers
         public IActionResult PutCreditOrganization()
         {
             //if (reqType == "put-credit-organization")
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             string ipDataStr = this.ReadPostData();
-            Func<object> func = () => UpdateCreditOrganization(ipDataStr);
+            Func<object> func = () => UpdateCreditOrganization(ipDataStr, currentUser);
             return InvokeHttpPutFunction(func);
         }
 
@@ -718,6 +770,14 @@ namespace DanpheEMR.Controllers
         {
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             Func<object> func = () => UpdateActivateDeactivateAdditionalServiceItem(additionalServiceItemId, isActive, currentUser);
+            return InvokeHttpPutFunction(func);
+        }
+
+        [HttpPut]
+        [Route("ActivateDeactivateRegistrationStickerStatus")]
+        public IActionResult ActivateDeactivateRegistrationStickerStatus(int registrationStickerSettingsId, bool isActive)
+        {
+            Func<object> func = () => UpdateRegistrationStickerStatus(registrationStickerSettingsId, isActive);
             return InvokeHttpPutFunction(func);
         }
 
@@ -796,7 +856,7 @@ namespace DanpheEMR.Controllers
                 }
             }
         }
-        
+
         [HttpPut]
         [Route("ActivateDeactivateSubScheme")]
         public IActionResult ActivateDeactivateSubScheme(int SubSchemeId)
@@ -808,14 +868,14 @@ namespace DanpheEMR.Controllers
         private object UpdateBillingSubSchemeStatus(int SubSchemeId, RbacUser currentUser)
         {
             var subScheme = _billingDbContext.BillingSubSchemes.AsNoTracking().Where(ss => ss.SubSchemeId == SubSchemeId).FirstOrDefault();
-            if(subScheme != null)
+            if (subScheme != null)
             {
-            subScheme.IsActive = !subScheme.IsActive;
-            subScheme.ModifiedBy = currentUser.EmployeeId;
-            subScheme.ModifiedOn = DateTime.Now;
-            _billingDbContext.Entry(subScheme).State = EntityState.Modified;
-            _billingDbContext.SaveChanges();
-            return subScheme.IsActive;
+                subScheme.IsActive = !subScheme.IsActive;
+                subScheme.ModifiedBy = currentUser.EmployeeId;
+                subScheme.ModifiedOn = DateTime.Now;
+                _billingDbContext.Entry(subScheme).State = EntityState.Modified;
+                _billingDbContext.SaveChanges();
+                return subScheme.IsActive;
             }
             else
             {
@@ -871,6 +931,15 @@ namespace DanpheEMR.Controllers
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             Func<object> func = () => ActivateDeactivateSchemePriceCategoryMapItem(PriceCategorySchemeMapId, Status, currentUser);
             return InvokeHttpPostFunction(func);
+        }
+
+
+        [HttpPut]
+        [Route("RegistrationStickerSettingsData")]
+        public IActionResult PutRegistrationStickerSettingsData([FromBody] RegistrationSticker_DTO registrationSticker_DTO)
+        {
+            Func<object> func = () => UpdateRegistrationStickerSettingsData(registrationSticker_DTO);
+            return InvokeHttpPutFunction(func);
         }
 
         #endregion
@@ -948,6 +1017,13 @@ namespace DanpheEMR.Controllers
             }
         }
 
+        private object GetBillingServiceItemList()
+        {
+            var serviceItems = (from serv in _billingDbContext.BillServiceItems
+                                select serv).ToList();
+
+            return serviceItems;
+        }
 
         private object GettingBillingItemList(bool showInactiveItems)
         {
@@ -1019,11 +1095,89 @@ namespace DanpheEMR.Controllers
             return filteredItems;
         }
 
+        [HttpPost]
+        [Route("GetFilteredServiceItemList")]
+        public IActionResult FilteredServiceItemList([FromBody] FilterServiceItemsRequestDTO request)
+        {
+            Func<object> func = () => GetFilteredServiceItemList(request);
+            return InvokeHttpGetFunction(func);
+        }
+
+
+        private object GetFilteredServiceItemList(FilterServiceItemsRequestDTO request)
+        {
+            try
+            {
+                var query = from item in _billingDbContext.BillServiceItems
+                            join dept in _billingDbContext.ServiceDepartment
+                                on item.ServiceDepartmentId equals dept.ServiceDepartmentId
+                            join srvcat in _billingDbContext.BillServiceCategories
+                                on item.ServiceCategoryId equals srvcat.ServiceCategoryId into srvcatGroup
+                            from srvcat in srvcatGroup.DefaultIfEmpty()
+                            select new ServiceItemsViewModel
+                            {
+                                ServiceItemId = item.ServiceItemId,
+                                ServiceDepartmentId = dept.ServiceDepartmentId,
+                                ServiceDepartmentName = dept.ServiceDepartmentName,
+                                ItemCode = item.ItemCode,
+                                ItemName = item.ItemName,
+                                Description = item.Description,
+                                IntegrationName = item.IntegrationName,
+                                IsTaxApplicable = item.IsTaxApplicable,
+                                IsActive = item.IsActive,
+                                ServiceCategoryId = srvcat.ServiceCategoryId,
+                                ServiceCategoryName = srvcat.ServiceCategoryName,
+                                PriceDetails = _billingDbContext.BillItemsPriceCategoryMaps
+                                    .Where(pc => pc.ServiceItemId == item.ServiceItemId)
+                                    .Select(pc => new ReadPriceDetails_DTO
+                                    {
+                                        PriceCategoryId = pc.PriceCategoryId,
+                                        Price = pc.Price
+                                    }).ToList()
+                            };
+
+                if (request.ServiceItemIds != null && request.ServiceItemIds.Any())
+                {
+                    query = query.Where(x => request.ServiceItemIds.Contains(x.ServiceItemId));
+                }
+
+                if (request.ServiceDepartmentId > 0)
+                {
+                    query = query.Where(x => x.ServiceDepartmentId == request.ServiceDepartmentId);
+                }
+
+                if (request.ServiceCategoryId.HasValue && request.ServiceCategoryId > 0)
+                {
+                    query = query.Where(x => x.ServiceCategoryId == request.ServiceCategoryId);
+                }
+                if (!string.IsNullOrEmpty(request.IntegrationName))
+                {
+                    query = query.Where(x => x.IntegrationName == request.IntegrationName);
+                }
+                if (request.Status.HasValue)
+                {
+                    query = query.Where(x => x.IsActive == request.Status.Value);
+                }
+
+                if (request.PriceCategoryIds != null && request.PriceCategoryIds.Any())
+                {
+                    query = query.Where(x => _billingDbContext.BillItemsPriceCategoryMaps
+                        .Any(pc => pc.ServiceItemId == x.ServiceItemId && request.PriceCategoryIds.Contains(pc.PriceCategoryId)));
+                }
+                var itemList = query.ToList();
+                return itemList;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"An unexpected error occurred while filtering service items: {ex.Message}", ex);
+                throw new Exception($"An unexpected error occurred while filtering service items: {ex.Message}.", ex);
+            }
+        }
         private object GetServiceItemList()
         {
             var itemList = (from item in _billingDbContext.BillServiceItems
                             join srv in _billingDbContext.ServiceDepartment on item.ServiceDepartmentId equals srv.ServiceDepartmentId
-                           // join srvcat in _billingDbContext.BillServiceCategories on item.ServiceCategoryId equals srvcat.ServiceCategoryId
+                            // join srvcat in _billingDbContext.BillServiceCategories on item.ServiceCategoryId equals srvcat.ServiceCategoryId
                             select new ServiceItemsViewModel
                             {
                                 ServiceItemId = item.ServiceItemId,
@@ -1047,13 +1201,86 @@ namespace DanpheEMR.Controllers
                                 CreatedBy = item.CreatedBy,
                                 CreatedOn = item.CreatedOn,
                                 IsActive = item.IsActive,
-                                ServiceCategoryName = ""//srvcat.ServiceCategoryName,
+                                ServiceCategoryName = "",//srvcat.ServiceCategoryName,
+                                IsIncentiveApplicable = item.IsIncentiveApplicable,
+                                IsInsurancePackage = item.IsInsurancePackage,
+                                OTCategory = item.OTCategory,
+                                DynamicReportGroupId = item.DynamicReportGroupId
                             }).OrderBy(b => b.ServiceDepartmentName).ToList();
 
             var filteredItems = new object();
-                filteredItems = itemList.OrderBy(itm => itm.DisplaySeq);
+            filteredItems = itemList.OrderBy(itm => itm.DisplaySeq);
             return filteredItems;
         }
+
+        private object GetServiceItemListBySchemeId(int schemeId)
+        {
+            try
+            {
+                var defaultPriceCategoryMappedToGivenScheme = _billingDbContext.PriceCategorySchemesMaps
+                                                .Where(pc => pc.SchemeId == schemeId && pc.IsDefault == true && pc.IsActive == true)
+                                                .Select(pc => pc.PriceCategoryId)
+                                                .FirstOrDefault();
+
+                var systemDefaultPriceCategory = _billingDbContext.PriceCategoryModels
+                                         .Where(pc => pc.IsDefault == true && pc.IsActive == true)
+                                         .Select(pc => pc.PriceCategoryId)
+                                         .FirstOrDefault();
+
+                var priceCategoryId = defaultPriceCategoryMappedToGivenScheme != 0 ? defaultPriceCategoryMappedToGivenScheme : systemDefaultPriceCategory;
+
+                if (priceCategoryId == 0)
+                {
+                    throw new InvalidOperationException("There is no default PriceCategory set in the system, Please set if first");
+                }
+
+                var itemList = (from item in _billingDbContext.BillServiceItems
+                                join srv in _billingDbContext.ServiceDepartment on item.ServiceDepartmentId equals srv.ServiceDepartmentId
+                                join mapPrice in _billingDbContext.BillItemsPriceCategoryMaps on item.ServiceItemId equals mapPrice.ServiceItemId
+                                where (mapPrice.PriceCategoryId == priceCategoryId)
+                                select new ServiceItemsViewModel
+                                {
+                                    ServiceItemId = item.ServiceItemId,
+                                    ServiceDepartmentId = srv.ServiceDepartmentId,
+                                    ServiceDepartmentName = srv.ServiceDepartmentName,
+                                    IntegrationName = item.IntegrationName,
+                                    ItemCode = item.ItemCode,
+                                    ItemName = item.ItemName,
+                                    Price = mapPrice.Price,
+                                    IntegrationItemId = item.IntegrationItemId,
+                                    IsTaxApplicable = item.IsTaxApplicable,
+                                    Description = item.Description,
+                                    DisplaySeq = item.DisplaySeq,
+                                    IsDoctorMandatory = item.IsDoctorMandatory,
+                                    IsOT = item.IsOT,
+                                    IsProc = item.IsProc,
+                                    ServiceCategoryId = item.ServiceCategoryId.HasValue ? item.ServiceCategoryId : 0,
+                                    AllowMultipleQty = item.AllowMultipleQty,
+                                    DefaultDoctorList = item.DefaultDoctorList,
+                                    IsValidForReporting = item.IsValidForReporting,
+                                    IsErLabApplicable = item.IsErLabApplicable,
+                                    CreatedBy = item.CreatedBy,
+                                    CreatedOn = item.CreatedOn,
+                                    IsActive = item.IsActive,
+                                    ServiceCategoryName = "",
+                                    IsIncentiveApplicable = item.IsIncentiveApplicable,
+                                    DepartmentId = srv.DepartmentId,
+                                }).OrderBy(b => b.ServiceDepartmentName).ToList();
+
+                var filteredItems = new object();
+                filteredItems = itemList.OrderBy(itm => itm.DisplaySeq);
+                return filteredItems;
+            }
+            catch (InvalidOperationException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new ApplicationException("An error occurred while fetching service items.", ex);
+            }
+        }
+
 
         private object GetServiceCategories()
         {
@@ -1095,26 +1322,26 @@ namespace DanpheEMR.Controllers
         }
         private object GettingBillItemPriceChangeHistory(int serviceDeptId, int itemId)
         {
-                var allUsers = _rbacDbContext.Users.ToList();
-                //Union BillItemPrice table with BillItemPrice_History table and get price changed history
-                var billItemList = (
-                    from billItemPriceHistory in _billingDbContext.BillItemPriceHistory
-                    where billItemPriceHistory.ItemId == itemId && billItemPriceHistory.ServiceDepartmentId == serviceDeptId
-                    select new
-                    {
-                        price = billItemPriceHistory.Price,
-                        createdOn = billItemPriceHistory.StartDate.HasValue ? billItemPriceHistory.StartDate.Value : DateTime.Now ,
-                        createdBy = billItemPriceHistory.CreatedBy.HasValue ? billItemPriceHistory.CreatedBy.Value : 0
-                    }).ToList()
-                                    .Union(from billItemPrice in _billingDbContext.BillServiceItems
-                                           join priceCatServItem in _billingDbContext.BillItemsPriceCategoryMaps on billItemPrice.ServiceItemId equals priceCatServItem.ServiceItemId
-                                           where billItemPrice.IntegrationItemId == itemId && billItemPrice.ServiceDepartmentId == serviceDeptId && priceCatServItem.PriceCategoryId == 1 //Krishna 13thMarch'23
-                                           select new
-                                           {
-                                               price = (double?)priceCatServItem.Price,
-                                               createdOn = billItemPrice.CreatedOn,
-                                               createdBy = billItemPrice.CreatedBy
-                                           }).OrderByDescending(b => b.createdOn).ToList();
+            var allUsers = _rbacDbContext.Users.ToList();
+            //Union BillItemPrice table with BillItemPrice_History table and get price changed history
+            var billItemList = (
+                from billItemPriceHistory in _billingDbContext.BillItemPriceHistory
+                where billItemPriceHistory.ItemId == itemId && billItemPriceHistory.ServiceDepartmentId == serviceDeptId
+                select new
+                {
+                    price = billItemPriceHistory.Price,
+                    createdOn = billItemPriceHistory.StartDate.HasValue ? billItemPriceHistory.StartDate.Value : DateTime.Now,
+                    createdBy = billItemPriceHistory.CreatedBy.HasValue ? billItemPriceHistory.CreatedBy.Value : 0
+                }).ToList()
+                                .Union(from billItemPrice in _billingDbContext.BillServiceItems
+                                       join priceCatServItem in _billingDbContext.BillItemsPriceCategoryMaps on billItemPrice.ServiceItemId equals priceCatServItem.ServiceItemId
+                                       where billItemPrice.IntegrationItemId == itemId && billItemPrice.ServiceDepartmentId == serviceDeptId && priceCatServItem.PriceCategoryId == 1 //Krishna 13thMarch'23
+                                       select new
+                                       {
+                                           price = (double?)priceCatServItem.Price,
+                                           createdOn = billItemPrice.CreatedOn,
+                                           createdBy = billItemPrice.CreatedBy
+                                       }).OrderByDescending(b => b.createdOn).ToList();
 
             //Get list of final BillItemPrice change history with username by using join               
             var billItempriceChangeHistoryList = (from usrs in allUsers
@@ -1138,26 +1365,32 @@ namespace DanpheEMR.Controllers
         private object GettingBillingPackageList()
         {
             var BillingPackage = (from billPackage in _billingDbContext.BillingPackages
-                              join priceCat in _billingDbContext.PriceCategoryModels on billPackage.PriceCategoryId equals priceCat.PriceCategoryId
-                              select new BillingPackageList_DTO
-                              {
-                                  BillingPackageId = billPackage.BillingPackageId,
-                                  BillingPackageName = billPackage.BillingPackageName,
-                                  Description = billPackage.Description,
-                                  TotalPrice = billPackage.TotalPrice,
-                                  DiscountPercent = billPackage.DiscountPercent,
-                                  PackageCode = billPackage.PackageCode,
-                                  IsActive = billPackage.IsActive,
-                                  LabTypeName = billPackage.LabTypeName,
-                                  SchemeId = billPackage.SchemeId,
-                                  PriceCategoryId = billPackage.PriceCategoryId,
-                                  PriceCategoryName = priceCat.PriceCategoryName,
-                                  IsEditable = billPackage.IsEditable
-                              })
+                                  join priceCat in _billingDbContext.PriceCategoryModels on billPackage.PriceCategoryId equals priceCat.PriceCategoryId
+                                  select new BillingPackageList_DTO
+                                  {
+                                      BillingPackageId = billPackage.BillingPackageId,
+                                      BillingPackageName = billPackage.BillingPackageName,
+                                      Description = billPackage.Description,
+                                      TotalPrice = billPackage.TotalPrice,
+                                      DiscountPercent = billPackage.DiscountPercent,
+                                      PackageCode = billPackage.PackageCode,
+                                      IsActive = billPackage.IsActive,
+                                      LabTypeName = billPackage.LabTypeName,
+                                      SchemeId = billPackage.SchemeId ?? 0,
+                                      PriceCategoryId = billPackage.PriceCategoryId,
+                                      PriceCategoryName = priceCat.PriceCategoryName,
+                                      PackageType = billPackage.IsHealthPackage ? ENUM_BillingPackageType.HealthPackage : ENUM_BillingPackageType.ItemLoadPackage,
+                                      IsEditable = billPackage.IsEditable,
+                                      IsItemLevelDiscount = billPackage.IsItemLevelDiscount,
+                                      IsDiscountEditableInSales = billPackage.IsDiscountEditableInSales,
+                                      IsHealthPackage = billPackage.IsHealthPackage,
+                                      IsItemLoadPackage = billPackage.IsItemLoadPackage
+
+                                  })
                               .OrderBy(c => c.BillingPackageName).ToList();
             return BillingPackage;
         }
-        
+
         private object GettingBillingPackageServiceItemList(int BillingPackageId, int PriceCategoryId)
         {
             if (BillingPackageId == 0 || PriceCategoryId == 0)
@@ -1165,29 +1398,29 @@ namespace DanpheEMR.Controllers
                 throw new Exception("BillingPackageId or PriceCategoryId is Null.");
             }
             var BillingPackageServiceItemList = (from billPackageItem in _billingDbContext.BillingPackageServiceItems
-                                            where billPackageItem.BillingPackageId == BillingPackageId && billPackageItem.IsActive
-                                            join billMapPrice in _billingDbContext.BillItemsPriceCategoryMaps
-                                                on new { billPackageItem.ServiceItemId, PriceCategoryId }
-                                                equals new { billMapPrice.ServiceItemId, billMapPrice.PriceCategoryId }
-                                            join billServiceitem in _billingDbContext.BillServiceItems
-                                                on billPackageItem.ServiceItemId equals billServiceitem.ServiceItemId
-                                            join emp in _billingDbContext.Employee
-                                                on billPackageItem.PerformerId equals emp.EmployeeId into employeeGroup
-                                            from emp in employeeGroup.DefaultIfEmpty()
-                                            select new BillingPackageServiceItemList_DTO
-                                            {
-                                                PackageServiceItemId = billPackageItem.PackageServiceItemId,
-                                                BillingPackageId = billPackageItem.BillingPackageId,
-                                                ServiceItemId = billPackageItem.ServiceItemId,
-                                                DiscountPercent = billPackageItem.DiscountPercent,
-                                                Quantity = billPackageItem.Quantity,
-                                                PerformerId = billPackageItem.PerformerId ?? 0,
-                                                IsActive = billPackageItem.IsActive,
-                                                Price = billMapPrice.Price,
-                                                ItemCode = billServiceitem.ItemCode,
-                                                ItemName = billServiceitem.ItemName,
-                                                PerformerName = emp.FullName
-                                            }).OrderByDescending(c => c.PackageServiceItemId).ToList();
+                                                 where billPackageItem.BillingPackageId == BillingPackageId && billPackageItem.IsActive
+                                                 join billMapPrice in _billingDbContext.BillItemsPriceCategoryMaps
+                                                     on new { billPackageItem.ServiceItemId, PriceCategoryId }
+                                                     equals new { billMapPrice.ServiceItemId, billMapPrice.PriceCategoryId }
+                                                 join billServiceitem in _billingDbContext.BillServiceItems
+                                                     on billPackageItem.ServiceItemId equals billServiceitem.ServiceItemId
+                                                 join emp in _billingDbContext.Employee
+                                                     on billPackageItem.PerformerId equals emp.EmployeeId into employeeGroup
+                                                 from emp in employeeGroup.DefaultIfEmpty()
+                                                 select new BillingPackageServiceItemList_DTO
+                                                 {
+                                                     PackageServiceItemId = billPackageItem.PackageServiceItemId,
+                                                     BillingPackageId = billPackageItem.BillingPackageId,
+                                                     ServiceItemId = billPackageItem.ServiceItemId,
+                                                     DiscountPercent = billPackageItem.DiscountPercent,
+                                                     Quantity = billPackageItem.Quantity,
+                                                     PerformerId = billPackageItem.PerformerId ?? 0,
+                                                     IsActive = billPackageItem.IsActive,
+                                                     Price = billMapPrice.Price,
+                                                     ItemCode = billServiceitem.ItemCode,
+                                                     ItemName = billServiceitem.ItemName,
+                                                     PerformerName = emp.FullName
+                                                 }).OrderBy(c => c.PackageServiceItemId).ToList();
             return BillingPackageServiceItemList;
         }
 
@@ -1195,7 +1428,7 @@ namespace DanpheEMR.Controllers
         {
             var membershipTypes = (from type in _billingDbContext.BillingSchemes
                                    select type).OrderBy(m => m.SchemeName).ToList();
-           return membershipTypes;
+            return membershipTypes;
         }
         private object GettingCreditOrganizations()
         {
@@ -1205,25 +1438,25 @@ namespace DanpheEMR.Controllers
         private object GetAdditionalServiceItems()
         {
             List<GetAdditionalServiceItems_DTO> additionalServiceItems = (from additm in _billingDbContext.BillingAdditionalServiceItems
-                                                                       join cat in _billingDbContext.PriceCategoryModels on additm.PriceCategoryId equals cat.PriceCategoryId
-                                                                       select new GetAdditionalServiceItems_DTO
-                                                                       {
-                                                                           AdditionalServiceItemId = additm.AdditionalServiceItemId,
-                                                                           GroupName = additm.GroupName,
-                                                                           ItemName = additm.ItemName,
-                                                                           UseItemSelfPrice = additm.UseItemSelfPrice,
-                                                                           PercentageOfParentItemForSameDept = additm.PercentageOfParentItemForSameDept,
-                                                                           PercentageOfParentItemForDiffDept = additm.PercentageOfParentItemForDiffDept,
-                                                                           MinimumChargeAmount = additm.MinimumChargeAmount,
-                                                                           IsPreAnaesthesia = additm.IsPreAnaesthesia,
-                                                                           WithPreAnaesthesia = additm.WithPreAnaesthesia,
-                                                                           IsOpServiceItem = additm.IsOpServiceItem,
-                                                                           IsIpServiceItem = additm.IsIpServiceItem,
-                                                                           IsActive = additm.IsActive,
-                                                                           ServiceItemId = additm.ServiceItemId,
-                                                                           PriceCategoryId = cat.PriceCategoryId,                                                                        
-                                                                           PriceCategoryName = cat.PriceCategoryName,
-                                                                       }).ToList();
+                                                                          join cat in _billingDbContext.PriceCategoryModels on additm.PriceCategoryId equals cat.PriceCategoryId
+                                                                          select new GetAdditionalServiceItems_DTO
+                                                                          {
+                                                                              AdditionalServiceItemId = additm.AdditionalServiceItemId,
+                                                                              GroupName = additm.GroupName,
+                                                                              ItemName = additm.ItemName,
+                                                                              UseItemSelfPrice = additm.UseItemSelfPrice,
+                                                                              PercentageOfParentItemForSameDept = additm.PercentageOfParentItemForSameDept,
+                                                                              PercentageOfParentItemForDiffDept = additm.PercentageOfParentItemForDiffDept,
+                                                                              MinimumChargeAmount = additm.MinimumChargeAmount,
+                                                                              IsPreAnaesthesia = additm.IsPreAnaesthesia,
+                                                                              WithPreAnaesthesia = additm.WithPreAnaesthesia,
+                                                                              IsOpServiceItem = additm.IsOpServiceItem,
+                                                                              IsIpServiceItem = additm.IsIpServiceItem,
+                                                                              IsActive = additm.IsActive,
+                                                                              ServiceItemId = additm.ServiceItemId,
+                                                                              PriceCategoryId = cat.PriceCategoryId,
+                                                                              PriceCategoryName = cat.PriceCategoryName,
+                                                                          }).ToList();
             return additionalServiceItems;
         }
 
@@ -1240,7 +1473,7 @@ namespace DanpheEMR.Controllers
                                           item.CreatedBy,
                                           item.CreatedOn,
                                           item.Description,
-                                         // item.DiscountApplicable,
+                                          // item.DiscountApplicable,
                                           item.IsTaxApplicable,
                                           item.IsActive,
                                           item.IntegrationItemId,
@@ -1313,7 +1546,7 @@ namespace DanpheEMR.Controllers
                                 ItemName = item.ItemName,
                                 ItemNamePrice = item.ItemName + " " + priceCatServItem.Price.ToString(),
                                 Price = priceCatServItem.Price
-                            }).Distinct().ToList();            
+                            }).Distinct().ToList();
             return itemList;
         }
         private object GettingBillItemsByServiceIntegrationName(string integrationName)
@@ -1373,6 +1606,29 @@ namespace DanpheEMR.Controllers
                                                   }).ToList();
             return depositHeads;
         }
+        private object GetUserList()
+        {
+            var users = _billingDbContext.User
+                .Select(u => new
+                {
+                    UserId = u.UserId,
+                    EmployeeId = u.EmployeeId,
+                    UserName = u.UserName,
+                    IsActive = u.IsActive
+                })
+                .ToList();
+
+            return users;
+        }
+
+
+        private object GetRegistrationStickerSettingsData()
+        {
+            var stickerSettingsData = (from data in _billingDbContext.RegistrationSticker
+
+                                       select data).ToList();
+            return stickerSettingsData;
+        }
 
         private object AddingServiceDepartment(string ipDataStr, RbacUser currentUser)
         {
@@ -1380,7 +1636,9 @@ namespace DanpheEMR.Controllers
             var isDeptExists = _billingDbContext.ServiceDepartment.Where(d => d.ServiceDepartmentName == servdeptModel.ServiceDepartmentName).ToList();
             if (isDeptExists.Count() != 0)
             {
-                throw new Exception("The service Department name is already exist.");
+                Log.Error($"{(servdeptModel.ServiceDepartmentName)} Department name already exist");
+                throw new Exception($"'{(servdeptModel.ServiceDepartmentName)}' Service Department name already exist.");
+
             }
             else
             {
@@ -1418,7 +1676,7 @@ namespace DanpheEMR.Controllers
 
             item.CreatedBy = currentUser.EmployeeId;
             item.CreatedOn = DateTime.Now;
-            if (item.IntegrationItemId == 0)  
+            if (item.IntegrationItemId == 0)
             {
                 int maxItemId = 0;
                 var allSrvDeptItems = _billingDbContext.BillServiceItems.Where(s => s.ServiceDepartmentId == item.ServiceDepartmentId).ToList();
@@ -1447,7 +1705,6 @@ namespace DanpheEMR.Controllers
             _billingDbContext.SaveChanges();
             return item;
         }
-
 
         private object AddServiceItems(ServiceItem_DTO serviceItemDto, RbacUser currentUser)
         {
@@ -1567,9 +1824,9 @@ namespace DanpheEMR.Controllers
         }
         private object AddingBillingPackage(BillingPackage_DTO billingPackage, RbacUser currentUser)
         {
-            using ( var billingPackageTransactionScope = _billingDbContext.Database.BeginTransaction())
+            using (var billingPackageTransactionScope = _billingDbContext.Database.BeginTransaction())
             {
-                
+
                 try
                 {
                     if (billingPackage == null)
@@ -1595,6 +1852,10 @@ namespace DanpheEMR.Controllers
                     newBillingPackage.CreatedBy = currentUser.EmployeeId;
                     newBillingPackage.CreatedOn = DateTime.Now;
                     newBillingPackage.DiscountPercent = billingPackage.DiscountPercent;
+                    newBillingPackage.IsItemLevelDiscount = billingPackage.IsItemLevelDiscount;
+                    newBillingPackage.IsDiscountEditableInSales = billingPackage.IsDiscountEditableInSales;
+                    newBillingPackage.IsItemLoadPackage = billingPackage.IsItemLoadPackage;
+                    newBillingPackage.IsHealthPackage = billingPackage.IsHealthPackage;
                     _billingDbContext.BillingPackages.Add(newBillingPackage);
                     _billingDbContext.SaveChanges();
                     foreach (var item in billingPackage.BillingPackageServiceItemList)
@@ -1620,7 +1881,7 @@ namespace DanpheEMR.Controllers
                     throw new Exception(ex.Message + " exception details:" + ex.ToString());
                 }
             }
-            
+
 
             /*            _billingDbContext.BillingPackages.Add(package);
                         _billingDbContext.SaveChanges();*/
@@ -1634,6 +1895,32 @@ namespace DanpheEMR.Controllers
             _billingDbContext.CreditOrganization.Add(org);
             _billingDbContext.SaveChanges();
             return org;
+        }
+
+        private object AddRegistrationStickerSettingsData(RegistrationSticker_DTO registrationSticker_DTO)
+        {
+            RegistrationStickerModel data = new RegistrationStickerModel();
+            data.RegistrationStickerSettingsId = registrationSticker_DTO.RegistrationStickerSettingsId;
+            data.StickerGroupCode = registrationSticker_DTO.StickerGroupCode;
+            data.StickerName = registrationSticker_DTO.StickerName;
+            data.VisitType = registrationSticker_DTO.VisitType;
+            data.VisitDateLabel = registrationSticker_DTO.VisitDateLabel;
+            data.IsDefaultForCurrentVisitType = registrationSticker_DTO.IsDefaultForCurrentVisitType;
+            data.MemberNoLabel = registrationSticker_DTO.MemberNoLabel;
+            data.ShowMemberNo = registrationSticker_DTO.ShowMemberNo;
+            data.PatientDesignationLabel = registrationSticker_DTO.PatientDesignationLabel;
+            data.ShowPatientDesignation = registrationSticker_DTO.ShowPatientDesignation;
+            data.QueueNoLabel = registrationSticker_DTO.QueueNoLabel;
+            data.ShowQueueNo = registrationSticker_DTO.ShowQueueNo;
+            data.ShowSchemeCode = registrationSticker_DTO.ShowSchemeCode;
+            data.ShowClaimCode = registrationSticker_DTO.ShowClaimCode;
+            data.ShowWardBedNo = registrationSticker_DTO.ShowWardBedNo;
+            data.ShowRegistrationCharge = registrationSticker_DTO.ShowRegistrationCharge;
+            data.ShowPatContactNo = registrationSticker_DTO.ShowPatContactNo;
+            data.IsActive = true;
+            _billingDbContext.RegistrationSticker.Add(data);
+            _billingDbContext.SaveChanges();
+            return data;
         }
         private object AddingMembershipType(string ipDataStr, RbacUser currentUser)
         {
@@ -1691,7 +1978,7 @@ namespace DanpheEMR.Controllers
             }
         }
 
-        private object AddingBillServiceItemsPriceCategoryMap(PriceCategoryServiceItem_DTO serviceItem_DTO , RbacUser currentUser)
+        private object AddingBillServiceItemsPriceCategoryMap(PriceCategoryServiceItem_DTO serviceItem_DTO, RbacUser currentUser)
         {
             BillMapPriceCategoryServiceItemModel servicePrice = new BillMapPriceCategoryServiceItemModel();
             servicePrice.CreatedBy = currentUser.UserId;
@@ -1700,16 +1987,19 @@ namespace DanpheEMR.Controllers
             servicePrice.HasAdditionalBillingItems = serviceItem_DTO.HasAdditionalBillingItems;
             servicePrice.IsDiscountApplicable = serviceItem_DTO.IsDiscountApplicable;
             //servicePrice.IsIncentiveApplicable= serviceItem_DTO.IsIncentiveApplicable;
-            servicePrice.IsZeroPriceAllowed= serviceItem_DTO.IsZeroPriceAllowed;
-            servicePrice.IsPriceChangeAllowed= serviceItem_DTO.IsPriceChangeAllowed;    
-            servicePrice.ItemLegalName= serviceItem_DTO.ItemLegalName;
-            servicePrice.ItemLegalCode= serviceItem_DTO.ItemLegalCode;
+            servicePrice.IsZeroPriceAllowed = serviceItem_DTO.IsZeroPriceAllowed;
+            servicePrice.IsPriceChangeAllowed = serviceItem_DTO.IsPriceChangeAllowed;
+            servicePrice.ItemLegalName = serviceItem_DTO.ItemLegalName;
+            servicePrice.ItemLegalCode = serviceItem_DTO.ItemLegalCode;
             servicePrice.Price = serviceItem_DTO.Price;
-            servicePrice.PriceCategoryId= serviceItem_DTO.PriceCategoryId;
+            servicePrice.PriceCategoryId = serviceItem_DTO.PriceCategoryId;
             servicePrice.ServiceItemId = serviceItem_DTO.ServiceItemId;
             servicePrice.ServiceDepartmentId = serviceItem_DTO.ServiceDepartmentId;
-            servicePrice.IntegrationItemId= serviceItem_DTO.IntegrationItemId;
-           _billingDbContext.BillItemsPriceCategoryMaps.Add(servicePrice);
+            servicePrice.IntegrationItemId = serviceItem_DTO.IntegrationItemId;
+            servicePrice.IsCappingEnabled = serviceItem_DTO.IsCappingEnabled;
+            servicePrice.CappingLimitDays = serviceItem_DTO.CappingLimitDays;
+            servicePrice.CappingQuantity = serviceItem_DTO.CappingQuantity;
+            _billingDbContext.BillItemsPriceCategoryMaps.Add(servicePrice);
             _billingDbContext.SaveChanges();
 
             return servicePrice;
@@ -1753,14 +2043,14 @@ namespace DanpheEMR.Controllers
         }
 
         private object UpdateActivateDeactivateServiceItem(ServiceItem_DTO serviceItem_DTO, RbacUser currentUser)
-        {    
+        {
 
-            var billServiceDetailToUpdate=_billingDbContext.BillServiceItems.Where(a=>a.ServiceItemId==serviceItem_DTO.ServiceItemId).FirstOrDefault();
+            var billServiceDetailToUpdate = _billingDbContext.BillServiceItems.Where(a => a.ServiceItemId == serviceItem_DTO.ServiceItemId).FirstOrDefault();
             billServiceDetailToUpdate.IsActive = serviceItem_DTO.IsActive;
-                _billingDbContext.SaveChanges();
+            _billingDbContext.SaveChanges();
 
-                return billServiceDetailToUpdate;
-          
+            return billServiceDetailToUpdate;
+
         }
 
 
@@ -1772,31 +2062,35 @@ namespace DanpheEMR.Controllers
             {
                 return new Exception("Provided data should not be null");
             }
-            
-                var ServiceItems = _billingDbContext.BillServiceItems.Where(x => x.ServiceItemId == serviceItemDto.ServiceItemId).FirstOrDefault();
-            if (ServiceItems == null) return new Exception("No data found to update");
-                
-                    ServiceItems.ModifiedOn = DateTime.Now;
-                    ServiceItems.ModifiedBy = currentUser.EmployeeId;
-                    ServiceItems.IsActive = true;
-                    ServiceItems.ItemCode = serviceItemDto.ItemCode;
-                    ServiceItems.IntegrationName = serviceItemDto.IntegrationName;
-                    ServiceItems.IsTaxApplicable = serviceItemDto.IsTaxApplicable;
-                    ServiceItems.IsErLabApplicable = serviceItemDto.IsErLabApplicable;
-                    ServiceItems.IsDoctorMandatory = serviceItemDto.IsDoctorMandatory;
-                    ServiceItems.Description = serviceItemDto.Description;
-                    ServiceItems.AllowMultipleQty = serviceItemDto.AllowMultipleQty;
-                    ServiceItems.IsProc = serviceItemDto.IsProc;
-                    ServiceItems.DefaultDoctorList = serviceItemDto.DefaultDoctorList;
-                    ServiceItems.ServiceCategoryId = serviceItemDto.ServiceCategoryId;
-                    ServiceItems.IsDoctorMandatory = serviceItemDto.IsDoctorMandatory;
-                    ServiceItems.ItemName = serviceItemDto.ItemName;
-                    ServiceItems.IsOT = serviceItemDto.IsOT;
-                    ServiceItems.IsValidForReporting = serviceItemDto.IsValidForReporting;
 
-                    _billingDbContext.SaveChanges();
-                
-            
+            var ServiceItems = _billingDbContext.BillServiceItems.Where(x => x.ServiceItemId == serviceItemDto.ServiceItemId).FirstOrDefault();
+            if (ServiceItems == null) return new Exception("No data found to update");
+
+            ServiceItems.ModifiedOn = DateTime.Now;
+            ServiceItems.ModifiedBy = currentUser.EmployeeId;
+            ServiceItems.IsActive = true;
+            ServiceItems.ItemCode = serviceItemDto.ItemCode;
+            ServiceItems.IntegrationName = serviceItemDto.IntegrationName;
+            ServiceItems.IsTaxApplicable = serviceItemDto.IsTaxApplicable;
+            ServiceItems.IsErLabApplicable = serviceItemDto.IsErLabApplicable;
+            ServiceItems.IsDoctorMandatory = serviceItemDto.IsDoctorMandatory;
+            ServiceItems.Description = serviceItemDto.Description;
+            ServiceItems.AllowMultipleQty = serviceItemDto.AllowMultipleQty;
+            ServiceItems.IsProc = serviceItemDto.IsProc;
+            ServiceItems.DefaultDoctorList = serviceItemDto.DefaultDoctorList;
+            ServiceItems.ServiceCategoryId = serviceItemDto.ServiceCategoryId;
+            ServiceItems.IsDoctorMandatory = serviceItemDto.IsDoctorMandatory;
+            ServiceItems.ItemName = serviceItemDto.ItemName;
+            ServiceItems.IsOT = serviceItemDto.IsOT;
+            ServiceItems.OTCategory = serviceItemDto.OTCategory;
+            ServiceItems.IsValidForReporting = serviceItemDto.IsValidForReporting;
+            ServiceItems.IsIncentiveApplicable = serviceItemDto.IsIncentiveApplicable;
+            ServiceItems.IsInsurancePackage = serviceItemDto.IsInsurancePackage;
+            ServiceItems.IntegrationItemId = serviceItemDto.IntegrationItemId;
+
+            _billingDbContext.SaveChanges();
+
+
 
 
             List<BillPriceCategoryServiceItemsDTO> serviceItemsPriceCategoryMap = serviceItemDto.BilCfgItemsVsPriceCategoryMap;
@@ -1805,24 +2099,29 @@ namespace DanpheEMR.Controllers
                 foreach (var item in serviceItemsPriceCategoryMap)
                 {
                     var ServicePrice = _billingDbContext.BillItemsPriceCategoryMaps.Where(x => x.PriceCategoryServiceItemMapId == item.PriceCategoryServiceItemMapId).FirstOrDefault();
-
-                    ServicePrice.ModifiedBy = currentUser.EmployeeId;
-                    ServicePrice.ModifiedOn = DateTime.Now;
-                    //ServicePrice.IsCoPayment = false;
-                    ServicePrice.IsActive = true;
-                    ServicePrice.ServiceItemId = ServiceItems.ServiceItemId;
-                    ServicePrice.ServiceDepartmentId = ServiceItems.ServiceDepartmentId;
-                    ServicePrice.IntegrationItemId = ServiceItems.IntegrationItemId;
-                    ServicePrice.ItemLegalCode = item.ItemLegalCode;
-                    ServicePrice.ItemLegalName = item.ItemLegalName;
-                    ServicePrice.HasAdditionalBillingItems = item.HasAdditionalBillingItems;
-                    ServicePrice.PriceCategoryId = item.PriceCategoryId;
-                    ServicePrice.Price = item.Price;
-                    ServicePrice.IsPriceChangeAllowed = item.IsPriceChangeAllowed;
-                    ServicePrice.IsZeroPriceAllowed = item.IsZeroPriceAllowed;
-                    //ServicePrice.IsIncentiveApplicable = item.IsIncentiveApplicable;
-                    ServicePrice.IsDiscountApplicable = item.IsDiscountApplicable;
-                    _billingDbContext.SaveChanges();
+                    if (ServicePrice != null)
+                    {
+                        ServicePrice.ModifiedBy = currentUser.EmployeeId;
+                        ServicePrice.ModifiedOn = DateTime.Now;
+                        //ServicePrice.IsCoPayment = false;
+                        ServicePrice.IsActive = true;
+                        ServicePrice.ServiceItemId = ServiceItems.ServiceItemId;
+                        ServicePrice.ServiceDepartmentId = ServiceItems.ServiceDepartmentId;
+                        ServicePrice.IntegrationItemId = ServiceItems.IntegrationItemId;
+                        ServicePrice.ItemLegalCode = item.ItemLegalCode;
+                        ServicePrice.ItemLegalName = item.ItemLegalName;
+                        ServicePrice.HasAdditionalBillingItems = item.HasAdditionalBillingItems;
+                        ServicePrice.PriceCategoryId = item.PriceCategoryId;
+                        ServicePrice.Price = item.Price;
+                        ServicePrice.IsPriceChangeAllowed = item.IsPriceChangeAllowed;
+                        ServicePrice.IsZeroPriceAllowed = item.IsZeroPriceAllowed;
+                        ServicePrice.IsCappingEnabled = item.IsCappingEnabled;
+                        ServicePrice.CappingLimitDays = item.CappingLimitDays;
+                        ServicePrice.CappingQuantity = item.CappingQuantity;
+                        //ServicePrice.IsIncentiveApplicable = item.IsIncentiveApplicable;
+                        ServicePrice.IsDiscountApplicable = item.IsDiscountApplicable;
+                        _billingDbContext.SaveChanges();
+                    }
                 }
             }
             return ServiceItems.ServiceItemId;
@@ -1866,9 +2165,9 @@ namespace DanpheEMR.Controllers
                     }
 
                     var newBillingPackage = (from billPackage in _billingDbContext.BillingPackages
-                                         where billPackage.BillingPackageId == billingPackage.BillingPackageId
-                                         select billPackage).FirstOrDefault();
-                    if(newBillingPackage == null)
+                                             where billPackage.BillingPackageId == billingPackage.BillingPackageId
+                                             select billPackage).FirstOrDefault();
+                    if (newBillingPackage == null)
                     {
                         throw new Exception("No Billing Package found.");
                     }
@@ -1884,12 +2183,16 @@ namespace DanpheEMR.Controllers
                     newBillingPackage.ModifiedBy = currentuser.EmployeeId;
                     newBillingPackage.ModifiedOn = DateTime.Now;
                     newBillingPackage.DiscountPercent = billingPackage.DiscountPercent;
+                    newBillingPackage.IsItemLevelDiscount = billingPackage.IsItemLevelDiscount;
+                    newBillingPackage.IsDiscountEditableInSales = billingPackage.IsDiscountEditableInSales;
+                    newBillingPackage.IsHealthPackage = billingPackage.IsHealthPackage;
+                    newBillingPackage.IsItemLoadPackage = billingPackage.IsItemLoadPackage;
                     _billingDbContext.Entry(newBillingPackage).State = EntityState.Modified;
                     _billingDbContext.SaveChanges();
 
                     var existingBillingPackageServiceItemList = (from billPackageItem in _billingDbContext.BillingPackageServiceItems
-                                                             where billPackageItem.BillingPackageId == newBillingPackage.BillingPackageId
-                                                             select billPackageItem).ToList();
+                                                                 where billPackageItem.BillingPackageId == newBillingPackage.BillingPackageId
+                                                                 select billPackageItem).ToList();
                     var NewItems = billingPackage.BillingPackageServiceItemList.Where(item => item.PackageServiceItemId == 0).ToList();
                     var ExistingList = existingBillingPackageServiceItemList.Where(oldItem => billingPackage.BillingPackageServiceItemList.Any(item => item.PackageServiceItemId == oldItem.PackageServiceItemId && oldItem.IsActive == true)).ToList();
 
@@ -1917,9 +2220,9 @@ namespace DanpheEMR.Controllers
                     ExistingList.ForEach(a =>
                     {
                         var packageServiceItem = billingPackage.BillingPackageServiceItemList.Find(p => p.PackageServiceItemId == a.PackageServiceItemId);
-                        if(packageServiceItem != null)
+                        if (packageServiceItem != null)
                         {
-                        a.DiscountPercent = packageServiceItem.DiscountPercent;
+                            a.DiscountPercent = packageServiceItem.DiscountPercent;
                         }
                         a.ModifiedBy = currentuser.EmployeeId;
                         a.ModifiedOn = DateTime.Now;
@@ -1937,13 +2240,13 @@ namespace DanpheEMR.Controllers
                 }
             }
         }
-        
+
         private object UpdateBillingPackageStatus(int BillingPackageId)
         {
             BillingPackageModel BillingPackage = (from billPackage in _billingDbContext.BillingPackages
                                                   where billPackage.BillingPackageId == BillingPackageId
                                                   select billPackage).FirstOrDefault();
-            if(BillingPackage == null)
+            if (BillingPackage == null)
             {
                 throw new Exception("BillingPackage not found.");
             }
@@ -1952,15 +2255,22 @@ namespace DanpheEMR.Controllers
             _billingDbContext.SaveChanges();
             return BillingPackage.IsActive;
         }
-        private object UpdateCreditOrganization(string ipDataStr)
+        private object UpdateCreditOrganization(string ipDataStr, RbacUser currentUser)
         {
             CreditOrganizationModel creditOrganization = DanpheJSONConvert.DeserializeObject<CreditOrganizationModel>(ipDataStr);
-            _billingDbContext.CreditOrganization.Attach(creditOrganization);
-            _billingDbContext.Entry(creditOrganization).State = EntityState.Modified;
-            _billingDbContext.Entry(creditOrganization).Property(x => x.CreatedOn).IsModified = false;
-            _billingDbContext.Entry(creditOrganization).Property(x => x.CreatedBy).IsModified = false;
+            var organizations = _billingDbContext.CreditOrganization.Where(x => x.OrganizationId == creditOrganization.OrganizationId).FirstOrDefault();
+            organizations.IsActive = creditOrganization.IsActive;
+            organizations.IsDefault = creditOrganization.IsDefault;
+            organizations.OrganizationName = creditOrganization.OrganizationName;
+            organizations.CreditOrganizationCode = organizations.CreditOrganizationCode;
+            organizations.IsClaimCodeAutoGenerate = creditOrganization.IsClaimCodeAutoGenerate;
+            organizations.IsClaimCodeCompulsory = creditOrganization.IsClaimCodeCompulsory;
+            organizations.DisplayName = creditOrganization.DisplayName;
+            organizations.IsClaimManagementApplicable = creditOrganization.IsClaimManagementApplicable;
+            organizations.ModifiedBy = currentUser.EmployeeId;
+            organizations.ModifiedOn = DateTime.Now;
             _billingDbContext.SaveChanges();
-            return creditOrganization;
+            return organizations;
         }
         private object UpdateMembershipType(string ipDataStr)
         {
@@ -1971,7 +2281,7 @@ namespace DanpheEMR.Controllers
             _billingDbContext.Entry(scheme).Property(x => x.CreatedBy).IsModified = false;
             _billingDbContext.SaveChanges();
             return scheme;
-            
+
         }
 
         private object UpdateAdditionalServiceItem(AddUpdateAdditionalServiceItem_DTO additionalServiceItems_DTO, RbacUser currentUser)
@@ -2040,6 +2350,13 @@ namespace DanpheEMR.Controllers
             serviceItems.IsActive = isActive;
             _billingDbContext.SaveChanges();
             return serviceItems;
+        }
+        private object UpdateRegistrationStickerStatus(int registrationStickerSettingsId, bool isActive)
+        {
+            var stickerData = _billingDbContext.RegistrationSticker.Where(x => x.RegistrationStickerSettingsId == registrationStickerSettingsId).FirstOrDefault();
+            stickerData.IsActive = isActive;
+            _billingDbContext.SaveChanges();
+            return stickerData;
         }
 
         private object UpdateActivateDeactivateDepositHead(int depositHeadId, RbacUser currentUser)
@@ -2158,14 +2475,17 @@ namespace DanpheEMR.Controllers
             billServiceDetailToUpdate.PriceCategoryId = servicePriceMap_DTO.PriceCategoryId;
             billServiceDetailToUpdate.IsDiscountApplicable = servicePriceMap_DTO.IsDiscountApplicable;
             //billServiceDetailToUpdate.IsIncentiveApplicable = servicePriceMap_DTO.IsIncentiveApplicable;
-            billServiceDetailToUpdate.ItemLegalCode= servicePriceMap_DTO.ItemLegalCode;
+            billServiceDetailToUpdate.ItemLegalCode = servicePriceMap_DTO.ItemLegalCode;
             billServiceDetailToUpdate.ItemLegalName = servicePriceMap_DTO.ItemLegalName;
             billServiceDetailToUpdate.IsPriceChangeAllowed = servicePriceMap_DTO.IsPriceChangeAllowed;
             billServiceDetailToUpdate.IsZeroPriceAllowed = servicePriceMap_DTO.IsZeroPriceAllowed;
             billServiceDetailToUpdate.HasAdditionalBillingItems = servicePriceMap_DTO.HasAdditionalBillingItems;
+            billServiceDetailToUpdate.IsCappingEnabled = servicePriceMap_DTO.IsCappingEnabled;
+            billServiceDetailToUpdate.CappingLimitDays = servicePriceMap_DTO.CappingLimitDays;
+            billServiceDetailToUpdate.CappingQuantity = servicePriceMap_DTO.CappingQuantity;
             _billingDbContext.SaveChanges();
             return billServiceDetailToUpdate;
-            
+
         }
 
 
@@ -2234,7 +2554,7 @@ namespace DanpheEMR.Controllers
         private void DeactivateOrActivateServiceItems(int ServiceItemId, int currentUserEmployeeId)
         {
             var billCfgItemsVsPriceCategoryMap = _billingDbContext.BillItemsPriceCategoryMaps.Where(a => a.ServiceItemId == ServiceItemId).ToList();
-           
+
             for (int i = 0; i < billCfgItemsVsPriceCategoryMap.Count; i++)
             {
                 BillMapPriceCategoryServiceItemModel bilCfgItemsVsPriceCategories = new BillMapPriceCategoryServiceItemModel();
@@ -2293,6 +2613,66 @@ namespace DanpheEMR.Controllers
             return rowToUpdate;
         }
 
+
+        private object UpdateRegistrationStickerSettingsData(RegistrationSticker_DTO registrationSticker_DTO)
+        {
+
+            if (registrationSticker_DTO == null)
+            {
+                return new Exception("Provided data should not be null");
+            }
+            else
+            {
+                var stickerDetail = _billingDbContext.RegistrationSticker.Where(x => x.RegistrationStickerSettingsId == registrationSticker_DTO.RegistrationStickerSettingsId).FirstOrDefault();
+                stickerDetail.IsActive = true;
+                stickerDetail.StickerName = registrationSticker_DTO.StickerName;
+                stickerDetail.StickerGroupCode = registrationSticker_DTO.StickerGroupCode;
+                stickerDetail.VisitType = registrationSticker_DTO.VisitType;
+                stickerDetail.VisitDateLabel = registrationSticker_DTO.VisitDateLabel;
+                stickerDetail.IsDefaultForCurrentVisitType = registrationSticker_DTO.IsDefaultForCurrentVisitType;
+                stickerDetail.MemberNoLabel = registrationSticker_DTO.MemberNoLabel;
+                stickerDetail.ShowMemberNo = registrationSticker_DTO.ShowMemberNo;
+                stickerDetail.PatientDesignationLabel = registrationSticker_DTO.PatientDesignationLabel;
+                stickerDetail.ShowPatientDesignation = registrationSticker_DTO.ShowPatientDesignation;
+                stickerDetail.QueueNoLabel = registrationSticker_DTO.QueueNoLabel;
+                stickerDetail.ShowQueueNo = registrationSticker_DTO.ShowQueueNo;
+                stickerDetail.ShowSchemeCode = registrationSticker_DTO.ShowSchemeCode;
+                stickerDetail.ShowClaimCode = registrationSticker_DTO.ShowClaimCode;
+                stickerDetail.ShowIpdNumber = registrationSticker_DTO.ShowIpdNumber;
+                stickerDetail.ShowWardBedNo = registrationSticker_DTO.ShowWardBedNo;
+                stickerDetail.ShowRegistrationCharge = registrationSticker_DTO.ShowRegistrationCharge;
+                stickerDetail.ShowPatContactNo = registrationSticker_DTO.ShowPatContactNo;
+                _billingDbContext.SaveChanges();
+                return stickerDetail;
+            }
+        }
+
+        private object GenerateUniqueItemCode(string itemName)
+        {
+            if (itemName == null)
+            {
+                throw new ArgumentNullException($"ItemName is required to generate Unique ItemCode {nameof(itemName)}");
+            }
+            //ItemCode = {fourCharactersFromItemNameInitial + (MaxServiceItemId+1)}
+            var fourCharactersFromItemName = "";
+            if (itemName.Length < 4)
+            {
+                fourCharactersFromItemName = itemName.Substring(0, 2);
+            }
+            else
+            {
+                fourCharactersFromItemName = itemName.Substring(0, 4);
+            }
+            var numericValue = GetMaxServiceItemId() + 1;
+            var itemCode = $"{fourCharactersFromItemName}{numericValue}";
+            return itemCode;
+        }
+
+        private int GetMaxServiceItemId()
+        {
+            var maxServiceItemId = _billingDbContext.BillServiceItems.Max(s => s.ServiceItemId);
+            return maxServiceItemId;
+        }
         #region reqType(Get)
         /*[HttpGet]
         public string Get(string department,
@@ -3038,5 +3418,362 @@ namespace DanpheEMR.Controllers
             return DanpheJSONConvert.SerializeObject(responseData, true);
         }*/
         #endregion
+
+        [HttpPost]
+        [Route("ReportGroup")]
+        public IActionResult AddReportGroup([FromBody] ReportGroupDTO reportGroupDto)
+        {
+
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => AddingReportGroup(reportGroupDto, currentUser, _billingDbContext);
+            return InvokeHttpPostFunction(func);
+        }
+
+        /// <summary>
+        /// Adds a new report group to the billing database within a transaction, ensuring uniqueness of the group name and handling exceptions for SQL or general errors.
+        /// </summary>
+        /// <param name="ipDataStr">The input data string containing the serialized JSON data of the <see cref="DynamicReportGroup"/> to be added.</param>
+        /// <param name="currentUser">The current user performing the operation, used to set the creator of the report group.</param>
+        /// <param name="_billingDbContext">The billing database context used to add the report group and manage the transaction.</param>
+        /// <returns>Returns the newly added <see cref="DynamicReportGroup"/> object if the operation is successful.</returns>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="ipDataStr"/> is null or empty.</exception>
+        /// <exception cref="ArgumentException">Thrown if <paramref name="ipDataStr"/> cannot be deserialized into a <see cref="DynamicReportGroup"/>.</exception>
+        /// <exception cref="InvalidOperationException">Thrown if a report group with the same name already exists in the database.</exception>
+        /// <exception cref="Exception">Thrown if a SQL error or any other exception occurs during the save operation.</exception>
+
+
+        private object AddingReportGroup(ReportGroupDTO reportGroupDto, RbacUser currentUser, BillingDbContext _billingDbContext)
+        {
+            if (reportGroupDto == null)
+            {
+                Log.Error("Invalid report group data: input is null.");
+                throw new ArgumentException("Invalid report group data.");
+            }
+
+            using (var dbContextTransaction = _billingDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+
+                    bool groupExists = _billingDbContext.DynamicReportGroups.Any(r => r.GroupName.ToLower() == reportGroupDto.GroupName.ToLower());
+
+                    if (groupExists)
+                    {
+                        Log.Error($"ReportGroup with GroupName '{reportGroupDto.GroupName}' already exists.");
+                        throw new InvalidOperationException($"ReportGroup with GroupName '{reportGroupDto.GroupName}' already exists.");
+                    }
+
+
+                    var dynamicReportGroup = new DynamicReportGroup
+                    {
+                        GroupName = reportGroupDto.GroupName,
+                        CreatedBy = currentUser.EmployeeId,
+                        CreatedOn = DateTime.Now,
+                        IsActive = true
+                    };
+
+                    _billingDbContext.DynamicReportGroups.Add(dynamicReportGroup);
+                    _billingDbContext.SaveChanges();
+
+                    dbContextTransaction.Commit();
+                    return reportGroupDto;
+                }
+                catch (SqlException sqlEx)
+                {
+                    dbContextTransaction.Rollback();
+                    Log.Error($"Database update error while saving the report group: {sqlEx.Message}", sqlEx);
+                    throw new Exception($"Database update error: {sqlEx.Message}. Exception details: {sqlEx}");
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    Log.Error($"An error occurred while saving the report group: {ex.Message}", ex);
+                    throw new Exception($"An error occurred while saving the report group: {ex.Message}. Exception details: {ex}");
+                }
+            }
+        }
+
+
+        [HttpGet]
+        [Route("ReportGroupList")]
+        public IActionResult GetReportGroup()
+        {
+            Func<object> func = () => GetReportGroupList();
+            return InvokeHttpGetFunction(func);
+        }
+
+        private object GetReportGroupList()
+        {
+            var reportGroupList = (from reportGroup in _billingDbContext.DynamicReportGroups
+                                   join employee in _billingDbContext.Employee
+                                                         on reportGroup.CreatedBy equals employee.EmployeeId into employeeJoin
+                                   from emp in employeeJoin.DefaultIfEmpty()
+                                   select new
+                                   {
+                                       reportGroup.DynamicReportGroupId,
+                                       reportGroup.GroupName,
+                                       reportGroup.IsActive,
+                                       reportGroup.CreatedBy,
+                                       reportGroup.CreatedOn,
+                                       reportGroup.ModifiedBy,
+                                       reportGroup.ModifiedOn,
+                                       EmployeeName = emp != null ? emp.FullName : null
+                                   }).ToList();
+            if (reportGroupList != null)
+            {
+                return reportGroupList;
+            }
+            else
+            {
+                throw new Exception("failed to get report group list");
+            }
+        }
+
+        [HttpPut]
+        [Route("ReportGroup")]
+        public IActionResult PutReportGroup([FromBody] ReportGroupDTO reportGroupDto)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => UpdateReportGroup(reportGroupDto, _billingDbContext, currentUser);
+            return InvokeHttpPutFunction(func);
+        }
+
+
+        private object UpdateReportGroup(ReportGroupDTO reportGroupDto, BillingDbContext _billingDbContext, RbacUser currentUser)
+        {
+            using (var reportGroupTransaction = _billingDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+
+                    var reportGroup = _billingDbContext.DynamicReportGroups.Where(x => x.DynamicReportGroupId == reportGroupDto.DynamicReportGroupId).FirstOrDefault();
+                    if (reportGroup == null)
+                    {
+                        Log.Error($"No report Group is found for {nameof(reportGroupDto.DynamicReportGroupId)}");
+                        throw new InvalidOperationException($"No report Group is found for {nameof(reportGroupDto.DynamicReportGroupId)}");
+                    }
+
+                    if (reportGroupDto == null || reportGroupDto.DynamicReportGroupId == 0)
+                    {
+                        Log.Error("Invalid ReportGroup data. ReportGroup object is null or DynamicReportGroupId is not provided.");
+                        throw new ArgumentException("Invalid ReportGroup data. ReportGroup object is null or DynamicReportGroupId is not provided.");
+                    }
+
+                    bool groupExists = _billingDbContext.DynamicReportGroups.Any(r => r.GroupName.ToLower() == reportGroupDto.GroupName.ToLower()
+                                                                                 && r.DynamicReportGroupId != reportGroupDto.DynamicReportGroupId);
+                    if (groupExists)
+                    {
+                        Log.Error($"ReportGroup with GroupName '{reportGroupDto.GroupName}' already exists.");
+                        throw new InvalidOperationException($"ReportGroup with GroupName '{reportGroupDto.GroupName}' already exists.");
+                    }
+
+
+
+                    reportGroup.GroupName = reportGroupDto.GroupName;
+                    reportGroup.ModifiedBy = currentUser.EmployeeId;
+                    reportGroup.ModifiedOn = DateTime.Now;
+
+
+                    _billingDbContext.Entry(reportGroup).State = EntityState.Modified;
+                    _billingDbContext.SaveChanges();
+
+                    reportGroupTransaction.Commit();
+
+                    return reportGroupDto;
+                }
+                catch (SqlException sqlEx)
+                {
+                    reportGroupTransaction.Rollback();
+                    Log.Error($"A SQL error occurred while updating the report group: {sqlEx.Message}", sqlEx);
+                    throw new Exception($"A SQL error occurred while updating the report group: {sqlEx.Message}. Exception details: {sqlEx}");
+                }
+                catch (Exception ex)
+                {
+                    reportGroupTransaction.Rollback();
+                    Log.Error($"An error occurred while updating the report group: {ex.Message}", ex);
+                    throw new Exception($"An error occurred while updating the report group: {ex.Message}. Exception details: {ex}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Activates or deactivates a report group based on its current status. Retrieves the dynamic report group ID from the request data and performs the activation toggle.
+        /// </summary>
+        /// <returns>Returns an <see cref="IActionResult"/> indicating the success or failure of the activation toggle operation.</returns>
+        /// <exception cref="BadRequestObjectResult">Returns a bad request result if the dynamic report group ID is invalid or missing.</exception>
+
+        [HttpPut]
+        [Route("ReportGroupActivation")]
+        public IActionResult ReportGroupActivation(int DynamicReportGroupId)
+        {
+
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => UpdateReportGroupActivation(currentUser, DynamicReportGroupId, _billingDbContext);
+            return InvokeHttpPutFunction(func);
+        }
+
+        /// <summary>
+        /// Toggles the activation status of a dynamic report group and updates its modification details.
+        /// </summary>
+        /// <param name="currentUser">The current user performing the activation toggle, used to set modification details.</param>
+        /// <param name="DynamicReportGroupId">The ID of the dynamic report group to be toggled.</param>
+        /// <param name="_billingDbContext">The billing database context used to retrieve and update the report group.</param>
+        /// <returns>Returns the updated <see cref="DynamicReportGroup"/> object after the activation toggle.</returns>
+        /// <exception cref="InvalidOperationException">Thrown if the dynamic report group ID is missing or invalid, or if an error occurs during the toggle operation.</exception>
+        private object UpdateReportGroupActivation(RbacUser currentUser, int DynamicReportGroupId, BillingDbContext _billingDbContext)
+        {
+            if (DynamicReportGroupId == 0)
+            {
+                Log.Error($"{nameof(DynamicReportGroupId)} is not provided");
+                throw new InvalidOperationException($"{nameof(DynamicReportGroupId)} is not provided");
+            }
+
+            var dynamicReportGroup = _billingDbContext.DynamicReportGroups.FirstOrDefault(r => r.DynamicReportGroupId == DynamicReportGroupId);
+            if (dynamicReportGroup == null)
+            {
+                Log.Error($"There is no Clinical Phrase to update with DynamicReportGroupId {DynamicReportGroupId}");
+                throw new InvalidOperationException($"There is no Clinical Phrase to update with DynamicReportGroupId {DynamicReportGroupId}");
+            }
+
+            try
+            {
+                dynamicReportGroup.IsActive = !dynamicReportGroup.IsActive;
+                dynamicReportGroup.ModifiedBy = currentUser.EmployeeId;
+                dynamicReportGroup.ModifiedOn = DateTime.Now;
+
+                _billingDbContext.Entry(dynamicReportGroup).State = EntityState.Modified;
+                _billingDbContext.SaveChanges();
+
+                return dynamicReportGroup;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"An error occurred while Activate/Deactivate the Report Group: {ex.Message}");
+                throw new InvalidOperationException($"An error occurred while Activate/Deactivate the Report Group: {ex.Message}");
+            }
+        }
+
+        [HttpGet]
+        [Route("GetActiveServiceItem")]
+        public IActionResult GetServiceItem()
+        {
+            Func<object> func = () => GetServiceItemForReportGroup();
+            return InvokeHttpGetFunction(func);
+        }
+        private object GetServiceItemForReportGroup()
+        {
+            var itemList = (from item in _billingDbContext.BillServiceItems
+                            join srv in _billingDbContext.ServiceDepartment on item.ServiceDepartmentId equals srv.ServiceDepartmentId
+                            where item.IsActive == true
+                            select new ServiceItemsViewModel
+                            {
+                                ServiceItemId = item.ServiceItemId,
+                                ServiceDepartmentId = srv.ServiceDepartmentId,
+                                ServiceDepartmentName = srv.ServiceDepartmentName,
+                                ItemCode = item.ItemCode,
+                                ItemName = item.ItemName,
+                                DynamicReportGroupId = item.DynamicReportGroupId
+                            }).OrderBy(b => b.ServiceDepartmentName).ToList();
+
+            return itemList;
+        }
+
+        [HttpGet]
+        [Route("GetMappedServiceItemsByReportGroupId")]
+        public IActionResult GetMappedServiceItems(int selectedDynamicReportGroupId)
+        {
+            Func<object> func = () => GetServiceItemFromDynamicReportGroupId(selectedDynamicReportGroupId, _billingDbContext);
+            return InvokeHttpGetFunction(func);
+        }
+
+        /// <summary>
+        /// Retrieves a list of service items associated with a specified dynamic report group ID from the billing database.
+        /// </summary>
+        /// <param name="selectedDynamicReportGroupId">The ID of the dynamic report group for which service items are to be retrieved.</param>
+        /// <param name="_billingDbContext">The billing database context used to query service items and their associated departments.</param>
+        /// <returns>Returns a list of <see cref="ServiceItemsViewModel"/> objects representing service items mapped to the specified dynamic report group.</returns>
+        private object GetServiceItemFromDynamicReportGroupId(int selectedDynamicReportGroupId, BillingDbContext _billingDbContext)
+        {
+
+            var mappedItems = (from item in _billingDbContext.BillServiceItems
+                               join srv in _billingDbContext.ServiceDepartment on item.ServiceDepartmentId equals srv.ServiceDepartmentId
+                               where item.DynamicReportGroupId == selectedDynamicReportGroupId
+                               select new ServiceItemsViewModel
+                               {
+                                   ServiceItemId = item.ServiceItemId,
+                                   ItemName = item.ItemName,
+                                   ServiceDepartmentName = srv.ServiceDepartmentName,
+                                   ServiceDepartmentId = item.ServiceDepartmentId,
+                                   DynamicReportGroupId = item.DynamicReportGroupId
+                               }).ToList();
+
+            return mappedItems;
+        }
+
+
+        [HttpPut]
+        [Route("ReportGroupServiceItemMap")]
+        public IActionResult PutReportGroupServiceItemMap([FromBody] List<ReportGroupServiceItemMapDTO> serviceItemMappings)
+        {
+
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => PutReportGroupServiceItemMap(serviceItemMappings, currentUser, _billingDbContext);
+            return InvokeHttpPostFunction(func);
+        }
+
+        /// <summary>
+        /// Updates the dynamic report group mapping for a list of service items in the billing database.
+        /// </summary>
+        /// <param name="ipDataStr">A JSON string containing a list of <see cref="ReportGroupServiceItemMapping"/> objects representing the service items and their new report group mappings.</param>
+        /// <param name="currentUser">The user making the update, used to record modification details on each service item.</param>
+        /// <param name="_billingDbContext">The billing database context used to update service item mappings.</param>
+        /// <returns>Returns a status object indicating the success or failure of the update operation, with an appropriate message.</returns>
+        /// <exception cref="Exception">Logs and returns an error message if an exception occurs during the update operation.</exception>
+        private object PutReportGroupServiceItemMap(List<ReportGroupServiceItemMapDTO> serviceItemMappings, RbacUser currentUser, BillingDbContext _billingDbContext)
+        {
+            try
+            {
+
+                if (serviceItemMappings != null && serviceItemMappings.Count > 0)
+                {
+
+                    foreach (var mapping in serviceItemMappings)
+                    {
+
+                        var serviceItem = _billingDbContext.BillServiceItems
+                            .FirstOrDefault(item => item.ServiceItemId == mapping.ServiceItemId);
+
+
+                        if (serviceItem != null)
+                        {
+                            serviceItem.DynamicReportGroupId = mapping.DynamicReportGroupId;
+                            serviceItem.ModifiedBy = currentUser.EmployeeId;
+                            serviceItem.ModifiedOn = DateTime.Now;
+                        }
+                        else
+                        {
+                            Log.Error($"ServiceItem with ID {mapping.ServiceItemId} not found.");
+                            return new { Status = ENUM_Danphe_HTTP_ResponseStatus.Failed, Message = $"ServiceItem with ID {mapping.ServiceItemId} not found." };
+                        }
+                    }
+
+
+                    _billingDbContext.SaveChanges();
+
+                    return new { Status = ENUM_Danphe_HTTP_ResponseStatus.OK, Message = "Items successfully updated." };
+                }
+                else
+                {
+                    Log.Error("No valid items to update.");
+                    return new { Status = ENUM_Danphe_HTTP_ResponseStatus.Failed, Message = "No valid items to update." };
+                }
+            }
+            catch (Exception ex)
+            {
+
+                Log.Error($"Error occurred while updating service items: {ex.Message}", ex);
+                return new { Status = ENUM_Danphe_HTTP_ResponseStatus.Failed, Message = "An error occurred while updating service items. Please try again." };
+            }
+        }
     }
 }

@@ -199,6 +199,21 @@ namespace DanpheEMR.ServerModel.SSFModels
         public string message { get; set; }
     }
 
+    public class AttachmentErrorRoot
+    {
+        public string resourceType { get; set; }
+        public List<AttachmentIssue> issue { get; set; }
+    }
 
+    public class AttachmentIssue
+    {
+        public string code { get; set; }
+        public AttachmentDetails details { get; set; }
+        public string severity { get; set; }
+    }
 
+    public class AttachmentDetails
+    {
+        public string text { get; set; }
+    }
 }

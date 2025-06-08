@@ -37,7 +37,6 @@ export class SelectEthnicGroupComponent {
         }
     }
     public patientEthnicGroup: string = "";
-
     public CastEthnicGroupList = new Array<EthnicGroup>();
     public selectedEthnicGroup: string = "";
     public defaultEthnicGroup: string = "Brahmin/Chettri";
@@ -46,8 +45,6 @@ export class SelectEthnicGroupComponent {
     @Output("on-ethnic-group-change")
     public onEthnicGroupChangeCallback = new EventEmitter<object>();
     public GeneralFieldLabel = new GeneralFieldLabels();
-
-
 
     constructor(private patientBlService: PatientsBLService, private msgBoxServ: MessageboxService, public coreService: CoreService,) {
         this.LoadEthnicGroups();
@@ -94,7 +91,7 @@ export class SelectEthnicGroupComponent {
             this.selectedEthnicGroup = tempEthnic;
             tempEthnic = "";
         } else {
-            this.selectedEthnicGroup = this.defaultEthnicGroup;
+            this.selectedEthnicGroup = this.patientEthnicGroup ? this.patientEthnicGroup : "";
         }
         this.onEthnicGroupChanged(this.selectedEthnicGroup);
 
@@ -108,7 +105,7 @@ export class SelectEthnicGroupComponent {
     }
 
     onEthnicGroupChanged(ethnicGroup: string) {
-        if (ethnicGroup) {
+        if (ethnicGroup !== null) {
             this.onEthnicGroupChangeCallback.emit({ ethnicGroup: ethnicGroup });
         }
     }

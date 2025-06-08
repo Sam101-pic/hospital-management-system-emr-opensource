@@ -15,6 +15,7 @@
                 <div class="col-md-7">
                   <select class="form-control" maxlength="30" type="text" [(ngModel)]="CurrentLedgerGroup.PrimaryGroup"
                           id="PrimaryGroup" (change)="PrimaryGroupChanged()" placeholder="PrimaryGroup"
+                          [attr.disabled]="CurrentLedgerGroup.IsSystemDefault ? true : null"
                           formControlName="PrimaryGroup">
                     <option *ngFor="let pg of primaryGroupList" [disabled]="update" value={{pg.PrimaryGroupName}}>{{pg.PrimaryGroupName}}</option>
                   </select>
@@ -27,6 +28,7 @@
                 <label class="control-label col-md-5">Chart Of Account<sup>*</sup><b>:</b></label>
                 <div class="col-md-7">
                   <select class="form-control" maxlength="30" type="text" [(ngModel)]="CurrentLedgerGroup.COAId" id="COA"
+                          [attr.disabled]="CurrentLedgerGroup.IsSystemDefault ? true : null"
                           (change)="COAChanged()" placeholder="LedgerGroupName" formControlName="COA">
                     <option *ngFor="let pg of coaList" [disabled]="update" value={{pg.ChartOfAccountId}}>{{pg.ChartOfAccountName}}</option>
                   </select>
@@ -40,6 +42,7 @@
                 <div class="col-md-7">
                   <input class="form-control" maxlength="30" type="text"
                          [(ngModel)]="CurrentLedgerGroup.LedgerGroupName" id="LedgerGroupName" placeholder="LedgerGroupName"
+                         [attr.disabled]="CurrentLedgerGroup.IsSystemDefault ? true : null"
                          formControlName="LedgerGroupName" />
                   <span class="color-red font-sm"
                         [hidden]="CurrentLedgerGroup.IsValidCheck('LedgerGroupName','required') || !(CurrentLedgerGroup.IsDirty('LedgerGroupName'))">Ledger

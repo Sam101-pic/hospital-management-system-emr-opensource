@@ -20,8 +20,10 @@
           </div>
 
           <div>
-            <div class="col-md-5 col-xs-12">
-              <from-to-date-select (on-change)="OnFromToDateChange($event)"> </from-to-date-select>
+            <div class="col-md-4 col-xs-12">
+              <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                                   [date-settings-name]="'common-range-with-today'">
+              </from-to-date-select>
             </div>
             <div class="col-md-3 col-xs-12">
               <div class="form-group row">
@@ -40,12 +42,24 @@
                 <option value="female">Female</option>
               </select>
             </div>
-            <div class="col-md-2 col-xs-12">
+            <div class="col-md-3 col-xs-12">
               <div class="form-group">
-                <button class="btn green btn-success" type="button" (click)="Load()"> <i class="fa fa-search"></i> Show
-                  Report
-                </button>
+                <label class="control-label col-md-3">Scheme<b style="float:right;">:</b></label>
+                <div class="col-md-8">
+                  <input class="form-control" danphe-auto-complete [(ngModel)]="SelectedScheme" [ngModelOptions]="{standalone: true}"
+                         [list-formatter]="SchemeFormatter" [source]="Schemes" placeholder="Select Scheme" display-property-name="SchemeName"
+                         value-property-name=null (focusout)="OnSchemeChange()" onClick="this.select()">
+                </div>
               </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-12" style="display: flex; justify-content: flex-end;">
+          <div style="margin-right: 55px;">
+            <div class="form-group">
+              <button class="btn green btn-success" type="button" (click)="Load()"> <i class="fa fa-search"></i> Show
+                Report
+              </button>
             </div>
           </div>
         </div>

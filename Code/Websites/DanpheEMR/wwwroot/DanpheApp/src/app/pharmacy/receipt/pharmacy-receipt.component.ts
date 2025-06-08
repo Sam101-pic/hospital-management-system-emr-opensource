@@ -55,7 +55,7 @@ export class PharmacyReceiptComponent {
   currentActiveDispensary: PHRMStoreModel;
   showExpiryDateInPrint: boolean = false;
   showRackNoInPrint: boolean = false;
-  
+
 
   @Input("BillGenerate") public set billgenerateindex(val: number) {
     this.BillGenerate = val ? val : 1;
@@ -96,7 +96,7 @@ export class PharmacyReceiptComponent {
     this.IsCurrentDispensaryInsurace = this._dispensaryService.isInsuranceDispensarySelected;
     this.currentActiveDispensary = this._dispensaryService.activeDispensary;
 
-    
+
 
   }
 
@@ -839,10 +839,10 @@ export class PharmacyReceiptComponent {
       let showExpiryDateInPrint = JSON.parse(dotMatrixExpiryDatePrintSetting.ParameterValue);
       this.showExpiryDateInPrint = showExpiryDateInPrint;
     }
-    let dotMatrixRackNoPrintSetting = this.coreService.Parameters.find(p => p.ParameterName == "ShowRackNoInPharmacyDotMatrixPrint" && p.ParameterGroupName == "Pharmacy");
+    let dotMatrixRackNoPrintSetting = this.coreService.Parameters.find(p => p.ParameterName == "ShowRackNoInPharmacyReceipt" && p.ParameterGroupName == "Pharmacy");
     if (dotMatrixRackNoPrintSetting) {
       let showRackNoInPrint = JSON.parse(dotMatrixRackNoPrintSetting.ParameterValue);
-      this.showRackNoInPrint = showRackNoInPrint;
+      this.showRackNoInPrint = showRackNoInPrint.ShowRackNoInPharmacyDotMatrixPrint;
     }
 
   }

@@ -1,9 +1,7 @@
-
-
-
 <div *ngIf="showGrid" class="row">
   <div class="col-md-12 col-xs-12 col-sm-12">
-    <a class="btn blue bordered " name="name" (click)="AddRole()">
+    <a class="btn blue bordered " name="name" (click)="AddRole()"
+       rbac-permission='{"name":"settings-manage-role-add-btn","actionOnInvalid":"remove"}'>
       <i class="fa fa-plus"></i>&nbsp;Add Role
     </a>
 

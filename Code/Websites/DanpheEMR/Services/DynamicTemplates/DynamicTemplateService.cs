@@ -5,6 +5,7 @@ using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.Services.DynamicTemplates.DTO;
+using DocumentFormat.OpenXml.InkML;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -83,18 +84,24 @@ namespace DanpheEMR.Services.DynamicTemplates
 
         public object GetTemplateFields(CoreDbContext coreDbContext, int templateId)
         {
-            var result = (from Template in coreDbContext.Templates
-                          join Mapping in coreDbContext.TemplateFieldMappings on Template.TemplateId equals Mapping.TemplateId
+            var result = (from 
+                          //Template in coreDbContext.Templates
+                          //join Mapping in coreDbContext.TemplateFieldMappings on Template.TemplateId equals Mapping.TemplateId
+                          Mapping in coreDbContext.TemplateFieldMappings 
                           join FieldMaster in coreDbContext.FieldMasters on Mapping.FieldMasterId equals FieldMaster.FieldMasterId
-                          where Template.TemplateId == templateId && Mapping.IsActive || FieldMaster.IsCompulsoryField == true
+                          where Mapping.TemplateId == templateId && Mapping.IsActive 
                           select new TemplateField_DTO
                           {
                               FieldName = FieldMaster.FieldName,
                               IsMandatory = Mapping.IsMandatory || FieldMaster.IsCompulsoryField,
                               IsActive = FieldMaster.IsActive || FieldMaster.IsCompulsoryField,
-                              IsCompulsoryField = FieldMaster.IsCompulsoryField
+                              IsCompulsoryField = FieldMaster.IsCompulsoryField,
+                              DisplayLabelAtForm = Mapping.DisplayLabelAtForm,
+                              DisplayLabelAtPrint = Mapping.DisplayLabelAtPrint,
+                              EnterSequence=Mapping.EnterSequence??100,
+                              DischargeTypeId=FieldMaster.FieldMasterId
 
-                          }).ToList();
+                          }).ToList().OrderBy(p=>p.EnterSequence);
             return result;
         }
 
@@ -172,7 +179,7 @@ namespace DanpheEMR.Services.DynamicTemplates
 
               
             }
-            return "Template Settings Successfully updated.";
+            return templateToUpdate;
         }
 
         public object AddNewTemplate(CoreDbContext coreDbContext, RbacUser currentUser, TemplateModel template)
@@ -227,7 +234,8 @@ namespace DanpheEMR.Services.DynamicTemplates
                         TemplateId = fieldmappings.TemplateId,
                         FieldMasterId = fieldmappings.FieldMasterId,
                         IsMandatory = fieldmappings.IsMandatory,
-                        DisplayLabel = fieldmappings.DisplayLabel,
+                        DisplayLabelAtForm = fieldmappings.DisplayLabelAtForm,
+                        DisplayLabelAtPrint = fieldmappings.DisplayLabelAtPrint,
                         IsActive = fieldmappings.IsActive,
                         EnterSequence = fieldmappings.EnterSequence,
                         CreatedBy = currentUser.EmployeeId,
@@ -239,7 +247,8 @@ namespace DanpheEMR.Services.DynamicTemplates
                 {
                     // Update existing mapping
                     existingMapping.IsMandatory = fieldmappings.IsMandatory;
-                    existingMapping.DisplayLabel = fieldmappings.DisplayLabel;
+                    existingMapping.DisplayLabelAtPrint = fieldmappings.DisplayLabelAtPrint;
+                    existingMapping.DisplayLabelAtForm = fieldmappings.DisplayLabelAtForm;
                     existingMapping.IsActive = fieldmappings.IsActive;
                     existingMapping.EnterSequence = fieldmappings.EnterSequence;
                     existingMapping.ModifiedBy = currentUser.EmployeeId;

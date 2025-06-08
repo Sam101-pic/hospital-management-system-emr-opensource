@@ -8,12 +8,13 @@ import { SecurityService } from "../../../security/shared/security.service";
 import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { CommonFunctions } from '../../../shared/common.functions';
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status, ENUM_PHRMPurchaseOrderStatus, ENUM_TermsApplication } from '../../../shared/shared-enums';
+import { ENUM_DanpheHTTPResponses, ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status, ENUM_PHRMPurchaseOrderStatus, ENUM_TermsApplication } from '../../../shared/shared-enums';
 import { PharmacyPOVerifier } from '../../shared/pharmacy-po-verifier.model';
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
 import { PharmacyService } from '../../shared/pharmacy.service';
 import { PHRMGenericModel } from '../../shared/phrm-generic.model';
 import { PHRMItemMasterModel } from "../../shared/phrm-item-master.model";
+import { PHRMPackingTypeModel } from '../../shared/phrm-packing-type.model';
 import { PHRMPurchaseOrderItems } from "../../shared/phrm-purchase-order-items.model";
 import { PHRMPurchaseOrder } from "../../shared/phrm-purchase-order.model";
 import { PHRMSupplierModel } from "../../shared/phrm-supplier.model";
@@ -56,6 +57,12 @@ export class PHRMPurchaseOrderComponent {
     public SelectedGeneric: PHRMGenericModel;
     public confirmationTitle: string = "Confirm !";
     public confirmationMessage: string = "Are you sure you want to Print Order ?";
+    TermsApplicationId: number = ENUM_TermsApplication.Pharmacy;
+    AllowPreviousFiscalYear: boolean = false;
+    IsPackageItem: boolean = false;
+    PackingTypeList: Array<PHRMPackingTypeModel> = new Array<PHRMPackingTypeModel>();
+    SelectedPacking: PHRMPackingTypeModel = new PHRMPackingTypeModel();
+    HasPermission: boolean = false;
 
     constructor(public pharmacyPOService: PharmacyPOService,
         public securityService: SecurityService,
@@ -75,9 +82,17 @@ export class PHRMPurchaseOrderComponent {
         this.GetPharmacyTermsList();
         this.GetVerifiers();
         this.GetSigningPanelConfiguration();
+        this.ShowPacking();
+        this.GetPackingTypeList();
     }
     ngOnInit() {
         this.LoadForEditPO();
+        if (this.securityService.HasPermission('btn-phrm-purchaseorder-needverification')) {
+            this.HasPermission = true;
+        }
+        else {
+            this.HasPermission = false;
+        }
     }
     ngOnDestroy() {
         this.pharmacyPOService.PurchaseOrderId = 0;
@@ -99,7 +114,8 @@ export class PHRMPurchaseOrderComponent {
                     this.SelectedSupplier = this.currentPO.SupplierName;
                     this.currentPO.PurchaseOrderValidator.controls['DeliveryDays'].setValue(this.currentPO.DeliveryDays);
                     this.currentPO.PODate = moment(new Date(this.currentPO.PODate)).format("YYYY-MM-DD");
-                    this.currentPO.DeliveryDate = moment(new Date(this.currentPO.DeliveryDate)).format("YYYY-MM-DD");
+                    this.currentPO.PurchaseOrderValidator.controls['PODate'].setValue(this.currentPO.PODate);
+                    this.currentPO.DeliveryDate = moment(this.currentPO.DeliveryDate).format("YYYY-MM-DD");
                     this.currentPOItems = res.Results.OrderItems.map((item) => {
                         const orderItem = Object.assign(new PHRMPurchaseOrderItems(), item);
                         orderItem.SelectedItem = this.ItemList.find(a => a.ItemId === item.ItemId);
@@ -306,23 +322,54 @@ export class PHRMPurchaseOrderComponent {
         return html;
     }
     CalculationForPOItem() {
-        this.purchaseOrderItem.TotalQuantity = this.purchaseOrderItem.Quantity + this.purchaseOrderItem.FreeQuantity;
+        if (this.IsPackageItem && this.SelectedPacking) {
+            this.CalculationForPackingItem();
+        }
+        else {
+            this.purchaseOrderItem.TotalQuantity = this.purchaseOrderItem.Quantity + this.purchaseOrderItem.FreeQuantity;
 
-        if (this.purchaseOrderItem.ItemId && this.purchaseOrderItem.TotalQuantity && this.purchaseOrderItem.StandardRate) {
-            this.purchaseOrderItem.SubTotal = CommonFunctions.parsePhrmAmount(this.purchaseOrderItem.Quantity * this.purchaseOrderItem.StandardRate);
+            this.purchaseOrderItem.IsPacking = this.IsPackageItem;
+
+            if (this.purchaseOrderItem.ItemId && this.purchaseOrderItem.TotalQuantity && this.purchaseOrderItem.StandardRate) {
+                this.purchaseOrderItem.SubTotal = CommonFunctions.parsePhrmAmount(this.purchaseOrderItem.Quantity * this.purchaseOrderItem.StandardRate);
+                if (this.purchaseOrderItem.DiscountPercentage > 0) {
+                    this.purchaseOrderItem.DiscountAmount = CommonFunctions.parsePhrmAmount(((this.purchaseOrderItem.Quantity * this.purchaseOrderItem.StandardRate) * this.purchaseOrderItem.DiscountPercentage) / 100);
+                }
+                if (this.purchaseOrderItem.VATPercentage > 0) {
+                    this.purchaseOrderItem.VATAmount = CommonFunctions.parsePhrmAmount(((this.purchaseOrderItem.SubTotal - this.purchaseOrderItem.DiscountAmount) * this.purchaseOrderItem.VATPercentage) / 100);
+                }
+                if (this.purchaseOrderItem.FreeQuantity > 0 && this.purchaseOrderItem.CCChargePercentage > 0) {
+                    this.purchaseOrderItem.CCChargeAmount = CommonFunctions.parsePhrmAmount((this.purchaseOrderItem.FreeQuantity * this.purchaseOrderItem.StandardRate) * this.purchaseOrderItem.CCChargePercentage / 100);
+                }
+                this.purchaseOrderItem.TotalAmount = CommonFunctions.parsePhrmAmount(this.purchaseOrderItem.SubTotal - this.purchaseOrderItem.DiscountAmount + this.purchaseOrderItem.VATAmount + this.purchaseOrderItem.CCChargeAmount);
+                this.CalculationForPO();
+            }
+        }
+    }
+    CalculationForPackingItem() {
+        let packingQty = 0;
+        packingQty = this.SelectedPacking.PackingQuantity ? this.SelectedPacking.PackingQuantity : 0;
+
+        this.purchaseOrderItem.TotalQuantity = this.purchaseOrderItem.PackingQty * packingQty + this.purchaseOrderItem.FreeQuantity * packingQty;
+
+        this.purchaseOrderItem.IsPacking = this.IsPackageItem;
+
+        if (this.purchaseOrderItem.ItemId && this.purchaseOrderItem.TotalQuantity && this.purchaseOrderItem.StripRate) {
+            this.purchaseOrderItem.SubTotal = CommonFunctions.parsePhrmAmount(this.purchaseOrderItem.PackingQty * this.purchaseOrderItem.StripRate);
             if (this.purchaseOrderItem.DiscountPercentage > 0) {
-                this.purchaseOrderItem.DiscountAmount = CommonFunctions.parsePhrmAmount(((this.purchaseOrderItem.Quantity * this.purchaseOrderItem.StandardRate) * this.purchaseOrderItem.DiscountPercentage) / 100);
+                this.purchaseOrderItem.DiscountAmount = CommonFunctions.parsePhrmAmount(((this.purchaseOrderItem.PackingQty * this.purchaseOrderItem.StripRate) * this.purchaseOrderItem.DiscountPercentage) / 100);
             }
             if (this.purchaseOrderItem.VATPercentage > 0) {
                 this.purchaseOrderItem.VATAmount = CommonFunctions.parsePhrmAmount(((this.purchaseOrderItem.SubTotal - this.purchaseOrderItem.DiscountAmount) * this.purchaseOrderItem.VATPercentage) / 100);
             }
             if (this.purchaseOrderItem.FreeQuantity > 0 && this.purchaseOrderItem.CCChargePercentage > 0) {
-                this.purchaseOrderItem.CCChargeAmount = CommonFunctions.parsePhrmAmount((this.purchaseOrderItem.FreeQuantity * this.purchaseOrderItem.StandardRate) * this.purchaseOrderItem.CCChargePercentage / 100);
+                this.purchaseOrderItem.CCChargeAmount = CommonFunctions.parsePhrmAmount((this.purchaseOrderItem.FreeQuantity * this.purchaseOrderItem.StripRate) * this.purchaseOrderItem.CCChargePercentage / 100);
             }
             this.purchaseOrderItem.TotalAmount = CommonFunctions.parsePhrmAmount(this.purchaseOrderItem.SubTotal - this.purchaseOrderItem.DiscountAmount + this.purchaseOrderItem.VATAmount + this.purchaseOrderItem.CCChargeAmount);
             this.CalculationForPO();
         }
     }
+
     CalculationForPO(discountPer?: number, discountAmt?: number) {
         let DiscountPer = discountPer ? discountPer : 0;
         let DiscountAmt = discountAmt ? discountAmt : 0;
@@ -331,6 +378,8 @@ export class PHRMPurchaseOrderComponent {
         let VATAmount = 0;
         let CCChargeAmount = 0;
         let TotalAmount = 0;
+        let TaxableAmount = 0;
+        let NonTaxableAmount = 0;
 
         this.currentPO.PHRMPurchaseOrderItems.forEach(item => {
             if (item.IsCancel !== true) {
@@ -339,16 +388,22 @@ export class PHRMPurchaseOrderComponent {
                 VATAmount += item.VATAmount;
                 CCChargeAmount += item.CCChargeAmount;
                 TotalAmount += item.TotalAmount;
+                if (item.VATAmount > 0) {
+                    item.TaxableAmount = item.TotalAmount;
+                }
+                else {
+                    this.purchaseOrderItem.NonTaxableAmount = item.TotalAmount;
+                }
+                TaxableAmount += item.TaxableAmount;
+                NonTaxableAmount += item.TotalAmount - item.TaxableAmount;
             }
         });
-
-
         this.currentPO.SubTotal = CommonFunctions.parseAmount(SubTotal, 4);
         this.currentPO.DiscountAmount = DiscountAmt > 0 ? DiscountAmt : CommonFunctions.parseAmount(DiscountAmount, 4);
         this.currentPO.DiscountPercentage = DiscountPer > 0 ? DiscountPer : CommonFunctions.parseAmount((DiscountAmount / SubTotal) * 100, 4);
-        this.currentPO.TaxableAmount = CommonFunctions.parseAmount(SubTotal - DiscountAmount, 4);
-        this.currentPO.NonTaxableAmount = CommonFunctions.parseAmount(DiscountAmount, 4);
         this.currentPO.VATAmount = CommonFunctions.parseAmount(VATAmount, 4);
+        this.currentPO.TaxableAmount = CommonFunctions.parseAmount(TaxableAmount, 4);
+        this.currentPO.NonTaxableAmount = CommonFunctions.parseAmount(NonTaxableAmount, 4);
         this.currentPO.CCChargeAmount = CommonFunctions.parseAmount(CCChargeAmount, 4);
         this.currentPO.TotalAmount = CommonFunctions.parseAmount(TotalAmount, 4);
     }
@@ -372,7 +427,10 @@ export class PHRMPurchaseOrderComponent {
     }
 
     CalculatePOItemsCalculationForEdit() {
-        this.currentPO.PHRMPurchaseOrderItems.forEach(item => item.DiscountAmount = CommonFunctions.parseAmount(item.SubTotal * item.DiscountPercentage / 100, 4));
+        this.currentPO.PHRMPurchaseOrderItems.forEach(item => {
+            item.DiscountAmount = CommonFunctions.parseAmount(item.SubTotal * item.DiscountPercentage / 100, 4)
+            item.TotalAmount = CommonFunctions.parsePhrmAmount(item.SubTotal - item.DiscountAmount + item.VATAmount + item.CCChargeAmount);
+        });
         this.CalculationForPO();
     }
     AddPurchaseOrder() {
@@ -415,6 +473,10 @@ export class PHRMPurchaseOrderComponent {
             errorMessages.push("Please Add Item ...Before Requesting");
             return;
         }
+        if (this.currentPO.IsVerificationEnabled && ((this.currentPO.VerifierList.length > 0 && this.currentPO.VerifierList.some(v => v.Id === 0)) || this.currentPO.VerifierList.length === 0)) {
+            this.msgserv.showMessage(ENUM_MessageBox_Status.Error, ['Please Select Verifier']);
+            return;
+        }
 
         if (checkIsValid) {
             if (this.currentPO.PHRMPurchaseOrderItems.length) {
@@ -452,8 +514,11 @@ export class PHRMPurchaseOrderComponent {
     UpdatePurchaseOrder() {
         var CheckIsValid = true;
         var errorMessages = [];
+        if (this.currentPO.IsVerificationEnabled && ((this.currentPO.VerifierList.length > 0 && this.currentPO.VerifierList.some(v => v.Id === 0)) || this.currentPO.VerifierList.length === 0)) {
+            this.msgserv.showMessage(ENUM_MessageBox_Status.Error, ['Please Select Verifier']);
+            return;
+        }
         if (this.currentPO.IsValidCheck(undefined, undefined) == false) {
-            this.loading = true;
             for (var b in this.currentPO.PurchaseOrderValidator.controls) {
                 this.currentPO.PurchaseOrderValidator.controls[b].markAsDirty();
                 this.currentPO.PurchaseOrderValidator.controls[b].updateValueAndValidity();
@@ -483,9 +548,10 @@ export class PHRMPurchaseOrderComponent {
 
         if (CheckIsValid == true && this.currentPO.PHRMPurchaseOrderItems != null) {
             this.currentPO.PHRMPurchaseOrderItems.forEach(item => item.CreatedOn = moment().format('YYYY-MM-DD')); // Since CreatedOn is not null in Model.
-
-            this.pharmacyBLService.UpdatePurchaseOrder(this.currentPO).
-                subscribe((res: DanpheHTTPResponse) => {
+            this.loading = true;
+            this.pharmacyBLService.UpdatePurchaseOrder(this.currentPO)
+                .finally(() => this.loading = false)
+                .subscribe((res: DanpheHTTPResponse) => {
                     if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
                         this.msgserv.showMessage("success", ["Purchase Order Updated Successfully!"]);
                         this.callBackClosePopup.emit(res.Results);
@@ -493,8 +559,6 @@ export class PHRMPurchaseOrderComponent {
                     else {
                         this.msgserv.showMessage("failed", ['failed to add Purchase Order.. please check log for details.']);
                         this.logError(res.ErrorMessage);
-                        this.loading = false;
-
                     }
                 });
         }
@@ -618,6 +682,14 @@ export class PHRMPurchaseOrderComponent {
         if (typeof $event == "object") {
             this.currentPO.VerifierList[index] = $event;
         }
+        else {
+            if (this.currentPO.VerifierList.length && this.currentPO.VerifierList[index] !== undefined) {
+                this.currentPO.VerifierList.splice(index, 1);
+                if (!this.currentPO.VerifierList.length) {
+                    this.AddVerifier();
+                }
+            }
+        }
     }
     SetDefaultVerifier() {
         var PharmacyVerificationSetting = this.coreService.Parameters.find(param => param.ParameterGroupName === 'Pharmacy' && param.ParameterName == "PharmacyVerificationSettings")
@@ -700,6 +772,13 @@ export class PHRMPurchaseOrderComponent {
         this.purchaseOrderItem.TotalAmount = purchaseOrderItem.TotalAmount;
         this.purchaseOrderItem.Remarks = purchaseOrderItem.Remarks;
         this.purchaseOrderItem.POItemStatus = purchaseOrderItem.POItemStatus;
+        if (purchaseOrderItem.IsPacking) {
+            this.purchaseOrderItem.IsPacking = purchaseOrderItem.IsPacking;
+            this.purchaseOrderItem.StripRate = purchaseOrderItem.StripRate;
+            this.purchaseOrderItem.PackingQty = purchaseOrderItem.PackingQty;
+            this.purchaseOrderItem.PackingName = purchaseOrderItem.PackingName;
+            this.SelectedPacking = this.PackingTypeList.find(p => p.PackingTypeId === purchaseOrderItem.PackingTypeId);
+        }
     }
     AddPO() {
         const errorMessages: Array<string> = [];
@@ -712,6 +791,10 @@ export class PHRMPurchaseOrderComponent {
 
         if (!this.purchaseOrderItem.IsValidCheck(undefined, undefined)) {
             check = false;
+        }
+        if (this.IsPackageItem && !this.purchaseOrderItem.PackingTypeId) {
+            this.msgserv.showMessage(ENUM_MessageBox_Status.Error, ['Packing is required']);
+            return;
         }
         if (check) {
             if (this.currentPO.PHRMPurchaseOrderItems.some(i => i.ItemId === this.purchaseOrderItem.ItemId) && !this.editPO) {
@@ -737,6 +820,7 @@ export class PHRMPurchaseOrderComponent {
                 this.FilteredItemList = this.ItemList;
                 this.SelectedItem = null;
                 this.SelectedGeneric = null;
+                this.SelectedPacking = null;
             }
         }
     }
@@ -754,6 +838,10 @@ export class PHRMPurchaseOrderComponent {
 
     }
     handleConfirm() {
+        if (this.IsPackageItem) {
+
+        }
+
         if (!this.editPO) {
             this.AddPurchaseOrder();
         }
@@ -784,7 +872,37 @@ export class PHRMPurchaseOrderComponent {
 
     }
 
-
+    ShowPacking() {
+        this.IsPackageItem = true;
+        let pkg = this.coreService.Parameters.find((p) => p.ParameterName == "PharmacyGRpacking" && p.ParameterGroupName == "Pharmacy").ParameterValue;
+        if (pkg == "true") {
+            this.IsPackageItem = true;
+        } else {
+            this.IsPackageItem = false;
+        }
+    }
+    public GetPackingTypeList() {
+        this.pharmacyBLService.GetPackingTypeList()
+            .subscribe((res: DanpheHTTPResponse) => {
+                if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                    this.PackingTypeList = res.Results;
+                }
+                else {
+                    this.msgserv.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+                }
+            });
+    }
+    PackingListsFormatter(data: any): string {
+        let html = data["PackingName"];
+        return html;
+    }
+    AssignPackingQty() {
+        if (this.purchaseOrderItem && this.SelectedPacking.PackingTypeId) {
+            this.purchaseOrderItem.PackingName = this.SelectedPacking.PackingName;
+            this.purchaseOrderItem.PackingTypeId = this.SelectedPacking.PackingTypeId;
+            this.CalculationForPOItem();
+        }
+    }
 }
 
 class ItemRateHistory {

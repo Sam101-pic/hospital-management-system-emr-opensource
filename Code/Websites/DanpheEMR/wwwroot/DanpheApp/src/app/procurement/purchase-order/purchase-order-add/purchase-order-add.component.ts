@@ -53,8 +53,8 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
   fromRequest: boolean = false;
   showBarcode: boolean = false;
   showSpecification: boolean = false;
-
-
+  AllowPreviousFiscalYear: boolean = false;
+  HasPermission: boolean = false;
   constructor(public procurementBLService: ProcurementBLService, public inventoryService: InventoryService, public coreService: CoreService, public inventoryBlService: InventoryBLService, public changeDetectorRef: ChangeDetectorRef, public messageBoxService: MessageboxService, public securityService: SecurityService, public invSettingBL: InventorySettingBLService, public router: Router, public route: ActivatedRoute, private _activateInventoryService: ActivateInventoryService, public inventoryFieldCustomizationService: InventoryFieldCustomizationService) {
     this.LoadTermsList();
     this.LoadVerifiersForPO();
@@ -74,6 +74,12 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
       this.LoadPurchaseOrderDraftDetails(this.inventoryService.DraftPurchaseOrderId);
     }
     this.currentPO.PaymentMode = "Credit";
+    if (this.securityService.HasPermission('btn-inventory-purchaseorder-needverification')) {
+      this.HasPermission = true;
+    }
+    else {
+      this.HasPermission = false;
+    }
   }
   ngOnDestroy() {
     this.inventoryService.RequisitionId = 0;
@@ -147,6 +153,15 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
                 PoItem.MSSNO = RequisitionItemArray[i].MSSNO;
                 PoItem.HSNCODE = RequisitionItemArray[i].HSNCODE;
                 PoItem.StandardRate = RequisitionItemArray[i].StandardRate;
+                //assign last 3 purchase price history if available
+                if (this.inventoryService.allItemPriceList && this.inventoryService.allItemPriceList.length > 0) {
+                  PoItem.itemPriceHistory = this.inventoryService.allItemPriceList
+                    .filter((item) => item.ItemId == PoItem.ItemId)
+                    .filter((u, i) => i < 3); //taking top 3
+                }
+                else {
+                  PoItem.itemPriceHistory = [];
+                }
                 this.currentPO.PurchaseOrderItems.push(PoItem);
               }
             }
@@ -157,6 +172,7 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
             else if (vndr == undefined && VendorId != null) {
               this.messageBoxService.showMessage("Notice-Message", ["This vendor is inactive.", "Please select another vendor."]);
             }
+            this.SetDefaultVerifier();
           }
         });
     }
@@ -188,8 +204,8 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
   private SetVendorToSearchInput(vendorObj: VendorMaster) {
     if (vendorObj) {
       this.currentPO.VendorId = vendorObj.VendorId;
-      this.selectedVndr = vendorObj;
-      this.currentPO.PurchaseOrderValidator.controls['VendorId'].setValue(vendorObj.VendorName);
+      this.selectedVndr = vendorObj.VendorName;
+      // this.currentPO.PurchaseOrderValidator.controls['VendorId'].setValue(vendorObj.VendorId);
       //assign the default currency id of vendor to the current po
       if (vendorObj.DefaultCurrencyId != null) {
         this.currentPO.CurrencyId = vendorObj.DefaultCurrencyId;
@@ -356,8 +372,6 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
   SelectItemFromSearchBox(Item: ItemMaster, index) {
     //if proper item is selected then the below code runs ..othewise it goes out side the function
     if (typeof Item === "object" && !Array.isArray(Item) && Item !== null) {
-      this.currentPO.updateItemDuplicationStatus();
-
       for (var a = 0; a < this.currentPO.PurchaseOrderItems.length; a++) {
         // Assiging the value StandardRate,VatPercentage and ItemId in the particular index ..
         //it helps for changing item after adding the item and also in adding in new item
@@ -374,6 +388,7 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
           selectedItem.UOMName = Item.UOMName;
           selectedItem.MSSNO = Item.MSSNO;
           selectedItem.HSNCODE = Item.HSNCODE;
+          this.currentPO.updateItemDuplicationStatus();
 
           //assign last 3 purchase price history if available
           if (this.inventoryService.allItemPriceList && this.inventoryService.allItemPriceList.length > 0) {
@@ -443,7 +458,7 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
       this.currentPO.VAT = res.Results.poDetails.VATAmount;
       this.currentPO.TermsConditions = res.Results.poDetails.Terms;
       this.SetVerifiersFromVerifierIdsObj(this.currentPO.VerifierIds);
-      let vndr = this.VendorList.find(a => a.VendorName == res.Results.poDetails.VendorName);
+      let vndr = this.VendorList.find(a => a.VendorName == this.currentPO.VendorName);
       if (vndr != undefined) { this.SetVendorToSearchInput(vndr); }
       else {
         this.messageBoxService.showMessage("Notice-Message", ["This vendor is inactive.", "Please select another vendor."])
@@ -542,6 +557,7 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
   AddPurchaseOrder() {
     var CheckIsValid = true;
     var errorMessages: string[] = [];
+    this.currentPO.PurchaseOrderItems = this.currentPO.PurchaseOrderItems.filter(item => item.ItemId != null && item.ItemId != 0);
     if (!this.currentPO.PurchaseOrderItems.some(a => a.ItemId != null && a.ItemId != 0)) {
       CheckIsValid = false;
       this.messageBoxService.showMessage("Failed", ['Please add at least one Valid item.']);
@@ -652,7 +668,7 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
     }
   }
   private CheckIfVerifierSelected(errorMessages: string[]): boolean {
-    if (this.currentPO.IsVerificationEnabled == true && this.currentPO.VerifierList.some(v => v.Id == undefined)) {
+    if (this.currentPO.IsVerificationEnabled && ((this.currentPO.VerifierList.length > 0 && this.currentPO.VerifierList.some(v => v.Id === 0)) || this.currentPO.VerifierList.length === 0)) {
       errorMessages.push("Please select proper verifier.");
       return false;
     }
@@ -748,6 +764,9 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
           }
         });
     }
+    else {
+      this.messageBoxService.showMessage('Notice-messages', errorMessages);
+    }
   }
   //update PO requisition
   UpdatePORequisition() {
@@ -825,7 +844,6 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
     console.log("vendor count-top:" + this.VendorList.length);
     this.VendorList.slice();
     this.selectedVndr = supplier.VendorName;
-    this.currentPO.PurchaseOrderValidator.get("VendorId").setValue(this.selectedVndr);
     this.selectedCurrencyCode = this.currencyCodeList.find(c => c.CurrencyID == supplier.DefaultCurrencyId);
     this.currentPO.PurchaseOrderValidator.get("CurrencyCode").setValue(this.selectedCurrencyCode.CurrencyCode);
     this.currentPO.VendorId = supplier.VendorId;
@@ -875,9 +893,19 @@ export class PurchaseOrderAddComponent implements AfterViewInit {
     if (typeof $event == "object") {
       this.currentPO.VerifierList[index] = $event;
     }
+    else {
+      if (this.currentPO.VerifierList.length && this.currentPO.VerifierList[index] !== undefined) {
+        this.currentPO.VerifierList.splice(index, 1);
+        if (!this.currentPO.VerifierList.length) {
+          this.AddVerifier();
+        }
+      }
+    }
   }
   CheckIfAddVerifierAllowed() {
-    return this.currentPO.VerifierList.some(V => V.Id == undefined) || this.currentPO.VerifierList.length >= this.VerificationLevel;
+    if (this.currentPO.VerifierList.length) {
+      return this.currentPO.VerifierList.some(V => V.Id == undefined || V.Id === 0) || this.currentPO.VerifierList.length >= this.VerificationLevel;
+    }
   }
   CheckIfDeleteVerifierAllowed() {
     return this.currentPO.VerifierList.length <= 1;

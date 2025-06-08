@@ -6,6 +6,7 @@ import { ReportingService } from "../../../reporting/shared/reporting-service";
 import { GeneralFieldLabels } from '../../../shared/DTOs/general-field-label.dto';
 import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { RPT_SchemeDTO } from '../../shared/dto/scheme.dto';
 import { RPT_APPT_DistrictWiseAppointmentReportModel } from "./districtwise-appointment-report.model";
 
 @Component({
@@ -26,21 +27,24 @@ export class RPT_APPT_DistrictWiseAppointmentReportComponent {
   http: HttpClient = null;
   public summary = { tot_new: 0, tot_followup: 0, tot_referral: 0, tot_all: 0 };
   public selGenderName: string = "all";
+  Schemes = new Array<RPT_SchemeDTO>();
+  SelectedScheme = new RPT_SchemeDTO();
   public GeneralFieldLabel = new GeneralFieldLabels();
-
 
   constructor(
     _http: HttpClient,
     _dlService: DLService,
     public msgBoxServ: MessageboxService,
-    public coreservice: CoreService,
-    public reportServ: ReportingService) {
+    public _reportingService: ReportingService,
+    public coreservice: CoreService) {
     // this.DistrictWiseAppointmentReportColumns = ReportGridColumnSettings.DistrictWiseAppointmentReport;
     this.http = _http;
     this.dlService = _dlService;
     this.districtwiseappointment.fromDate = moment().format('YYYY-MM-DD');
     this.districtwiseappointment.toDate = moment().format('YYYY-MM-DD');
-    this.DistrictWiseAppointmentReportColumns = this.reportServ.reportGridCols.RPT_APPT_DistrictWiseAppointmentCounts;
+    this.DistrictWiseAppointmentReportColumns = this._reportingService.reportGridCols.RPT_APPT_DistrictWiseAppointmentCounts;
+    this.Schemes = this._reportingService.SchemeList;
+    this.DistrictWiseAppointmentReportColumns = this._reportingService.reportGridCols.RPT_APPT_DistrictWiseAppointmentCounts;
     this.GeneralFieldLabel = coreservice.GetFieldLabelParameter();
     this.DistrictWiseAppointmentReportColumns[0].headerName = `${this.GeneralFieldLabel.DistrictState} `;
 
@@ -64,7 +68,7 @@ export class RPT_APPT_DistrictWiseAppointmentReportComponent {
 
       this.dlService.Read("/Reporting/DistrictwiseAppointmentReport?FromDate="
         + this.districtwiseappointment.fromDate + "&ToDate=" + this.districtwiseappointment.toDate + "&CountrySubDivisionName=" + this.districtwiseappointment.distProvider
-        + "&gender=" + this.selGenderName)
+        + "&gender=" + this.selGenderName + "&SchemeId=" + this.districtwiseappointment.SchemeId)
         .map(res => res)
         .subscribe(res => this.Success(res),
           res => this.Error(res));
@@ -104,5 +108,20 @@ export class RPT_APPT_DistrictWiseAppointmentReportComponent {
     this.districtwiseappointment.fromDate = this.fromDate;
     this.districtwiseappointment.toDate = this.toDate;
     this.dateRange = "<b>Date:</b>&nbsp;" + this.fromDate + "&nbsp;<b>To</b>&nbsp;" + this.toDate;
+  }
+
+  SchemeFormatter(data: any): string {
+    let html = data["SchemeName"];
+    return html;
+  }
+
+  OnSchemeChange(): void {
+    if (this.SelectedScheme && typeof (this.SelectedScheme) === "object" && this.SelectedScheme.SchemeId) {
+      this.districtwiseappointment.SchemeId = this.SelectedScheme.SchemeId;
+    }
+    else {
+      this.SelectedScheme = new RPT_SchemeDTO();
+      this.districtwiseappointment.SchemeId = null;
+    }
   }
 }

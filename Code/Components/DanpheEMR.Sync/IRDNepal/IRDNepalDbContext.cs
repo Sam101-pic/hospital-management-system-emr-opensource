@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DanpheEMR.Sync.IRDNepal.Models;
 using DanpheEMR.ServerModel;
+using System.Data.Entity.Core.Common;
 
 namespace DanpheEMR.Sync.IRDNepal
 {
@@ -27,6 +28,7 @@ namespace DanpheEMR.Sync.IRDNepal
         public DbSet<IRDLogModel> IRDLog { get; set; }
         public DbSet<PHRMInvoiceTransactionModel> PhrmInvoiceSale { get; set; }
         public DbSet<PHRMInvoiceReturnItemsModel> PhrmInvoiceReturnItems { get; set; }
+        public DbSet<AdminParametersModel> Parameters { get; set; }
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
             //modelBuilder.Entity<IRD_Common_InvoiceModel>().ToTable("IRD_Sync_Invoices_Common");
@@ -38,6 +40,7 @@ namespace DanpheEMR.Sync.IRDNepal
             modelBuilder.Entity<IRDLogModel>().ToTable("IRD_Log");
             modelBuilder.Entity<PHRMInvoiceTransactionModel>().ToTable("PHRM_TXN_Invoice");
             modelBuilder.Entity<PHRMInvoiceReturnItemsModel>().ToTable("PHRM_TXN_InvoiceReturnItems");
+            modelBuilder.Entity<AdminParametersModel>().ToTable("CORE_CFG_Parameters");
         }
 
     }

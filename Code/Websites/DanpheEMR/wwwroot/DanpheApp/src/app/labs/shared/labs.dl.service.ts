@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs-compat';
 import { DanpheHTTPResponse } from '../../shared/common-models';
 import { ExternalLabStatus_DTO } from './DTOs/external-lab-sample-satatus.dto';
+import { LabReportSendSMS_DTO } from './DTOs/lab-report-send-sms.dto';
 import { LoginToTelemed } from './labMasterData.model';
 
 @Injectable()
@@ -279,10 +280,15 @@ export class LabsDLService {
   //   return this.http.put<any>("/api/Lab/UpdateCommentsOnTestRequisition?" + 'comments=' + comments, data, this.options);
   // }
 
-  public UndoSampleCode(requisitionIdlist: Array<number>) {
-    let data = (requisitionIdlist);
-    return this.http.put<any>("/api/Lab/UndoSampleCode", data, this.options);
+  // public UndoSampleCode(requisitionIdlist: Array<number>) {
+  //   let data = (requisitionIdlist);
+  //   return this.http.put<any>("/api/Lab/UndoSampleCode", data, this.options);
+  // }
+  public UndoSampleCode(requisitionIdlist: Array<number>, undoFromPageAction?: string) {
+    let data = requisitionIdlist;
+    return this.http.put<any>(`/api/Lab/UndoSampleCode?undoFromPageAction=${undoFromPageAction}`, data, this.options);
   }
+
 
   // to update the lab result
   public PutLabTestResult(labTestComponents, specimenData: string) {
@@ -290,9 +296,9 @@ export class LabsDLService {
     return this.http.put<any>("/api/Lab/ComponentResults?specimenData=" + specimenData, data, this.options);
   }
 
-  public PutDoctor(id: number, reqId: number[]) {
+  public PutDoctor(id: number, reqId: number[], updateMode?: string) {
     let data = JSON.stringify(reqId);
-    return this.http.put<any>('/api/Lab/UpdateDoctorInLabRequisition?' + 'id=' + id, data, this.options);
+    return this.http.put<any>('/api/Lab/UpdateDoctorInLabRequisition?' + 'id=' + id + '&updateMode=' + updateMode, data, this.options);
   }
 
   public PutDoctorNameInLabReport(LabReportId: number, doctorName: string) {
@@ -373,7 +379,7 @@ export class LabsDLService {
   //end: sud:16May'19--for lab-external vendors.
 
 
-  //activate lab 
+  //activate lab
   public ActivateLab(labId: number, labName: string) {
     return this.http.put<any>("/api/Security/ActivateLab?labId=" + labId + "&labName=" + labName, this.options);
   }
@@ -412,6 +418,9 @@ export class LabsDLService {
 
   public SendPdf(data, reqId: number) {
     return this.http.post<any>("/api/Lab/Notification/UploadCovidReportToGoogleDrive?requisitionId=" + reqId, data, this.options);
+  }
+  public UploadToGoogleDrive(data, reqId: number) {
+    return this.http.post<DanpheHTTPResponse>("/api/Lab/Notification/UploadLabReportToGoogleDrive?requisitionId=" + reqId, data, this.options);
   }
   public SendEmail(formData: any) {
     let data = formData;
@@ -489,5 +498,33 @@ export class LabsDLService {
 
   public UpdateExternalLabStatus(externalLabDataStatus: ExternalLabStatus_DTO) {
     return this.http.put<DanpheHTTPResponse>(`/api/lab/ExternalLabStatus`, externalLabDataStatus, this.optionsJson);
+  }
+
+  public GetAllSMSApplicablePatientList(fromDate: string, toDate: string) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Lab/PatientsForLabReportSMS?fromLabReportVerificationDate=${fromDate}&toLabReportVerificationDate=${toDate}`, this.options);
+  }
+  public SendGeneralLabReportSMS(data: LabReportSendSMS_DTO) {
+    return this.http.post<DanpheHTTPResponse>(`/api/Lab/SendLabReportSMS`, data, this.optionsJson);
+  }
+
+  public GetSampleReceivePatientList(fromDate: string, toDate: string, categoryList: string) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Lab/SampleReceive?FromDate=${fromDate}&ToDate=${toDate}&CategoryList=${categoryList}`, this.options);
+  }
+
+  public ReceiveSample(RequisitionIdList: Array<Number> = []) {
+    return this.http.put<DanpheHTTPResponse>(`/api/Lab/SampleReceive`, RequisitionIdList, this.optionsJson);
+  }
+
+  public GetSampleItemsByRequisitionId(RequisitionIds: Array<Number> = []) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Lab/SampleItemsByRequisitionId?requisitionIds=${RequisitionIds}`, this.optionsJson);
+  }
+
+
+  public UndoFinalReport(RequisitionIdList: Array<Number> = []) {
+    return this.http.put<DanpheHTTPResponse>(`/api/Lab/FinalReport/Undo`, RequisitionIdList, this.optionsJson);
+  }
+
+  public UndoPendingReport(RequisitionIdList: Array<Number> = []) {
+    return this.http.put<DanpheHTTPResponse>(`/api/Lab/PendingReport/Undo`, RequisitionIdList, this.optionsJson);
   }
 }

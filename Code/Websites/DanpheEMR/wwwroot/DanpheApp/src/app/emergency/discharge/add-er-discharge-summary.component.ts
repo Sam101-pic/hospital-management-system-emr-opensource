@@ -1,16 +1,12 @@
-import { Component, ChangeDetectorRef, EventEmitter, Output, OnInit, Input } from '@angular/core';
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { CoreService } from '../../core/shared/core.service';
-import { EmergencyPatientModel } from '../shared/emergency-patient.model';
-import { CommonFunctions } from '../../shared/common.functions';
-import { EmergencyBLService } from '../shared/emergency.bl.service';
-import { EmergencyDLService } from '../shared/emergency.dl.service';
-import { DanpheHTTPResponse } from '../../shared/common-models';
-import { PatientService } from '../../patients/shared/patient.service';
-import * as moment from 'moment/moment';
+import { ChangeDetectorRef, Component, ElementRef, EventEmitter, Input, Output } from '@angular/core';
 import { VisitService } from '../../appointments/shared/visit.service';
-import { EmergencyDischargeSummaryVM } from '../shared/emergency-discharge-summaryVM';
+import { CoreService } from '../../core/shared/core.service';
+import { PatientService } from '../../patients/shared/patient.service';
+import { DanpheHTTPResponse } from '../../shared/common-models';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { EmergencyDischargeSummary } from '../shared/emergency-discharge-summary.model';
+import { EmergencyDischargeSummaryVM } from '../shared/emergency-discharge-summaryVM';
+import { EmergencyBLService } from '../shared/emergency.bl.service';
 
 @Component({
     selector: 'add-er-discharge-summary',
@@ -49,7 +45,8 @@ export class AddERDischargeSummaryComponent {
     constructor(public changeDetector: ChangeDetectorRef,
         public msgBoxServ: MessageboxService, public emergencyBLService: EmergencyBLService,
         public patientService: PatientService, public visitService: VisitService,
-        public coreService: CoreService) {
+        public coreService: CoreService,
+        private elementRef: ElementRef) {
         this.GetDoctorsList();
     }
 
@@ -184,7 +181,15 @@ export class AddERDischargeSummaryComponent {
                     if (res.Status == "OK") {
                         this.msgBoxServ.showMessage('success', ["Discharge Summary of " + this.ERpatientSummary.EmergencyPatient.FullName + "successfully added"]);
                         this.callBackToMain.emit({ submit: true, action: 'add', dischargeSummary: res.Results });
+                        const event: CustomEvent = new CustomEvent('AfterDischargedPatientSuccess', {
+                            bubbles: true,
+                            detail: { dischargeSummary: res.Results }
+                        });
+
+                        this.elementRef.nativeElement.dispatchEvent(event);
+
                         this.loading = false;
+
                     }
                     else {
                         this.loading = false;

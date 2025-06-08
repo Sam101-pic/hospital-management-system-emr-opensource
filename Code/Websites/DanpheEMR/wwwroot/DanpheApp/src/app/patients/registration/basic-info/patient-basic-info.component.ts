@@ -8,6 +8,7 @@ import { PatientsBLService } from '../../shared/patients.bl.service';
 //import { CoreDLService } from '../../../../core/shared/core.dl.service';
 import * as moment from 'moment/moment';
 import { UnicodeService } from "../../../common/unicode.service";
+import { Salutation } from "../../../settings-new/shared/DTOs/Salutation.Model";
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 import { NepaliCalendarService } from '../../../shared/calendar/np/nepali-calendar.service';
 import { NepaliDate } from '../../../shared/calendar/np/nepali-dates';
@@ -46,6 +47,7 @@ export class PatientBasicInfoComponent implements IRouteGuard {
   //public Muncipalitylable: string = "";
   public showNam_Thar: boolean = true;
   public GeneralFieldLabel = new GeneralFieldLabels();
+  SalutationList: Array<Salutation> = new Array<Salutation>();
 
   // @Output('emitToRegisterButton')
   // public emitToRegisterButton: EventEmitter<boolean>  = new EventEmitter<boolean>();
@@ -56,8 +58,8 @@ export class PatientBasicInfoComponent implements IRouteGuard {
     public npCalendarService: NepaliCalendarService,
     public msgBoxServ: MessageboxService,
     public changeDetector: ChangeDetectorRef) {
-
     this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
+    this.SalutationList = this.coreService.SalutationData.filter(salutation => salutation.IsActive && salutation.IsApplicableForPatients);
     this.showNam_Thar = this.GeneralFieldLabel.showNam_Thar;
     /*var Muncipalitylable = JSON.parse(coreService.Parameters.find(p => p.ParameterGroupName == "Patient" && p.ParameterName == "Municipality").ParameterValue);
     if (Muncipalitylable) {
@@ -73,7 +75,6 @@ export class PatientBasicInfoComponent implements IRouteGuard {
     this.model = _serv.getGlobal();
 
     this.LoadMembershipSettings();
-
 
     //assign countryid only when it's null or 0 or empty. --yub 3rd Sept '18
     if (!this.model.CountryId)
@@ -120,6 +121,23 @@ export class PatientBasicInfoComponent implements IRouteGuard {
 
   }
 
+  OnLastNameChanged($event): void {
+    if ($event) {
+      const lastName = $event.target.value;
+      this.model.LastName = lastName;
+    }
+  }
+
+  OnEthnicGroupChangeCallBack(ethnicGroup): void {
+    if (ethnicGroup) {
+      this.model.EthnicGroup = ethnicGroup.ethnicGroup;
+    }
+  }
+
+
+  ClearEthnicGroup(): void {
+    this.model.EthnicGroup = "";
+  }
 
   //getting country name from core_CFG_parameter table
   LoadCountryDefaultSubDivision() {
@@ -406,6 +424,11 @@ export class PatientBasicInfoComponent implements IRouteGuard {
   public updateMunicipality(event) {
     if (event && event.data) {
       this.model.MunicipalityId = event.data.MunicipalityId;
+      this.model.MunicipalityName = event.data.MunicipalityName;
+    }
+    else {
+      this.model.MunicipalityId = null;
+      this.model.MunicipalityName = null;
     }
   }
 

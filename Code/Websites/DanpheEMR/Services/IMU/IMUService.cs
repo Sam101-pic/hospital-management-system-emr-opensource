@@ -73,7 +73,7 @@ namespace DanpheEMR.Services.IMU
                           join district in labDbContex.CountrySubdivisions on pat.CountrySubDivisionId equals district.CountrySubDivisionId
                           join mun in labDbContex.Municipalities on pat.MunicipalityId equals mun.MunicipalityId into r
                           from muncipality in r.DefaultIfEmpty()
-                          where value.Value == "positive" || value.Value == "negative"
+                          where value.Value == "positive" || value.Value == "negative" && value.IsActive == true
                           select new
                           {
                               Name = pat.ShortName,

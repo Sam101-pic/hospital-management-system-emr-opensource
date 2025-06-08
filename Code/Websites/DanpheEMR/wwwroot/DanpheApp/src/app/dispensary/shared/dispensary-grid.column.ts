@@ -17,7 +17,7 @@ export default class DispensaryGridColumns {
     { headerName: "Hospital Number", field: "PatientCode", width: 100 },
     { headerName: "Patient Name", field: "ShortName", width: 200 },
     { headerName: "Age/Sex", field: "", width: 110, cellRenderer: DispensaryGridColumns.AgeSexRendererPatient },
-    { headerName: "Address", field: "Address", width: 110 },
+    { headerName: "Address", field: "SortedAddress", width: 110 },
     { headerName: "Phone", field: "PhoneNumber", width: 110 },
     { headerName: "Patient Type", field: "IsOutdoorPat", width: 100, cellRenderer: DispensaryGridColumns.IsOutdoorPatientText },
     {
@@ -41,7 +41,7 @@ export default class DispensaryGridColumns {
     { headerName: "Patient Name", field: "ShortName", width: 200 },
     { headerName: "NSHI Number", field: "Ins_NshiNumber", width: 100 },
     { headerName: "Age/Sex", field: "", width: 110, cellRenderer: DispensaryGridColumns.AgeSexRendererPatient },
-    { headerName: "Address", field: "Address", width: 110 },
+    { headerName: "Address", field: "SortedAddress", width: 110 },
     { headerName: "Phone", field: "PhoneNumber", width: 110 },
     { headerName: "Patient Type", field: "IsOutdoorPat", width: 100, cellRenderer: DispensaryGridColumns.IsOutdoorPatientText },
     {
@@ -72,6 +72,7 @@ export default class DispensaryGridColumns {
     // { headerName: "PrescriptionId", field: "PrescriptionId", width: 100 },
     { headerName: "Code", field: "PatientCode", width: 100 },
     { headerName: "Patient Name", field: "PatientName", width: 200 },
+    { headerName: "Visit Type", field: "VisitType", width: 200 },
     { headerName: "Requested By", field: "PrescriberName", width: 200 },
     { headerName: "Date", field: "CreatedOn", width: 110, cellRenderer: DispensaryGridColumns.PrescriptionListDateRender },
     {
@@ -85,13 +86,13 @@ export default class DispensaryGridColumns {
             `
     }
   ]
-  static ProvisionalTotal(params) {
-    let data = params.data;
-    let provBal: number =
-      data.ProvisionalTotal == null ? 0 : data.ProvisionalTotal;
-    provBal = CommonFunctions.parseAmount(provBal);
-    return provBal;
-  }
+  // static ProvisionalTotal(params) {
+  //   let data = params.data;
+  //   let provBal: number =
+  //     data.ProvisionalTotal == null ? 0 : data.ProvisionalTotal;
+  //   provBal = CommonFunctions.parseAmount(provBal);
+  //   return provBal;
+  // }
 
   //This for prescription List createdOn date format rendering
   static PrescriptionListDateRender(params) {
@@ -112,12 +113,6 @@ export default class DispensaryGridColumns {
     },
     { headerName: "Deposit Amt", field: "DepositBalance", width: 120 },
     { headerName: "Credit Amt", field: "CreditTotal", width: 120 },
-    {
-      headerName: "Provisional Amt",
-      field: "",
-      width: 140,
-      cellRenderer: DispensaryGridColumns.ProvisionalTotal,
-    },
     {
       headerName: "Balance Amt",
       field: "",
@@ -172,10 +167,8 @@ export default class DispensaryGridColumns {
     let data = params.data;
     let credit: number = data.CreditTotal == null ? 0 : data.CreditTotal;
     let depositBal: number = data.DepositBalance;
-    let provBal: number =
-      data.ProvisionalTotal == null ? 0 : data.ProvisionalTotal;
 
-    let balAmt: number = depositBal - credit - provBal;
+    let balAmt: number = depositBal - credit;
 
     balAmt = CommonFunctions.parseAmount(balAmt);
 
@@ -263,11 +256,14 @@ export default class DispensaryGridColumns {
   StockDetailsList = [
     { headerName: "Generic Name", field: "GenericName", width: 250 },
     { headerName: "Medicine Name", field: "ItemName", width: 250 },
+    { headerName: "Unit", field: "UOMName", width: 250 },
     { headerName: "Rack No", field: "RackNo", width: 120 },
     { headerName: "Batch No", field: "BatchNo", width: 100 },
     { headerName: "Expiry Date", field: "ExpiryDate", width: 150, cellRenderer: DispensaryGridColumns.DateOfExpiry },
     { headerName: "Available Quantity", field: "AvailableQuantity", width: 200 },
     { headerName: "SalePrice", field: "SalePrice", width: 100 },
+    { headerName: "TotalValue", field: "TotalValue", width: 100 },
+    // { headerName: "CostPrice", field: "CostPrice", width: 100 },
     { headerName: "StoreName", field: "StoreName", width: 250 },
 
   ]
@@ -389,7 +385,7 @@ export default class DispensaryGridColumns {
     { headerName: "Patient Name", field: "PatientName", width: 200 },
     { headerName: "Sub Total", field: "SubTotal", width: 100 },
     { headerName: "Dis Amt", field: "DiscountAmount", width: 100 },
-    { headerName: "Total Amt", field: "PaidAmount", width: 100 },
+    { headerName: "Total Amt", field: "TotalAmount", width: 100 },
     { headerName: "Date", field: "CreateOn", width: 110, cellRenderer: DispensaryGridColumns.SaleListDateRender },
     { headerName: "Patient Type", field: "PatientType", width: 120 },
     {
@@ -406,7 +402,7 @@ export default class DispensaryGridColumns {
     { headerName: "Claim Code", field: "ClaimCode", width: 200 },
     { headerName: "Sub Total", field: "SubTotal", width: 100 },
     { headerName: "Dis Amt", field: "DiscountAmount", width: 100 },
-    { headerName: "Total Amt", field: "PaidAmount", width: 100 },
+    { headerName: "Total Amt", field: "TotalAmount", width: 100 },
     { headerName: "Date", field: "CreateOn", width: 110, cellRenderer: DispensaryGridColumns.SaleListDateRender },
     { headerName: "Patient Type", field: "PatientType", width: 120 },
     {
@@ -436,14 +432,14 @@ export default class DispensaryGridColumns {
 
   static ProvisionalReturnList = [
     { headerName: "Hospital Number", field: "PatientCode", width: 170, pinned: true },
-    { headerName: "Ref No", field: "ReferenceProvisionalReceiptNo", width: 70, pinned: true },
+    { headerName: "Ret Receipt No", field: "CancellationReceiptNo", width: 150, pinned: true },
     { headerName: "Patient Name", field: "PatientName", width: 160, pinned: true },
     { headerName: "Contact No.", field: "ContactNo", width: 100, pinned: true },
     { headerName: "Age/Sex", field: "", width: 110, cellRenderer: DispensaryGridColumns.AgeSexRendererPatient, pinned: true },
     { headerName: "Subtotal", field: "SubTotal", width: 110, pinned: true },
     { headerName: "Discount", field: "DiscountAmount", width: 110, pinned: true },
     { headerName: "Total", field: "TotalAmount", width: 110, pinned: true },
-    { headerName: "Ret Receipt No", field: "CancellationReceiptNo", width: 150, pinned: true },
+    { headerName: "Ref No", field: "ReferenceProvisionalReceiptNo", width: 70, pinned: true },
     { headerName: "LastReturnDate", field: "LastReturnDate", width: 180, pinned: true, cellRenderer: DispensaryGridColumns.PHRMRetunProvisionalRenderer },
     { headerName: "VisitType", field: "VisitType", width: 110, pinned: true },
     {

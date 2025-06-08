@@ -21,13 +21,14 @@ import { LabTestRequisition } from '../../labs/shared/lab-requisition.model';
 import { LabsBLService } from '../../labs/shared/labs.bl.service';
 import { Patient } from '../../patients/shared/patient.model';
 import { PHRMInvoiceModel } from '../../pharmacy/shared/phrm-invoice.model';
+import { EditDoctor_DTO } from '../../radiology/shared/DTOs/edit-doctor.dto';
 import { ImagingItemRequisition } from '../../radiology/shared/imaging-item-requisition.model';
 import { SecurityDLService } from "../../security/shared/security.dl.service";
 import { SecurityService } from '../../security/shared/security.service';
 import { CommonFunctions } from '../../shared/common.functions';
 import { DanpheCache, MasterType } from '../../shared/danphe-cache-service-utility/cache-services';
 import { RouteFromService } from '../../shared/routefrom.service';
-import { ENUM_AppointmentType, ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_VisitStatus, ENUM_VisitType } from '../../shared/shared-enums';
+import { ENUM_AppointmentType, ENUM_BillPaymentMode, ENUM_BillingStatus, ENUM_DateTimeFormat, ENUM_VisitStatus, ENUM_VisitType } from '../../shared/shared-enums';
 import { DischargeDetailBillingVM } from '../ip-billing/shared/discharge-bill.view.models';
 import { ProvisionalDischarge_DTO } from '../ip-billing/shared/dto/provisional-discharge.dto';
 import { PharmacyPendingBillItemsViewModel } from '../ip-billing/shared/pharmacy-pending-bill-item-view.model';
@@ -38,12 +39,13 @@ import { BillingReceiptModel } from './billing-receipt.model';
 import { BillingTransactionItem } from './billing-transaction-item.model';
 import { DiscardProvisionalItems_DTO } from './dto/bill-discard-provisional-items.dto';
 import { BillNewSettlement_DTO } from './dto/bill-new-settlement.dto';
+import { EditDoctorRequest } from './dto/edit-doctor.request';
+import { FreeVisit_DTO } from './dto/free-visit.dto';
 import { HandOverTransactionModel } from './hand-over-transaction.model';
 import { IpBillingDiscountModel } from './ip-bill-discount.model';
 
 @Injectable()
 export class BillingBLService {
-
   constructor(public billingDLService: BillingDLService,
     public securityService: SecurityService,
     public visitDLService: VisitDLService,
@@ -175,6 +177,11 @@ export class BillingBLService {
   //       return responseData;
   //     });
   // }
+
+  public GetInvoiceReceiptByInvoiceId(invoiceId: number, FiscalYearId: number, BillingTransactionId: number) {
+    return this.billingDLService.GetInvoiceReceiptByInvoiceId(invoiceId, FiscalYearId, BillingTransactionId)
+      .map(res => { return res });
+  }
 
   public GetCreditNoteByCreditNoteNo(CreditNoteNo: number, fiscalYrId: number) {
     return this.billingDLService.GetCreditNoteByCreditNoteNo(CreditNoteNo, fiscalYrId)
@@ -377,12 +384,6 @@ export class BillingBLService {
   // }
 
   //sud: 19Jun'18--for RequestingDepartment and BillingType.
-  public GetPatientById(patientId) {
-    return this.patientDLService.GetPatientById(patientId)
-      .map(res => res);
-  }
-
-
   public GetTxnItemsForEditDoctor(searchTxt) {
     return this.billingDLService.GetTxnItemsForEditDoctor(searchTxt)
       .map(res => res);
@@ -438,7 +439,10 @@ export class BillingBLService {
     return this.billingDLService.GetPastTestList(patientId)
       .map(res => res);
   }
-
+  public GetPatientPastOneYearBillITxntems(patientId) {
+    return this.billingDLService.GetPatientPastOneYearBillITxntems(patientId)
+      .map(res => res);
+  }
   public GetExistedMatchingPatientList(FirstName, LastName, PhoneNumber, Age, Gender, IsInsurance = false, IMISCode = null) {
     return this.patientDLService.GetExistedMatchingPatientList(FirstName, LastName, PhoneNumber, Age, Gender, IsInsurance, IMISCode)
       .map(res => res);
@@ -703,6 +707,12 @@ export class BillingBLService {
         return responseData;
       })
   }
+  public PutDischargeStatementPrintCount(dischargeStatementId: number) {
+    return this.billingDLService.PutDischargeStatementPrintCount(dischargeStatementId)
+      .map((responseData) => {
+        return responseData;
+      })
+  }
 
   //Group Discount on Billingtransaction:: Yubraj 29th Nov '18
   public UpdateBillTxnItems(modifiedItems: Array<BillingTransactionItem>) {
@@ -789,16 +799,16 @@ export class BillingBLService {
   }
 
   // update doctor after doctor edit feature
-  public UpdateDoctorafterDoctorEdit(BillTxnItemId: number, performerObj, prescriberObj) {
-    return this.billingDLService.PutAssignedToDoctor(BillTxnItemId, performerObj, prescriberObj)
+  public ChangeDoctor(editDoctorRequest: EditDoctorRequest) {
+    return this.billingDLService.ChangeDoctor(editDoctorRequest)
       .map((responseData) => {
         return responseData;
       });
   }
 
   //update doctor from radiology
-  public UpdateDoctorafterDoctorEditRadiology(BillTnxItemId: number, RequisitionId: number, performerObj, prescriberObj) {
-    return this.billingDLService.PutAssignedToDoctorRad(BillTnxItemId, RequisitionId, performerObj, prescriberObj)
+  public ChangeRadiologyDoctor(DoctorsDetailsObj: EditDoctor_DTO) {
+    return this.billingDLService.ChangeRadiologyDoctor(DoctorsDetailsObj)
       .map((responseData) => {
         return responseData;
       });
@@ -839,24 +849,29 @@ export class BillingBLService {
 
 
     for (let s = 0; s < billingTransaction.BillingTransactionItems.length; s++) {
-      let integrationName = this.coreService.GetServiceIntegrationName(billingTransaction.BillingTransactionItems[s].ServiceDepartmentName);
-      integrationName = integrationName ? integrationName.toLowerCase() : '';
-      billingTransaction.BillingTransactionItems[s].ItemIntegrationName = integrationName;
+      // let integrationName = this.coreService.GetServiceIntegrationName(billingTransaction.BillingTransactionItems[s].ServiceDepartmentName);
+      // integrationName = integrationName ? integrationName.toLowerCase() : '';
+      // billingTransaction.BillingTransactionItems[s].ItemIntegrationName = integrationName;
 
+      // take integration name from item itself.
+      let integrationName = billingTransaction.BillingTransactionItems[s].IntegrationName ? billingTransaction.BillingTransactionItems[s].IntegrationName.toLowerCase() : '';
 
-      if (integrationName == "radiology" && !billingTransaction.BillingTransactionItems[s].RequisitionId) {
+      // if item does not have integration name then only check using ServiceDepartmentName.
+      if (!integrationName) {
+        integrationName = this.coreService.GetServiceIntegrationName(billingTransaction.BillingTransactionItems[s].ServiceDepartmentName);
+        billingTransaction.BillingTransactionItems[s].ItemIntegrationName = integrationName ? integrationName.toLowerCase() : '';
+      }
+
+      if (integrationName == "radiology") {
         imgingItems.push(billingTransaction.BillingTransactionItems[s]);
       }
-      else if (integrationName == "lab" && !billingTransaction.BillingTransactionItems[s].RequisitionId) {
+      else if (integrationName == "lab") {
         labItems.push(billingTransaction.BillingTransactionItems[s]);    //Push only Lab items
       }
 
-      else if (integrationName == "er" && billingTransaction.BillingTransactionItems[s].ItemName.toLowerCase() == "emergency registration" && !billingTransaction.BillingTransactionItems[s].RequisitionId) {
+      else if (integrationName == "er" && billingTransaction.BillingTransactionItems[s].ItemName.toLowerCase() == "emergency registration") {
         visitItems.push(billingTransaction.BillingTransactionItems[s]); //push only opd items.
       }
-      // else if (integrationName == "opd" && billingTransaction.BillingTransactionItems[s].ItemName.toLowerCase().match("consultation charge")) {
-      //   visitItems.push(billingTransaction.BillingTransactionItems[s]); //push only opd items.
-      // }
       else if (integrationName == "opd") {
         visitItems.push(billingTransaction.BillingTransactionItems[s]); //push only opd items.
       }
@@ -926,7 +941,7 @@ export class BillingBLService {
 
   //This function will add new item row if AllowMultipleQty is false but Quantity > 1;
   private AddMultipleQuantityItems(billingTransactionItems: Array<BillingTransactionItem>) {
-    for (var k = 0; k < billingTransactionItems.length; k++) {
+    for (let k = 0; k < billingTransactionItems.length; k++) {
       if (!billingTransactionItems[k].AllowMultipleQty && billingTransactionItems[k].Quantity > 1) {
 
         let itmQty = billingTransactionItems[k].Quantity;
@@ -935,7 +950,7 @@ export class BillingBLService {
 
         let extraRowsToCreate = itmQty - 1;
 
-        for (var i = 0; i < extraRowsToCreate; i++) {
+        for (let i = 0; i < extraRowsToCreate; i++) {
           //Adding new item row
           let item = new BillingTransactionItem();
           item.PatientId = billingTransactionItems[k].PatientId;
@@ -964,12 +979,13 @@ export class BillingBLService {
           item.PatientVisitId = billingTransactionItems[k].PatientVisitId;
           item.BillingType = billingTransactionItems[k].BillingType;
           item.RequestingDeptId = billingTransactionItems[k].RequestingDeptId;
-
-          item.DiscountSchemeId = billingTransactionItems[k].DiscountSchemeId;
+          item.RequestingDeptId = billingTransactionItems[k].RequestingDeptId;
+          item.ServiceItemId = billingTransactionItems[k].ServiceItemId;
           item.PriceCategory = billingTransactionItems[k].PriceCategory;
           item.ProcedureCode = billingTransactionItems[k].ProcedureCode;
           item.IsZeroPriceAllowed = billingTransactionItems[k].IsZeroPriceAllowed;
-
+          item.IntegrationItemId = billingTransactionItems[k].IntegrationItemId;
+          item.DiscountSchemeId = billingTransactionItems[k].DiscountSchemeId;
           item.ServiceDepartmentName = billingTransactionItems[k].ServiceDepartmentName;
           item.ServiceDepartmentId = billingTransactionItems[k].ServiceDepartmentId;
           item.IsValidSelDepartment = billingTransactionItems[k].IsValidSelDepartment;
@@ -983,7 +999,7 @@ export class BillingBLService {
       }
     }
 
-    for (var i = 0; i < billingTransactionItems.length; i++) {
+    for (let i = 0; i < billingTransactionItems.length; i++) {
       let subtotal = billingTransactionItems[i].Price * billingTransactionItems[i].Quantity;
       let itemDiscountPercent = billingTransactionItems[i].DiscountPercent ? billingTransactionItems[i].DiscountPercent : 0;
       let itmDiscAmount = subtotal * itemDiscountPercent / 100;
@@ -991,11 +1007,17 @@ export class BillingBLService {
       let totalDiscountAmount = itmDiscAmount;
 
       let aggDiscPercent = (totalDiscountAmount) / subtotal * 100;
-      billingTransactionItems[i].DiscountPercentAgg = CommonFunctions.parseAmount(aggDiscPercent, 3);
-      billingTransactionItems[i].DiscountPercent = CommonFunctions.parseAmount(itemDiscountPercent, 3);
-      billingTransactionItems[i].DiscountAmount = CommonFunctions.parseAmount(itmDiscAmount, 3);
-      billingTransactionItems[i].SubTotal = CommonFunctions.parseAmount(subtotal, 3);
-      billingTransactionItems[i].TotalAmount = CommonFunctions.parseAmount(itmTotAmt, 3);
+      // billingTransactionItems[i].DiscountPercentAgg = CommonFunctions.parseAmount(aggDiscPercent, 5);
+      // billingTransactionItems[i].DiscountPercent = CommonFunctions.parseAmount(itemDiscountPercent, 5);
+      // billingTransactionItems[i].DiscountAmount = CommonFunctions.parseAmount(itmDiscAmount, 5);
+      // billingTransactionItems[i].SubTotal = CommonFunctions.parseAmount(subtotal, 5);
+      // billingTransactionItems[i].TotalAmount = CommonFunctions.parseAmount(itmTotAmt, 5);
+
+      billingTransactionItems[i].DiscountPercentAgg = CommonFunctions.parseAmount(aggDiscPercent, 5);//CommonFunctions.parseAmount(aggDiscPercent, 5);
+      billingTransactionItems[i].DiscountPercent = itemDiscountPercent;//CommonFunctions.parseAmount(itemDiscountPercent, 5);
+      billingTransactionItems[i].DiscountAmount = itmDiscAmount;//CommonFunctions.parseAmount(itmDiscAmount, 5);
+      billingTransactionItems[i].SubTotal = subtotal;//CommonFunctions.parseAmount(subtotal, 5);
+      billingTransactionItems[i].TotalAmount = itmTotAmt;//CommonFunctions.parseAmount(itmTotAmt, 5);
 
     }
     return billingTransactionItems;
@@ -1149,14 +1171,14 @@ export class BillingBLService {
         PatientName: null,//this will be assigned from server side.
         Diagnosis: null,
         Urgency: "normal",//default for Billing
-        OrderDateTime: moment().format("YYYY-MM-DD"),
+        OrderDateTime: moment().format(ENUM_DateTimeFormat.Year_Month_Day),
         PrescriberName: null,
         BillingStatus: billStatus,
         OrderStatus: orderStatus,
         SampleCode: null,
         RequisitionRemarks: null,
         CreatedBy: 0,//bill.CreatedBy,
-        CreatedOn: moment().format("YYYY-MM-DD"),//bill.CreatedOn,
+        CreatedOn: moment().format(ENUM_DateTimeFormat.Year_Month_Day),//bill.CreatedOn,
         SampleCreatedBy: null,
         SampleCreatedOn: null,
         Comments: null,
@@ -1179,6 +1201,11 @@ export class BillingBLService {
         IsSmsSend: false,
         IsSelected: false,
         ServiceItemId: bill.ServiceItemId,
+        SampleReceivedOn: null,
+        IsPreVerified: false,
+        PreVerifiedBy: null,
+        PreVerifiedOn: null,
+        CreatedDay: moment().format(ENUM_DateTimeFormat.Year_Month_Day)
       });
     });
 
@@ -1488,6 +1515,21 @@ export class BillingBLService {
     return this.patientDLService.PostBillingOutPatient(patString);
   }
 
+  public AddNewOutdoorPatientAndCreateFreeVisit(freeVisit: FreeVisit_DTO) {
+    let freeVisitObj = _.cloneDeep(freeVisit);
+
+    let visitData = _.omit(freeVisitObj, [
+      'QuickAppointmentValidator',
+      'Patient.PatientValidator',
+      'Visit.VisitValidator',
+      'Patient.PatientScheme.PatientSchemeValidator',
+      'Patient.Guarantor',
+      'Patient.CountrySubDivision',
+    ]);
+
+    return this.billingDLService.AddNewOutDoorPatientAndCreateFreeVisit(visitData);
+
+  }
 
 
   //Update quantity price doctor etc of billingtransaction item.
@@ -1520,8 +1562,8 @@ export class BillingBLService {
       .map(res => res);
   }
 
-  public GetDataOfInPatient(patId: number, visitId: number) {
-    return this.billingDLService.GetDataOfInPatient(patId, visitId)
+  public GetPatientCurrentVisitContext(patId: number, visitId: number) {
+    return this.billingDLService.GetPatientCurrentVisitContext(patId, visitId)
       .map(res => {
         return res
       })
@@ -1624,7 +1666,6 @@ export class BillingBLService {
         return responseData;
       });
   }
-
   //sud:9Sept'21--for visit context..
   public GetPatientLatestVisitContext(patientId: number) {
     return this.patientDLService.GetPatientLatestVisitContext(patientId)
@@ -1683,8 +1724,13 @@ export class BillingBLService {
     });
   }
 
-  public IsClaimed(latestClaimCode: number, patientId: number) {
-    return this.billingDLService.IsClaimed(latestClaimCode, patientId).map(res => {
+  public IsClaimed_SSF(latestClaimCode: number, patientId: number) {
+    return this.billingDLService.IsClaimed_SSF(latestClaimCode, patientId).map(res => {
+      return res;
+    });
+  }
+  public IsClaimed_HIB(latestClaimCode: number) {
+    return this.billingDLService.IsClaimed_HIB(latestClaimCode).map(res => {
       return res;
     });
   }
@@ -1731,6 +1777,11 @@ export class BillingBLService {
   public GetPatientDepositsList(patientId: number) {
     return this.billingDLService.GetPatientDepositsList(patientId)
       .map(res => res);
+  }
+
+  GetAdditionalBedReservations(patientId: number, patientVisitId: number) {
+    return this.billingDLService.GetAdditionalBedReservations(patientId, patientVisitId)
+      .map(res => { return res })
   }
   public PostProvisionalDischarge(provisionalDischarge: ProvisionalDischarge_DTO) {
     return this.billingDLService.PostProvisionalDischarge(provisionalDischarge)
@@ -1799,6 +1850,37 @@ export class BillingBLService {
         return responseData;
       })
   }
+
+  GetMasterServiceItems() {
+    return this.billingDLService.GetMasterServiceItems().map(res => {
+      return res;
+    });
+  }
+
+  public GetPatientVisitConsultants(patientVisitId: number) {
+    return this.admissionDLService.GetPatientVisitConsultants(patientVisitId)
+      .map(res => { return res })
+  }
+  public GetPatientWithVisitInformation(patientId: number, patientVisitId: number) {
+    return this.admissionDLService.GetPatientWithVisitInformation(patientId, patientVisitId)
+      .map(res => { return res })
+  }
+  GetPatientVisits(patientId: number) {
+    return this.billingDLService.GetPatientVisits(patientId)
+      .map(res => { return res })
+  }
+  GetBillingSalesSummaryReport(patientId: number, visitId: number, billingType: string, schemeId: number, priceCategoryId: number) {
+    return this.billingDLService.GetBillingSalesSummaryReport(patientId, visitId, billingType, schemeId, priceCategoryId).map(res => {
+      return res;
+    })
+
+  }
+  GetBillingPreviousProvisionalAmount(patientId: number, visitId: number) {
+    return this.billingDLService.GetBillingPreviousProvisionalAmount(patientId, visitId).map(res => {
+      return res;
+    });
+  }
+
 
 }
 

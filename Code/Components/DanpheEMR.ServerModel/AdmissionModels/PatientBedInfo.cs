@@ -53,5 +53,8 @@ namespace DanpheEMR.ServerModel
         public int? ReceivedBy { get; set; }
         public DateTime? ReceivedOn { get; set; }
 
+        [NotMapped]
+        public List<AddPatientVisitConsultants_DTO> AddPatientVisitConsultants { get; set; }
+
     }
 }

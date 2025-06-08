@@ -157,6 +157,9 @@ export class GetRequisitionItemViewDto {
       public CancelledOn: string = "";
       public CancelRemarks: string = "";
       public DispatchedQuantity: number = 0;
+      public Unit: string;
+      public ItemCode: string;
+
 }
 
 export class CancellRequisitionDTO {

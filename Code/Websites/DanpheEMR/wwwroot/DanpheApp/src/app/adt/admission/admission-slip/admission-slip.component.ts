@@ -31,59 +31,64 @@ export class AdmissionSlipComponent implements OnInit {
 
   public currentUser: User = new User();
   constructor(
-    private messageBoxService: MessageboxService,
-    private changeDetector: ChangeDetectorRef,
-    private securityService: SecurityService,
-    private coreService: CoreService,
-    private adtBlService: ADT_BLService
+    private _messageBoxService: MessageboxService,
+    private _changeDetector: ChangeDetectorRef,
+    private _securityService: SecurityService,
+    private _adtBlService: ADT_BLService,
+    private _coreService: CoreService
   ) {
     this.GetBillingHeaderParameter();
-    this.InvoiceDisplaySettings = this.coreService.GetInvoiceDisplaySettings();
+    this.InvoiceDisplaySettings = this._coreService.GetInvoiceDisplaySettings();
   }
 
   ngOnInit() {
-    this.currentUser = this.securityService.GetLoggedInUser();
+    this.currentUser = this._securityService.GetLoggedInUser();
     this.GetDetailsForAdmissionSlip(this.PatientVisitId);
   }
 
   public GetDetailsForAdmissionSlip(patientVisitId: number): void {
     try {
-      this.adtBlService.GetDetailsForAdmissionSlip(patientVisitId)
+      this._adtBlService.GetDetailsForAdmissionSlip(patientVisitId)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
             this.admissionSlipDetails = res.Results;
+            this.admissionSlipDetails.AgeGender = this.SetAgeAndGender(this.admissionSlipDetails.DateOfBirth, this.admissionSlipDetails.Gender);
             this.showAdmissionSlip = true;
           }
           else {
-            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed  to get Details for Admission Slip"]);
+            this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed  to get Details for Admission Slip"]);
           }
         });
     }
     catch (exception) {
-      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Exception : ${exception}`]);
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Exception : ${exception}`]);
     }
   }
-
+  SetAgeAndGender(dateOfBirth: string, gender: string): string {
+    const age = this._coreService.CalculateAge(dateOfBirth);
+    const ageGender = this._coreService.FormateAgeSex(age, gender);
+    return ageGender;
+  }
   public PrintAdmissionSlip(): void {
     this.loading = true;
     if (!this.selectedPrinter || this.selectedPrinter.PrintingType === ENUM_PrintingType.browser) {
       this.browserPrintContentObj = document.getElementById("id_admission_slip");
       this.openBrowserPrintWindow = false;
-      this.changeDetector.detectChanges();
+      this._changeDetector.detectChanges();
       this.openBrowserPrintWindow = true;
       this.loading = false;
     }
     else {
       this.loading = false;
-      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Printer Not Supported."]);
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Printer Not Supported."]);
     }
   }
   public GetBillingHeaderParameter(): void {
-    const param = this.coreService.Parameters.find(a => a.ParameterName === 'BillingHeader');
+    const param = this._coreService.Parameters.find(a => a.ParameterName === 'BillingHeader');
     const paramValue = param ? param.ParameterValue : null;
     if (paramValue)
       this.headerDetail = JSON.parse(paramValue);
     else
-      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Please enter parameter values for BillingHeader"]);
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Please enter parameter values for BillingHeader"]);
   }
 }

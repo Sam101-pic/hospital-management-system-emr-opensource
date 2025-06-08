@@ -13,7 +13,8 @@ namespace DanpheEMR.Core.DynamicTemplate
         public int TemplateFieldMapId { get; set; }
         public int TemplateId { get; set; }
         public int FieldMasterId { get; set; }
-        public string DisplayLabel { get; set; }
+        public string DisplayLabelAtForm { get; set; }
+        public string DisplayLabelAtPrint { get; set; }
         public bool IsMandatory { get; set; }
         public int? EnterSequence { get; set; }
         public int CreatedBy { get; set; }

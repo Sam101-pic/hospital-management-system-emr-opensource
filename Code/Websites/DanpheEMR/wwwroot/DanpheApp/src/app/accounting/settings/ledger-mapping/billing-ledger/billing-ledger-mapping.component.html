@@ -37,10 +37,10 @@
                         </div>
                         <div class="col-md-5">
                             <input type="radio" id="id_radio_billingType_outPatient" [(ngModel)]="billingType" aria-selected="true"
-                                   name="radioBtn_BillingType" value="outpatient" (change)="filterBillintType()">
+                                   name="radioBtn_BillingType" value="outpatient" (change)="filterBillintType()" [disabled]="true">
                             <label for="id_radio_billingType_outPatient" style="margin-left: 10px;">OutPatient</label>
                             <input type="radio" id="id_radio_billingType_inPatient" [(ngModel)]="billingType" name="radioBtn_BillingType"
-                                   value="inpatient" style="margin-left: 20px;" (change)="filterBillintType()">
+                                   value="inpatient" style="margin-left: 20px;" (change)="filterBillintType()" [disabled]="true">
                             <label for="id_radio_billingType_inPatient" style="margin-left: 10px;">InPatient</label>
                         </div>
                     </div>

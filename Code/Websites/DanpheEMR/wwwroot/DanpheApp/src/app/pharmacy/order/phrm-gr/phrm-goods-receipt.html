@@ -19,7 +19,8 @@
                 <div class="row">
                   <label class="col-md-5">Supplier Bill Date:</label>
                   <div class="col-md-7">
-                    <danphe-date-picker [(ngModel)]="goodsReceiptVM.goodReceipt.SupplierBillDate" ngDefaultControl [CalendarTypes]="'np,en'" [ngModelOptions]="{standalone:true}">
+                    <danphe-date-picker [(ngModel)]="goodsReceiptVM.goodReceipt.SupplierBillDate" ngDefaultControl [CalendarTypes]="'np,en'"
+                                        [ngModelOptions]="{standalone:true}">
                     </danphe-date-picker>
                   </div>
                 </div>
@@ -28,8 +29,11 @@
                 <div class="row">
                   <label class="col-md-4">Goods Receipt Date:</label>
                   <div class="col-md-8">
-                    <danphe-date-picker [(ngModel)]="goodsReceiptVM.goodReceipt.GoodReceiptDate" ngDefaultControl [CalendarTypes]="'np,en'" [ngModelOptions]="{standalone:true}">
-                    </danphe-date-picker>
+                    <form>
+                      <danphe-date-picker [(ngModel)]="goodsReceiptVM.goodReceipt.GoodReceiptDate" ngDefaultControl [CalendarTypes]="'np,en'"
+                                          [ngModelOptions]="{standalone:true}" [previous-fiscal-year]="AllowPreviousFiscalYear">
+                      </danphe-date-picker>
+                    </form>
                   </div>
                 </div>
               </div>
@@ -38,7 +42,9 @@
           <div class="col-md-1">
             <div class="pull-right">
               <div class="shortcut-key shortkey-right " title="Shortcut Keys">
-                <a href="#"><img src="../../../themes/theme-default/images/Keyboard-icon.svg" alt=""></a>
+                <a>
+                  <img src="../../../themes/theme-default/images/Keyboard-icon.svg" alt="">
+                </a>
                 <div class="keydropdown">
                   <ul>
                     <li><kbd>ALT</kbd> + <kbd>P</kbd> = <samp> <span *ngIf="IsGRedit; else updateshortcut">Update</span> Receipt
@@ -66,8 +72,13 @@
             <label class="col-md-4 pt5">Supplier Name<sup>*</sup> <b>:</b></label>
             <div class="col-md-8 no-padding no-margin">
               <div class="div-relative">
-                <input danphe-auto-complete class="form-control mb-0" [(ngModel)]="currentSupplier" [source]="supplierList" [list-formatter]="supplierListFormatter" placeholder="Select Supplier" display-property-name="SupplierName" id="SupplierName" value-property-name=null min-chars="0" max-num-list="20" onClick="this.select();" (keyup.enter)="SetFocusById('InvoiceId')" match-formatted="true" [grid-sort]="'SupplierName'" [ngModelOptions]="{standalone: true}" [disabled]="IsPOorder" (change)="OnInvoiceChange()" />
-                <a style="z-index:initial" class="fa fa-question" (click)="AddSupplierPopUp()" *ngIf="!IsPOorder && loading == false " title="Unable to find Supplier ? Click to add to Master"></a>
+                <input danphe-auto-complete class="form-control mb-0" [(ngModel)]="currentSupplier" [source]="supplierList"
+                       [list-formatter]="supplierListFormatter" placeholder="Select Supplier" display-property-name="SupplierName" id="SupplierName"
+                       value-property-name=null min-chars="0" max-num-list="20" onClick="this.select();" (keyup.enter)="SetFocusById('InvoiceId')"
+                       match-formatted="true" [grid-sort]="'SupplierName'" [ngModelOptions]="{standalone: true}" [disabled]="IsPOorder"
+                       (change)="OnInvoiceChange()" />
+                <a style="z-index:initial" class="fa fa-question" (click)="AddSupplierPopUp()" *ngIf="!IsPOorder && loading == false "
+                   title="Unable to find Supplier ? Click to add to Master"></a>
                 <a *ngIf="loading == true" style="z-index:initial" title="Supplier is loading.">
                   <i class="fa fa-spinner"></i>
                 </a>
@@ -80,7 +91,9 @@
             <div [ngClass]="{'alert alert-warning':duplicateInvoice}" style="padding:0px!important;margin:0px!important">
               <label class="col-md-4 col-sm-5">Invoice<sup>*</sup> <b>:</b></label>
               <div class="col-md-8 col-sm-7">
-                <input type="text" [(ngModel)]="goodsReceiptVM.goodReceipt.InvoiceNo" name="InvoiceNo" id="InvoiceId" [ngModelOptions]="{standalone: true}" placeholder="Invoice No" style="width:100%" (keyup.enter)="SetFocusById('btn_AddNew')" class="form-control mb-0" (change)="OnInvoiceChange()">
+                <input type="text" [(ngModel)]="goodsReceiptVM.goodReceipt.InvoiceNo" name="InvoiceNo" id="InvoiceId"
+                       [ngModelOptions]="{standalone: true}" placeholder="Invoice No" style="width:100%" (keyup.enter)="SetFocusById('btn_AddNew')"
+                       class="form-control mb-0" (change)="OnInvoiceChange()">
               </div>
               <div class="color-red font-sm" *ngIf="duplicateInvoice">
                 <i class="fa fa-warning"></i>Duplicate Invoice No. not allowed
@@ -94,7 +107,8 @@
           <div class="row">
             <label class="col-md-5">Payment Mode<sup>*</sup> <b>:</b></label>
             <div class="form-group col-md-7  mt-0">
-              <select [(ngModel)]="goodsReceiptVM.goodReceipt.TransactionType" type="text" name="TransactionType" style="width:100%" [ngModelOptions]="{standalone: true}" placeholder="" class="form-control mb-0" id="paymentMode">
+              <select [(ngModel)]="goodsReceiptVM.goodReceipt.TransactionType" type="text" name="TransactionType" style="width:100%"
+                      [ngModelOptions]="{standalone: true}" placeholder="" class="form-control mb-0" id="paymentMode">
                 <option value="cash">Cash </option>
                 <option value="credit">Credit </option>
               </select>
@@ -105,7 +119,9 @@
           <div class="row no-gutters">
             <label class="col-md-6">Credit Period <b>:</b></label>
             <div class="col-md-6">
-              <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.CreditPeriod" name="CreditPeriod" id="CreditPeriod" style="width:100%" (keyup.enter)="IsPOorder ? SetFocusById('editButton0') : SetFocusById('btn_AddNew')" [ngModelOptions]="{standalone: true}" placeholder="Credit Period" class="form-control mb-0" (ngModelChange)="OnCreditPeriodChange()" />
+              <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.CreditPeriod" name="CreditPeriod" id="CreditPeriod" style="width:100%"
+                     (keyup.enter)="IsPOorder ? SetFocusById('editButton0') : SetFocusById('btn_AddNew')" [ngModelOptions]="{standalone: true}"
+                     placeholder="Credit Period" class="form-control mb-0" (ngModelChange)="OnCreditPeriodChange()" />
               <div *ngIf="checkCreditPeriod" class="color-red font-sm">Credit Period must be positive and whole number</div>
             </div>
           </div>
@@ -128,16 +144,16 @@
             <th>Rack No</th>
             <th *ngIf="!isExpiryNotApplicable">Exp Date</th>
             <th *ngIf="IsPOorder || (IsGRedit && goodsReceiptVM.goodReceipt.PurchaseOrderId != null)">Pending Qty </th>
-            <th *ngIf="IsPkgitem">Packing</th>
-            <th *ngIf="IsPkgitem">Packing Qty</th>
-            <th *ngIf="!IsPkgitem">Item Qty</th>
+            <th *ngIf="IsPackageItem">Packing</th>
+            <th *ngIf="IsPackageItem">Packing Qty</th>
+            <th *ngIf="!IsPackageItem">Item Qty</th>
             <th *ngIf="showFreeQty">Free Qty </th>
             <th *ngIf="showFreeQty">Total Qty </th>
-            <th *ngIf="IsPkgitem"> Strip Rate </th>
-            <th *ngIf="!IsPkgitem">Rate</th>
+            <th *ngIf="IsPackageItem"> Strip Rate </th>
+            <th *ngIf="!IsPackageItem">Rate</th>
             <th>Margin%</th>
-            <th *ngIf="IsPkgitem">Strip SalePrice</th>
-            <th *ngIf="!IsPkgitem"> SalePrice</th>
+            <th *ngIf="IsPackageItem">Strip SalePrice</th>
+            <th *ngIf="!IsPackageItem"> SalePrice</th>
             <th *ngIf="showFreeQty">Free Amt</th>
             <th *ngIf="showCCCharge">CC Charge%</th>
             <th>Sub Total</th>
@@ -148,17 +164,20 @@
         </thead>
         <tbody>
           <!--class="alert alert-warning"-->
-          <tr *ngFor="let row of grItemList; let i = index" [style.background-color]="row.VATAmount > 0 ? '#f6f696' : 'none'" [ngClass]="{'alert alert-warning':HasDuplicateItems(row.ItemId,i)}">
+          <tr *ngFor="let row of grItemList; let i = index" [style.background-color]="row.VATAmount > 0 ? '#f6f696' : 'none'"
+              [ngClass]="{'alert alert-warning':HasDuplicateItems(row.ItemId,i)}"
+              [attr.title]="HasDuplicateItems(row.ItemId, i) ? 'Duplicate item found: ' + row.ItemName : null">
             <td title="Delete record">
               <div *ngIf="i>=0 && grItemList[i].ItemId !== 0">
-                <a (click)="DeleteGrItemRow(i)">
+                <a (click)="DeleteGrItemRow(i);">
                   <i class="fa fa-times fa-2x" style="color: red;" aria-hidden="true"></i>
                 </a>
               </div>
             </td>
             <td title="Edit record">
               <div *ngIf="i>=0 && grItemList[i].ItemId !== 0">
-                <button id="editButton{{i}}" (click)="EditRow(i)" style="border: none; background: none;"><i class="fa fa-edit" style="font-size:20px;color: blue;"></i></button>
+                <button id="editButton{{i}}" (click)="EditRow(i)" style="border: none; background: none;"><i class="fa fa-edit"
+                     style="font-size:20px;color: blue;"></i></button>
               </div>
             </td>
             <td>
@@ -179,13 +198,13 @@
             <td *ngIf="IsPOorder || (IsGRedit && goodsReceiptVM.goodReceipt.PurchaseOrderId != null)">
               {{row.PendingQuantity}}
             </td>
-            <td *ngIf="IsPkgitem">
+            <td *ngIf="IsPackageItem">
               {{row.PackingName}}
             </td>
-            <td *ngIf="IsPkgitem">
+            <td *ngIf="IsPackageItem">
               {{row.PackingQty}}
             </td>
-            <td *ngIf="!IsPkgitem">
+            <td *ngIf="!IsPackageItem">
               {{row.ItemQTy}}
             </td>
             <td *ngIf="showFreeQty">
@@ -194,19 +213,19 @@
             <td *ngIf="showFreeQty">
               {{row.ItemQTy + row.FreeQuantity}}
             </td>
-            <td *ngIf="IsPkgitem">
+            <td *ngIf="IsPackageItem">
               {{row.StripRate}}
             </td>
-            <td *ngIf="!IsPkgitem">
+            <td *ngIf="!IsPackageItem">
               {{row.GRItemPrice}}
             </td>
             <td>
               {{row.AdjustedMargin}}
             </td>
-            <td *ngIf="IsPkgitem">
+            <td *ngIf="IsPackageItem">
               {{row.StripMRP}}
             </td>
-            <td *ngIf="!IsPkgitem">
+            <td *ngIf="!IsPackageItem">
               {{row.SalePrice}}
             </td>
             <td *ngIf="showFreeQty">
@@ -224,7 +243,8 @@
       </table>
       <tr>
         <td title="Add New Item" *ngIf="itemList && itemList.length">
-          <button id="btn_AddNew" class="btn green btn-success" (click)="AddGRItemPopUp()" tabindex="1"><i class="fa fa-plus" style="width: auto;"></i> Add New Item</button>
+          <button id="btn_AddNew" class="btn green btn-success" (click)="AddGRItemPopUp()" tabindex="1"><i class="fa fa-plus"
+               style="width: auto;"></i> Add New Item</button>
         </td>
         <td>
           <div style="margin-left: 20px; color: blue; font-size: 15px;">
@@ -248,7 +268,8 @@
               <td> Taxable Sub Total: </td>
               <td>
                 <div class="form-group">
-                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.TaxableSubTotal" [ngModelOptions]="{standalone:true}" disabled min="0" name="subtotal" class="form-control" value="{{0}}">
+                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.TaxableSubTotal" [ngModelOptions]="{standalone:true}" disabled min="0"
+                         name="subtotal" class="form-control" value="{{0}}">
                 </div>
               </td>
             </tr>
@@ -256,7 +277,8 @@
               <td> Non-Taxable Sub Total: </td>
               <td>
                 <div class="form-group">
-                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.NonTaxableSubTotal" [ngModelOptions]="{standalone:true}" disabled min="0" name="subtotal" class="form-control" value="{{0}}">
+                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.NonTaxableSubTotal" [ngModelOptions]="{standalone:true}" disabled
+                         min="0" name="subtotal" class="form-control" value="{{0}}">
                 </div>
               </td>
             </tr>
@@ -264,7 +286,8 @@
               <td> Sub Total: </td>
               <td>
                 <div class="form-group">
-                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.SubTotal" [ngModelOptions]="{standalone:true}" disabled min="0" name="subtotal" class="form-control" value="{{0}}">
+                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.SubTotal" [ngModelOptions]="{standalone:true}" disabled min="0"
+                         name="subtotal" class="form-control" value="{{0}}">
                 </div>
               </td>
             </tr>
@@ -272,11 +295,14 @@
               <td>Discount Percent: </td>
               <td>
                 <div class="form-group">
-                    <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.DiscountPercentage" tabindex="2" (focusout)="CalculationForPHRMGoodsReceipt(goodsReceiptVM.goodReceipt.DiscountPercentage,0)" min="0" name="DiscountPercentage" class="form-control" value="{{0}}" [disabled]="!isMainDiscountApplicable" onClick="this.select();" onwheel=this.blur() (keyup.enter)="setFocusById('discountAmount')">
-                    <!-- <span class="color-red font-sm" *ngIf="throwError"> Discount % Range: 0-100% </span> -->
-                    <div style="color:red" *ngIf="invalidDiscountPercentage">
-                      Discount % Range: 0-100%
-                    </div>
+                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.DiscountPercentage" tabindex="2"
+                         (focusout)="CalculationForPHRMGoodsReceipt(goodsReceiptVM.goodReceipt.DiscountPercentage,0)" min="0"
+                         name="DiscountPercentage" class="form-control" value="{{0}}" [disabled]="!isMainDiscountApplicable" onClick="this.select();"
+                         onwheel=this.blur() (keyup.enter)="setFocusById('discountAmount')">
+                  <!-- <span class="color-red font-sm" *ngIf="throwError"> Discount % Range: 0-100% </span> -->
+                  <div style="color:red" *ngIf="invalidDiscountPercentage">
+                    Discount % Range: 0-100%
+                  </div>
                 </div>
               </td>
             </tr>
@@ -284,21 +310,26 @@
               <td>Discount Amount: </td>
               <td>
                 <div class="form-group">
-                    <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.DiscountAmount" (focusout)="CalculationForPHRMGoodsReceipt(0,goodsReceiptVM.goodReceipt.DiscountAmount)" min="0" name="DiscTotal" class="form-control" value="{{0}}" [disabled]="!isMainDiscountApplicable" onClick="this.select();" (keyup.enter)="setFocusById('remarks')" onwheel=this.blur() id="discountAmount">
-                    <div style="color:red" *ngIf="invalidDiscountAmount">
-                      Min (0)
-                    </div>
+                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.DiscountAmount"
+                         (focusout)="CalculationForPHRMGoodsReceipt(0,goodsReceiptVM.goodReceipt.DiscountAmount)" min="0" name="DiscTotal"
+                         class="form-control" value="{{0}}" [disabled]="!isMainDiscountApplicable" onClick="this.select();"
+                         (keyup.enter)="setFocusById('remarks')" onwheel=this.blur() id="discountAmount">
+                  <div style="color:red" *ngIf="invalidDiscountAmount">
+                    Min (0)
+                  </div>
                 </div>
-                </td>
-                </tr>
-                <tr class="form-group">
-                  <td>VAT%: </td>
-                  <td>
-                    <div class="form-group">
-                      <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.VATPercentage" (focusout)="OnVATChange(goodsReceiptVM.goodReceipt.VATPercentage,0)" min="0" name="VATTotal" class="form-control" value="{{0}}">
-                      <div style="color:red" *ngIf="invalidVATPercentage">
-                        VAT % Range: 0-100%
-                      </div>
+              </td>
+            </tr>
+            <tr class="form-group">
+              <td>VAT%: </td>
+              <td>
+                <div class="form-group">
+                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.VATPercentage"
+                         (focusout)="OnVATChange(goodsReceiptVM.goodReceipt.VATPercentage,0)" min="0" name="VATTotal" class="form-control"
+                         value="{{0}}">
+                  <div style="color:red" *ngIf="invalidVATPercentage">
+                    VAT % Range: 0-100%
+                  </div>
                 </div>
               </td>
             </tr>
@@ -306,18 +337,20 @@
               <td>VAT Total: </td>
               <td>
                 <div class="form-group">
-                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.VATAmount" (focusout)="OnVATChange(0,goodsReceiptVM.goodReceipt.VATAmount)" min="0" name="VATTotal" class="form-control" value="{{0}}">
+                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.VATAmount"
+                         (focusout)="OnVATChange(0,goodsReceiptVM.goodReceipt.VATAmount)" min="0" name="VATTotal" class="form-control" value="{{0}}">
                   <div style="color:red" *ngIf="invalidVATAmount">
                     Min (0)
                   </div>
-                  </div>
-                  </td>
-                  </tr>
-                  <tr class="form-group">
-                    <td>CC Charge: </td>
-                    <td>
-                      <div class="form-group">
-                        <input type="number" disabled [(ngModel)]="goodsReceiptVM.goodReceipt.CCAmount" [ngModelOptions]="{standalone:true}" min="0" name="VATTotal" class="form-control" value="{{0}}">
+                </div>
+              </td>
+            </tr>
+            <tr class="form-group">
+              <td>CC Charge: </td>
+              <td>
+                <div class="form-group">
+                  <input type="number" disabled [(ngModel)]="goodsReceiptVM.goodReceipt.CCAmount" [ngModelOptions]="{standalone:true}" min="0"
+                         name="VATTotal" class="form-control" value="{{0}}">
                 </div>
               </td>
             </tr>
@@ -325,7 +358,9 @@
               <td> Adjustment: </td>
               <td>
                 <div class="form-group">
-                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.Adjustment" [ngModelOptions]="{standalone:true}" disabled min="0" name="Adjustment" class="form-control" value="{{0}}">
+                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.Adjustment" [ngModelOptions]="{standalone:true}"
+                         [disabled]="!EnableAdjustmentEdit" min="0"
+                         name="Adjustment" class="form-control" value="{{0}}" (focusout)="OnAdjustmentChange($event)">
                 </div>
               </td>
             </tr>
@@ -333,7 +368,8 @@
               <td> Total Amount: </td>
               <td>
                 <div class="form-group">
-                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.TotalAmount" [ngModelOptions]="{standalone:true}" disabled min="0" name="totalamount" class="form-control" value="{{0}}">
+                  <input type="number" [(ngModel)]="goodsReceiptVM.goodReceipt.TotalAmount" [ngModelOptions]="{standalone:true}" disabled min="0"
+                         name="totalamount" class="form-control" value="{{0}}">
                 </div>
               </td>
             </tr>
@@ -343,7 +379,8 @@
               <td>Remarks: </td>
               <td>
                 <div class="form-group">
-                  <input type="text" [(ngModel)]="goodsReceiptVM.goodReceipt.Remarks" [ngModelOptions]="{standalone:true}" name="remarks" class="form-control" id="remarks" (keyup.enter)="IsGRedit ? setFocusToBtnById('updateGr') : setFocusToBtnById('saveGr')" />
+                  <input type="text" [(ngModel)]="goodsReceiptVM.goodReceipt.Remarks" [ngModelOptions]="{standalone:true}" name="remarks"
+                         class="form-control" id="remarks" (keyup.enter)="IsGRedit ? setFocusToBtnById('updateGr') : setFocusToBtnById('saveGr')" />
                 </div>
               </td>
             </tr>
@@ -357,8 +394,10 @@
           </table>
           <div class="form-group clearfix">
             <div class="text-right mt20">
-              <button id="saveGr" *ngIf="!IsGRedit" class="btn green btn-success tooltip" title="ALT + P" (click)="SaveGoodsReceipt()" [disabled]="loading"> <u>P</u>rint Receipt </button>
-              <button id="updateGr" *ngIf="IsGRedit" class="btn green btn-success tooltip" title="ALT + P" (click)="EditGR()" [disabled]="loading">U<u>p</u>date Receipt </button>
+              <button id="saveGr" *ngIf="!IsGRedit" class="btn green btn-success tooltip" title="ALT + P" (click)="SaveGoodsReceipt()"
+                      [disabled]="loading"> <u>P</u>rint Receipt </button>
+              <button id="updateGr" *ngIf="IsGRedit" class="btn green btn-success tooltip" title="ALT + P" (click)="EditGR()"
+                      [disabled]="loading">U<u>p</u>date Receipt </button>
               <span></span>
               <button class="btn btn-danger" (click)="DiscardGoodsReceipt()">Discard</button>
 
@@ -372,23 +411,28 @@
 </div>
 
 
-<phrm-supplier-add *ngIf="showAddSupplierPopUp" [showAddPage]="showAddSupplierPopUp" (callback-add)="OnNewSupplierAdded($event)">
+<phrm-supplier-add *ngIf="showAddSupplierPopUp" [showAddPage]="showAddSupplierPopUp" (callback-add)="OnNewSupplierAdded($event)"
+                   (popup-close-event)="OnSupplierViewPopUpClose()">
 </phrm-supplier-add>
 
 
 <div *ngIf="showAddGRPage || showUpdateGRPage">
-  <phrm-add-goods-receipt-item (callback-update)="CallBackUpdateGRItem($event)" (callback-add)="OnNewGRItemAdded($event)" (popup-close)="OnPopupClose($event)" #grItemPop [PackingList]="packingtypeList" [all-items-list]="itemList">
+  <phrm-add-goods-receipt-item (callback-update)="CallBackUpdateGRItem($event)" (callback-add)="OnNewGRItemAdded($event)"
+                               (popup-close)="OnPopupClose($event)" #grItemPop [PackingList]="PackingTypeList" [all-items-list]="itemList"
+                               [generic-list]="genericList" (callback-add-item)="OnNewMasterItemAdded($event)">
   </phrm-add-goods-receipt-item>
 </div>
 
 
 <div *ngIf="showNepaliReceipt; else englishReceipt">
   <!-- Nepali GR VIEW-->
-  <app-phrm-gr-view-np *ngIf="showGRReceipt" [showPopUp]="showGRReceipt" [goodsReceiptId]="goodsReceiptIdForPrint" [canUserModify]="false" (popup-close-event)="OnGRViewPopUpClose()"></app-phrm-gr-view-np>
+  <app-phrm-gr-view-np *ngIf="showGRReceipt" [showPopUp]="showGRReceipt" [goodsReceiptId]="goodsReceiptIdForPrint" [canUserModify]="false"
+                       (popup-close-event)="OnGRViewPopUpClose()" [EnableAdjustmentEdit]="EnableAdjustmentEdit"></app-phrm-gr-view-np>
 </div>
 <ng-template #englishReceipt>
   <div>
     <!-- English GR View -->
-    <goods-receipt-view *ngIf="showGRReceipt" [showPopUp]="showGRReceipt" [goodsReceiptId]="goodsReceiptIdForPrint" [canUserModify]="false" (popup-close-event)="OnGRViewPopUpClose()"></goods-receipt-view>
+    <goods-receipt-view *ngIf="showGRReceipt" [showPopUp]="showGRReceipt" [goodsReceiptId]="goodsReceiptIdForPrint" [canUserModify]="false"
+                        (popup-close-event)="OnGRViewPopUpClose()" [EnableAdjustmentEdit]="EnableAdjustmentEdit"></goods-receipt-view>
   </div>
 </ng-template>

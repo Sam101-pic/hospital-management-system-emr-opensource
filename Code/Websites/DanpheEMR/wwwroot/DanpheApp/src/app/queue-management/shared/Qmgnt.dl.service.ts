@@ -16,12 +16,12 @@ export class QueueManagementDLService {
     return this.http.get<any>("/api/QueueManagement/GetAllAppointmentApplicableDoctor", this.options);
   }
 
-  public GetAppointmentData(deptId,doctorId,pendingOnly){
-    return this.http.get<any>("/api/QueueManagement/GetAppointmentData?deptId="+deptId+"&doctorId="+doctorId+"&pendingOnly="+pendingOnly, this.options);
+  public GetAppointmentData(deptId, doctorId, pendingOnly) {
+    return this.http.get<any>("/api/QueueManagement/GetAppointmentData?deptId=" + deptId + "&doctorId=" + doctorId + "&pendingOnly=" + pendingOnly, this.options);
   }
 
-  public updateQueueStatus(data,visitId){
-    return this.http.put<any>("/api/QueueManagement/updateQueueStatus?data="+data+"&visitId="+visitId,this.options);
+  public updateQueueStatus(data, visitId) {
+    return this.http.put<any>("/api/QueueManagement/updateQueueStatus?data=" + data + "&visitId=" + visitId, this.options);
   }
 
 }

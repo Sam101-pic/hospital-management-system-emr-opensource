@@ -1,10 +1,8 @@
 import {
-  NgForm,
-  FormGroup,
-  FormControl,
-  Validators,
   FormBuilder,
-  ReactiveFormsModule
+  FormControl,
+  FormGroup,
+  Validators
 } from '@angular/forms';
 
 import * as moment from 'moment/moment';
@@ -34,7 +32,9 @@ export class EditDoctorFeatureViewModel {
   public PrescriberName: string = null;
   public DoctorMandatory: boolean = false;
   public RequisitionId: number = null;
-
+  public Age: string = null;
+  public ReferredById: number = null;
+  public ReferrerName: string = null;
   public EditDoctorValidator: FormGroup = null;
 
   constructor() {

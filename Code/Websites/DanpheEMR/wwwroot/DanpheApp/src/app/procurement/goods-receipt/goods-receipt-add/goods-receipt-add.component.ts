@@ -12,7 +12,7 @@ import { CommonFunctions } from '../../../shared/common.functions';
 import { InventoryFieldCustomizationService } from '../../../shared/inventory-field-customization.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
-import { ENUM_GRItemCategory } from '../../../shared/shared-enums';
+import { ENUM_GRItemCategory, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { POVerifier } from '../../purchase-order/purchase-order.model';
 import { ProcurementBLService } from '../../shared/procurement.bl.service';
 import { GoodReceiptService } from '../good-receipt.service';
@@ -72,6 +72,8 @@ export class GoodsReceiptAddComponent implements OnInit {
   addOtherChargeToTotalAmount: boolean = false;
   showSpecification: boolean = false;
   AllowVerificationEdit: boolean = true;
+  AllowPreviousFiscalYear: boolean = false;
+  HasPermission: boolean = false;
   constructor(public routeFrom: RouteFromService, public goodReceiptService: GoodReceiptService, public securityService: SecurityService, public procurementBLService: ProcurementBLService, public inventoryService: InventoryService, public changeDetectorRef: ChangeDetectorRef, public messageBoxService: MessageboxService, public coreService: CoreService, public router: Router, private _activateInventoryService: ActivateInventoryService, public inventoryFieldCustomizationService: InventoryFieldCustomizationService) {
 
     this.disableTextBox = true;
@@ -100,6 +102,12 @@ export class GoodsReceiptAddComponent implements OnInit {
     this.LoadVendorList(); //vendor must be loaded at last, because, in edit GR case, we may need inactive vendors as well.
     this.setautofocus();
     this.getGoodsReceiptMasterList();
+    if (this.securityService.HasPermission('btn-inventory-goodreceipt-addqualityinspection')) {
+      this.HasPermission = true;
+    }
+    else {
+      this.HasPermission = false;
+    }
   }
   //fxn to get the valid Item Count only after proper valid item is selected.
   public get getValidItemCount() {
@@ -118,6 +126,7 @@ export class GoodsReceiptAddComponent implements OnInit {
       this.LoadPo(this.inventoryService.POId);
       this.isGrFromPOMode = true;
       this.inventoryService.POId = 0;//need to reset POId to zero so that other component's won't get mistaken.
+      this.SetDefaultVerifier();
       this.checkIfDateEntryAllowed();
     }
     else if (this.inventoryService.GoodsReceiptId > 0) { //this comes from GR-Edit Page. (Changed: sud-19Feb'20- inventoryService.id was wrongly implemented.)
@@ -161,6 +170,7 @@ export class GoodsReceiptAddComponent implements OnInit {
           this.SetVerifiersFromVerifierIdsObj(ProcurementVerificationSettingParsed.VerifierIds);
         }
         else {
+          this.goodsReceipt.IsVerificationEnabled = false;
           this.IsVerificationActivated = false;
         }
       }
@@ -176,7 +186,13 @@ export class GoodsReceiptAddComponent implements OnInit {
       else {
         //if more than three verifiers are selected, it will take only first three.
         // VerifierIdsParsed = VerifierIdsParsed.slice(0, 2);
-        VerifierIdsParsed.forEach(a => this.goodsReceipt.VerifierList.push(this.VerifierList.find(v => v.Id == a.Id && v.Type == a.Type)));
+        VerifierIdsParsed.forEach(a => {
+          const verifier = this.VerifierList.find(v => v.Id == a.Id && v.Type == a.Type);
+          if (verifier) {
+            this.goodsReceipt.VerifierList.push(verifier);
+          }
+        });
+
       }
     }
   }
@@ -222,12 +238,10 @@ export class GoodsReceiptAddComponent implements OnInit {
       //to check for previous verifiers from edit mode
       if (this.goodsReceipt.VerifierIds && !this.goodsReceipt.VerificationId) {
         this.SetVerifiersFromVerifierIdsObj(this.goodsReceipt.VerifierIds);
-        this.AllowVerificationEdit = true;
         this.IsVerificationActivated = true;
       }
       else {
         this.SetVerifiersFromVerifierIdsObj(this.goodsReceipt.VerifierIds);
-        this.AllowVerificationEdit = false;
         this.IsVerificationActivated = true;
       }
 
@@ -292,7 +306,7 @@ export class GoodsReceiptAddComponent implements OnInit {
       if (this.goodsReceipt.GoodsReceiptItem.length > 0) {
         this.goodsReceipt.GoodsReceiptItem.forEach(itm => {
           if (itm.ExpiryDate != null)
-            itm.ExpiryDate = moment(itm.ExpiryDate).format('DD-MM-YYYY');
+            itm.ExpiryDate = moment(itm.ExpiryDate).format("YYYY-MM");
         });
         this.goodsReceipt.GoodsArrivalDate = moment(this.goodsReceipt.GoodsArrivalDate).format('YYYY-MM-DD');
         this.goodsReceipt.ReceivedDate = moment(this.goodsReceipt.ReceivedDate).format('YYYY-MM-DD');
@@ -346,8 +360,13 @@ export class GoodsReceiptAddComponent implements OnInit {
       this.messageBoxService.showMessage("Notice-message", ["This vendor is inactive now. Please select another vendor."])
     }
     //load verifiers
-    this.goodsReceipt.IsVerificationEnabled = this.purchaseOrder.IsVerificationEnabled;
-    this.SetVerifiersFromVerifierIdsObj(this.purchaseOrder.VerifierIds);
+    if (!this.purchaseOrder.IsVerificationEnabled) {
+      this.SetDefaultVerifier();
+    }
+    else {
+      if (this.goodsReceipt.IsVerificationEnabled)
+        this.SetVerifiersFromVerifierIdsObj(this.purchaseOrder.VerifierIds);
+    }
     this.GetGrItemsFromPoItems();
     this.goodsReceipt.updateItemDuplicationStatus();
     //this.FilterItemByGRItemCategory();
@@ -625,15 +644,14 @@ export class GoodsReceiptAddComponent implements OnInit {
     if (this.editGR) { this.isGrFromPOMode = false };
     if (this.goodsReceipt != null) {
       let validationObj = this.CheckValidation();
-      this.goodsReceipt.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
-      this.goodsReceipt.CreatedOn = moment().format('YYYY-MM-DD');
-      this.goodsReceipt.GRStatus = this.goodsReceipt.IsVerificationEnabled ? "pending" : "verified";
-      this.goodsReceipt.VendorBillDate = moment(this.goodsReceipt.VendorBillDate).format('YYYY-MM-DD') + 'T' + moment().format('HH:mm:ss.SSS');
-      this.goodsReceipt.GoodsReceiptDate = moment(this.goodsReceipt.GoodsReceiptDate).format('YYYY-MM-DD') + 'T' + moment().format('HH:mm:ss.SSS');
-      this.goodsReceipt.GoodsArrivalDate = this.goodsReceipt.GoodsReceiptDate;
-      this.goodsReceipt.IsDonation = this.inventoryService.isDonation;
       if (validationObj.isValid) {
-
+        this.goodsReceipt.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
+        this.goodsReceipt.CreatedOn = moment().format('YYYY-MM-DD');
+        this.goodsReceipt.GRStatus = this.goodsReceipt.IsVerificationEnabled ? "pending" : "verified";
+        this.goodsReceipt.VendorBillDate = moment(this.goodsReceipt.VendorBillDate).format('YYYY-MM-DD') + 'T' + moment().format('HH:mm:ss.SSS');
+        this.goodsReceipt.GoodsReceiptDate = moment(this.goodsReceipt.GoodsReceiptDate).format('YYYY-MM-DD') + 'T' + moment().format('HH:mm:ss.SSS');
+        this.goodsReceipt.GoodsArrivalDate = this.goodsReceipt.GoodsReceiptDate;
+        this.goodsReceipt.IsDonation = this.inventoryService.isDonation;
         for (let index = 0; index < this.goodsReceipt.GoodsReceiptItem.length; index++) {
           this.goodsReceipt.GoodsReceiptItem[index].CreatedOn = moment().format('YYYY-MM-DD');
           if (this.goodsReceipt.GoodsReceiptItem[index].ReceivedQuantity == 0) {
@@ -666,11 +684,11 @@ export class GoodsReceiptAddComponent implements OnInit {
                   this.RouteToViewDetails(res.Results);
                 }
                 else {
-                  this.messageBoxService.showMessage("failed", ["failed to add result.. please check log for details.", res.ErrorMessage]);
+                  this.messageBoxService.showMessage("failed", ["Failed to save Good Receipt. <br>", res.ErrorMessage]);
                 }
               },
               err => {
-                console.log(err.error.ErrorMessage);
+                this.messageBoxService.showMessage("failed", ["Failed to save Good Receipt. <br>", err.ErrorMessage]);
               });
         }
       }
@@ -707,7 +725,7 @@ export class GoodsReceiptAddComponent implements OnInit {
     }
     if (this.IsGoodsReceiptDateValid == false) {
       validationObj.isValid = false;
-      validationObj.messageArr.push("Invalid Fiscal Year Vendor Bill Date..");
+      validationObj.messageArr.push("Invalid Goods Receipt Date");
     }
     if (!this.goodsReceipt.BillNo) {
       validationObj.isValid = false;
@@ -717,7 +735,7 @@ export class GoodsReceiptAddComponent implements OnInit {
       validationObj.isValid = false;
       validationObj.messageArr.push("Please select item first");
     }
-    if (this.goodsReceipt.VerifierList.length == 0 && this.goodsReceipt.IsVerificationEnabled) {
+    if (this.goodsReceipt.IsVerificationEnabled && ((this.goodsReceipt.VerifierList.length > 0 && this.goodsReceipt.VerifierList.some(v => v.Id === 0)) || this.goodsReceipt.VerifierList.length === 0)) {
       validationObj.isValid = false;
       validationObj.messageArr.push("Please Select Verifiers.");
     }
@@ -763,11 +781,11 @@ export class GoodsReceiptAddComponent implements OnInit {
         if (res.Status == "OK") {
           this.editGR = false;
           this.inventoryService.GoodsReceiptId = 0;//sud:3Mar'20-Property Rename in InventoryService
-          this.messageBoxService.showMessage("success", ["Good Receipt has been saved."]);
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Good Receipt has been saved."]);
           this.goodsreceiptList();
         }
         else {
-          this.messageBoxService.showMessage("Failed", [res.ErrorMessage]);
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to update Good Receipt. <br>' + res.ErrorMessage]);
           this.loading = false;
         }
       });
@@ -855,7 +873,7 @@ export class GoodsReceiptAddComponent implements OnInit {
       // in case of edit mode, if the goodsreceiptno is different, then
       // declare the bill as duplicate bill
       this.duplicateVendorGRBillList = this.vendorBillHistoryList.filter(a => a.BillNo == this.goodsReceipt.BillNo && (this.editGR == true && a.GoodsReceiptNo != a.GoodsReceiptNo));
-      let billNo = this.goodsReceipt.BillNo;
+      let billNo = this.goodsReceipt.BillNo.trim();
       let VendorId = this.goodsReceipt.VendorId;
       let selectedDate = this.goodsReceipt.VendorBillDate;
       let fiscalyearId = (this.inventoryService.allFiscalYearList.length > 0) ? this.inventoryService.allFiscalYearList.filter(f => f.StartDate <= selectedDate && f.EndDate >= selectedDate)[0].FiscalYearId : null;
@@ -900,9 +918,19 @@ export class GoodsReceiptAddComponent implements OnInit {
     if (typeof $event == "object") {
       this.goodsReceipt.VerifierList[index] = $event;
     }
+    else {
+      if (this.goodsReceipt.VerifierList.length && this.goodsReceipt.VerifierList[index] !== undefined) {
+        this.goodsReceipt.VerifierList.splice(index, 1);
+        if (!this.goodsReceipt.VerifierList.length) {
+          this.AddVerifier();
+        }
+      }
+    }
   }
   CheckIfAddVerifierAllowed() {
-    return this.goodsReceipt.VerifierList.some(V => V.Id == undefined) || this.goodsReceipt.VerifierList.length >= this.VerificationLevel;
+    if (this.goodsReceipt.VerifierList.length) {
+      return this.goodsReceipt.VerifierList.some(V => V.Id == undefined || V.Id === 0) || this.goodsReceipt.VerifierList.length >= this.VerificationLevel;
+    }
   }
   CheckIfDeleteVerifierAllowed() {
     return this.goodsReceipt.VerifierList.length <= 1;
@@ -1108,5 +1136,10 @@ export class GoodsReceiptAddComponent implements OnInit {
       this.VerifierSignatories = signingPanelConfigurationParameterValue.VerifierSignatories;
       this.VerificationLevel = signingPanelConfigurationParameterValue.VerificationLevel;
     }
+  }
+
+  Back() {
+    this.router.navigate(['ProcurementMain/GoodsReceipt/GoodsReceiptList']);
+
   }
 }

@@ -17,7 +17,7 @@ import { PatientsDLService } from "../../../patients/shared/patients.dl.service"
 import { ImagingItemRequisition } from "../../../radiology/shared/imaging-item-requisition.model";
 import { SecurityService } from "../../../security/shared/security.service";
 import { DanpheCache, MasterType } from "../../../shared/danphe-cache-service-utility/cache-services";
-import { ENUM_AppointmentType, ENUM_BillingStatus, ENUM_VisitStatus, ENUM_VisitType } from "../../../shared/shared-enums";
+import { ENUM_AppointmentType, ENUM_BillingStatus, ENUM_DateTimeFormat, ENUM_VisitStatus, ENUM_VisitType } from "../../../shared/shared-enums";
 import { DischargeDetailBillingVM } from "../ins-ipd-billing/shared/discharge-bill.view.models";
 import { GovInsurancePatientVM } from "./gov-ins-patient.view-model";
 import { GovInsuranceBalanceAmountHistory } from "./ins-insurance-balance-amount-history.model";
@@ -784,7 +784,12 @@ export class GovInsuranceBlService {
         LabTypeName: bill.LabTypeName,
         IsSmsSend: null,
         IsSelected: false,
-        ServiceItemId: bill.ServiceItemId
+        ServiceItemId: bill.ServiceItemId,
+        SampleReceivedOn: null,
+        IsPreVerified: false,
+        PreVerifiedBy: null,
+        PreVerifiedOn: null,
+        CreatedDay: moment().format(ENUM_DateTimeFormat.Year_Month_Day),
       });
     });
 
@@ -875,5 +880,31 @@ export class GovInsuranceBlService {
       return null;
     }
 
+  }
+  GetPatientDetailsAndEligibilityFromHIBServer(NSHINumber: string) {
+    return this.insuranceDLService.GetPatientDetailsAndEligibilityFromHIBServer(NSHINumber).map((responseData) => {
+      return responseData;
+    });
+  }
+  CheckEligibility(NSHINumber: string) {
+    return this.insuranceDLService.CheckEligibility(NSHINumber).map((responseData) => {
+      return responseData;
+    });
+  }
+  GetNHSIPatientDetailLocally(schemeId, patientId) {
+    return this.insuranceDLService.GetNHSIPatientDetailLocally(schemeId, patientId).map((responseData) => {
+      return responseData;
+    });
+  }
+  CheckIfClaimSubmitted(NSHINumber) {
+    return this.insuranceDLService.CheckIfClaimSubmitted(NSHINumber).map((responseData) => {
+      return responseData;
+    });
+  }
+  public GetPreviousSaleQuantityWithInCappingDays(patientId: number, cappingDaysLimit: number, itemId: number) {
+    return this.insuranceDLService.GetPreviousSaleQuantityWithInCappingDays(patientId, cappingDaysLimit, itemId)
+      .map((responseData) => {
+        return responseData;
+      });
   }
 }

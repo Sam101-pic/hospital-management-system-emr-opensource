@@ -1,6 +1,9 @@
 export class SummaryModel {
-    public totalInsurancePatient: number = 0;
-    public totalNonInsurancePatient: number = 0;
-    public totalPatient: number = 0;
+    NumberOfFreeFollowupAppointments: number = 0;
+    NumberOfPaidFollowupAppointments: number = 0;
+    NumberOfNewAppointments: number = 0;
+    NumberOfReferralAppointments: number = 0;
+    NumberOfRevisitAppointments: number = 0;
+    TotalAppointments: number = 0;
 
 }

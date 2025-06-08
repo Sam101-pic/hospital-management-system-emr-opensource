@@ -1,12 +1,9 @@
-import { Injectable, Directive } from '@angular/core';
+import { Injectable } from '@angular/core';
 
-import { Role } from "../../../security/shared/role.model";
-import { User } from "../../../security/shared/user.model";
-import { RolePermissionMap } from "../../../security/shared/role-permission-map.model";
-import { UserRoleMap } from "../../../security/shared/user-role-map.model";
 
 import { InventorySettingDLService } from './inventory-settings.dl.service';
 
+import { TermsConditionsMasterModel } from '../../shared/terms-conditions-master.model';
 import { AccountHeadModel } from "./account-head.model";
 import { CurrencyModel } from "./currency.model";
 import { ItemCategoryModel } from "./item-category.model";
@@ -14,10 +11,10 @@ import { ItemModel } from "./item.model";
 import { PackagingTypeModel } from "./packaging-type.model";
 import { UnitOfMeasurementModel } from "./unit-of-measurement.model";
 import { VendorsModel } from "./vendors.model";
-import { TermsConditionsMasterModel } from '../../shared/terms-conditions-master.model'
 
-import * as moment from 'moment/moment';
 import * as _ from 'lodash';
+import * as moment from 'moment/moment';
+import { ConsumptionType } from '../consumption-type/consumption-type.model';
 import { ItemSubCategoryModel } from './item-subcategory.model';
 
 @Injectable()
@@ -240,5 +237,19 @@ export class InventorySettingBLService {
     return this.invSettingDLservice.PutTerms(temp)
       .map(res => { return res });
   }
-
+  SaveConsumptionType(consumptionType: ConsumptionType) {
+    return this.invSettingDLservice.SaveConsumptionType(consumptionType).map(res => { return res });
+  }
+  UpdateConsumptionType(consumptionType: ConsumptionType) {
+    return this.invSettingDLservice.UpdateConsumptionType(consumptionType).map(res => { return res });
+  }
+  GetConsumptionTypes() {
+    return this.invSettingDLservice.GetConsumptionTypes().map(res => { return res });
+  }
+  GetActiveConsumptionTypes() {
+    return this.invSettingDLservice.GetActiveConsumptionTypes().map(res => { return res });
+  }
+  ActivateDeActiveConsumptionType(consumptionTypeId: number, activate: boolean) {
+    return this.invSettingDLservice.ActivateDeActiveConsumptionType(consumptionTypeId, activate).map(res => { return res });
+  }
 }

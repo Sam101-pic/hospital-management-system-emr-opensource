@@ -35,7 +35,7 @@
 </style>
 
 <div class="wrapper">
-  <div style="border:1px dotted;padding: 10px;">
+  <div style="border:1px dotted;padding: 10px;" *ngIf="!PrintTemplateTypeSettings.Enable">
     <div id="dvDischargeBillPrintPage" class="discharge-receipt">
       <table style="width: 100%;">
         <thead>
@@ -55,12 +55,14 @@
                          [backgroundAlpha]="0"></qr-code>
               </div> -->
 
-              <div *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType==='image'">
+              <div class="ipd-discharge-invoice-header-image"
+                   *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType==='image'">
                 <img src="../../../../themes/theme-default/images/customer-headers/billing-invoice-header-image.png"
                      style="width: 100%;">
               </div>
 
-              <div *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType === 'custom'">
+              <div class="ipd-discharge-invoice-header-custom"
+                   *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.HeaderType === 'custom'">
                 <billing-header *ngIf="InvoiceDisplaySettings.ShowHeader"></billing-header>
                 <div class="qr-code" style="position: absolute;right: 15px;top: 20px;"
                      *ngIf="InvoiceDisplaySettings.ShowHeader && InvoiceDisplaySettings.ShowQR">
@@ -374,10 +376,21 @@
     </div>
   </div>
 
-  <div style="text-align: center;margin-top: 10px;">
+  <div style="text-align: center;margin-top: 10px;" *ngIf="!PrintTemplateTypeSettings.Enable">
     <button type="button" id="btnPrintDischargeInvoice" class="btn green btn-success" (click)="print()"
             [disabled]="loading">
       Print
+    </button>
+  </div>
+
+  <div id="id_dynamic_discharge_billing" *ngIf="PrintTemplateTypeSettings.Enable">
+    <!--Here Dynamically the invoice will be rendered-->
+  </div>
+
+  <div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;" *ngIf="PrintTemplateTypeSettings.Enable">
+    <button class="btn green btn-success" value="" [disabled]="loading" (click)="PrintDynamicPrintReceipt()" id="id_btn_ip_dynamic_invoice_print">
+      <span>Print Receipt</span>&nbsp;&nbsp;
+      &nbsp;&nbsp; <i class="glyphicon glyphicon-print"></i>
     </button>
   </div>
 
@@ -387,6 +400,10 @@
 
 </div>
 
-<app-print-page *ngIf="openBrowserPrintWindow" [print-data]="browserPrintContentObj"
+<!-- <app-print-page *ngIf="openBrowserPrintWindow" [print-data-header]="browserPrintContentObj"
                 (print-sucess)="UpdatePrintCount()">
-</app-print-page>
+</app-print-page> -->
+
+<new-print-page *ngIf="openBrowserPrintWindow" [print-data]="browserPrintContentObj"
+                (print-sucess)="UpdatePrintCount($event)">
+</new-print-page>

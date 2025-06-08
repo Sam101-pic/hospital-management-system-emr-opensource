@@ -25,5 +25,6 @@ namespace DanpheEMR.ServerModel
         public virtual VisitModel Visit { get; set; }
         public string Contents { get; set; }
         public string Remarks { get; set; }
+        public bool IsActive { get; set; }
     }
 }

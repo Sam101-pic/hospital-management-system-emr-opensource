@@ -1,7 +1,10 @@
+<div class="input-group" style="float: right;  margin: 0 10px 0 10px;">
+  <button type="button" class="btn btn-primary" (click)="LoadStock()"> Load Stock</button>
+</div>
 <!-- Zero Qty Filter -->
 <div class="input-group" style="float: right;">
   <div style="display: flex;align-items: flex-end;">
-    <div style="margin-right: 1rem;"><input type="checkbox" (change)="FilterStockList()" [(ngModel)]="showStockWithZeroQty"
+    <div style="margin-right: 1rem;"><input type="checkbox" [(ngModel)]="showStockWithZeroQty"
              name="showStockWithZeroQty" id="showStockWithZeroQty" style="zoom: 1.4;" /></div>
     <label for="showStockWithZeroQty">Show Zero Quantity </label>
   </div>
@@ -9,7 +12,7 @@
 <div class="input-group" style="float: right;  margin-right: 10px;">
   <div class="icheck-inline">
     <label for="Store" class="mt-checkbox mt-checkbox-outline"><i class="fa fa-filter"></i>Filter by Store:</label>
-    <select name="Store" id="Store" [(ngModel)]="selectedStoreId" (change)="FilterStockList()">
+    <select name="Store" id="Store" [(ngModel)]="selectedStoreId">
       <option [ngValue]="null">All</option>
       <option *ngFor="let store of Stores" [ngValue]="store.StoreId">{{store.Name}}</option>
     </select>
@@ -18,9 +21,38 @@
 <div class="row" *ngIf="showStockList">
   <div class="col-lg-12 col-sm-12">
     <danphe-grid [grid-colDefaults]="stockDetailsGridColumns" [grid-data]="stockDetailsList" [resizeColumnToFit]="true"
-                 (grid-actions)="StockDetailsGridAction($event)"> </danphe-grid>
+                 (grid-actions)="StockDetailsGridAction($event)" [grid-showExport]="true" [show-header]="true" [report-for]="'pharmacy'"
+                 [report-title]="'Dispensary Stock Report'" [grid-footer-content]="footer" [grid-showExport]="true"
+                 [grid-exportOptions]="gridExportOptions"> </danphe-grid>
   </div>
-  <div class="right"><strong> Total Stock Value: </strong> {{coreService.currencyUnit}} {{ totalstockvalue | number: '1.0-2' }}</div>
+  <div class=" col-sm-12 col-md-12" style="margin-bottom: 10px !important; display: flex;justify-content: center;">
+    <div class="table-responsive table-wrapper" id="disp-stock-list-print">
+      <table class="table table-bordered table-hover table-condensed custom_table padLess_table" border="1">
+        <thead>
+          <tr>
+            <th colspan="2" style="text-align: center;">
+              <span style="font-size:large;"> Summary </span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container>
+            <tr>
+              <td style="font-weight:bold; color:blue">
+                <span> <b> Total Stock Value</b> </span>
+              </td>
+              <td>
+                <span style="font-size:2rem;"> {{TotalStockValue | number: '1.0-2' }}</span>
+              </td>
+            </tr>
+          </ng-container>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class=" col-sm-12 col-md-12" style="margin-bottom: 10px !important; display: flex;justify-content: center;">
+    <span class="text-danger">NOTE: &nbsp; Stock Value is SUM of (AvailableQuantity * CostPrice)</span>
+  </div>
 </div>
 <div class="row" *ngIf="!showStockList">
   <div class="col-md-12">
@@ -75,7 +107,8 @@
                     <span></span>Out </label>
                 </div>
               </div>
-              <span class="error-msg" *ngIf="selectedItem.IsDirty('InOut')" [hidden]="selectedItem.IsValidCheck('InOut','required')"> adjustment-type
+              <span class="error-msg" *ngIf="selectedItem.IsDirty('InOut')" [hidden]="selectedItem.IsValidCheck('InOut','required')">
+                adjustment-type
                 is required</span>
             </form>
           </div>

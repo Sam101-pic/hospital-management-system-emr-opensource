@@ -4,12 +4,13 @@ import { PHRMGenericModel } from './phrm-generic.model';
 import { PHRMGoodsReceiptItemsModel } from "./phrm-goods-receipt-items.model";
 import { PHRMItemMasterModel } from "./phrm-item-master.model";
 import { PHRMNarcoticRecordModel } from './phrm-narcotic-record';
+import { InsurancePackageBillServiceItem_DTO } from '../../dispensary/shared/DTOs/insurance-package-bill-service-item.dto';
 
 export class PHRMInvoiceItemsModel {
   public InvoiceItemId: number = 0;
   public InvoiceId: number = 0;
   public StoreId: number = 0;
-  public CompanyId: number = 0;
+  public CompanyId: number = null;
   public StockId: number = 0;
   public ItemId: number = 0;
   public ItemName: string = "";
@@ -90,14 +91,33 @@ export class PHRMInvoiceItemsModel {
   CoPaymentCashPercent: number = 0;
   CoPaymentCreditPercent: number = 0;
   ReceiptNo: number = null;
+  ItemCode: string = '';
+  IsPackageItemQuantityRemaining: boolean = false;
+  IsPackageItemNearlyExpire: boolean = false;
+  IsNarcotic: boolean = false;
+  HideRow: boolean = false;
+  Index: number = 0;
+  CappingQuantity: number = 0;
+  PreviouslySalesQuantity: number = 0;
+  QuantityRemainingToBeSale: number = 0;
+  IsCappingEnable: boolean = false;
+  CappingDaysLimit: number = 0;
+  IsPharmacySalePriceEditable: boolean = false;
+  PreviousSalePrice: number = 0;
+  BillServiceItem: InsurancePackageBillServiceItem_DTO = new InsurancePackageBillServiceItem_DTO();
+  BillServiceItemId: number = null;
+  BillServiceItemName: string = '';
+  TempSalePrice: number = 0;
+  ClaimCode: number = null;
+
 
   //Constructor of class
   constructor() {
     var _formBuilder = new FormBuilder();
     this.InvoiceItemsValidator = _formBuilder.group({
       'ItemName': ['', Validators.compose([this.ItemNameValidator()])],
-      'Quantity': ['', Validators.compose([this.integerValidator, this.wholeNumberValidator])],
-      'Price': ['', Validators.compose([this.positiveNumberValdiator])],
+      'Quantity': [0, Validators.compose([this.integerValidator, this.wholeNumberValidator])],
+      'Price': [0, Validators.compose([this.positiveNumberValdiator])],
       'DiscountPercentage': [0, [Validators.required, Validators.min(0), Validators.max(100)]],
       'VATPercentage': [0, [Validators.required, Validators.min(0), Validators.max(100)]]
 
@@ -122,7 +142,7 @@ export class PHRMInvoiceItemsModel {
   public InvoiceItemsValidatortest() {
     var _formBuilder = new FormBuilder();
     _formBuilder.group({
-      'Quantity': ['', Validators.compose([this.positiveNumberValdiatortest])]
+      'Quantity': [0, Validators.compose([this.positiveNumberValdiatortest])]
     });
   }
   positiveNumberValdiator(control: FormControl): { [key: string]: boolean } {

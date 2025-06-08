@@ -12,7 +12,7 @@ import { PHRMGenericModel } from '../../shared/phrm-generic.model';
 import PHRMGridColumns from '../../shared/phrm-grid-columns';
 
 @Component({
-    selector: "generictype-add",
+    selector: "generic-type-add",
     templateUrl: "./phrm-generic-manage.html"
 })
 
@@ -71,6 +71,15 @@ export class PHRMGenericManageComponent implements OnInit {
             this.currentGeneric.GenericValidator.controls[i].updateValueAndValidity();
         }
 
+
+        if (this.genericList && this.genericList.length) {
+            const isGenericNameAlreadyExists = this.genericList.some(s => s.GenericName.toLowerCase() === this.currentGeneric.GenericName.toLowerCase());
+            if (isGenericNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add generic name as the Generic Name "${this.currentGeneric.GenericName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.currentGeneric.IsValidCheck(undefined, undefined)) {
             this.currentGeneric.CreatedOn = moment().format('YYYY-MM-DD');
             this.pharmacyBLService.AddGenericName(this.currentGeneric)
@@ -80,7 +89,7 @@ export class PHRMGenericManageComponent implements OnInit {
                         this.CallBackAddToGrid(res);
                         this.currentGeneric = new PHRMGenericModel();
                     } else {
-                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Sorry!! Generic Name Cannot be Added"]);
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Sorry!! Generic Name Cannot be save    " + res.ErrorMessage]);
                     }
                 });
         }
@@ -92,6 +101,15 @@ export class PHRMGenericManageComponent implements OnInit {
             this.currentGeneric.GenericValidator.controls[i].updateValueAndValidity();
         }
 
+        // if (this.genericList && this.genericList.length) {
+        //     const isGenericNameAlreadyExists = this.genericList.some(s => s.GenericName === this.currentGeneric.GenericName && s.GenericId !== this.currentGeneric.GenericId);
+        //     if (isGenericNameAlreadyExists) {
+        //         this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update generic name as the Generic Name "${this.currentGeneric.GenericName}" already exists!`]);
+        //         return;
+        //     }
+        // }
+
+
         if (this.currentGeneric.IsValidCheck(undefined, undefined)) {
             this.currentGeneric.CreatedOn = moment().format('YYYY-MM-DD');
             this.pharmacyBLService.UpdateGenericName(this.currentGeneric)
@@ -101,7 +119,7 @@ export class PHRMGenericManageComponent implements OnInit {
                         this.CallBackAddToGrid(res);
                         this.currentGeneric = new PHRMGenericModel();
                     } else {
-                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Sorry!! Generic Name Cannot be Updated"]);
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Sorry!! Generic Name Cannot be Updated" + res.ErrorMessage]);
                     }
                 });
         }
@@ -185,6 +203,7 @@ export class PHRMGenericManageComponent implements OnInit {
         this.showGenericAddPage = false;
         this.update = false;
         this.selCategory = new PHRMCategoryModel();
+        this.callbackAdd.emit();
     }
 
     CallBackAdd(generic: PHRMGenericModel) {

@@ -51,6 +51,8 @@ namespace DanpheEMR.DalLayer
         public DbSet<EmpCashTransactionModel> EmpCashTransactions { get; set; }
         public DbSet<EmergencyPatientModel> EmergencyPatients { get; set; }
         public DbSet<PriceCategoryModel> PriceCategories { get; set; }
+        public DbSet<BillingFiscalYear> BillingFiscalYears { get; set; }
+        public DbSet<MunicipalityModel> Municipalities { get; set; }
         public VisitDbContext(string conn) : base(conn)
         {
             this.Configuration.LazyLoadingEnabled = true;
@@ -114,6 +116,8 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<EmpCashTransactionModel>().ToTable("TXN_EmpCashTransaction");
             modelBuilder.Entity<EmergencyPatientModel>().ToTable("ER_Patient");
             modelBuilder.Entity<PriceCategoryModel>().ToTable("BIL_CFG_PriceCategory");
+            modelBuilder.Entity<BillingFiscalYear>().ToTable("BIL_CFG_FiscalYears");
+            modelBuilder.Entity<MunicipalityModel>().ToTable("MST_Municipality");
 
         }
         public DbSet<PatientModel> Patients { get; set; }

@@ -176,7 +176,8 @@
                             <p class="c_paragraphs" style="text-align: center;">{{ headerDetail.DDA}}</p>
                         </td>
                         <td colspan="3" width="25%" style="text-align: right; vertical-align: top;">
-                            <p class="c_paragraphs" style="text-align: right; margin-top: 10px; margin: 0; color: #000 !important;"><strong>{{GeneralFieldLabel.PANNo}}
+                            <p class="c_paragraphs" style="text-align: right; margin-top: 10px; margin: 0; color: #000 !important;">
+                                <strong>{{GeneralFieldLabel.PANNo}}
                                     : {{headerDetail.PANno}}</strong> </p>
                         </td>
                     </tr>
@@ -277,7 +278,7 @@
                         <th style="padding: 10px 10px;" *ngIf="receipt.IsReturned">Ret.Qty</th>
                         <th colspan="2" style="padding: 10px 10px;">Expiry</th>
                         <th style="padding: 10px 10px;">Batch</th>
-                        <th style="padding: 10px 10px;">Rack No.</th>
+                        <th *ngIf="showRackNoInPrint" style="padding: 10px 10px;">Rack No.</th>
                         <th style="padding: 10px 10px;">Rate</th>
                         <th style="padding: 10px 10px;">Amount</th>
                     </tr>
@@ -288,7 +289,7 @@
                         <td style="padding: 5px 10px; " *ngIf="receipt.IsReturned">{{row.ReturnedQty}}</td>
                         <td colspan="2" style="padding: 5px 10px; ">{{row.ExpiryDate | date: 'dd MMM yyy'}}</td>
                         <td style="padding: 5px 10px; ">{{row.BatchNo}}</td>
-                        <td style="padding: 5px 10px; ">{{row.RackNo}}</td>
+                        <td *ngIf="showRackNoInPrint" style="padding: 5px 10px; ">{{row.RackNo}}</td>
                         <td style="padding: 5px 10px; ">{{row.SalePrice | number: "1.2-2"}} </td>
                         <td style="padding: 5px 10px; ">{{row.SubTotal | number: "1.2-2"}}</td>
                     </tr>
@@ -406,7 +407,8 @@
                             <p class="c_paragraphs" style="text-align: center;">{{headerDetail.DDA}}</p>
                         </td>
                         <td colspan="3" width="25%" style="text-align: right; vertical-align: top;">
-                            <p class="c_paragraphs" style="text-align: right; margin-top: 10px; margin: 0; color: #000 !important;"><strong>{{GeneralFieldLabel.PANNo}}
+                            <p class="c_paragraphs" style="text-align: right; margin-top: 10px; margin: 0; color: #000 !important;">
+                                <strong>{{GeneralFieldLabel.PANNo}}
                                     : {{headerDetail.PANno}}</strong> </p>
                         </td>
                     </tr>

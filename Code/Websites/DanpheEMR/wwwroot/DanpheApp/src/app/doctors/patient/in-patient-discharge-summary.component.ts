@@ -1,11 +1,11 @@
 import { Component } from "@angular/core";
-import { PatientService } from "../../patients/shared/patient.service";
 import { Router } from "@angular/router";
+import { ADT_BLService } from "../../adt/shared/adt.bl.service";
 import { VisitService } from "../../appointments/shared/visit.service";
+import { Patient } from "../../patients/shared/patient.model";
+import { PatientService } from "../../patients/shared/patient.service";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
 import { DoctorsBLService } from "../shared/doctors.bl.service";
-import { Patient } from "../../patients/shared/patient.model";
-import { ADT_BLService } from "../../adt/shared/adt.bl.service";
 
 @Component({
   templateUrl: "./in-patient-discharge-summary.html"
@@ -37,10 +37,13 @@ export class InPatientDischargeSummaryComponent {
     this.adtBlService.GetPatientPlusBedInfo(this.patientId, this.patientVisitId).subscribe(res => {
       if (res.Status == "OK" && res.Results.length != 0) {
         this.selectedPatient = res.Results[0];
-        var selectedPatient = res.Results[0];
+        if (res.Results.EmergencyPatient) { //Bibek if patient is from emergency module 
+          this.selectedPatient = res.Results.EmergencyPatient;
+          console.log('selectedPatient is :', this.selectedPatient)
+        }
 
-        if (selectedPatient) {
-          if (!selectedPatient.IsSubmitted) { // if (IsSubmitted==false)            
+        if (this.selectedPatient) {
+          if (!this.selectedPatient.IsSubmitted) { // if (IsSubmitted==false)            
             this.showDischargeSummaryView = false;
             this.showDischargeSummaryAdd = true;
           }

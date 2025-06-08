@@ -832,8 +832,6 @@ namespace DanpheEMR.Controllers
         {
 
             List<BillServiceItemModel> itemList = currEmployee.ServiceItemsList;
-            //BillingDbContext bilDbContext = new BillingDbContext(connString);
-
 
             itemList.ForEach(itm =>
             {
@@ -846,17 +844,13 @@ namespace DanpheEMR.Controllers
                 {
                     //Item Doesn't exist. add it.
                     itm.IntegrationItemId = currEmployee.EmployeeId;
-                    //itm.ProcedureCode = currEmployee.EmployeeId.ToString();
                     masterDbContext.BillingServiceItems.Add(itm);
-                    masterDbContext.SaveChanges();
                 }
                 else
                 {
-                    //Case:2 : Employee already existsm, search for the billItem.
-
+                    //Case:2 : Employee already exists, search for the billItem.
                     BillServiceItemModel itmFromServer = masterDbContext.BillingServiceItems
                                                 .Where(b => b.ServiceDepartmentId == itm.ServiceDepartmentId && itm.IntegrationItemId == b.IntegrationItemId).FirstOrDefault();
-
 
 
                     //case: 2.1: Item is not adde in billitemprice table.
@@ -864,43 +858,20 @@ namespace DanpheEMR.Controllers
                     if (itmFromServer == null)
                     {
                         itm.IntegrationItemId = currEmployee.EmployeeId;
-                        //itm.ProcedureCode = currEmployee.EmployeeId.ToString();
                         masterDbContext.BillingServiceItems.Add(itm);
-                        masterDbContext.SaveChanges();
                     }
                     else
                     {
                         //case: 2.2: Item is already there in BillItemPrice table, Update It.
 
                         itmFromServer.ItemName = itm.ItemName;
-                        //itmFromServer.Price = itm.Price; //Krishna, 13thMarch'23 Need to revise this later
-                        //itmFromServer.EHSPrice = itm.EHSPrice;
-                        //itmFromServer.SAARCCitizenPrice = itm.SAARCCitizenPrice;
-                        //itmFromServer.ForeignerPrice = itm.ForeignerPrice;
-                        //itmFromServer.InsForeignerPrice = itm.InsForeignerPrice;
-                        //itmFromServer.IsEHSPriceApplicable = itm.IsEHSPriceApplicable;
-                        //itmFromServer.IsSAARCPriceApplicable = itm.IsSAARCPriceApplicable;
-                        //itmFromServer.IsForeignerPriceApplicable = itm.IsForeignerPriceApplicable;
-                        //itmFromServer.IsInsForeignerPriceApplicable = itm.IsInsForeignerPriceApplicable;
-                        //itmFromServer.IsFractionApplicable = itm.IsFractionApplicable;
                         masterDbContext.Entry(itmFromServer).Property(b => b.ItemName).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.Price).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.EHSPrice).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.SAARCCitizenPrice).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.ForeignerPrice).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.InsForeignerPrice).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.IsEHSPriceApplicable).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.IsSAARCPriceApplicable).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.IsForeignerPriceApplicable).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.IsInsForeignerPriceApplicable).IsModified = true;
-                        //masterDbContext.Entry(itmFromServer).Property(b => b.IsFractionApplicable).IsModified = true;
-
-                        masterDbContext.SaveChanges();
 
                     }
                 }
             });
 
+            masterDbContext.SaveChanges();
 
         }
         private object GetEmployeeType(bool ShowIsActive)
@@ -957,7 +928,6 @@ namespace DanpheEMR.Controllers
             {
                 try
                 {
-
                     emp.InternalReferralServiceItemId = emp.InternalReferralServiceItemId == 0 ? null : emp.InternalReferralServiceItemId;
                     emp.FollowupServiceItemId = emp.FollowupServiceItemId == 0 ? null : emp.FollowupServiceItemId;
                     emp.OpdNewPatientServiceItemId = emp.OpdNewPatientServiceItemId == 0 ? null : emp.OpdNewPatientServiceItemId;
@@ -970,25 +940,23 @@ namespace DanpheEMR.Controllers
                     _masterDbContext.SaveChanges();
 
 
-
                     if (emp.ServiceItemsList != null && emp.ServiceItemsList.Count > 0)
                     {
                         UpdateBillItemsOfEmployee(emp, _masterDbContext);
                     }
 
-
-
                     if (emp.SignatoryImageBase64 != null)
                     {
                         UploadEmployeeSignatoryImage(_masterDbContext, emp);
                     }
+
                     dbTransaction.Commit();
                     return emp;
                 }
                 catch (Exception ex)
                 {
                     dbTransaction.Rollback();
-                    throw new Exception("failed to add employee ");
+                    throw new Exception("failed to add employee: {ex}", ex);
                 }
             }
         }
@@ -1016,7 +984,17 @@ namespace DanpheEMR.Controllers
 
             if (emp != null)
             {
-
+                if( extRefVm.ContactNumber == null)
+                {
+                    throw new Exception("Contact Number is mandatory.");
+                }
+                var employeesContactNumberList = (from emplpoyee in _masterDbContext.Employees
+                                                  select emplpoyee.ContactNumber).ToList();
+                bool contactAlreadyExists = employeesContactNumberList.Contains(emp.ContactNumber);
+                if (contactAlreadyExists)
+                {
+                    throw new Exception("Duplicate Contact Number.");
+                }
                 emp.CreatedBy = currentUser.EmployeeId;
                 emp.CreatedOn = DateTime.Now;
 
@@ -1098,9 +1076,21 @@ namespace DanpheEMR.Controllers
         }
         private object UpdateExternalReferrer(string ipDataStr, RbacUser currentUser)
         {
+           
             ExternalReferrerVM extRefVm = DanpheJSONConvert.DeserializeObject<ExternalReferrerVM>(ipDataStr);
             EmployeeModel clientEmployee = GetEmpModelFromExtReferrerModel(extRefVm);
-
+            if(clientEmployee.ContactNumber == null)
+            {
+                throw new Exception("Contact Number is mandatory.");
+            }
+            var employeesContactNumberList = (from employee in _masterDbContext.Employees
+                                              where employee.EmployeeId != clientEmployee.EmployeeId
+                                              select employee.ContactNumber).ToList();
+            bool contactAlreadyExists = employeesContactNumberList.Contains(clientEmployee.ContactNumber);
+            if (contactAlreadyExists)
+            {
+                throw new Exception("Duplicate Contact Number.");
+            }
             clientEmployee.ModifiedBy = currentUser.EmployeeId;
             clientEmployee.ModifiedOn = DateTime.Now;
 

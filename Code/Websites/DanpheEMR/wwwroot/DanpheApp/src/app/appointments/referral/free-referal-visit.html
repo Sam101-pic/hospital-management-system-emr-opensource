@@ -18,7 +18,7 @@
               <option *ngFor="let dep of departmentList" value="{{dep.DepartmentId}}">{{dep.DepartmentName}}</option>
             </select></td>
           <td><input danphe-auto-complete
-                   [disabled] = "deptLevelAppt"
+                   [disabled]="deptLevelAppt"
                    [(ngModel)]="selectedDoctor"
                    [list-formatter]="DocListFormatter"
                    [source]="filteredDocList"

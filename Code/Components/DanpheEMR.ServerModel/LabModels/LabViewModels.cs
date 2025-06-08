@@ -52,6 +52,9 @@ namespace DanpheEMR.ServerModel
         //public int SmNumber { get; set; }
 
         //public List<TestReqIdPair> Tests { get; set; }
+        
+
+   
     }
 
     public class PatientTestComponentsVM
@@ -90,6 +93,7 @@ namespace DanpheEMR.ServerModel
             public int? LabCategoryId { get; set; }
             public int? LabReportId { get; set; }   
             public string CovidFileUrl { get; set; }
+            public bool IsPreVerified { get; set; }
         }
 
         public string PatientName { get; set; }
@@ -128,6 +132,8 @@ namespace DanpheEMR.ServerModel
         public DateTime? ResultAddedOn { get; set; }
         //ashim: 01Sep2018 : since we're grouping by sample code, TemplateId and TemplateName is now moved to test level. i.e LabTestDetail
         //public List<Int64> RequisitionIdList { get; set; }
+
+        public string VerificationStatus { get; set; }
     }
 
 
@@ -186,6 +192,9 @@ namespace DanpheEMR.ServerModel
         public string Address { get; set; }
         public string MunicipalityName { get; set; }
         public string CountrySubDivisionName { get; set; }
+        public string CountryName { get; set; }
+        public string WardNumber { get; set; }
+
         public int? PrescriberId { get; set; } // Dev : 16June'22 --Changed ReferredById to PrescriberId
         public string PrescriberName { get; set; } // Dev : 16June'22 --Changed RefferedBy To PrescriberName
         public DateTime? ReceivingDate { get; set; }
@@ -201,6 +210,11 @@ namespace DanpheEMR.ServerModel
         public string ProfilePictureName { get; set; }
         public string PassPortNumber { get; set; }
         public string WardName { get; set; }
+        public string PolicyNumber { get; set; }
+        public int? ReferredById { get; set; }
+        [NotMapped]
+        public string ReferredByName { get; set; } //Bibek 12Dec'24 Added ReferredBy name in report of lab
+
     }
     public class LabReportTemplateVM
     {
@@ -250,6 +264,8 @@ namespace DanpheEMR.ServerModel
         public int ReportGeneratedById { get; set; }
         public bool? HasInsurance { get; set; }
         public bool AllowOutpatientWithProvisional { get; set; }
+      
+
 
     }
 
@@ -274,8 +290,12 @@ namespace DanpheEMR.ServerModel
         public string RunNumberType { get; set; }
         public string CountrySubDivisionName { get; set; }
         public string MunicipalityName { get; set; }
+        public string CountryName { get; set; }
+
         public string PassPortNumber { get; set; }
         public string WardName { get; set; }
+        public string WardNumber { get; set; }
+
         //Lab Report
         public int? LabReportId { get; set; }
         public int? TemplateId { get; set; }
@@ -362,6 +382,10 @@ namespace DanpheEMR.ServerModel
         public string Email { get; set; }
         public bool? IsFileUploadedToTeleMedicine { get; set; }
         public bool IsLISApplicable { get; set; }
+        public int? ReferredById { get; set; }
+        [NotMapped]
+        public string ReferredByName { get; set; } //Bibek 12Dec'24 Added ReferredBy name in report of lab
+
     }
 
     public class LabTest_Temp_VM

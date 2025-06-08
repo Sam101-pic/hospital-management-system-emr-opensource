@@ -6,6 +6,7 @@ import { PatientCareTaker_DTO } from '../../appointments/shared/dto/patient-care
 import { BillingDeposit } from '../../billing/shared/billing-deposit.model';
 import { BillingTransaction } from '../../billing/shared/billing-transaction.model';
 import { PatientScheme } from '../../billing/shared/patient-map-scheme';
+import { AddPatientVisitConsultants_DTO } from '../../shared/DTOs/add-patient-visit-consultants.dto';
 import { PatientBedInfo } from './patient-bed-info.model';
 
 export class AdmissionModel {
@@ -64,6 +65,8 @@ export class AdmissionModel {
   public PriceCategoryId: number = 0;
   public CareTaker = new PatientCareTaker_DTO();
   public PatientSchemesMap = new PatientScheme();
+  public AddPatientVisitConsultants = new Array<AddPatientVisitConsultants_DTO>();
+  public Name: string = "";
 
   constructor() {
     this.CreatedOn = moment().format("YYYY-MM-DD HH:mm:ss");
@@ -81,15 +84,16 @@ export class AdmissionModel {
       'CareOfPersonRelation': ['', Validators.compose([Validators.maxLength(100)])],
       'ClaimCode': ['', Validators.compose([Validators.required])],
       'AdmissionCase': ['', Validators.compose([Validators.required])],
+      'ConsultantDoctorId': [0],
     });
   }
-  //Modified: Ashim 14thSep : 
+  //Modified: Ashim 14thSep :
   //Validation: Can select admission date of upto 1 year before or after from today's date.
   dateValidator(control: FormControl): { [key: string]: boolean } {
 
     //dateTime limit is 1 day
     //Ex:it's 16Aug 7:30 PM now
-    //user can add admission entry  upto 15Aug 12:00AM 
+    //user can add admission entry  upto 15Aug 12:00AM
     const limitDate = moment({ hour: 0, minute: 0, second: 0, millisecond: 0 }).subtract(1, 'year').format('YYYY-MM-DD HH:mm');
     //if positive then selected date is of future else it of the past || selected year can't be of future
     if (control.value) {

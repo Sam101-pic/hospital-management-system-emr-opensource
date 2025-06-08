@@ -1,9 +1,6 @@
-using System;
-using System.Data.Entity;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using DanpheEMR.ServerModel;
 using Audit.EntityFramework;
+using DanpheEMR.ServerModel;
+using System.Data.Entity;
 
 namespace DanpheEMR.Security
 {
@@ -27,6 +24,9 @@ namespace DanpheEMR.Security
         public DbSet<EmployeeModel> Employees { get; set; }
         public DbSet<PHRMStoreModel> Store { get; set; }
         public DbSet<StoreVerificationMapModel> StoreVerificationMapModel { get; set; }
+        public DbSet<RbacPolicy> RbacPolicies { get; set; }
+        public DbSet<RbacPolicyRoleMapping> RbacPolicyRoleMappings { get; set; }
+
 
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
@@ -41,6 +41,8 @@ namespace DanpheEMR.Security
             modelBuilder.Entity<EmployeeModel>().ToTable("EMP_Employee");
             modelBuilder.Entity<PHRMStoreModel>().ToTable("PHRM_MST_Store");
             modelBuilder.Entity<StoreVerificationMapModel>().ToTable("MST_MAP_StoreVerification");
+            modelBuilder.Entity<RbacPolicy>().ToTable("RBAC_Policies");
+            modelBuilder.Entity<RbacPolicyRoleMapping>().ToTable("RBAC_MAP_RolePolicy");
 
 
             //application and permission mapping

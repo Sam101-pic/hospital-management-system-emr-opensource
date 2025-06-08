@@ -10,6 +10,8 @@ import { RegistrationSchemeSharedModule } from '../appointments/shared/registrat
 import { VisitDLService } from '../appointments/shared/visit.dl.service';
 import { BillingSharedModule } from '../billing/billing-shared.module';
 import { BillingDLService } from '../billing/shared/billing.dl.service';
+import { ClinicalNoteBLService } from '../clinical-new/shared/clinical.bl.service';
+import { ClinicalNoteDLService } from '../clinical-new/shared/clinical.dl.service';
 import { IOAllergyVitalsBLService } from '../clinical/shared/io-allergy-vitals.bl.service';
 import { DischargeSummaryModule } from '../discharge-summary/discharge-summary.module';
 import { LabsDLService } from '../labs/shared/labs.dl.service';
@@ -40,7 +42,9 @@ import { TransferComponent } from './transfer/transfer.component';
     BillingDLService,
     IOAllergyVitalsBLService,
     AdmissionMasterBlService,
-    AdmissionMasterDlService],
+    AdmissionMasterDlService,
+    ClinicalNoteBLService,
+    ClinicalNoteDLService],
   imports: [
     CommonModule,
     ReactiveFormsModule,
@@ -49,7 +53,8 @@ import { TransferComponent } from './transfer/transfer.component';
     DischargeSummaryModule,
     DanpheAutoCompleteModule,
     RegistrationSchemeSharedModule,
-    BillingSharedModule
+    BillingSharedModule,
+
   ],
   declarations: [
     AdmissionReserveComponent,

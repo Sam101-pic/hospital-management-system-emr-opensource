@@ -12,6 +12,7 @@ using DanpheEMR.Services.Utilities.DTOs;
 using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -46,50 +47,58 @@ namespace DanpheEMR.Controllers
         {
             //if (reqType == "deposit-list")
             //{
-            Func<object> func = () => (from deposit in _billingDbContext.BillingDeposits
-                                       join patient in _billingDbContext.Patient on deposit.PatientId equals patient.PatientId
-                                       join adm in _billingDbContext.Admissions on deposit.PatientVisitId equals adm.PatientVisitId into admittedPatient
-                                       from admPat in admittedPatient.DefaultIfEmpty()
-                                       join fiscalYear in _billingDbContext.BillingFiscalYears on deposit.FiscalYearId equals fiscalYear.FiscalYearId
-                                       join employee in _billingDbContext.Employee on deposit.CreatedBy equals employee.EmployeeId
-                                       join mun in _billingDbContext.MunicipalityModels on patient.MunicipalityId equals mun.MunicipalityId into gr
-                                       from mn in gr.DefaultIfEmpty()
-                                       join country in _billingDbContext.CountrySubdivisions on patient.CountrySubDivisionId equals country.CountrySubDivisionId into sub
-                                       from countrySub in sub.DefaultIfEmpty()
 
-                                       where deposit.IsActive == true
-                                       select new
-                                       {
-                                           deposit.DepositId,
-                                           deposit.ReceiptNo,
-                                           deposit.TransactionType,
-                                           Amount = deposit.TransactionType == ENUM_DepositTransactionType.Deposit ? deposit.InAmount : deposit.OutAmount,
-                                           deposit.InAmount,
-                                           deposit.OutAmount,
-                                           deposit.Remarks,
-                                           deposit.CreatedOn,
-                                           deposit.PrintCount,
-                                           deposit.PaymentMode,
-                                           deposit.PaymentDetails,
-                                           deposit.DepositBalance,
-                                           FiscalYear = fiscalYear.FiscalYearFormatted,
-
-                                           deposit.PatientId,
-                                           patient.PatientCode,
-                                           PatientName = patient.ShortName,
-                                           Gender = patient.Gender,
-                                           DateOfBirth = patient.DateOfBirth,
-                                           patient.PhoneNumber,
-                                           BillingUser = employee.FullName,// employee.FirstName + " " + (string.IsNullOrEmpty(employee.MiddleName) ? "" : employee.MiddleName + " ") + employee.LastName,
-                                           Address = patient.Address + ", " + mn.MunicipalityName + ", " + countrySub.CountrySubDivisionName,
-                                           deposit.CareOf,
-                                           IsDuplicatePrint = true,
-                                           AdmissionCase = admPat != null ? admPat.AdmissionCase : null,
-                                           AdmissionDate = admPat != null ? DbFunctions.TruncateTime(admPat.AdmissionDate) : null,
-                                       }).OrderByDescending(d => d.CreatedOn).ToList();
-
-
+            Func<object> func = () => GetDeposits();
             return InvokeHttpGetFunction<object>(func);
+        }
+
+        private object GetDeposits()
+        {
+            var usePharmacyDepositsIndependently = false;
+            usePharmacyDepositsIndependently = ReadDepositConfigureationParam();
+
+            var deposits = (from deposit in _billingDbContext.BillingDeposits
+                            join patient in _billingDbContext.Patient on deposit.PatientId equals patient.PatientId
+                            join adm in _billingDbContext.Admissions on deposit.PatientVisitId equals adm.PatientVisitId into admittedPatient
+                            from admPat in admittedPatient.DefaultIfEmpty()
+                            join fiscalYear in _billingDbContext.BillingFiscalYears on deposit.FiscalYearId equals fiscalYear.FiscalYearId
+                            join employee in _billingDbContext.Employee on deposit.CreatedBy equals employee.EmployeeId
+                            join mun in _billingDbContext.MunicipalityModels on patient.MunicipalityId equals mun.MunicipalityId into gr
+                            from mn in gr.DefaultIfEmpty()
+                            join country in _billingDbContext.CountrySubdivisions on patient.CountrySubDivisionId equals country.CountrySubDivisionId into sub
+                            from countrySub in sub.DefaultIfEmpty()
+                            where deposit.IsActive == true
+                            && ((usePharmacyDepositsIndependently && deposit.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && deposit.ModuleName == deposit.ModuleName))
+                            select new
+                            {
+                                deposit.DepositId,
+                                deposit.ReceiptNo,
+                                deposit.TransactionType,
+                                Amount = deposit.TransactionType == ENUM_DepositTransactionType.Deposit ? deposit.InAmount : deposit.OutAmount,
+                                deposit.InAmount,
+                                deposit.OutAmount,
+                                deposit.Remarks,
+                                deposit.CreatedOn,
+                                deposit.PrintCount,
+                                deposit.PaymentMode,
+                                deposit.PaymentDetails,
+                                deposit.DepositBalance,
+                                FiscalYear = fiscalYear.FiscalYearFormatted,
+                                deposit.CareOfContact,
+                                deposit.PatientId,
+                                patient.PatientCode,
+                                PatientName = patient.ShortName,
+                                Gender = patient.Gender,
+                                DateOfBirth = patient.DateOfBirth,
+                                patient.PhoneNumber,
+                                BillingUser = employee.FullName,// employee.FirstName + " " + (string.IsNullOrEmpty(employee.MiddleName) ? "" : employee.MiddleName + " ") + employee.LastName,
+                                Address = patient.Address + ", " + mn.MunicipalityName + ", " + countrySub.CountrySubDivisionName,
+                                deposit.CareOf,
+                                IsDuplicatePrint = true,
+                                AdmissionCase = admPat != null ? admPat.AdmissionCase : null,
+                                AdmissionDate = admPat != null ? DbFunctions.TruncateTime(admPat.AdmissionDate) : null,
+                            }).OrderByDescending(d => d.CreatedOn).ToList();
+            return deposits;
         }
 
 
@@ -99,22 +108,30 @@ namespace DanpheEMR.Controllers
         [Route("PatientDeposits")]
         public object PatientDeposits(int patientId)
         {
-            //if (reqType != null && reqType == "patAllDeposits" && patientId != null && patientId != 0)
-            //{
-            Func<object> func = () => (from deposit in _billingDbContext.BillingDeposits
-                                       where deposit.PatientId == patientId &&
-                                       deposit.IsActive == true
-                                       group deposit by new { deposit.TransactionType } into p
-                                       select new
-                                       {
-                                           TransactionType = p.Key.TransactionType,
-                                           //DepositAmount = p.Sum(a => a.Amount)
-                                           SumInAmount = p.Sum(a => a.InAmount),
-                                           SumOutAmount = p.Sum(a => a.OutAmount)
-                                       }).ToList();
+            Func<object> func = () => GetPatientDeposits(patientId);
             return InvokeHttpGetFunction<object>(func);
 
         }
+
+        private object GetPatientDeposits(int patientId)
+        {
+            var usePharmacyDepositsIndependently = false;
+            usePharmacyDepositsIndependently = ReadDepositConfigureationParam();
+
+            var deposits = (from deposit in _billingDbContext.BillingDeposits
+                            where deposit.PatientId == patientId &&
+                            deposit.IsActive == true && ((usePharmacyDepositsIndependently && deposit.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && deposit.ModuleName == deposit.ModuleName))
+                            group deposit by new { deposit.TransactionType } into p
+                            select new
+                            {
+                                TransactionType = p.Key.TransactionType,
+                                //DepositAmount = p.Sum(a => a.Amount)
+                                SumInAmount = p.Sum(a => a.InAmount),
+                                SumOutAmount = p.Sum(a => a.OutAmount)
+                            }).ToList();
+            return deposits;
+        }
+
 
         [HttpGet]
         [Route("PatientDepositsList")]
@@ -126,13 +143,18 @@ namespace DanpheEMR.Controllers
 
         private object GetPatientDepositsList(int patientId)
         {
+            var usePharmacyDepositsIndependently = false;
+            usePharmacyDepositsIndependently = ReadDepositConfigureationParam();
+
             var deposits = (from dep in _billingDbContext.BillingDeposits
                             join depositHead in _billingDbContext.DepositHeadModel on dep.DepositHeadId equals depositHead.DepositHeadId
                             join pat in _billingDbContext.Patient on dep.PatientId equals pat.PatientId
                             join vis in _billingDbContext.Visit on dep.PatientVisitId equals vis.PatientVisitId
                             into grp from visit in grp.DefaultIfEmpty()
                             join emp in _billingDbContext.Employee on dep.CreatedBy equals emp.EmployeeId
-                            where pat.PatientId == patientId select new BillingDepositsList_DTO 
+                            where pat.PatientId == patientId 
+                            && ((usePharmacyDepositsIndependently && dep.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && dep.ModuleName == dep.ModuleName))
+                            select new BillingDepositsList_DTO 
                             {
                                 DepositId = dep.DepositId,
                                 HospitalNo = pat.PatientCode,
@@ -349,8 +371,12 @@ namespace DanpheEMR.Controllers
             {
                 return true;
             }
+            var usePharmacyDepositsIndependently = false;
+            usePharmacyDepositsIndependently = ReadDepositConfigureationParam();
+
             var patientAllDepositTxns = (from bill in contex.BillingDeposits
                                          where bill.PatientId == deposit.PatientId && bill.IsActive == true
+                                         && ((usePharmacyDepositsIndependently && bill.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && bill.ModuleName == bill.ModuleName))
                                          group bill by new { bill.PatientId, bill.TransactionType } into p
                                          select new
                                          {
@@ -417,6 +443,20 @@ namespace DanpheEMR.Controllers
             }
 
         }
+
+        private bool ReadDepositConfigureationParam()
+        {
+            var usePharmacyDepositsIndependently = false;
+            var param = _billingDbContext.AdminParameters.FirstOrDefault(p => p.ParameterGroupName == "Pharmacy" && p.ParameterName == "UsePharmacyDeposit");
+            if (param != null)
+            {
+                var paramValue = param.ParameterValue;
+                usePharmacyDepositsIndependently = paramValue == "true" ? true : false;
+            }
+
+            return usePharmacyDepositsIndependently;
+        }
+
     }
 
 

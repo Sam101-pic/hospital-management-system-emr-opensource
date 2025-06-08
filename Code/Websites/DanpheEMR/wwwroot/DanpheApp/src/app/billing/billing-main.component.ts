@@ -43,8 +43,8 @@ export class BillingMainComponent {
     this.LoadAllEmployeeList();//sud:30Apr'20--for reusability.-- note that doctors list and employeelist can be different..
     this.GetOrganizationList(); //sud: 07May '20--for reusability
     this.GetCurrenciesList();
+    this.GetInsuranceMasterItems();
   }
-
 
   public OpenQrPage(): void {
     this.qrService.showBilling = true;
@@ -123,4 +123,9 @@ export class BillingMainComponent {
         }
       });
   }
+
+  public GetInsuranceMasterItems() {
+    this.coreService.GetInsuranceMasterItems();
+  }
+
 }

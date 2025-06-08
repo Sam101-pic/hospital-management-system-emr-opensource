@@ -9,7 +9,8 @@ import { RPT_ADT_DiagnosisWisePatientReportComponent } from "./adt/diagnosis/dia
 import { RPT_ADT_DischargedPatientComponent } from "./adt/discharge/discharged-patient.component";
 import { RPT_ADT_InpatientCensusComponent } from "./adt/inpatient-census/inpatient-census.component";
 import { RPT_ADT_InPatientOutstandingReport } from "./adt/inpatient-outstanding-report/inpatient-outstanding-report.component";
-import { RankMembershipwiseAdmittedPatientReportComponent } from "./adt/rank-membershipwise-admitted-patient-report/rpt-adt-rank-membershipwise-admitted-patient-list/rpt-adt-rank-membershipwise-admitted-patient-list.component";
+import { RPT_ADT_PatientBedDetailsReportComponent } from "./adt/patient-bed-details-report/patient-bed-details-report.component";
+import { RankWiseAdmittedPatientReportComponent } from "./adt/rank-wise-admission-report/rank-wise-admitted-patient-list.component";
 import { RankWiseDischargeListComponent } from "./adt/rank-wise-discharge-list/rank-wise-discharge-list.component";
 import { RPT_ADT_TransferredPatientsComponent } from "./adt/transfer/transferred-patient.component";
 import { RPT_APPT_AgeClassifiedOPStatsReportComponent } from "./appointment/age-classified-op-stats-report/age-classified-op-stats-report.component";
@@ -27,8 +28,11 @@ import { RPT_APPT_RankwiseDailyAppointmentReportComponent } from "./appointment/
 import { RPT_BIL_EHSBillReportComponent } from "./billing/EHS-billing-report/ehs-bill-report.component";
 import { RPT_BIL_PaymentModeWiseReport } from "./billing/PaymentMode Wise Report/payment-mode-wise-report.component";
 import { BillDetailComponent } from "./billing/bill-detail/bill-detail.component";
+import { RPT_BIL_BillWiseSalesReportComponent } from "./billing/bill-wise-sales-report/bill-wise-sales-report.component";
 import { RPT_BIL_BillingReportsMainComponent } from "./billing/billing-reports-main.component";
 import { RPT_BIL_BillCancelSummaryComponent } from "./billing/cancel-summary/bill-cancel-summary.component";
+import { RPT_BIL_ClaimSubmissionReportComponent } from "./billing/claim-submission-report/claim-submission-report";
+import { CopaymentReportComponent } from "./billing/copayment-report/copayment-report.component";
 import { RPT_BIL_CreditSettlementReport } from "./billing/credit-settlement-report/credit-settlement-report.component";
 import { RPT_BIL_CustomReportComponent } from "./billing/custom-reports/custom-report.component";
 import { RPT_BIL_BilDenominationReportComponent } from "./billing/denominations/bil-denomination-report.component";
@@ -48,6 +52,7 @@ import { RPT_BIL_DoctorRevenueComponent } from "./billing/doctor-revenue/doctor-
 import { RPT_BIL_DoctorSummaryMainComponent } from "./billing/doctor-summary/bill-doc-summary-main.component";
 import { RPT_BIL_IncomeSegregationComponent } from "./billing/income-segregation/income-segregation.component";
 import { RPT_BIL_ItemSummaryReportComponent } from "./billing/item-summary/bill-item-summary-report.component";
+import { RPT_BIL_ItemWiseCopaymentReportComponent } from "./billing/item-wise-copay-report/itemwise-copay-report.component";
 import { RPT_BIL_DailyMISReportComponent } from "./billing/mis-reports/daily-mis-report.component";
 import { RPT_BIL_PackageSalesReportComponent } from "./billing/package-sales/package-sales-report-component";
 import { RPT_BIL_PatientBillHistoryComponent } from "./billing/pat-bill-history/patient-bill-history.component";
@@ -59,6 +64,7 @@ import { RPT_BIL_ReturnBillReportComponent } from "./billing/return-bills/return
 import { RPT_BIL_DepartmentSalesDaybookComponent } from "./billing/sales-daybook/dept-sales-daybook.component";
 import { RPT_BIL_SalesDaybookComponent } from "./billing/sales-daybook/sales-daybook.component";
 import { RPT_BIL_SchemeDetailInvoiceReportComponent } from "./billing/scheme-detail-invoice-report/scheme-detail-invoice-report.component";
+import { RPT_BIL_ServiceDepartmentWiseCopaymentReportComponent } from "./billing/service-department-wise-copaymentreport/service-department-wise-copayment-report";
 import { RPT_BIL_TotalItemsBillComponent } from "./billing/total-items-bill/total-items-bill-report.component";
 import { RPT_BIL_UserCollectionReportComponent } from "./billing/user-collection/user-collection-report.component";
 import { RPT_BIL_UserWiseCashCollectionComponent } from "./billing/user-wise-cash-collection-report/user-wise-cash-collection.component";
@@ -143,7 +149,7 @@ import { RPT_ReportingMainComponent } from "./reporting-main.component";
               },
               {
                 path: "RankwiseAdmissionList",
-                component: RankMembershipwiseAdmittedPatientReportComponent,
+                component: RankWiseAdmittedPatientReportComponent,
                 canActivate: [AuthGuardService],
               },
               {
@@ -151,6 +157,13 @@ import { RPT_ReportingMainComponent } from "./reporting-main.component";
                 component: RPT_ADT_InPatientOutstandingReport,
                 canActivate: [AuthGuardService],
               },
+
+              {
+                path: "PatientBedDetailsReport",
+                component: RPT_ADT_PatientBedDetailsReportComponent,
+                canActivate: [AuthGuardService],
+              },
+
               { path: "**", component: PageNotFound },
             ],
           },
@@ -341,6 +354,31 @@ import { RPT_ReportingMainComponent } from "./reporting-main.component";
           {
             path: "BillingMain/SchemeDetailInvoice",
             component: RPT_BIL_SchemeDetailInvoiceReportComponent,
+            canActivate: [AuthGuardService],
+          },
+          {
+            path: "BillingMain/ClaimSubmissionReport",
+            component: RPT_BIL_ClaimSubmissionReportComponent,
+            canActivate: [AuthGuardService],
+          },
+          {
+            path: "BillingMain/CopaymentReport",
+            component: CopaymentReportComponent,
+            canActivate: [AuthGuardService],
+          },
+          {
+            path: "BillingMain/ItemWiseCopaymentReport",
+            component: RPT_BIL_ItemWiseCopaymentReportComponent,
+            canActivate: [AuthGuardService],
+          },
+          {
+            path: "BillingMain/ServiceDepartmentWiseCopaymentReport",
+            component: RPT_BIL_ServiceDepartmentWiseCopaymentReportComponent,
+            canActivate: [AuthGuardService],
+          },
+          {
+            path: "BillingMain/BillWiseSalesReport",
+            component: RPT_BIL_BillWiseSalesReportComponent,
             canActivate: [AuthGuardService],
           },
           {

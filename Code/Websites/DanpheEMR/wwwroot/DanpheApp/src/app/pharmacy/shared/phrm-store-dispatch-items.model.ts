@@ -47,13 +47,14 @@ export class PHRMStoreDispatchItems {
   public TargetStore: string = null;
   public CreatedByName: string = null;
   public DispatchedByName: string = null;
+  public IssueNo: number = null;
 
   public DispatchItemValidator: FormGroup = null;
   constructor() {
     var _formBuilder = new FormBuilder();
     this.DispatchItemValidator = _formBuilder.group({
       'DispensaryId': ['', Validators.required],
-      'DispatchedQuantity': ['', Validators.compose([Validators.required])],
+      'DispatchedQuantity': [0, Validators.compose([Validators.required, Validators.min(1)])],
       'ItemName': ['', Validators.compose([Validators.required])],
     });
 

@@ -4,6 +4,7 @@ import * as moment from 'moment/moment';
 import { CoreService } from "../../core/shared/core.service";
 import { CommonFunctions } from '../../shared/common.functions';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { Enum_PatientHistoryViewCategory } from '../../shared/shared-enums';
 import { PatientFilesModel } from '../shared/patient-files.model';
 import { PatientsBLService } from '../shared/patients.bl.service';
 @Component({
@@ -11,47 +12,43 @@ import { PatientsBLService } from '../shared/patients.bl.service';
     templateUrl: "./patient-history.html"
 })
 export class PatientHistoryComponent {
-    public patientId: number = 0;
-    public labHistory: any;
-    public imagingHistory: any;
-    public billingHistory: any;
-    public visitHistory: any;
-    public drugDetails: any;
-    public uploadedDocuments: any;
-    public admissionHistory: any;
-    public showVisitDetails: boolean = true;
-    public showAdmissionDetails: boolean = false;
-    public showDrugDetails: boolean = false;
-    public showLabDetails: boolean = false;
-    public showRadiologyDetails: boolean = false;
-    public showBillDetails: boolean = false;
-    public showDocumentsDetails: boolean = false;
-    public showPatientHistory: boolean = false;
-    public showuploadedDocuments: boolean = false;
-    public showImage: boolean = false;
-    public isShowUploadMode: boolean = false;
-    public isShowListMode: boolean = false;
-    public showUploadFiles: boolean = false;
-    public album = [];
-    @Input("selectedPatient")
-    public selectedPatient: any;
+    patientId: number = 0;
+    labHistory: any;
+    imagingHistory: any;
+    billingHistory: any;
+    visitHistory: any;
+    drugDetails: any;
+    uploadedDocuments: any;
+    admissionHistory: any;
+    showVisitDetails: boolean = true;
+    showAdmissionDetails: boolean = false;
+    showDrugDetails: boolean = false;
+    showLabDetails: boolean = false;
+    showRadiologyDetails: boolean = false;
+    showBillDetails: boolean = false;
+    showDocumentsDetails: boolean = false;
+    showPatientHistory: boolean = false;
+    showuploadedDocuments: boolean = false;
+    showImage: boolean = false;
+    isShowUploadMode: boolean = false;
+    isShowListMode: boolean = false;
+    showUploadFiles: boolean = false;
+    album = [];
+    @Input("selectedPatient") selectedPatient: any;
 
     /////For Binding the Image to Popup box 
-    public PopupImageData: PatientFilesModel = new PatientFilesModel();
+    PopupImageData: PatientFilesModel = new PatientFilesModel();
 
-    public totalBillAmount: number = 0;
-    public paidAmount: number = 0;
-    public cancelledBillAmount: number = 0;
-    public unpaidBillAmount: number = 0;
-    public returnedAmount: number = 0;
-    public depositAmount: number = 0;
-    public discountAmount: number = 0;
-    public balance: number = 0;
-    public checkouttimeparameter: string;
-
-
-
-
+    totalBillAmount: number = 0;
+    paidAmount: number = 0;
+    cancelledBillAmount: number = 0;
+    unpaidBillAmount: number = 0;
+    returnedAmount: number = 0;
+    depositAmount: number = 0;
+    discountAmount: number = 0;
+    balance: number = 0;
+    checkouttimeparameter: string;
+    ShowSalesSummary: boolean = false;
 
     constructor(public patientBLService: PatientsBLService, public lightbox: Lightbox, public changeDetector: ChangeDetectorRef,
         public msgBoxServ: MessageboxService, public coreService: CoreService) {
@@ -199,13 +196,14 @@ export class PatientHistoryComponent {
         this.showPatientHistory = true;
     }
     public updateView(category: number): void {
-        this.showVisitDetails = (category == 0);
-        this.showAdmissionDetails = (category == 1);
-        this.showDrugDetails = (category == 2);
-        this.showLabDetails = (category == 3);
-        this.showRadiologyDetails = (category == 4);
-        this.showBillDetails = (category == 5);
-        this.showDocumentsDetails = (category == 6);
+        this.showVisitDetails = (category == Enum_PatientHistoryViewCategory.VisitDetails);
+        this.showAdmissionDetails = (category == Enum_PatientHistoryViewCategory.AdmissionDetails);
+        this.showDrugDetails = (category == Enum_PatientHistoryViewCategory.DrugDetails);
+        this.showLabDetails = (category == Enum_PatientHistoryViewCategory.LadDetails);
+        this.showRadiologyDetails = (category == Enum_PatientHistoryViewCategory.RadiologyDetails);
+        this.showBillDetails = (category == Enum_PatientHistoryViewCategory.BillingDetails);
+        this.showDocumentsDetails = (category == Enum_PatientHistoryViewCategory.DocumentsDetails);
+        this.ShowSalesSummary = (category == Enum_PatientHistoryViewCategory.SalesSummaryReport);
     }
     public CalculateTotal() {
         if (this.billingHistory.paidBill.length) {

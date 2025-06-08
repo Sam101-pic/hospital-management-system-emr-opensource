@@ -15,7 +15,7 @@ import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
-import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_INVRequisitionStatus, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { WardSupplyBLService } from "../../shared/wardsupply.bl.service";
 import { InventoryWardItem_DTO } from "./shared/inventory-wardd-item.dto";
 
@@ -47,6 +47,7 @@ export class InventoryRequisitionListComponent {
   ItemList: InventoryWardItem_DTO[] = [];
   IsItemLoaded: boolean = false;
   showInventoryRequisitionDetails: boolean = false;
+  showRequisitionAdd: boolean = false;
 
   constructor(
     public InventoryBLService: InventoryBLService,
@@ -60,7 +61,6 @@ export class InventoryRequisitionListComponent {
     this.CheckForSubstoreActivation();
     this.LoadItemList();
   }
-
   CheckForSubstoreActivation() {
     this.CurrentStoreId = this.securityService.getActiveStore().StoreId;
     try {
@@ -149,19 +149,19 @@ export class InventoryRequisitionListComponent {
   LoadRequisitionListByStatus() {
     switch (this.RequisitionStatusFilter) {
       case "pending": {
-        this.RequisitionGridDataFiltered = this.RequisitionGridData.filter(R => ["pending", "active", "partial"].includes(R.RequisitionStatus) || R.NewDispatchAvailable == true);
+        this.RequisitionGridDataFiltered = this.RequisitionGridData.filter(R => (R.RequisitionStatus === ENUM_INVRequisitionStatus.Pending || R.RequisitionStatus === ENUM_INVRequisitionStatus.Partial || R.RequisitionStatus === ENUM_INVRequisitionStatus.Active) || (R.isReceiveItemsEnabled == true && !R.IsReceived));
         break;
       }
       case "complete": {
-        this.RequisitionGridDataFiltered = this.RequisitionGridData.filter(R => R.RequisitionStatus == "complete" && R.NewDispatchAvailable == false);
+        this.RequisitionGridDataFiltered = this.RequisitionGridData.filter(R => (R.RequisitionStatus === ENUM_INVRequisitionStatus.Complete && (R.isReceiveItemsEnabled == true && R.IsReceived)) || (R.RequisitionStatus === ENUM_INVRequisitionStatus.Complete && R.isReceiveItemsEnabled == false));
         break;
       }
       case "cancelled": {
-        this.RequisitionGridDataFiltered = this.RequisitionGridData.filter(R => R.RequisitionStatus == "cancelled");
+        this.RequisitionGridDataFiltered = this.RequisitionGridData.filter(R => R.RequisitionStatus === ENUM_INVRequisitionStatus.Cancel);
         break;
       }
       case "withdrawn": {
-        this.RequisitionGridDataFiltered = this.RequisitionGridData.filter(R => R.RequisitionStatus == "withdrawn");
+        this.RequisitionGridDataFiltered = this.RequisitionGridData.filter(R => R.RequisitionStatus === ENUM_INVRequisitionStatus.Withdrawn);
         break;
       }
       default: {
@@ -171,8 +171,10 @@ export class InventoryRequisitionListComponent {
     this.filterStockByInventory();
   }
   filterStockByInventory() {
-    if (this.selectedInventoryId == null)
+    if (this.selectedInventoryId == null) {
       this.RequisitionGridDataFiltered = this.RequisitionGridDataFiltered;
+      this.RequisitionGridDataFiltered = this.RequisitionGridDataFiltered.slice();
+    }
     else
       this.RequisitionGridDataFiltered = this.RequisitionGridDataFiltered.filter(a => a.RequestToStoreId == this.selectedInventoryId);
   }
@@ -218,8 +220,9 @@ export class InventoryRequisitionListComponent {
 
   //route to create Requisition page
   CreateRequisition() {
-    this.inventoryService.RequisitionId = 0;
-    this.router.navigate(['/WardSupply/Inventory/InventoryRequisitionItem']);
+    // this.inventoryService.RequisitionId = 0;
+    // this.router.navigate(['/WardSupply/Inventory/InventoryRequisitionItem']);
+    this.showRequisitionAdd = true;
   }
   onDateChange($event) {
     this.fromDate = $event.fromDate;
@@ -258,5 +261,17 @@ export class InventoryRequisitionListComponent {
     if (event) {
       this.LoadDeptwiseList();
     }
+  }
+  CallbackOnClickEdit() {
+    this.showInventoryRequisitionDetails = false;
+    this.showRequisitionAdd = true;
+  }
+  Close() {
+    this.showRequisitionAdd = false;
+  }
+  CloseRequisitionAddEditPage() {
+    this.showRequisitionAdd = false;
+    this.showInventoryRequisitionDetails = true;
+    this.LoadDeptwiseList();
   }
 }

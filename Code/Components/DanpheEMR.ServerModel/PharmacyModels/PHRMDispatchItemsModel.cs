@@ -34,5 +34,6 @@ namespace DanpheEMR.ServerModel
         public DateTime? ReceivedOn { get; set; }
         public int GenericId { get; set; }
         public decimal PendingQuantity { get; set; }
+        public int? IssueNo { get; set; }
     }
 }

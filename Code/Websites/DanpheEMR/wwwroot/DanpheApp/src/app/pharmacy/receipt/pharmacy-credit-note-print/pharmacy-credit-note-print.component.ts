@@ -37,6 +37,8 @@ export class PharmacyCreditNotePrintComponent {
     public browserPrintContentObj: any = { innerHTML: '' };
     public GeneralFieldLabel = new GeneralFieldLabels();
     @Output("call-back-print") callBackPrint: EventEmitter<object> = new EventEmitter();
+    ShowItemCode: boolean = false;
+    showRackNoInPrint: boolean = false;
 
 
     constructor(public coreService: CoreService,
@@ -46,6 +48,8 @@ export class PharmacyCreditNotePrintComponent {
         private changeDetector: ChangeDetectorRef
     ) {
         this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
+        this.GetRackNoParameterSettings();
+
     }
 
     ngOnInit() {
@@ -53,6 +57,7 @@ export class PharmacyCreditNotePrintComponent {
         this.GetPharmacyInvoiceFooterParameter();
         this.GetPharmacyBillingHeaderParameter();
         this.GetPharmacyItemNameDisplaySettings();
+        this.GetDisplayGenericItemCodeParameter();
 
         if (this.ReturnInvoiceId) {
             this.GetCreditNoteInfo(this.ReturnInvoiceId);
@@ -118,6 +123,12 @@ export class PharmacyCreditNotePrintComponent {
             this.showItemName = phrmItemNameSettingValue.Show_ItemName;
             this.showGenNameAfterItemName = phrmItemNameSettingValue.Show_GenericName_After_ItemName;
             this.LeadingSeparator = phrmItemNameSettingValue.Separator.trim();
+        }
+    }
+    GetDisplayGenericItemCodeParameter() {
+        let genericItemCodeParameter = this.coreService.Parameters.find(p => p.ParameterName == "DisplayGenericItemCodeInInvoice" && p.ParameterGroupName == "Pharmacy");
+        if (genericItemCodeParameter) {
+            this.ShowItemCode = JSON.parse(genericItemCodeParameter.ParameterValue);
         }
     }
 
@@ -199,5 +210,11 @@ export class PharmacyCreditNotePrintComponent {
         this.pharmacyBLService.PutPrintCount(printCount, InvoiceReturnId).subscribe();
         this.callBackPrint.emit();
     }
-
+    GetRackNoParameterSettings(): void {
+        let RackNoPrintSetting = this.coreService.Parameters.find(p => p.ParameterName == "ShowRackNoInPharmacyReceipt" && p.ParameterGroupName == "Pharmacy");
+        if (RackNoPrintSetting) {
+            let showRackNoInPrint = JSON.parse(RackNoPrintSetting.ParameterValue);
+            this.showRackNoInPrint = showRackNoInPrint.ShowRackNoInNormalPharmacyReceipt;
+        }
+    }
 }

@@ -167,12 +167,15 @@ namespace DanpheEMR.Controllers
         {
             var deathCertificateData = (from deathDetail in _mrDbContext.DeathDetails
                                         join pat in _mrDbContext.Patient on deathDetail.PatientId equals pat.PatientId
+                                        join vis in _mrDbContext.PatientVisits on pat.PatientId equals vis.PatientId
                                         join country in _mrDbContext.Countries on pat.CountryId equals country.CountryId
                                         join subdiv in _mrDbContext.CountrySubdivisions on pat.CountrySubDivisionId equals subdiv.CountrySubDivisionId
                                         where deathDetail.DeathId == deathDetailId
                                         select new
                                         {
                                             DeathId = deathDetail.DeathId,
+                                            VisitCode = vis.VisitCode,
+                                            PatientCode = pat.PatientCode,
                                             FiscalYearFormatted = deathDetail.FiscalYear.FiscalYearFormatted,
                                             CertificateNumber = deathDetail.CertificateNumber,
                                             Sex = pat.Gender,
@@ -1010,17 +1013,20 @@ namespace DanpheEMR.Controllers
             //Note: this is used to get final diagnosis details for patient in MR Outpatient list and Emergency List
 
             Func<Task<object>> func = async () => await (from diag in _mrDbContext.FinalDiagnosis
-                                                         join icd10 in _mrDbContext.ICD10Code on diag.ICD10ID equals icd10.ICD10ID
-                                                         where diag.PatientVisitId == patVisitId && diag.PatientId == patId && diag.IsActive == true
-                                                         select new
-                                                         {
-                                                             icd10.ICD10Code,
-                                                             icd10.ICD10Description,
-                                                             diag.IsPatientReferred,
-                                                             diag.ReferredBy
-
-                                                         }
-                                 ).ToListAsync();
+                                                            join disGrp in _mrDbContext.ICDDiseaseGroups
+                                                            on diag.DiseaseGroupId equals disGrp.DiseaseGroupId //into disGrpJoin
+                                                            //from disGrp in disGrpJoin.DefaultIfEmpty()
+                                                            where diag.PatientVisitId == patVisitId
+                                                            && diag.PatientId == patId
+                                                            && diag.IsActive == true
+                                                            select new
+                                                            {
+                                                                ICD10Code = disGrp != null ? disGrp.ICDCode : null,
+                                                                ICD10Description = disGrp != null ? disGrp.DiseaseGroupName : null,
+                                                                diag.IsPatientReferred,
+                                                                diag.ReferredBy
+                                                            }
+                                                        ).ToListAsync();
             return await InvokeHttpGetFunctionAsync(func);
         }
 

@@ -3,6 +3,7 @@ import { Router } from "@angular/router";
 import * as moment from 'moment/moment';
 import { MonthModel } from "../../accounting/settings/shared/fiscalyear.model";
 import { AccHospitalInfoVM } from "../../accounting/shared/acc-view-models";
+import { CommonHospitalInfoVM } from "../../accounting/shared/common-hospital-info.model";
 import { Ward } from "../../adt/shared/ward.model";
 import { BillingCounter } from "../../billing/shared/billing-counter.model";
 import { CoreService } from "../../core/shared/core.service";
@@ -68,6 +69,8 @@ export class SecurityService {
 
 
   public AccHospitalInfo: AccHospitalInfoVM = new AccHospitalInfoVM();
+  public CommonHospitalInfo: CommonHospitalInfoVM = new CommonHospitalInfoVM();
+
   public ActiveInsuranceProvider: CreditOrganization = new CreditOrganization();
   public INVHospitalInfo: AccHospitalInfoVM = new AccHospitalInfoVM(); //NageshBB- 10 Sep 2020: we are using AccHospitalInforVM for inventory also
   public ModuleNameForFiscalYear: string = "accounting"; //default is accounting
@@ -79,6 +82,13 @@ export class SecurityService {
     return this.AccHospitalInfo;
   }
 
+  public SetComonHospitalInfo(hospitalInfo) {
+    //this function will assign proper data to list as per month details
+    this.CommonHospitalInfo = this.FiscalYearListAssignData(hospitalInfo);
+  }
+  public GetComonHospitalInfo(): CommonHospitalInfoVM {
+    return this.CommonHospitalInfo;
+  }
   public SetINVHospitalInfo(hospitalInfo) {
     //this function will assign proper data to list as per month details
     this.INVHospitalInfo = this.FiscalYearListAssignData(hospitalInfo);
@@ -291,5 +301,16 @@ export class SecurityService {
       return false;
     }
   }
-
+  getRadiologyFlowParameter() {
+    let param = this.coreService.Parameters.find(a => a.ParameterGroupName === 'Radiology' && a.ParameterName === 'RadiologyFlowConfig');
+    if (param) {
+      let obj = JSON.parse(param.ParameterValue);
+      let ShowAddEditReportButton = obj.AllowAddReport;
+      let ShowAddEditFileButton = obj.AllowFileUpload;
+      return {
+        ShowAddEditReportButton: ShowAddEditReportButton,
+        ShowAddEditFileButton: ShowAddEditFileButton
+      };
+    }
+  }
 }

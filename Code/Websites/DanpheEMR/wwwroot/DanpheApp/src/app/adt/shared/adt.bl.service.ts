@@ -13,6 +13,9 @@ import { ImagingDLService } from '../../radiology/shared/imaging.dl.service';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { PatientBedInfoVM } from '../shared/admission.view.model';
 import { DischargeSummary } from '../shared/discharge-summary.model';
+import { AddBedReservation_DTO } from './DTOs/adt-add-bed-reservation.dto';
+import { AdtExchangeBed_DTO } from './DTOs/adt-post-exchange-bed.dto';
+import { CancelBedReservation_DTO } from './DTOs/cancel-bed-reservation.dto';
 import { AdmissionModel } from './admission.model';
 import { AdmissionCancelVM, AdmittingDocInfoVM } from './admission.view.model';
 import { ADT_DLService } from './adt.dl.service';
@@ -52,6 +55,15 @@ export class ADT_BLService {
     return this.admissionDLService.GetADTList(admissionStatus)
       .map(res => { return res })
   }
+  public GetReservedBedList() {
+    return this.admissionDLService.GetReservedBedList()
+      .map(res => { return res })
+  }
+  public CancelBedReservation(reservationDetails: CancelBedReservation_DTO) {
+    let data = _.omit(reservationDetails, ['Ward']);
+    return this.admissionDLService.CancelBedReservation(data)
+      .map(res => { return res })
+  }
   public GetPatients(searchTxt) {
     return this.admissionDLService.GetPatientList(searchTxt)
       .map(res => { return res })
@@ -89,12 +101,25 @@ export class ADT_BLService {
       .map(res => { return res })
   }
 
+  public GetReservedBedDetail(patientId: number, patientVisitId: number) {
+    return this.admissionDLService.GetReservedBedDetail(patientId, patientVisitId)
+      .map(res => { return res })
+  }
+
   public GetSimilarBedFeatures(ward: number, bedFeatureId: number) {
     return this.admissionDLService.GetSimilarBedFeatures(ward, bedFeatureId)
       .map(res => { return res })
   }
   public GetAvailableBeds(wardId: number, bedFeatureId: number) {
     return this.admissionDLService.GetAvailableBeds(wardId, bedFeatureId)
+      .map(res => { return res })
+  }
+  public GetBedsByBedFeature(wardId: number, bedFeatureId: number) {
+    return this.admissionDLService.GetBedsByBedFeature(wardId, bedFeatureId)
+      .map(res => { return res })
+  }
+  public GetPatientOccupyingTheBed(bedId: number, wardId: number, bedFeatureId: number) {
+    return this.admissionDLService.GetPatientOccupyingTheBed(bedId, wardId, bedFeatureId)
       .map(res => { return res })
   }
   public GetDischargeSummary(patientVisitId: number) {
@@ -387,6 +412,26 @@ export class ADT_BLService {
   }
   public GetAppointmentApplicableDoctorsInfo() {
     return this.admissionDLService.GetAppointmentApplicableDoctorsInfo()
+      .map(res => { return res })
+  }
+  public ExchangeBed(adtBedExchange: AdtExchangeBed_DTO) {
+    return this.admissionDLService.ExchangeBed(adtBedExchange)
+      .map(res => { return res })
+  }
+  public GetPatientVisitConsultants(patientVisitId: number) {
+    return this.admissionDLService.GetPatientVisitConsultants(patientVisitId)
+      .map(res => { return res })
+  }
+  public ReserveBed(addBedReservation: AddBedReservation_DTO) {
+    return this.admissionDLService.ReserveBed(addBedReservation)
+      .map(res => { return res })
+  }
+  public GetCareTakerInformation(patientId: number, patientVisitId: number) {
+    return this.admissionDLService.GetCareTakerInformation(patientId, patientVisitId)
+      .map(res => { return res })
+  }
+  public CheckAlreadyReservedBed(patientId: number, patientVisitId: number) {
+    return this.admissionDLService.CheckAlreadyReservedBed(patientId, patientVisitId)
       .map(res => { return res })
   }
 }

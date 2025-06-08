@@ -1,16 +1,15 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef, OnInit } from '@angular/core';
-import { PatientsBLService } from '../shared/patients.bl.service';
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import * as moment from 'moment/moment';
-import { CommonFunctions } from '../../shared/common.functions';
-import { CoreService } from "../../core/shared/core.service";
-import { Patient } from "../../patients/shared/patient.model";
-import { DanpheHTTPResponse } from '../../shared/common-models';
 import { HttpClient } from '@angular/common/http';
+import { Component, Input, OnInit } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import html2canvas from 'html2canvas';
-import { DomSanitizer } from '@angular/platform-browser';
-import { HealthCard } from '../shared/health-card.model';
+import * as moment from 'moment/moment';
+import { CoreService } from "../../core/shared/core.service";
 import { SecurityService } from '../../security/shared/security.service';
+import { DanpheHTTPResponse } from '../../shared/common-models';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../shared/shared-enums';
+import { HealthCard } from '../shared/health-card.model';
+import { PatientsBLService } from '../shared/patients.bl.service';
 
 @Component({
   selector: "patient-health-card",
@@ -39,15 +38,22 @@ export class PatientHealthCardComponent implements OnInit {
   public imgLogoSrcPath: string = "";
   public hospBgSrcPath: string = "";
   public hcTextFields = { front_Header: "", back_PropertyOf: "", back_HospName: "", back_addressInfo: "", back_contactInfo: "", back_emailInfo: "", back_websiteInfo: "" };
-
-
+  TemplateList = new Array<string>();
+  HealthCardFrontHTMLContent: SafeHtml = '';
+  HealthCardBackHTMLContent: SafeHtml = '';
+  ImgLogoSRCPath = { imgLogoSrcPath: '' };
+  HealthCardFront: string = "";
+  HealthCardBack: string = "";
 
   constructor(
     public msgBoxServ: MessageboxService,
     public coreService: CoreService,
     public securityService: SecurityService,
     public http: HttpClient,
-    public _sanitizer: DomSanitizer) {
+    public _sanitizer: DomSanitizer,
+    private _patientsBLService: PatientsBLService,
+    private _messageBoxService: MessageboxService,
+  ) {
 
     this.InitializeHospitalSettings();
 
@@ -62,6 +68,7 @@ export class PatientHealthCardComponent implements OnInit {
       //Naming format for our logo is: hospshortname-logo.png  inside above folder.
       //final path format example: ../images/health-card/hospital-logo.PNG, ../images/health-card/mmh-logo.PNG  and so on. 
       this.imgLogoSrcPath = this.hospLogoFolderPath + this.hospitalShortName + "-logo.PNG";
+      this.ImgLogoSRCPath.imgLogoSrcPath = this.imgLogoSrcPath;
       //hams-hospital-bg.jpg
       this.hospBgSrcPath = this.hospBgFolderPath + this.hospitalShortName + "-hospital-bg.jpg";
 
@@ -82,7 +89,7 @@ export class PatientHealthCardComponent implements OnInit {
       this.hcTextFields.back_emailInfo = hcTxtJson["back-hospital-emailinfo"];
       this.hcTextFields.back_websiteInfo = hcTxtJson["back-hospital-websiteinfo"];
       //end: sud: 12Jul'19--below fields are set in database-- Pl's don't change anything..
- 
+
 
     }
 
@@ -105,6 +112,66 @@ export class PatientHealthCardComponent implements OnInit {
     if (this.selectedPat.PatientId) {
       this.LoadProfilePic();
       this.LoadHealthCardStatus();
+    }
+    this.InitializePatientHealthCardTemplate();
+  }
+  mergedObj: any;
+  InitializePatientHealthCardTemplate() {
+    (async (): Promise<void> => {
+      try {
+        await this.GetPatientHealthCardTemplates("HealthCardFront001", this.selectedPat.PatientId);
+        await this.GetPatientHealthCardTemplates("HealthCardBack001", this.selectedPat.PatientId);
+        console.info(this.selectedPat);
+        if (this.HealthCardFront) {
+          this.HealthCardFrontHTMLContent = this._sanitizer.bypassSecurityTrustHtml(this.HealthCardFront);
+        }
+
+        if (this.HealthCardBack) {
+          this.HealthCardBackHTMLContent = this._sanitizer.bypassSecurityTrustHtml(this.HealthCardBack);
+        }
+
+      }
+      catch (err) {
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Error: ${err.ErrorMessage}`]);
+      }
+    })();
+  }
+
+  ReplacePlaceholdersWithData(htmlContent: string, data: any): string {  //Bikesh: 25-july'23 this is used for  replacing placeholder of provided htmlContent 
+    return htmlContent.replace(/{{(.*?)}}/g, (match, placeholder) => {
+      const propertyKeys = placeholder.split('.');
+      let value = data;
+
+      for (const key of propertyKeys) {
+        if (value && value.hasOwnProperty(key)) {
+          value = value[key];
+        } else {
+          return '';
+        }
+      }
+      return (value !== null && value !== undefined) ? value : '';
+    });
+  }
+
+  async GetPatientHealthCardTemplates(templateCode: string, patientId: number): Promise<void> {
+    try {
+      const res: DanpheHTTPResponse = await this._patientsBLService.GetPatientHealthCardTemplates(templateCode, patientId).toPromise();
+      if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+        if (templateCode === "HealthCardFront001") {
+          const template = res.Results.TemplateHTML;
+          this.HealthCardFront = template;
+        }
+        else if (templateCode === "HealthCardBack001") {
+          const template = res.Results.TemplateHTML;
+          this.HealthCardBack = template;
+        }
+      }
+      else {
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`TemplateList is empty.`]);
+      }
+    }
+    catch (err) {
+      throw new Error(err);
     }
   }
 
@@ -183,15 +250,15 @@ export class PatientHealthCardComponent implements OnInit {
     //If patient card was already printed, we've to give an warning whether or not user wants to print that again.
     //also if User wants to print a Card for Unpaid Bill then also we've to give warning..
     let printAgain: boolean = true;//default value is true.
-    if (this.patHealthCardStatus && this.patHealthCardStatus.IsPrinted) {
-      let msg_alreadyPrinted = "NOTE ! Health card for this patient is already printed on " + moment(this.patHealthCardStatus.PrintedOn).format('YYYY-MM-DD');
-      msg_alreadyPrinted += "  Do you want to print again ?";
-      printAgain = window.confirm(msg_alreadyPrinted);
-    }
-    else if (this.patHealthCardStatus && this.patHealthCardStatus.BillStatus != 'paid') {
-      let msg_unpaid = "NOTE ! Payment is not made for Health Card. Do you want to print anyway ?";
-      printAgain = window.confirm(msg_unpaid);
-    }
+    // if (this.patHealthCardStatus && this.patHealthCardStatus.IsPrinted) {
+    //   let msg_alreadyPrinted = "NOTE ! Health card for this patient is already printed on " + moment(this.patHealthCardStatus.PrintedOn).format('YYYY-MM-DD');
+    //   msg_alreadyPrinted += "  Do you want to print again ?";
+    //   printAgain = window.confirm(msg_alreadyPrinted);
+    // }
+    // else if (this.patHealthCardStatus && this.patHealthCardStatus.BillStatus != 'paid') {
+    //   let msg_unpaid = "NOTE ! Payment is not made for Health Card. Do you want to print anyway ?";
+    //   printAgain = window.confirm(msg_unpaid);
+    // }
 
     //if user has selected on YES on confirmation window, then go ahead and print again..
     if (printAgain) {
@@ -200,18 +267,14 @@ export class PatientHealthCardComponent implements OnInit {
       //below code gets content of html into a canvas (using: html2canvas) and appends to a existing div id="idPrint"
       //Check in html for actual placement of these elements.
       let popupWinindow;
-      var printContents = document.getElementById("cardFrontside").innerHTML;
+      // var printContents = document.getElementById("id_healthCard").innerHTML;
+      var printContents = this.HealthCardFront;
       popupWinindow = window.open('', '_blank', 'width=1600,height=700,scrollbars=no,menubar=no,toolbar=no,location=no,status=no,titlebar=no');
       popupWinindow.document.open();
-      popupWinindow.document.write(`<html><head><link rel="stylesheet" type="text/css" href="../../../themes/theme-default/DanpheStyle.css" />`
-        + `<link rel="stylesheet" type="text/css" href="../../../themes/theme-default/DanphePrintStyle.css" />`
-        + `<style>@media print { @page { size: 258mm 162.29mm; padding: 0; margin: 0; color: #fff; } } .sngl-row{padding: 15px 0px;} .allwith-bg {font-size: 40px; line-height: 30px;color: #000;white-space: nowrap;} .parm-nam{color: #000;} .card-background{position: relative !important; overflow:hidden;}</style>`
-        + `</head><body style="margin: 0 !important;"  onload="window.print()">`
-        + printContents
-        + `</body></html>`);
+      popupWinindow.document.write(printContents);
       popupWinindow.document.close();
       this.showCard = false;
-      document.getElementById("frontSide").style.display = "none";
+      //document.getElementById("id_healthCard").style.display = "none";
 
     }
 

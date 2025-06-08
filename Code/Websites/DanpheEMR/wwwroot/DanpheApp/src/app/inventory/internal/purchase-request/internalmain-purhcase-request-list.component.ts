@@ -1,15 +1,15 @@
 import { Component } from '@angular/core';
-import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
-import { InventoryBLService } from "../../shared/inventory.bl.service";
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import { InventoryService } from "../../shared/inventory.service";
 import { Router } from "@angular/router";
-import { PurchaseRequestModel } from "../../shared/purchase-request.model";
-import { CoreService } from "../../../core/shared/core.service";
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
-import { RouteFromService } from "../../../shared/routefrom.service";
 import * as moment from 'moment/moment';
+import { CoreService } from "../../../core/shared/core.service";
+import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { RouteFromService } from "../../../shared/routefrom.service";
+import { InventoryBLService } from "../../shared/inventory.bl.service";
+import { InventoryService } from "../../shared/inventory.service";
+import { PurchaseRequestModel } from "../../shared/purchase-request.model";
 
 @Component({
   selector: 'app-internalmain-purhcase-request-list',
@@ -22,7 +22,7 @@ export class InternalmainPurhcaseRequestListComponent {
   public toDate: string = null;
   public dateRange: string = null;
   public rowIndex: number;
-  public PurchsaeRequestListFiltered: Array<PurchaseRequestModel> = new Array<PurchaseRequestModel>();
+  public PurchaseRequestListFiltered: Array<PurchaseRequestModel> = new Array<PurchaseRequestModel>();
   public currentPurchaseRequest: PurchaseRequestModel;
   public isShowRequisitionDetail: boolean = false;
   public NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
@@ -55,6 +55,8 @@ export class InternalmainPurhcaseRequestListComponent {
     }
   }
   GetPORequisition() {
+    this.PurchaseRequestListFiltered = [];
+    this.PurchaseRequestList = [];
     this.inventoryBLService.GetPORequisition(this.fromDate, this.toDate)
       .subscribe(res => {
         if (res.Status == "OK" && res.Results.length > 0) {
@@ -86,7 +88,7 @@ export class InternalmainPurhcaseRequestListComponent {
 
   public FilterRequisitionList() {
     //This function will be used for filtering later on.
-    this.PurchsaeRequestListFiltered = this.PurchaseRequestList;
+    this.PurchaseRequestListFiltered = this.PurchaseRequestList;
   }
   Close() {
     this.isShowRequisitionDetail = false;

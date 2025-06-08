@@ -1,13 +1,19 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using DanpheEMR.Enums;
+using DanpheEMR.Filters;
+using DanpheEMR.RateLimit.Factory;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using Swashbuckle.AspNetCore.Swagger;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace DanpheEMR
 {
@@ -73,15 +79,61 @@ namespace DanpheEMR
                 options.RequireHttpsMetadata = false;
                 options.TokenValidationParameters = new TokenValidationParameters()
                 {
-                    // The signing key must match!
+                    // The signing key must match
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["JwtTokenConfig:JwtKey"])),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
+                    ValidateIssuer = true,
+                    ValidIssuer = Configuration["JwtTokenConfig:JwtIssuer"],
+                    ValidateAudience = true,
                     ValidAudience = Configuration["JwtTokenConfig:JwtAudience"],
-                    ValidIssuer = Configuration["JwtTokenConfig:JwtIssuer"]
+                    ValidateLifetime = true,
+                    RequireSignedTokens = true,
+                };
+                //Additional Event Handlers for Detailed Validation.
+                options.Events = new JwtBearerEvents
+                {
+                    //Custom Token validation Logic
+                    OnTokenValidated = async context =>
+                    {
+                        //Extract Claims Principal
+                        var claimsPrincipal = context.Principal;
+                        // Custom validation logic
+                        if (claimsPrincipal == null)
+                        {
+                            context.Fail("No claims principal found");
+                            return;
+                        }
+
+                        // Example: Additional custom validation
+                        var userIdClaim = claimsPrincipal.FindFirst(ENUM_ClaimTypes.userId);
+                        if (userIdClaim == null)
+                        {
+                            context.Fail("Missing user identifier");
+                            return;
+                        }
+                    },
+                    //Handle Authentication Failures
+                    OnAuthenticationFailed = context =>
+                    {
+                        // Log specific authentication failure reasons
+                        if (context.Exception is SecurityTokenExpiredException)
+                        {
+                            context.Response.Headers.Add("Token-Expired", "true");
+                        }
+
+                        // Log the specific authentication failure
+                        Log.Error($"Authentication failed: {context.Exception.Message}");
+
+                        return Task.CompletedTask;
+                    }
                 };
             });
+            return services;
+        }
+
+        public static IServiceCollection AddRateLimit(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddScoped<RateLimitFilter>();
             return services;
         }
     }

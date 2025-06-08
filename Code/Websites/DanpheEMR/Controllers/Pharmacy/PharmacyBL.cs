@@ -1,27 +1,36 @@
 ﻿using AutoMapper;
+using DanpheEMR.Controllers.Billing;
 using DanpheEMR.Core;
 using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
-using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.MasterModels;
 using DanpheEMR.ServerModel.MedicareModels;
+using DanpheEMR.ServerModel.PatientModels;
 using DanpheEMR.ServerModel.PharmacyModels;
 using DanpheEMR.Services;
 using DanpheEMR.Services.Dispensary.DTOs.PharmacyInvoiceReceipt;
 using DanpheEMR.Services.Dispensary.DTOs.PharmacyProvisional;
+using DanpheEMR.Services.Insurance;
 using DanpheEMR.Services.Pharmacy.DTOs.PurchaseOrder;
+using DanpheEMR.Services.SSF.DTO;
+using DanpheEMR.Sync.IRDNepal;
 using DanpheEMR.Sync.IRDNepal.Models;
 using DanpheEMR.Utilities;
+using DanpheEMR.Utilities.SignalRHubs;
 using DanpheEMR.ViewModel.Pharmacy;
 using DocumentFormat.OpenXml.Spreadsheet;
+using FluentValidation;
+using FluentValidation.Results;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore.Internal;
 using Newtonsoft.Json;
 using RefactorThis.GraphDiff;//for entity-update.
+using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Data;
 using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
@@ -29,6 +38,7 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Transactions;
+using static DanpheEMR.Services.Insurance.HIBApiResponses;
 using ParameterModel = DanpheEMR.Core.Parameters.ParameterModel;
 
 namespace DanpheEMR.Controllers
@@ -47,7 +57,7 @@ namespace DanpheEMR.Controllers
             PharmacyDbContext phrmdbcontext = new PharmacyDbContext(connString);
             return GetFiscalYear(phrmdbcontext);
         }
-        public static Boolean GoodReceiptTransaction(PHRMGoodsReceiptViewModel grViewModelData, PharmacyDbContext phrmdbcontext, RbacUser currentUser)
+        public static Boolean GoodReceiptTransaction(PHRMGoodsReceiptViewModel grViewModelData, PharmacyDbContext phrmdbcontext, RbacUser currentUser, IValidator<PHRMGoodsReceiptModel> validator)
         {
             //Transaction Begin
             using (var dbContextTransaction = phrmdbcontext.Database.BeginTransaction())
@@ -55,11 +65,22 @@ namespace DanpheEMR.Controllers
                 try
                 {
                     var currentDate = DateTime.Now;
-                    var currentFiscalYearId = GetFiscalYear(phrmdbcontext).FiscalYearId;
                     bool isGRCreatedFromPO = false;
-                    isGRCreatedFromPO = (grViewModelData.purchaseOrder.PurchaseOrderId > 0) ? true : false;
-                    if (isGRCreatedFromPO == true)
+                    isGRCreatedFromPO = (grViewModelData.purchaseOrder.PurchaseOrderId > 0);
+
+                    var IsDuplicateInvoice = phrmdbcontext.PHRMGoodsReceipt.Any(g => g.SupplierId == grViewModelData.goodReceipt.SupplierId && g.InvoiceNo == grViewModelData.goodReceipt.InvoiceNo && g.FiscalYearId == grViewModelData.goodReceipt.FiscalYearId && !g.IsCancel);
+                    if (IsDuplicateInvoice)
                     {
+                        throw new Exception("Duplicate InvoiceNo and Supplier is not allowed");
+                    }
+                    if (isGRCreatedFromPO)
+                    {
+                        var PurchaseOrder = phrmdbcontext.PHRMPurchaseOrder.Where(p => p.PurchaseOrderId == grViewModelData.purchaseOrder.PurchaseOrderId && p.POStatus == ENUM_PharmacyPurchaseOrderStatus.Complete).FirstOrDefault();
+                        if (PurchaseOrder != null)
+                        {
+                            throw new Exception("Goods Receipt has already been done");
+
+                        }
                         grViewModelData.goodReceipt.PurchaseOrderId = grViewModelData.purchaseOrder.PurchaseOrderId;
                         UpdatePOandPOItemsStatus(phrmdbcontext, grViewModelData);
                     }
@@ -67,207 +88,271 @@ namespace DanpheEMR.Controllers
                     {
                         grViewModelData.goodReceipt.PurchaseOrderId = null;
                     }
-
                     // Add goodsReceipt, so that we can save the goods receiptId
-                    var goodsReceiptData = grViewModelData.goodReceipt;
-                    var goodsReceiptItemData = grViewModelData.goodReceipt.GoodReceiptItem;
-                    goodsReceiptData.GoodReceiptItem = new List<PHRMGoodsReceiptItemsModel>();
-                    goodsReceiptData.CreatedOn = currentDate;
-                    var dispercentage = (decimal)0;
-                    var vatpercentage = (decimal)0;
-                    if (grViewModelData.goodReceipt.SubTotal > 0)
-                    {
-                        dispercentage = (decimal)(grViewModelData.goodReceipt.DiscountAmount * 100 / grViewModelData.goodReceipt.SubTotal);
-                        if (grViewModelData.goodReceipt.SubTotal - grViewModelData.goodReceipt.DiscountAmount > 0)
-                        {
-                            vatpercentage = (decimal)(grViewModelData.goodReceipt.VATAmount * 100 / (grViewModelData.goodReceipt.SubTotal - grViewModelData.goodReceipt.DiscountAmount));
-                        }
-                    }
-                    phrmdbcontext.PHRMGoodsReceipt.Add(goodsReceiptData);
-                    phrmdbcontext.SaveChanges();
-
-                    var mainStoreObj = phrmdbcontext.PHRMStore.Where(s => s.Category == ENUM_StoreCategory.Store && s.SubCategory == ENUM_StoreSubCategory.Pharmacy).FirstOrDefault();
-
-                    if (mainStoreObj == null)
-                    {
-                        throw new Exception("Main Store not found");
-                    }
-                    // Add gr items along with stock
-                    goodsReceiptItemData.ForEach(gri =>
-                    {
-                        // TODO: Make StoreId Dynamic later, also add SubCategory
-                        //var mainStoreId = phrmdbcontext.PHRMStore.Where(a => a.Category == "store" && a.SubCategory == "pharmacy").Select(a => a.StoreId).FirstOrDefault();
-
-                        // Add to stock master
-                        var newStockMaster = new PHRMStockMaster(
-                            itemId: gri.ItemId,
-                            batchNo: gri.BatchNo,
-                            expiryDate: gri.ExpiryDate,
-                            //costPrice: gri.GRItemPrice     //Changed: coz we need to store the actual cost price.
-                            costPrice: (decimal)gri.CostPrice,
-                            salePrice: gri.SalePrice,
-                            createdBy: currentUser.EmployeeId,
-                            createdOn: currentDate,
-                            mrp: gri.MRP);
-
-                        // add the new barcode id
-                        var barcodeService = new PharmacyStockBarcodeService(phrmdbcontext);
-                        newStockMaster.UpdateBarcodeId(barcodeService.AddStockBarcode(
-                           stock: newStockMaster,
-                           createdBy: currentUser.EmployeeId
-                            ));
-
-                        phrmdbcontext.StockMasters.Add(newStockMaster);
-                        phrmdbcontext.SaveChanges();
-
-                        // Add stock first
-                        var newStoreStock = new PHRMStoreStockModel(newStockMaster, mainStoreObj.StoreId, (gri.ReceivedQuantity + gri.FreeQuantity), (decimal)gri.CostPrice, gri.SalePrice);
-                        phrmdbcontext.StoreStocks.Add(newStoreStock);
-                        phrmdbcontext.SaveChanges();
-
-                        // Add GoodsReceiptItem
-                        gri.GoodReceiptId = goodsReceiptData.GoodReceiptId;
-                        gri.StockId = newStoreStock.StockId;
-                        gri.StoreStockId = newStoreStock.StoreStockId.Value;
-                        gri.CreatedBy = currentUser.EmployeeId;
-                        gri.CreatedOn = currentDate;
-                        gri.AvailableQuantity = gri.ReceivedQuantity + gri.FreeQuantity;
-                        //below fields are used for accounting do not remove
-                        if (gri.AvailableQuantity != 0)
-                        {
-                            gri.GrPerItemVATAmt = gri.VATAmount;
-                            //(gri.SubTotal - (gri.SubTotal * dispercentage / 100)) / 100 * vatpercentage / (decimal)gri.ReceivedQuantity;
-                            //gri.GrPerItemDisAmt = gri.SubTotal * Convert.ToDecimal(gri.DiscountPercentage) / 100 / (decimal)gri.ReceivedQuantity;            //cal per item discount     
-                            gri.GrPerItemDisAmt = gri.DiscountAmount;
-                        }
-                        phrmdbcontext.PHRMGoodsReceiptItems.Add(gri);
-                        phrmdbcontext.SaveChanges();
-
-                        // Add stock txns
-                        var newMainStockTxns = new PHRMStockTransactionModel(newStoreStock, ENUM_PHRM_StockTransactionType.PurchaseItem, goodsReceiptData.GoodReceiptDate, gri.GoodReceiptItemId, currentUser.EmployeeId, currentDate, goodsReceiptData.FiscalYearId);
-                        newMainStockTxns.SetInOutQuantity(newStoreStock.AvailableQuantity, 0);
-                        phrmdbcontext.StockTransactions.Add(newMainStockTxns);
-                        phrmdbcontext.SaveChanges();
-
-                        //Add StockHistoryMRP
-                        var newStockHistoryMRP = new PHRMMRPHistoryModel()
-                        {
-                            StockId = newStockMaster.StockId ?? 0,
-                            StartDate = currentDate,
-                            SalePrice = newStockMaster.SalePrice,
-                            CreatedBy = currentUser.EmployeeId,
-                        };
-                        phrmdbcontext.MRPHistories.Add(newStockHistoryMRP);
-                        phrmdbcontext.SaveChanges();
-
-                        //Add StockHistoryBatchAndExpiryDate
-                        var newStockHistoryBatchAndExpiry = new PHRMExpiryDateBatchNoHistoryModel()
-                        {
-                            StockId = newStockMaster.StockId ?? 0,
-                            StartDate = currentDate,
-                            BatchNo = newStockMaster.BatchNo,
-                            ExpiryDate = newStockMaster.ExpiryDate,
-                            CreatedBy = currentUser.EmployeeId,
-                        };
-                        phrmdbcontext.ExpiryDateBatchNoHistories.Add(newStockHistoryBatchAndExpiry);
-                        phrmdbcontext.SaveChanges();
-                    });
-                    //supplier ledger txn part;
-                    var supplier = phrmdbcontext.PHRMSupplier.Find(goodsReceiptData.SupplierId);
-                    bool isLedgerApplicable = supplier.IsLedgerRequired;
-                    if (isLedgerApplicable == true)
-                    {
-                        //check the payment mode ie cash and credit mode;
-                        //if mode is credit, update CreditAmount equals TotalGRAmount and DebitAmount equals 0:Also,BalanceAmount = CreditAmount- DebitAmount ie BalAnceAmount equals TotalGRAmount resp;
-                        //if mode is cash, update CreditAmount and DebitAmount equals to TotalGRAmount and BalanceAmount is 0 since balanceAmt equals Credit - Debit;
-                        if (goodsReceiptData.TransactionType == "Credit")
-                        {
-                            //find the supplierLedger to update amount;
-                            var supplierLedger = phrmdbcontext.SupplierLedger.Where(s => s.SupplierId == goodsReceiptData.SupplierId).FirstOrDefault();
-                            //update cr,db, and balance amount of that supplier in PHRMSupplierLedger table;
-                            supplierLedger.CreditAmount += goodsReceiptData.TotalAmount;
-                            supplierLedger.DebitAmount += 0;
-                            supplierLedger.BalanceAmount += goodsReceiptData.TotalAmount;
-                            phrmdbcontext.SaveChanges();
-
-                            //Add Supplier Ledger txn;
-                            var newSupplierLedgerTxn = new PHRMSupplierLedgerTransactionModel()
-                            {
-                                FiscalYearId = PharmacyBL.GetFiscalYear(phrmdbcontext).FiscalYearId,
-                                LedgerId = supplierLedger.LedgerId,
-                                SupplierId = supplierLedger.SupplierId,
-                                CreditAmount = goodsReceiptData.TotalAmount,
-                                DebitAmount = 0,
-                                ReferenceNo = goodsReceiptData.GoodReceiptId,
-                                TransactionType = ENUM_SupplierLedgerTransaction.GoodsReceipt,
-                                Remarks = null,
-                                IsActive = true,
-                                CreatedBy = currentUser.EmployeeId,
-                                CreatedOn = DateTime.Now
-
-                            };
-                            phrmdbcontext.SupplierLedgerTransactions.Add(newSupplierLedgerTxn);
-                            phrmdbcontext.SaveChanges();
-                        }
-                        else
-                        {
-                            //find the supplierLedger to update amount;
-                            var supplierLedger = phrmdbcontext.SupplierLedger.Where(s => s.SupplierId == goodsReceiptData.SupplierId).FirstOrDefault();
-                            //update cr,db, and balance amount of that supplier in PHRMSupplierLedger table;
-                            supplierLedger.CreditAmount += goodsReceiptData.TotalAmount;
-                            supplierLedger.DebitAmount += goodsReceiptData.TotalAmount;
-                            supplierLedger.BalanceAmount += 0;
-                            phrmdbcontext.SaveChanges();
-                            //Add Supplier Ledger txn for adding CreditAmount;
-                            var newSupplierLedgerTxnForCreditAmount = new PHRMSupplierLedgerTransactionModel()
-                            {
-                                FiscalYearId = PharmacyBL.GetFiscalYear(phrmdbcontext).FiscalYearId,
-                                LedgerId = supplierLedger.LedgerId,
-                                SupplierId = supplierLedger.SupplierId,
-                                CreditAmount = goodsReceiptData.TotalAmount,
-                                DebitAmount = 0,
-                                ReferenceNo = goodsReceiptData.GoodReceiptId,
-                                TransactionType = ENUM_SupplierLedgerTransaction.GoodsReceipt,
-                                Remarks = null,
-                                IsActive = true,
-                                CreatedBy = currentUser.EmployeeId,
-                                CreatedOn = DateTime.Now
-
-                            };
-                            phrmdbcontext.SupplierLedgerTransactions.Add(newSupplierLedgerTxnForCreditAmount);
-                            phrmdbcontext.SaveChanges();
-                            //Add Supplier Ledger txn for adding DebitAmount;
-                            var newSupplierLedgerTxnForDebitAmount = new PHRMSupplierLedgerTransactionModel()
-                            {
-                                FiscalYearId = PharmacyBL.GetFiscalYear(phrmdbcontext).FiscalYearId,
-                                LedgerId = supplierLedger.LedgerId,
-                                SupplierId = supplierLedger.SupplierId,
-                                CreditAmount = 0,
-                                DebitAmount = goodsReceiptData.TotalAmount,
-                                ReferenceNo = goodsReceiptData.GoodReceiptId,
-                                TransactionType = ENUM_SupplierLedgerTransaction.GoodsReceipt,
-                                Remarks = null,
-                                IsActive = true,
-                                CreatedBy = currentUser.EmployeeId,
-                                CreatedOn = DateTime.Now
-
-                            };
-                            phrmdbcontext.SupplierLedgerTransactions.Add(newSupplierLedgerTxnForDebitAmount);
-                            phrmdbcontext.SaveChanges();
-
-                        }
-                    }
-
-
+                    SaveGoodsReceipt(grViewModelData, phrmdbcontext, currentUser, currentDate, validator);
                     dbContextTransaction.Commit();//Commit Transaction
                     return true;
                 }
                 catch (Exception ex)
                 {
-                    //Rollback all transaction if exception occured  i.e. WriteOff Insertion, Stock_Transaction Insertion, Stock Updation
                     dbContextTransaction.Rollback();
                     throw ex;
                 }
+            }
+        }
+
+        private static void SaveGoodsReceipt(PHRMGoodsReceiptViewModel grViewModelData, PharmacyDbContext phrmdbcontext, RbacUser currentUser, DateTime currentDate, IValidator<PHRMGoodsReceiptModel> validator)
+        {
+            var goodsReceiptData = grViewModelData.goodReceipt;
+            var goodsReceiptItemData = grViewModelData.goodReceipt.GoodReceiptItem;
+            goodsReceiptData.GoodReceiptItem = new List<PHRMGoodsReceiptItemsModel>();
+            goodsReceiptData.CreatedOn = currentDate;
+
+            Log.Information($"Server Side Data Validation is enabled and the validation rule is being applied in billing transaction object from Op Billing!");
+
+            ValidationResult validationResult = validator.Validate(goodsReceiptData);
+
+            if (!validationResult.IsValid)
+            {
+                var error = "";
+                var errors = validationResult.Errors.Select(a => a.ErrorMessage);
+                foreach (var item in errors)
+                {
+                    error += $"{item} \n";
+                }
+                Log.Error($"Data Validation issue during BillingTransaction Process, \n {error}");
+                throw new InvalidOperationException($"Data Validation issue during Good Receipt Process \n {error}");
+            }
+
+            phrmdbcontext.PHRMGoodsReceipt.Add(goodsReceiptData);
+            phrmdbcontext.SaveChanges();
+
+            var mainStoreObj = phrmdbcontext.PHRMStore.Where(s => s.Category == ENUM_StoreCategory.Store && s.SubCategory == ENUM_StoreSubCategory.Pharmacy).FirstOrDefault();
+
+            if (mainStoreObj == null)
+            {
+                throw new Exception("Main Store not found");
+            }
+
+            goodsReceiptItemData.ForEach(gri =>
+            {
+                var stockMaster = phrmdbcontext.StockMasters.Where(s => s.ItemId == gri.ItemId && s.ExpiryDate == gri.ExpiryDate && s.BatchNo == gri.BatchNo && s.CostPrice == gri.CostPrice && s.MRP == gri.MRP && s.SalePrice == gri.SalePrice).FirstOrDefault();
+
+                if (stockMaster != null)
+                {
+                    var storeStock = phrmdbcontext.StoreStocks.Where(ss => ss.StockId == stockMaster.StockId && ss.StoreId == mainStoreObj.StoreId).FirstOrDefault();
+
+                    if (storeStock != null)
+                    {
+                        SaveGoodReceiptItem(phrmdbcontext, currentUser, currentDate, gri, goodsReceiptData, storeStock);
+
+                        storeStock.UpdateAvailableQuantity(storeStock.AvailableQuantity + gri.ReceivedQuantity + gri.FreeQuantity);
+
+                        SaveStockTransaction(phrmdbcontext, currentUser, currentDate, gri, goodsReceiptData, storeStock);
+                    }
+                }
+                else
+                {
+                    gri.GoodReceiptId = goodsReceiptData.GoodReceiptId;
+                    gri.CreatedBy = currentUser.EmployeeId;
+                    gri.CreatedOn = currentDate;
+                    gri.AvailableQuantity = gri.ReceivedQuantity + gri.FreeQuantity;
+                    if (gri.AvailableQuantity > 0)
+                    {
+                        gri.GrPerItemVATAmt = gri.VATAmount;
+                        gri.GrPerItemDisAmt = gri.DiscountAmount;
+                    }
+
+                    PHRMStockMaster newStockMaster = SaveMasterStock(phrmdbcontext, currentUser, currentDate, gri);
+
+                    // Add stock first
+                    PHRMStoreStockModel newStoreStock = SaveNewStoreStock(phrmdbcontext, gri, mainStoreObj, newStockMaster);
+
+                    gri.StockId = newStoreStock.StockId;
+                    gri.StoreStockId = newStoreStock.StoreStockId.Value;
+                    phrmdbcontext.PHRMGoodsReceiptItems.Add(gri);
+                    phrmdbcontext.SaveChanges();
+
+                    // Add stock txns
+                    SaveNewStockTransaction(phrmdbcontext, currentUser, currentDate, gri, goodsReceiptData, newStoreStock);
+
+                    //Add StockHistoryMRP
+                    SaveStockMRPHistory(phrmdbcontext, currentUser, currentDate, newStockMaster);
+
+                    //Add StockHistoryBatchAndExpiryDate
+                    SaveStockBatchAndExpiryHistory(phrmdbcontext, currentUser, currentDate, newStockMaster);
+                }
+            });
+
+            var supplier = phrmdbcontext.PHRMSupplier.Find(goodsReceiptData.SupplierId);
+            bool isLedgerApplicable = supplier.IsLedgerRequired;
+            if (isLedgerApplicable)
+            {
+                UpdateAndSavePharmacySupplierLedgerTransaction(phrmdbcontext, currentUser, goodsReceiptData);
+            }
+        }
+
+        private static void SaveStockBatchAndExpiryHistory(PharmacyDbContext phrmdbcontext, RbacUser currentUser, DateTime currentDate, PHRMStockMaster newStockMaster)
+        {
+            var newStockHistoryBatchAndExpiry = new PHRMExpiryDateBatchNoHistoryModel()
+            {
+                StockId = newStockMaster.StockId ?? 0,
+                StartDate = currentDate,
+                BatchNo = newStockMaster.BatchNo,
+                ExpiryDate = newStockMaster.ExpiryDate,
+                CreatedBy = currentUser.EmployeeId,
+            };
+            phrmdbcontext.ExpiryDateBatchNoHistories.Add(newStockHistoryBatchAndExpiry);
+            phrmdbcontext.SaveChanges();
+        }
+
+        private static void SaveStockTransaction(PharmacyDbContext phrmdbcontext, RbacUser currentUser, DateTime currentDate, PHRMGoodsReceiptItemsModel gri, PHRMGoodsReceiptModel goodsReceiptData, PHRMStoreStockModel storeStock)
+        {
+            var newMainStockTxns = new PHRMStockTransactionModel(storeStock, ENUM_PHRM_StockTransactionType.PurchaseItem, goodsReceiptData.GoodReceiptDate, gri.GoodReceiptItemId, currentUser.EmployeeId, currentDate, goodsReceiptData.FiscalYearId);
+            newMainStockTxns.SetInOutQuantity(gri.ReceivedQuantity + gri.FreeQuantity, 0);
+            phrmdbcontext.StockTransactions.Add(newMainStockTxns);
+            phrmdbcontext.SaveChanges();
+        }
+
+        private static void SaveGoodReceiptItem(PharmacyDbContext phrmdbcontext, RbacUser currentUser, DateTime currentDate, PHRMGoodsReceiptItemsModel gri, PHRMGoodsReceiptModel goodsReceiptData, PHRMStoreStockModel storeStock)
+        {
+            gri.StockId = storeStock.StockId;
+            gri.StoreStockId = storeStock.StoreStockId.Value;
+            gri.GoodReceiptId = goodsReceiptData.GoodReceiptId;
+            gri.CreatedBy = currentUser.EmployeeId;
+            gri.CreatedOn = currentDate;
+            gri.AvailableQuantity = gri.ReceivedQuantity + gri.FreeQuantity;
+            if (gri.AvailableQuantity > 0)
+            {
+                gri.GrPerItemVATAmt = gri.VATAmount;
+                gri.GrPerItemDisAmt = gri.DiscountAmount;
+            }
+            phrmdbcontext.PHRMGoodsReceiptItems.Add(gri);
+            phrmdbcontext.SaveChanges();
+        }
+
+        private static void SaveStockMRPHistory(PharmacyDbContext phrmdbcontext, RbacUser currentUser, DateTime currentDate, PHRMStockMaster newStockMaster)
+        {
+            var newStockHistoryMRP = new PHRMMRPHistoryModel()
+            {
+                StockId = newStockMaster.StockId ?? 0,
+                StartDate = currentDate,
+                SalePrice = newStockMaster.SalePrice,
+                CreatedBy = currentUser.EmployeeId,
+            };
+            phrmdbcontext.MRPHistories.Add(newStockHistoryMRP);
+            phrmdbcontext.SaveChanges();
+        }
+
+        private static void SaveNewStockTransaction(PharmacyDbContext phrmdbcontext, RbacUser currentUser, DateTime currentDate, PHRMGoodsReceiptItemsModel gri, PHRMGoodsReceiptModel goodsReceiptData, PHRMStoreStockModel newStoreStock)
+        {
+            var newMainStockTxns = new PHRMStockTransactionModel(newStoreStock, ENUM_PHRM_StockTransactionType.PurchaseItem, goodsReceiptData.GoodReceiptDate, gri.GoodReceiptItemId, currentUser.EmployeeId, currentDate, goodsReceiptData.FiscalYearId);
+            newMainStockTxns.SetInOutQuantity(newStoreStock.AvailableQuantity, 0);
+            phrmdbcontext.StockTransactions.Add(newMainStockTxns);
+            phrmdbcontext.SaveChanges();
+        }
+
+        private static PHRMStoreStockModel SaveNewStoreStock(PharmacyDbContext phrmdbcontext, PHRMGoodsReceiptItemsModel gri, PHRMStoreModel mainStoreObj, PHRMStockMaster newStockMaster)
+        {
+            var newStoreStock = new PHRMStoreStockModel(newStockMaster, mainStoreObj.StoreId, (gri.ReceivedQuantity + gri.FreeQuantity), (decimal)gri.CostPrice, gri.SalePrice);
+            phrmdbcontext.StoreStocks.Add(newStoreStock);
+            phrmdbcontext.SaveChanges();
+            return newStoreStock;
+        }
+
+        private static PHRMStockMaster SaveMasterStock(PharmacyDbContext phrmdbcontext, RbacUser currentUser, DateTime currentDate, PHRMGoodsReceiptItemsModel gri)
+        {
+            PHRMStockMaster newStockMaster = CreateNewMasterStock(currentUser, currentDate, gri);
+            // add the new barcode id
+            AddNewBarCode(phrmdbcontext, currentUser, newStockMaster);
+
+            phrmdbcontext.StockMasters.Add(newStockMaster);
+            phrmdbcontext.SaveChanges();
+            return newStockMaster;
+        }
+
+        private static void AddNewBarCode(PharmacyDbContext phrmdbcontext, RbacUser currentUser, PHRMStockMaster newStockMaster)
+        {
+            var barcodeService = new PharmacyStockBarcodeService(phrmdbcontext);
+            newStockMaster.UpdateBarcodeId(barcodeService.AddStockBarcode(
+               stock: newStockMaster,
+               createdBy: currentUser.EmployeeId
+                ));
+        }
+
+        private static PHRMStockMaster CreateNewMasterStock(RbacUser currentUser, DateTime currentDate, PHRMGoodsReceiptItemsModel gri)
+        {
+            return new PHRMStockMaster(
+                                    itemId: gri.ItemId,
+                                    batchNo: gri.BatchNo,
+                                    expiryDate: gri.ExpiryDate,
+                                    costPrice: gri.CostPrice,
+                                    salePrice: gri.SalePrice,
+                                    createdBy: currentUser.EmployeeId,
+                                    createdOn: currentDate,
+                                    mrp: gri.MRP);
+        }
+
+        private static void UpdateAndSavePharmacySupplierLedgerTransaction(PharmacyDbContext phrmdbcontext, RbacUser currentUser, PHRMGoodsReceiptModel goodsReceiptData)
+        {
+            if (goodsReceiptData.TransactionType == "Credit")
+            {
+
+                var supplierLedger = phrmdbcontext.SupplierLedger.Where(s => s.SupplierId == goodsReceiptData.SupplierId).FirstOrDefault();
+                if (supplierLedger != null)
+                {
+                    supplierLedger.CreditAmount += goodsReceiptData.TotalAmount;
+                    supplierLedger.DebitAmount += 0;
+                    supplierLedger.BalanceAmount += goodsReceiptData.TotalAmount;
+
+
+                    var newSupplierLedgerTxn = new PHRMSupplierLedgerTransactionModel()
+                    {
+                        FiscalYearId = PharmacyBL.GetFiscalYear(phrmdbcontext).FiscalYearId,
+                        LedgerId = supplierLedger.LedgerId,
+                        SupplierId = supplierLedger.SupplierId,
+                        CreditAmount = goodsReceiptData.TotalAmount,
+                        DebitAmount = 0,
+                        ReferenceNo = goodsReceiptData.GoodReceiptId,
+                        TransactionType = ENUM_SupplierLedgerTransaction.GoodsReceipt,
+                        Remarks = null,
+                        IsActive = true,
+                        CreatedBy = currentUser.EmployeeId,
+                        CreatedOn = DateTime.Now
+
+                    };
+                    phrmdbcontext.SupplierLedgerTransactions.Add(newSupplierLedgerTxn);
+                }
+
+            }
+            else
+            {
+                var supplierLedger = phrmdbcontext.SupplierLedger.Where(s => s.SupplierId == goodsReceiptData.SupplierId).FirstOrDefault();
+                if (supplierLedger != null)
+                {
+                    supplierLedger.CreditAmount += goodsReceiptData.TotalAmount;
+                    supplierLedger.DebitAmount += goodsReceiptData.TotalAmount;
+                    supplierLedger.BalanceAmount += 0;
+
+
+                    var newSupplierLedgerTxnForCreditAmount = new PHRMSupplierLedgerTransactionModel()
+                    {
+                        FiscalYearId = PharmacyBL.GetFiscalYear(phrmdbcontext).FiscalYearId,
+                        LedgerId = supplierLedger.LedgerId,
+                        SupplierId = supplierLedger.SupplierId,
+                        CreditAmount = goodsReceiptData.TotalAmount,
+                        DebitAmount = 0,
+                        ReferenceNo = goodsReceiptData.GoodReceiptId,
+                        TransactionType = ENUM_SupplierLedgerTransaction.GoodsReceipt,
+                        Remarks = null,
+                        IsActive = true,
+                        CreatedBy = currentUser.EmployeeId,
+                        CreatedOn = DateTime.Now
+
+                    };
+                    phrmdbcontext.SupplierLedgerTransactions.Add(newSupplierLedgerTxnForCreditAmount);
+                }
+                phrmdbcontext.SaveChanges();
             }
         }
 
@@ -465,8 +550,10 @@ namespace DanpheEMR.Controllers
         /// 5. Update if prescription item is selected.
         /// Note: if above five transaction done successfully then Invoice Post done, If any one fails will all operation rollback
         /// </summary>
-        public static PHRMInvoiceTransactionModel InvoiceTransaction(PHRMInvoiceTransactionModel invoiceDataFromClient, PharmacyDbContext phrmdbcontext, MasterDbContext masterDbContext, RbacUser currentUser)
+        public static PHRMInvoiceTransactionModel InvoiceTransaction(PHRMInvoiceTransactionModel invoiceDataFromClient, PharmacyDbContext phrmdbcontext, RbacUser currentUser, bool realTimeSyncEnabled, bool realTimeSSFClaimBooking, IHubContext<FonePayHub> hubContext, IHttpContextAccessor contextAccessor, CoreDbContext coreDbContext, IInsuranceService insuranceService, string connString)
         {
+            var itemSchemeId = invoiceDataFromClient.InvoiceItems[0].SchemeId;
+            var patientScheme = phrmdbcontext.PatientSchemeMaps.Where(a => a.SchemeId == itemSchemeId && a.PatientId == invoiceDataFromClient.PatientId).FirstOrDefault();
             //Transaction Begin
             using (var dbContextTransaction = phrmdbcontext.Database.BeginTransaction())
             {
@@ -478,12 +565,19 @@ namespace DanpheEMR.Controllers
                     var currentFiscalYearId = GetFiscalYear(phrmdbcontext).FiscalYearId;
                     int? PatientVisitId = invoiceDataFromClient.PatientVisitId;
 
+                    // Serverside Validation for Capping Limit Check.
+                    ValidateInsuranceCapping(invoiceDataFromClient, phrmdbcontext, coreDbContext, insuranceService, patientScheme, currentDate);
 
                     ExtractInvoiceInfoOnlyFromInvoiceDataFromClient(invoiceDataFromClient, out invoiceItemFromClient, out invoiceCashTransaction);
 
                     SaveInvoice(invoiceDataFromClient, phrmdbcontext, currentUser, currentDate, currentFiscalYearId);
 
                     SaveInvoiceItems(invoiceDataFromClient, phrmdbcontext, currentUser, currentDate, invoiceItemFromClient, currentFiscalYearId);
+
+                    if (invoiceDataFromClient.IsSalesForPrescription)
+                    {
+                        UpdatePrescriptionItemsStatus(phrmdbcontext, invoiceItemFromClient);
+                    }
 
                     if (invoiceDataFromClient.PaymentMode == ENUM_BillPaymentMode.credit)
                     {
@@ -494,14 +588,9 @@ namespace DanpheEMR.Controllers
 
                     if (invoiceDataFromClient.DepositDeductAmount > 0)
                     {
-                        HandleDeposit(invoiceDataFromClient, phrmdbcontext, masterDbContext, currentUser, currentDate, currentFiscalYearId);
+                        HandleDeposit(invoiceDataFromClient, phrmdbcontext, currentUser, currentDate, currentFiscalYearId);
                     }
 
-                    //update prescriptionItems status  if sale from prescription then do this NBB-now we checking if there prescriptionid >0 then it's from prescription to sale
-                    if (invoiceDataFromClient.InvoiceItems[0].PrescriptionItemId != null)
-                    {
-                        UpdatePrescriptionItemStatus(invoiceDataFromClient, phrmdbcontext);
-                    }
                     if (invoiceDataFromClient.IsInsurancePatient == true)
                     {
                         UpdateInsuranceBalance(invoiceDataFromClient, phrmdbcontext);
@@ -514,15 +603,199 @@ namespace DanpheEMR.Controllers
                     UpdateStock(invoiceDataFromClient, phrmdbcontext, currentUser, currentDate, currentFiscalYearId, invoiceItemFromClient);
 
                     dbContextTransaction.Commit();
-                    return invoiceDataFromClient;
+
+                    //Send the Notification to client;
+                    if (invoiceDataFromClient.PaymentDetails != null && invoiceDataFromClient.PaymentDetails.ToLower().Contains(ENUM_OnlinePaymentMode.FonePay))
+                    {
+                        FonePayHub hub = new FonePayHub(hubContext, contextAccessor);
+                        InvoiceDetail invoiceDetail = new InvoiceDetail();
+                        invoiceDetail.InvoiceId = invoiceDataFromClient.InvoiceId;
+                        invoiceDetail.PaymentStatus = true;
+                        hub.SendNotification(currentUser.UserId.ToString(), invoiceDetail);
+                    }
+                    if (realTimeSyncEnabled)
+                    {
+                        if (invoiceDataFromClient.IsRealtime)
+                        {
+                            PHRMInvoiceTransactionModel invoiceSale = phrmdbcontext.PHRMInvoiceTransaction.Where(p => p.InvoiceId == invoiceDataFromClient.InvoiceId).FirstOrDefault();
+                            //finalInvoiceData = invoiceSale;
+                            return invoiceSale;
+                        }
+                        if (invoiceDataFromClient.IsReturn)
+                        {
+
+                            //Sud:24Dec'18--making parallel thread call (asynchronous) to post to IRD. so that it won't stop the normal execution of logic.
+                            Task.Run(() => PharmacyBL.SyncPHRMBillInvoiceToRemoteServer(invoiceDataFromClient, "phrm-invoice", phrmdbcontext));
+                        }
+                    }
+
+
                 }
                 catch (Exception ex)
                 {
                     dbContextTransaction.Rollback();
+                    Log.Error(@"Failed to save invoice. This transaction is rolled back. The error message is as follows:", ex);
                     throw ex;
                 }
             }
+
+            //Send to SSF Server for Real time ClaimBooking.
+            try
+            {
+
+                if (patientScheme != null)
+                {
+                    var scheme = phrmdbcontext.Schemes.FirstOrDefault(s => s.SchemeId == patientScheme.SchemeId);
+                    if (scheme != null && scheme.ApiIntegrationName != null && scheme.ApiIntegrationName.ToLower() == "ssf")
+                    {
+                        Log.Information($"The Real Time SSF Claim Booking is started from Dispensary Sales and is in process to book,Invoice PH{invoiceDataFromClient.InvoicePrintId} with ClaimCode {invoiceDataFromClient.ClaimCode}");
+                        var fiscalYear = phrmdbcontext.PharmacyFiscalYears.FirstOrDefault(f => f.FiscalYearId == invoiceDataFromClient.FiscalYearId);
+                        var fiscalYearFormatted = fiscalYear != null ? fiscalYear.FiscalYearName : "";
+                        //making parallel thread call (asynchronous) to post to SSF Server. so that it won't stop the normal BillingFlow.
+                        SSFDbContext ssfDbContext = new SSFDbContext(connString);
+                        var billObj = new SSF_ClaimBookingBillDetail_DTO()
+                        {
+                            InvoiceNoFormatted = $"{fiscalYearFormatted}-PH{invoiceDataFromClient.InvoicePrintId}",
+                            TotalAmount = invoiceDataFromClient.TotalAmount,
+                            ClaimCode = (long)invoiceDataFromClient.ClaimCode,
+                            VisitType = invoiceDataFromClient.VisitType
+                        };
+
+                        SSF_ClaimBookingService_DTO claimBooking = SSF_ClaimBookingService_DTO.GetMappedToBookClaim(billObj, patientScheme);
+
+                        Task.Run(() => BillingBL.SyncToSSFServer(claimBooking, "pharmacy", ssfDbContext, patientScheme, currentUser, realTimeSSFClaimBooking));
+
+                        Log.Information($"Parallel thread is created from Dispensary Sales to book, ssf Invoice PH{invoiceDataFromClient.InvoicePrintId} with ClaimCode {invoiceDataFromClient.ClaimCode}");
+
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                //Rohit/Krishna, 26thMarch' 24, Here Exception is handled for Real time claim Booking outside of the scope in order to handle the rollbacks issues and db scopes issues.
+                // We are not persisting the Remakrs in Database level for now, We will log this information in logger in new versions
+                var scheme = phrmdbcontext.Schemes.FirstOrDefault(s => s.SchemeId == patientScheme.SchemeId);
+                if (scheme != null && scheme.ApiIntegrationName.ToLower() == "ssf")
+                {
+
+                    if (String.IsNullOrEmpty(invoiceDataFromClient.Remark))
+                    {
+
+                        invoiceDataFromClient.Remark = "Invoice is not booked at real time";
+                    }
+                    else
+                    {
+                        invoiceDataFromClient.Remark = $"{invoiceDataFromClient.Remark} (Invoice is not booked at real time)";
+                    }
+                }
+            }
+
+            return invoiceDataFromClient;
         }
+
+        private static void ValidateInsuranceCapping(PHRMInvoiceTransactionModel invoiceDataFromClient, PharmacyDbContext phrmdbcontext, CoreDbContext coreDbContext, IInsuranceService insuranceService, PatientSchemeMapModel patientScheme, DateTime currentDate)
+        {
+            if (invoiceDataFromClient.IsCappingApplicable && patientScheme != null && patientScheme.PolicyNo != null)
+            {
+                var scheme = phrmdbcontext.Schemes.Where(a => a.SchemeId == patientScheme.SchemeId).FirstOrDefault();
+                if (scheme != null && scheme.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.NGHIS)
+                {
+                    var insuranceCappingResponse = new CappingResponseInfo();
+                    var CappingEntries = new List<CappingEntry>();
+                    if (scheme.UseCappingAPI)
+                    {
+                        insuranceCappingResponse = insuranceService.GetCappingResponseByCHFID(patientScheme.PolicyNo, coreDbContext).Result;
+                        CappingEntries = insuranceCappingResponse.entries;
+                        Log.Information($"Below are the insurance capping entries for this patient ({invoiceDataFromClient.PatientId}) at the time ({currentDate}) from the HIB Server", CappingEntries);
+                    }
+
+                    foreach (var item in invoiceDataFromClient.InvoiceItems)
+                    {
+                        decimal previouslySalesQty = 0;
+                        decimal remainingQty = 0;
+                        decimal totalQuantity = 0;
+                        if (item.IsCappingEnable)
+                        {
+                            if (scheme.UseCappingAPI)
+                            {
+                                if (CappingEntries != null && CappingEntries.Count > 0)
+                                {
+                                    var cappingEntry = CappingEntries.Where(a => a.Code == item.ItemCode).FirstOrDefault();
+                                    if (cappingEntry != null)
+                                    {
+                                        previouslySalesQty = cappingEntry.QtyUsed ?? 0;
+                                        remainingQty = cappingEntry.QtyRemain ?? 0;
+
+                                        totalQuantity = (decimal)item.Quantity;
+
+                                        if (totalQuantity > remainingQty)
+                                        {
+                                            decimal excessQuantity = totalQuantity - remainingQty;
+                                            throw new InvalidOperationException($"Capping Quantity is exceeded by {excessQuantity} for item {item.ItemName}");
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                previouslySalesQty = PharmacyBL.PreviouslySalesQuantityWithinCappingDaysLimit(phrmdbcontext, item.ItemId, invoiceDataFromClient.PatientId, item.CappingDaysLimit);
+
+                                totalQuantity = (decimal)item.Quantity + previouslySalesQty;
+
+                                if (totalQuantity > item.CappingQuantity)
+                                {
+                                    decimal excessQuantity = totalQuantity - item.CappingQuantity;
+                                    throw new InvalidOperationException($"Capping Quantity is exceeded by {excessQuantity} for item {item.ItemName}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void UpdatePrescriptionItemsStatus(PharmacyDbContext phrmdbcontext, List<PHRMInvoiceTransactionItemsModel> invoiceItemFromClient)
+        {
+            var prescriptionItemIdsFromClient = invoiceItemFromClient.Select(a => a.PrescriptionItemId).ToList();
+            var prescriptionItemsFromClientDictionary = invoiceItemFromClient.GroupBy(a => a.PrescriptionItemId)
+                                                                                        .ToDictionary(g => g.Key, g => g.Sum(item => item.Quantity)); // Sum up the quantities for duplicate PrescriptionItemId
+            string[] orderStatus = { ENUM_PrescriptionOrderStatus.Discarded, ENUM_PrescriptionOrderStatus.Final };
+            var prescriptionItemsFromServer = phrmdbcontext.PHRMPrescriptionItems.Where(a => prescriptionItemIdsFromClient.Contains(a.PrescriptionItemId)).ToList();
+
+            if (prescriptionItemsFromServer.Any(a => orderStatus.Contains(a.OrderStatus)))
+            {
+                throw new InvalidOperationException($"Some of the prescription are already modified");
+            }
+            foreach (var serverItem in prescriptionItemsFromServer)
+            {
+                if (prescriptionItemsFromClientDictionary.TryGetValue(serverItem.PrescriptionItemId, out var totalClientQuantity))
+                {
+                    serverItem.SalesQuantity += (decimal)totalClientQuantity;
+                    if (serverItem.SalesQuantity == serverItem.Quantity)
+                    {
+                        serverItem.OrderStatus = ENUM_PrescriptionOrderStatus.Final;
+                    }
+                    else
+                    {
+                        serverItem.OrderStatus = ENUM_PrescriptionOrderStatus.Partial;
+                    }
+                }
+            }
+            phrmdbcontext.SaveChanges();
+
+            int prescriptionId = prescriptionItemsFromServer[0].PrescriptionId;
+            var prescription = phrmdbcontext.PHRMPrescription.Where(a => a.PrescriptionId == prescriptionId).FirstOrDefault();
+            string[] status = { ENUM_PrescriptionOrderStatus.Active, ENUM_PrescriptionOrderStatus.Partial };
+
+            if (prescription != null)
+            {
+                prescription.PrescriptionStatus = phrmdbcontext.PHRMPrescriptionItems
+                                                                .Where(a => a.PrescriptionId == prescriptionId && status.Contains(a.OrderStatus))
+                                                                .All(a => a.Quantity == a.SalesQuantity && a.SalesQuantity > 0) ? ENUM_PrescriptionOrderStatus.Final : ENUM_PrescriptionOrderStatus.Partial;
+            }
+            phrmdbcontext.SaveChanges();
+        }
+
         private static int? GetDepositReceiptNo(PharmacyDbContext phrmdbcontext, int fiscalYearId)
         {
             int? receiptNo = (from depTxn in phrmdbcontext.BillingDepositModel
@@ -624,7 +897,24 @@ namespace DanpheEMR.Controllers
 
                         if (patientCreditLimitData.IpCreditLimit == 0 && patientCreditLimitData.OpCreditLimit == 0 && patientCreditLimitData.GeneralCreditLimit > 0 && patientCreditLimitData.GeneralCreditLimit >= invoiceDataFromClient.TotalAmount)
                         {
-                            patientCreditLimitData.GeneralCreditLimit = patientCreditLimitData.GeneralCreditLimit - invoiceDataFromClient.TotalAmount;
+                            if (invoiceDataFromClient.IsCopayment == true)
+                            {
+                                Boolean isTotalAmountSubtracted = phrmdbcontext.CFGParameters.Where(ap => ap.ParameterGroupName == "Insurance" && ap.ParameterName == "SubtractTotalAmountFromGeneralCreditLimitForCoPayment").Select(param => param.ParameterValue == "true" ? true : false).FirstOrDefault();
+
+                                if (isTotalAmountSubtracted == true)
+                                {
+                                    patientCreditLimitData.GeneralCreditLimit = patientCreditLimitData.GeneralCreditLimit - (decimal)invoiceDataFromClient.TotalAmount;
+                                }
+                                else
+                                {
+                                    patientCreditLimitData.GeneralCreditLimit = patientCreditLimitData.GeneralCreditLimit - (decimal)invoiceDataFromClient.CoPaymentCreditAmount;
+                                }
+                            }
+                            else
+                            {
+                                patientCreditLimitData.GeneralCreditLimit = patientCreditLimitData.GeneralCreditLimit - (decimal)invoiceDataFromClient.TotalAmount;
+
+                            }
                             phrmdbcontext.SaveChanges();
                         }
                     }
@@ -640,16 +930,6 @@ namespace DanpheEMR.Controllers
                     }
                 }
             }
-        }
-
-        private static void UpdatePrescriptionItemStatus(PHRMInvoiceTransactionModel invoiceDataFromClient, PharmacyDbContext phrmdbcontext)
-        {
-            //get items for status update after sale prescription items
-            var preItems = (from pres in phrmdbcontext.PHRMPrescriptionItems.AsEnumerable()
-                            join sale in invoiceDataFromClient.InvoiceItems
-                            on pres.PrescriptionItemId equals sale.PrescriptionItemId
-                            select pres).ToList();
-            var updatePresItemsOrderStatus = UpdatePrescriptionItems(preItems, phrmdbcontext);
         }
 
         private static void UpdateInsuranceBalance(PHRMInvoiceTransactionModel invoiceDataFromClient, PharmacyDbContext phrmdbcontext)
@@ -716,58 +996,57 @@ namespace DanpheEMR.Controllers
             }
         }
 
-        private static void HandleDeposit(PHRMInvoiceTransactionModel invoiceDataFromClient, PharmacyDbContext phrmdbcontext, MasterDbContext masterDbContext, RbacUser currentUser, DateTime currentDate, int currentFiscalYearId)
+        private static void HandleDeposit(PHRMInvoiceTransactionModel invoiceDataFromClient, PharmacyDbContext phrmdbcontext, RbacUser currentUser, DateTime currentDate, int currentFiscalYearId)
         {
             var DefaultDepositHead = phrmdbcontext.DepositHeadModels.FirstOrDefault(a => a.IsDefault == true);
             var DepositHeadId = DefaultDepositHead != null ? DefaultDepositHead.DepositHeadId : 0;
 
-            var depositDetails = phrmdbcontext.BillingDepositModel.Where(d => d.PatientId == invoiceDataFromClient.PatientId && d.PatientVisitId == invoiceDataFromClient.PatientVisitId).OrderByDescending(d => d.CreatedOn).FirstOrDefault();
+            decimal currentDepositBalance = PharmacyBL.CurrentDepositBalance(invoiceDataFromClient.PatientId, invoiceDataFromClient.DepositDeductAmount, 0, phrmdbcontext);
 
-            if (depositDetails != null)
+            BillingDepositModel dep = new BillingDepositModel()
             {
-                BillingDepositModel dep = new BillingDepositModel()
-                {
-                    TransactionType = ENUM_DepositTransactionType.DepositDeduct,
-                    ModuleName = ENUM_ModuleNames.Dispensary,
-                    OrganizationOrPatient = ENUM_Deposit_OrganizationOrPatient.Patient,
-                    DepositHeadId = DepositHeadId,
-                    IsActive = true,
-                    FiscalYearId = invoiceDataFromClient.FiscalYearId,
-                    Remarks = "deposit used for transactionid:" + "PH" + invoiceDataFromClient.InvoicePrintId + " on " + DateTime.Now.Date,
-                    CreatedBy = currentUser.EmployeeId,
-                    CreatedOn = DateTime.Now,
-                    CounterId = (int)invoiceDataFromClient.CounterId,
-                    PatientVisitId = invoiceDataFromClient.PatientVisitId,
-                    PatientId = invoiceDataFromClient.PatientId,
-                    OutAmount = invoiceDataFromClient.DepositDeductAmount,
-                    DepositBalance = depositDetails.DepositBalance - invoiceDataFromClient.DepositDeductAmount,
-                    PaymentMode = ENUM_BillPaymentMode.cash,
-                    ReceiptNo = GetDepositReceiptNo(phrmdbcontext, invoiceDataFromClient.FiscalYearId),
-                    VisitType = invoiceDataFromClient.VisitType
-                };
-                phrmdbcontext.BillingDepositModel.Add(dep);
-                phrmdbcontext.SaveChanges();
+                TransactionType = ENUM_DepositTransactionType.DepositDeduct,
+                ModuleName = ENUM_ModuleNames.Dispensary,
+                OrganizationOrPatient = ENUM_Deposit_OrganizationOrPatient.Patient,
+                DepositHeadId = DepositHeadId,
+                IsActive = true,
+                FiscalYearId = invoiceDataFromClient.FiscalYearId,
+                Remarks = "deposit used for transactionid:" + "PH" + invoiceDataFromClient.InvoicePrintId,
+                CreatedBy = currentUser.EmployeeId,
+                CreatedOn = DateTime.Now,
+                CounterId = invoiceDataFromClient.CounterId,
+                PatientVisitId = invoiceDataFromClient.PatientVisitId,
+                PatientId = invoiceDataFromClient.PatientId,
+                OutAmount = invoiceDataFromClient.DepositDeductAmount,
+                DepositBalance = currentDepositBalance - invoiceDataFromClient.DepositDeductAmount,
+                PaymentMode = ENUM_BillPaymentMode.cash,
+                ReceiptNo = GetDepositReceiptNo(phrmdbcontext, invoiceDataFromClient.FiscalYearId),
+                VisitType = invoiceDataFromClient.VisitType,
+                InvoiceId = invoiceDataFromClient.InvoiceId,
+                StoreId = invoiceDataFromClient.StoreId
+            };
+            phrmdbcontext.BillingDepositModel.Add(dep);
+            phrmdbcontext.SaveChanges();
 
-                //Save deposit deduct details on Employee Cash Transaction table.
-                List<PHRMEmployeeCashTransaction> empCashTxns = new List<PHRMEmployeeCashTransaction>();
-                PHRMEmployeeCashTransaction empCashTxn = new PHRMEmployeeCashTransaction();
-                PaymentModes MstPaymentModes = masterDbContext.PaymentModes.Where(a => a.PaymentSubCategoryName.ToLower() == "deposit").FirstOrDefault();
-                empCashTxn.ReferenceNo = dep.DepositId;
-                empCashTxn.InAmount = 0;
-                empCashTxn.OutAmount = invoiceDataFromClient.DepositDeductAmount;
-                empCashTxn.PaymentModeSubCategoryId = MstPaymentModes.PaymentSubCategoryId;
-                empCashTxn.PatientId = invoiceDataFromClient.PatientId;
-                empCashTxn.EmployeeId = currentUser.EmployeeId;
-                empCashTxn.CounterID = invoiceDataFromClient.CounterId;
-                empCashTxn.TransactionDate = currentDate;
-                empCashTxn.TransactionType = ENUM_PHRM_EmpCashTxnTypes.DepositDeduct;
-                empCashTxn.ModuleName = ENUM_ModuleNames.Pharmacy;
-                empCashTxn.Remarks = "deduct from deposit";
-                empCashTxn.IsActive = true;
-                empCashTxn.FiscalYearId = currentFiscalYearId;
-                empCashTxns.Add(empCashTxn);
-                SaveEmployeeCashTransaction(empCashTxns, phrmdbcontext);
-            }
+            //Save deposit deduct details on Employee Cash Transaction table.
+            List<PHRMEmployeeCashTransaction> empCashTxns = new List<PHRMEmployeeCashTransaction>();
+            PHRMEmployeeCashTransaction empCashTxn = new PHRMEmployeeCashTransaction();
+            PaymentModes MstPaymentModes = phrmdbcontext.PaymentModes.Where(a => a.PaymentSubCategoryName.ToLower() == "deposit").FirstOrDefault();
+            empCashTxn.ReferenceNo = dep.DepositId;
+            empCashTxn.InAmount = 0;
+            empCashTxn.OutAmount = invoiceDataFromClient.DepositDeductAmount;
+            empCashTxn.PaymentModeSubCategoryId = MstPaymentModes.PaymentSubCategoryId;
+            empCashTxn.PatientId = invoiceDataFromClient.PatientId;
+            empCashTxn.EmployeeId = currentUser.EmployeeId;
+            empCashTxn.CounterID = invoiceDataFromClient.CounterId;
+            empCashTxn.TransactionDate = currentDate;
+            empCashTxn.TransactionType = ENUM_PHRM_EmpCashTxnTypes.DepositDeduct;
+            empCashTxn.ModuleName = ENUM_ModuleNames.Pharmacy;
+            empCashTxn.Remarks = "deduct from deposit";
+            empCashTxn.IsActive = true;
+            empCashTxn.FiscalYearId = currentFiscalYearId;
+            empCashTxns.Add(empCashTxn);
+            SaveEmployeeCashTransaction(empCashTxns, phrmdbcontext);
 
         }
 
@@ -822,7 +1101,7 @@ namespace DanpheEMR.Controllers
             invoiceItemFromClient.ForEach(item =>
             {
                 item.InvoiceId = invoiceDataFromClient.InvoiceId;
-                item.PerItemDisAmt = (decimal)(((item.SubTotal * Convert.ToDecimal(item.DiscountPercentage)) / 100) / (decimal)item.Quantity);
+                item.PerItemDisAmt = (((item.SubTotal * Convert.ToDecimal(item.DiscountPercentage)) / 100) / (decimal)item.Quantity);
                 item.CreatedOn = currentDate;
                 item.CreatedBy = currentUser.EmployeeId;
                 item.PatientId = invoiceDataFromClient.PatientId;
@@ -830,6 +1109,7 @@ namespace DanpheEMR.Controllers
                 item.BilItemStatus = invoiceDataFromClient.BilStatus;
                 item.VisitType = invoiceDataFromClient.VisitType;
                 item.FiscalYearId = fiscalYearId;
+                item.PreviousSalePrice = item.SalePrice;
                 if (item.NarcoticsRecord.NMCNumber != null)
                 {
                     item.NarcoticsRecord.ItemId = item.ItemId;
@@ -849,6 +1129,7 @@ namespace DanpheEMR.Controllers
             invoiceDataFromClient.CreateOn = currentDate;
             invoiceDataFromClient.CreatedBy = currentUser.EmployeeId;
             invoiceDataFromClient.Creditdate = invoiceDataFromClient.BilStatus == "unpaid" ? (DateTime?)currentDate : null;
+            invoiceDataFromClient.OrganizationId = invoiceDataFromClient.PaymentMode == "credit" ? invoiceDataFromClient.OrganizationId : null;
             phrmdbcontext.PHRMInvoiceTransaction.Add(invoiceDataFromClient);
             phrmdbcontext.SaveChanges();
         }
@@ -888,6 +1169,7 @@ namespace DanpheEMR.Controllers
             transactionCreditBillStatus.PatientVisitId = invoiceDataFromClient.PatientVisitId;
             transactionCreditBillStatus.SchemeId = invoiceDataFromClient.SchemeId;
             transactionCreditBillStatus.MemberNo = invoiceDataFromClient.PolicyNo;
+            transactionCreditBillStatus.ClaimCode = invoiceDataFromClient.ClaimCode;
             phrmdbcontext.PHRMTransactionCreditBillStatus.Add(transactionCreditBillStatus);
             phrmdbcontext.SaveChanges();
         }
@@ -936,6 +1218,7 @@ namespace DanpheEMR.Controllers
                 catch (Exception ex)
                 {
                     dbContextTransaction.Rollback();
+                    Log.ForContext("UserId", currentUser.EmployeeId).Error("Failed to save provisional" + ex.Message);
                     throw ex;
                 }
             }
@@ -946,8 +1229,8 @@ namespace DanpheEMR.Controllers
             int fiscalYearId = GetFiscalYear(phrmdbcontext).FiscalYearId;
 
             int provisionalReceiptNo = (from txn in phrmdbcontext.PHRMInvoiceTransactionItems
-                                 where txn.FiscalYearId == fiscalYearId
-                                 select txn.ReceiptNo ?? 0).DefaultIfEmpty(0).Max();
+                                        where txn.FiscalYearId == fiscalYearId
+                                        select txn.ReceiptNo ?? 0).DefaultIfEmpty(0).Max();
             return provisionalReceiptNo + 1;
         }
 
@@ -959,9 +1242,40 @@ namespace DanpheEMR.Controllers
             int? PrescriberId = invoiceItems[0].PrescriberId;
             int? PatientVisitId = invoiceItems[0].PatientVisitId;
             int ReceiptNo = (int)invoiceItems[0].ReceiptNo;
+            int StoreId = invoiceItems[0].StoreId;
+
+            var itemIds = invoiceItems.Select(a => a.ItemId).ToList();
+
+            var rackDetails = (from itemrack in pharmacyDbContext.PHRMRackItem.Where(ri => itemIds.Contains(ri.ItemId) && ri.StoreId == StoreId)
+                               join rack in pharmacyDbContext.PHRMRack on itemrack.RackId equals rack.RackId
+                               select new
+                               {
+                                   itemrack.ItemId,
+                                   rack.RackNo
+                               }).ToList();
+            var items = pharmacyDbContext.PHRMItemMaster.Where(a => itemIds.Contains(a.ItemId)).ToList();
+
+            // Create a dictionary that maps ItemId to RackNo
+            var rackNoDictionary = rackDetails.ToDictionary(r => r.ItemId, r => r.RackNo);
+            var itemDictionary = items.ToDictionary(r => r.ItemId);
+            invoiceItems.ForEach(i =>
+            {
+                if (rackNoDictionary.TryGetValue(i.ItemId, out var rackNo))
+                {
+                    i.RackNo = rackNo;
+                }
+                if (itemDictionary.TryGetValue(i.ItemId, out var tempItem))
+                {
+                    i.HSCode = tempItem.HSCode;
+                }
+            });
+
 
             var PatientInfo = (from pat in pharmacyDbContext.PHRMPatient.Where(p => p.PatientId == PatientId)
                                join consub in pharmacyDbContext.CountrySubDivision on pat.CountrySubDivisionId equals consub.CountrySubDivisionId
+                               join country in pharmacyDbContext.Countries on pat.CountryId equals country.CountryId
+                               join mun in pharmacyDbContext.Municipalities on pat.MunicipalityId equals mun.MunicipalityId into munGroup
+                               from MunicipalityModel in munGroup.DefaultIfEmpty()
                                select new PatientInfo_DTO
                                {
                                    PatientId = pat.PatientId,
@@ -973,7 +1287,11 @@ namespace DanpheEMR.Controllers
                                    Age = pat.Age,
                                    DateOfBirth = pat.DateOfBirth,
                                    PhoneNumber = pat.PhoneNumber,
-                                   PANNumber = pat.PANNumber
+                                   PANNumber = pat.PANNumber,
+                                   CountryName = country.CountryName,
+                                   MunicipalityName = MunicipalityModel != null ? MunicipalityModel.MunicipalityName : null,
+                                   WardNumber = pat.WardNumber,
+
                                }).FirstOrDefault();
 
             var UserName = pharmacyDbContext.Employees.Where(emp => emp.EmployeeId == CreatedBy).FirstOrDefault().FullName;
@@ -984,20 +1302,20 @@ namespace DanpheEMR.Controllers
             var provisionalInvoice = new PharmacyProvisionalSale_DTO()
             {
                 PatientInfo = PatientInfo,
-                UserName=UserName,
+                UserName = UserName,
                 ProvisionalInvoiceItems = DanpheJSONConvert.DeserializeObject<List<PharmacyProvisionalSaleItem_DTO>>(DanpheJSONConvert.SerializeObject(invoiceItems)),
                 InvoiceDate = InvoiceDate,
                 ProviderNMCNumber = prescriberDetail != null ? prescriberDetail.MedCertificationNo : "N/A",
                 ProviderName = prescriberDetail != null ? prescriberDetail.FullName : "ANONYMOUS DOCTOR",
                 ClaimCode = SchemDetail != null ? SchemDetail.LatestClaimCode : null,
                 PolicyNo = SchemDetail != null ? SchemDetail.PolicyNo : null,
-                SubTotal=invoiceItems.Sum(a=>a.SubTotal),
+                SubTotal = invoiceItems.Sum(a => a.SubTotal),
                 DiscountAmount = invoiceItems.Sum(a => a.TotalDisAmt),
                 VATAmount = invoiceItems.Sum(a => a.VATAmount),
                 TotalAmount = invoiceItems.Sum(a => a.TotalAmount),
                 CoPaymentCashAmount = invoiceItems.Sum(a => a.CoPaymentCashAmount),
                 CoPaymentCreditAmount = invoiceItems.Sum(a => a.CoPaymentCreditAmount),
-                ReceiptNo =ReceiptNo
+                ReceiptNo = ReceiptNo
             };
             return provisionalInvoice;
         }
@@ -1064,7 +1382,9 @@ namespace DanpheEMR.Controllers
                 item.ReceiptNo = GetProvisionalReceiptNumber(pharmacyDbContext);
                 item.CreatedOn = currentDate;
                 item.CreatedBy = currentUser.EmployeeId;
-                item.InvoiceId =item.InvoiceId==0? null :item.InvoiceId;
+                item.InvoiceId = item.InvoiceId == 0 ? null : item.InvoiceId;
+                item.VisitType = item.VisitType is null ? ENUM_VisitType.outpatient : item.VisitType;
+                item.PreviousSalePrice = item.SalePrice;
             });
             pharmacyDbContext.PHRMInvoiceTransactionItems.AddRange(invoiceItems);
             pharmacyDbContext.SaveChanges();
@@ -1255,9 +1575,9 @@ namespace DanpheEMR.Controllers
                     returnToSupplierObj.CreatedOn = currentDate;
                     returnToSupplierObj.CreatedBy = currentUser.EmployeeId;
 
-                    var returnToSupplierItems = SystemExtension.Clone(returnToSupplierObj.returnToSupplierItems);
+                    var returnToSupplierItems = SystemExtension.Clone(returnToSupplierObj.ReturnToSupplierItems);
 
-                    returnToSupplierObj.returnToSupplierItems.ForEach(retItem =>
+                    returnToSupplierObj.ReturnToSupplierItems.ForEach(retItem =>
                     {
                         nowReturningQty = retItem.Quantity;
                         var grItemDetails = (from gri in phrmdbcontext.PHRMGoodsReceiptItems.Where(a => a.StockId == retItem.StockId && a.BatchNo == retItem.BatchNo)
@@ -1291,7 +1611,7 @@ namespace DanpheEMR.Controllers
 
                     foreach (var rtsitemClone in returnToSupplierItems)
                     {
-                        var matchingOriginalItem = returnToSupplierObj.returnToSupplierItems
+                        var matchingOriginalItem = returnToSupplierObj.ReturnToSupplierItems
                             .FirstOrDefault(rtsitemOriginal =>
                                 rtsitemOriginal.ItemId == rtsitemClone.ItemId &&
                                 rtsitemOriginal.BatchNo == rtsitemClone.BatchNo);
@@ -1733,6 +2053,7 @@ namespace DanpheEMR.Controllers
                 catch (Exception ex)
                 {
                     dbContextTransaction.Rollback();
+                    Log.Error($"Failed to save credit note", ex);
                     return false;
                     throw ex;
                 }
@@ -1756,7 +2077,7 @@ namespace DanpheEMR.Controllers
                                     where txnItem.InvoiceId == invid
                                     select txnItem.PriceCategoryId).DefaultIfEmpty(0).Max();
 
-            int? SettlementId = SaveSettlement(ClientData, phrmdbcontext, currentUser);
+            SaveSettlement(ClientData, phrmdbcontext, currentUser);
 
 
 
@@ -1765,7 +2086,6 @@ namespace DanpheEMR.Controllers
             ClientData.CreditNoteId = newCreditNoteNum;
             ClientData.CreatedOn = currentDate;
             ClientData.CreatedBy = currentUser.EmployeeId;
-            ClientData.SettlementId = SettlementId;
             ClientData.OrganizationId = ClientData.OrganizationId == 0 ? null : ClientData.OrganizationId;
             ClientData.InvoiceReturnItems.ForEach(returnedItem =>
             {
@@ -1779,9 +2099,8 @@ namespace DanpheEMR.Controllers
             phrmdbcontext.SaveChanges();
         }
 
-        private static int? SaveSettlement(PHRMInvoiceReturnModel ClientData, PharmacyDbContext phrmdbcontext, RbacUser currentUser)
+        private static void SaveSettlement(PHRMInvoiceReturnModel ClientData, PharmacyDbContext phrmdbcontext, RbacUser currentUser)
         {
-            int? SettlementId = null;
             if (ClientData.CashDiscount > 0)
             {
                 PHRMSettlementModel settlement = new PHRMSettlementModel();
@@ -1799,9 +2118,7 @@ namespace DanpheEMR.Controllers
 
                 phrmdbcontext.PHRMSettlements.Add(settlement);
                 phrmdbcontext.SaveChanges();
-                SettlementId = settlement.SettlementId;
             }
-            return SettlementId;
         }
 
         private static void SaveEmployeeCashTransaction(PHRMInvoiceReturnModel ClientData, PharmacyDbContext phrmdbcontext, RbacUser currentUser, DateTime currentDate, PharmacyFiscalYear currFiscalYear, MasterDbContext masterDbContext)
@@ -1827,22 +2144,50 @@ namespace DanpheEMR.Controllers
                 empTxns.Add(emptxn);
             }
 
-            PHRMEmployeeCashTransaction empTxn = new PHRMEmployeeCashTransaction();
-            empTxn.PaymentModeSubCategoryId = MstPaymentModes.PaymentSubCategoryId;
-            empTxn.CounterID = ClientData.CounterId;
-            empTxn.TransactionType = ENUM_PHRM_EmpCashTxnTypes.SalesReturn;
-            empTxn.OutAmount = ClientData.ReturnCashAmount;
-            empTxn.ReferenceNo = ClientData.InvoiceReturnId;
-            empTxn.PatientId = ClientData.PatientId;
-            empTxn.EmployeeId = currentUser.EmployeeId;
-            empTxn.ModuleName = ENUM_ModuleNames.Dispensary;
-            empTxn.TransactionDate = currentDate;
-            empTxn.Remarks = "sales-return";
-            empTxn.IsActive = true;
-            empTxn.FiscalYearId = currFiscalYear.FiscalYearId;
-            empTxns.Add(empTxn);
-            phrmdbcontext.phrmEmployeeCashTransaction.AddRange(empTxns);
-            phrmdbcontext.SaveChanges();
+            if (ClientData.PaymentMode == ENUM_BillPaymentMode.credit && ClientData.SettlementId != null)   // This settlement is from Client.
+            {
+                if (ClientData.ReturnCreditAmount > 0)
+                {
+                    PHRMEmployeeCashTransaction empTxn = new PHRMEmployeeCashTransaction();
+                    empTxn.PaymentModeSubCategoryId = MstPaymentModes.PaymentSubCategoryId;
+                    empTxn.CounterID = ClientData.CounterId;
+                    empTxn.TransactionType = ENUM_PHRM_EmpCashTxnTypes.SalesReturn;
+                    empTxn.OutAmount = ClientData.ReturnCreditAmount;
+                    empTxn.ReferenceNo = ClientData.InvoiceReturnId;
+                    empTxn.PatientId = ClientData.PatientId;
+                    empTxn.EmployeeId = currentUser.EmployeeId;
+                    empTxn.ModuleName = ENUM_ModuleNames.Dispensary;
+                    empTxn.TransactionDate = currentDate;
+                    empTxn.Remarks = "sales-return";
+                    empTxn.IsActive = true;
+                    empTxn.FiscalYearId = currFiscalYear.FiscalYearId;
+                    empTxns.Add(empTxn);
+                    phrmdbcontext.phrmEmployeeCashTransaction.AddRange(empTxns);
+                    phrmdbcontext.SaveChanges();
+                }
+            }
+            else
+            {
+                if (ClientData.ReturnCashAmount > 0)
+                {
+                    PHRMEmployeeCashTransaction empTxn = new PHRMEmployeeCashTransaction();
+                    empTxn.PaymentModeSubCategoryId = MstPaymentModes.PaymentSubCategoryId;
+                    empTxn.CounterID = ClientData.CounterId;
+                    empTxn.TransactionType = ENUM_PHRM_EmpCashTxnTypes.SalesReturn;
+                    empTxn.OutAmount = ClientData.ReturnCashAmount;
+                    empTxn.ReferenceNo = ClientData.InvoiceReturnId;
+                    empTxn.PatientId = ClientData.PatientId;
+                    empTxn.EmployeeId = currentUser.EmployeeId;
+                    empTxn.ModuleName = ENUM_ModuleNames.Dispensary;
+                    empTxn.TransactionDate = currentDate;
+                    empTxn.Remarks = "sales-return";
+                    empTxn.IsActive = true;
+                    empTxn.FiscalYearId = currFiscalYear.FiscalYearId;
+                    empTxns.Add(empTxn);
+                    phrmdbcontext.phrmEmployeeCashTransaction.AddRange(empTxns);
+                    phrmdbcontext.SaveChanges();
+                }
+            }
         }
 
         private static void UpdatePharmacyCreditStatusAndCreditBalance(PharmacyDbContext pharmacyDbContext, PHRMInvoiceReturnModel phrmInvoiceReturn, RbacUser currentUser)
@@ -1893,17 +2238,31 @@ namespace DanpheEMR.Controllers
             if (patientSchemeMapDetails != null && phrmInvoiceReturn.IsCoPayment == true)
             {
                 var patientVisitDetails = pharmacyDbContext.PHRMPatientVisit.OrderByDescending(a => a.PatientVisitId).FirstOrDefault(a => a.PatientVisitId == phrmCreditStatusObj.PatientVisitId);
+                var scheme = pharmacyDbContext.Schemes.FirstOrDefault(a => a.SchemeId == patientVisitDetails.SchemeId);
                 if (patientVisitDetails != null)
                 {
-                    if (patientVisitDetails.VisitType.ToLower() != ENUM_VisitType.inpatient.ToLower())
+                    if (patientVisitDetails.VisitType.ToLower() != ENUM_VisitType.inpatient.ToLower() && !scheme.IsGeneralCreditLimited)
                     {
                         patientSchemeMapDetails.OpCreditLimit = patientSchemeMapDetails.OpCreditLimit + phrmInvoiceReturn.TotalAmount;
                         pharmacyDbContext.Entry(patientSchemeMapDetails).Property(p => p.OpCreditLimit).IsModified = true;
                     }
-                    else
+                    else if (patientVisitDetails.VisitType.ToLower() != ENUM_VisitType.outpatient.ToLower() && !scheme.IsGeneralCreditLimited)
                     {
                         patientSchemeMapDetails.IpCreditLimit = (decimal)(patientSchemeMapDetails.IpCreditLimit + phrmInvoiceReturn.TotalAmount);
                         pharmacyDbContext.Entry(patientSchemeMapDetails).Property(p => p.IpCreditLimit).IsModified = true;
+                    }
+                    else
+                    {
+                        Boolean isTotalAmountSubtracted = pharmacyDbContext.CFGParameters.Where(ap => ap.ParameterGroupName == "Insurance" && ap.ParameterName == "SubtractTotalAmountFromGeneralCreditLimitForCoPayment").Select(param => param.ParameterValue == "true" ? true : false).FirstOrDefault();
+
+                        if (isTotalAmountSubtracted == true)
+                        {
+                            patientSchemeMapDetails.GeneralCreditLimit = patientSchemeMapDetails.GeneralCreditLimit + phrmInvoiceReturn.TotalAmount;
+                        }
+                        else
+                        {
+                            patientSchemeMapDetails.GeneralCreditLimit = patientSchemeMapDetails.GeneralCreditLimit + phrmInvoiceReturn.ReturnCreditAmount;
+                        }
                     }
                     patientSchemeMapDetails.ModifiedBy = currentUser.EmployeeId;
                     patientSchemeMapDetails.ModifiedOn = DateTime.Now;
@@ -1912,7 +2271,6 @@ namespace DanpheEMR.Controllers
                     pharmacyDbContext.Entry(patientSchemeMapDetails).Property(p => p.ModifiedOn).IsModified = true;
                     pharmacyDbContext.SaveChanges();
 
-                    var scheme = pharmacyDbContext.Schemes.FirstOrDefault(a => a.SchemeId == patientVisitDetails.SchemeId);
                     if (scheme != null && scheme.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.Medicare)
                     {
                         UpdateMedicareBalanceAfterReturn(patientVisitDetails, pharmacyDbContext, phrmInvoiceReturn.TotalAmount);
@@ -2702,36 +3060,6 @@ namespace DanpheEMR.Controllers
         }
         #endregion
 
-        #region Update Prescription Items Order Status
-        public static Boolean UpdatePrescriptionItems(List<PHRMPrescriptionItemModel> presItems, PharmacyDbContext phrmdbcontext)
-        {
-            try
-            {
-                if (presItems != null)
-                {
-                    presItems.ForEach(itm =>
-                    {
-                        itm.OrderStatus = "final";
-                        phrmdbcontext.PHRMPrescriptionItems.Attach(itm);
-                        // phrmdbcontext.Entry(grItm).State = EntityState.Modified;                       
-                        phrmdbcontext.Entry(itm).Property(x => x.OrderStatus).IsModified = true;
-                    });
-                    int i = phrmdbcontext.SaveChanges();
-                    return (i > 0) ? true : false;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-
-        }
-        #endregion
-
         #region Method for check all flag from flaglist
         public static Boolean CheckFlagList(List<Boolean> flagList)
         {
@@ -2772,11 +3100,18 @@ namespace DanpheEMR.Controllers
                 {
                     item.CreatedOn = currentDate;
                     item.CreatedBy = currentUser.EmployeeId;
-                    item.PendingQuantity = item.Quantity;
+                    item.PendingQuantity = item.IsPacking ? (double)item.PackingQty : item.Quantity;
                     item.POItemStatus = ENUM_PharmacyPurchaseOrderStatus.Active;
                     item.PendingFreeQuantity = item.FreeQuantity;
                 });
-                purchaseOrder.VerifierIds = SerializePHRMPOVerifiers(purchaseOrderDTO.VerifierList);
+                if (purchaseOrderDTO.VerifierList.Count > 0)
+                {
+                    purchaseOrder.VerifierIds = SerializePHRMPOVerifiers(purchaseOrderDTO.VerifierList);
+                }
+                else
+                {
+                    purchaseOrder.VerifierIds = null;
+                }
                 purchaseOrder.POStatus = purchaseOrder.IsVerificationEnabled ? ENUM_PharmacyPurchaseOrderStatus.Pending : ENUM_PharmacyPurchaseOrderStatus.Active;
                 purchaseOrder.CreatedOn = currentDate;
                 purchaseOrder.CreatedBy = currentUser.EmployeeId;
@@ -2838,13 +3173,14 @@ namespace DanpheEMR.Controllers
                         //find Store Stock for the particular Gr items;
                         var storeStock = phrmdbcontext.StoreStocks.Include(a => a.StockMaster).Where(s => s.StoreStockId == grItem.StoreStockId).FirstOrDefault();
 
+                        double RemainingStockQty = storeStock.AvailableQuantity - grItem.AvailableQuantity;
                         //If stock is unavailabe, throw exception
-                        if (grItem.AvailableQuantity != storeStock.AvailableQuantity) throw new Exception($"The quantity of the stock has been modified for Item = {grItem.ItemName}, Batch = {grItem.BatchNo}.");
+                        if (RemainingStockQty < 0) throw new Exception($"The quantity of the stock has been modified for Item = {grItem.ItemName}, Batch = {grItem.BatchNo}.");
 
                         //If stock is available, proceed cancel
 
                         //Update the stock quantity to 0
-                        storeStock.UpdateAvailableQuantity(0);
+                        storeStock.UpdateAvailableQuantity(RemainingStockQty);
 
                         //Add transaction data in stock transaction table
                         var stockTxn = new PHRMStockTransactionModel(
@@ -2883,6 +3219,7 @@ namespace DanpheEMR.Controllers
 
         public static void SyncPHRMBillInvoiceToRemoteServer(object billToPost, string billType, PharmacyDbContext dbContext)
         {
+            var irdConfigs = GetIrdConfigurations(dbContext);
             IRDLogModel irdLog = new IRDLogModel();
             if (billType == "phrm-invoice")
             {
@@ -2896,7 +3233,7 @@ namespace DanpheEMR.Controllers
                     invoiceTxn.FiscalYear = GetFiscalYearNameById(dbContext, invoiceTxn.FiscalYearId);
                     IRD_PHRMBillSaleViewModel invoicebill = IRD_PHRMBillSaleViewModel.GetMappedInvoiceForIRD(invoiceTxn, true);
                     irdLog.JsonData = JsonConvert.SerializeObject(invoicebill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceToIRD(invoicebill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceToIRD(invoicebill, irdConfigs);
                 }
                 catch (Exception ex)
                 {
@@ -2925,7 +3262,7 @@ namespace DanpheEMR.Controllers
 
                 irdLog.BillType = billType;
                 irdLog.ResponseMessage = responseMsg;
-                PostIRDLog(irdLog, dbContext);
+                PostIRDLog(irdLog, dbContext, irdConfigs);
             }
             else if (billType == "phrm-invoice-return")
             {
@@ -2940,7 +3277,7 @@ namespace DanpheEMR.Controllers
                     IRD_PHRMBillSaleReturnViewModel salesRetBill = IRD_PHRMBillSaleReturnViewModel.GetMappedPhrmSalesReturnBillForIRD(invoiceRet, true);
                     salesRetBill.credit_note_number = GetCreditNoteNumberByInvoiceId(dbContext, invoiceRet.InvoiceId).ToString();
                     irdLog.JsonData = JsonConvert.SerializeObject(salesRetBill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceReturnToIRD(salesRetBill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceReturnToIRD(salesRetBill, irdConfigs);
                 }
                 catch (Exception ex)
                 {
@@ -2969,10 +3306,19 @@ namespace DanpheEMR.Controllers
                 dbContext.SaveChanges();
                 irdLog.BillType = billType;
                 irdLog.ResponseMessage = responseMsg;
-                PostIRDLog(irdLog, dbContext);
+                PostIRDLog(irdLog, dbContext, irdConfigs);
             }
         }
-
+        private static IrdConfigsDTO GetIrdConfigurations(PharmacyDbContext dbContext)
+        {
+            var param = dbContext.CFGParameters.FirstOrDefault(p => p.ParameterGroupName == "IRD" && p.ParameterName == "IrdSyncConfig");
+            if (param != null)
+            {
+                var irdConfigs = DanpheJSONConvert.DeserializeObject<IrdConfigsDTO>(param.ParameterValue);
+                return irdConfigs;
+            }
+            return new IrdConfigsDTO();
+        }
         public static string GetInnerMostException(Exception ex)
         {
             Exception currentEx = ex;
@@ -2983,24 +3329,23 @@ namespace DanpheEMR.Controllers
             return currentEx.Message;
         }
 
-        public static void PostIRDLog(IRDLogModel irdLogdata, PharmacyDbContext dbContext)
+        public static void PostIRDLog(IRDLogModel irdLogdata, PharmacyDbContext dbContext, IrdConfigsDTO irdConfigs)
         {
             try
             {
                 irdLogdata.CreatedOn = DateTime.Now;
-
-                string url_IRDNepal = ConfigurationManager.AppSettings["url_IRDNepal"];
+                string url_IRDNepal = irdConfigs.url_IRDNepal; //ConfigurationManager.AppSettings["url_IRDNepal"];
                 switch (irdLogdata.BillType)
                 {
                     case "phrm-invoice":
                         {
-                            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesIRDNepal"];
+                            string api_SalesIRDNepal = irdConfigs.api_SalesIRDNepal; //ConfigurationManager.AppSettings["api_SalesIRDNepal"];
                             irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesIRDNepal;
                             break;
                         }
                     case "phrm-invoice-return":
                         {
-                            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
+                            string api_SalesIRDNepal = irdConfigs.api_SalesReturnIRDNepal; //ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
                             irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesIRDNepal;
                             break;
                         }
@@ -3241,14 +3586,28 @@ namespace DanpheEMR.Controllers
         }
         #endregion
 
-        public static async Task<int> DirectDispatch(List<PHRMDispatchItemsModel> dispatchedItems, PharmacyDbContext db, RbacUser currentUser)
+        public static int DirectDispatch(List<PHRMDispatchItemsModel> dispatchedItems, PharmacyDbContext db, RbacUser currentUser)
         {
             using (var dbResource = db.Database.BeginTransaction())
             {
                 try
                 {
+                    var dispatchId = db.StoreDispatchItems.Select(a => a.DispatchId).DefaultIfEmpty(0).Max() + 1;
                     var currentDateTime = DateTime.Now;
                     var currentFiscalYearId = GetFiscalYear(db).FiscalYearId;
+                    if (dispatchedItems.Count > 0 && dispatchedItems[0].IssueNo != null)
+                    {
+                        var issueNoToSearch = dispatchedItems[0].IssueNo;
+                        var dispatchDetail = (from D in db.StoreDispatchItems where D.IssueNo == issueNoToSearch select D).FirstOrDefault();
+                        if (dispatchDetail != null)
+                        {
+                            bool IsIssueNoAlreadyPresent = db.StoreRequisition.Any(s => s.RequisitionId == dispatchDetail.RequisitionId && s.FiscalYearId == currentFiscalYearId);
+                            if (IsIssueNoAlreadyPresent)
+                            {
+                                throw new Exception("Duplicate IssueNo is not allowed for the same fiscal year");
+                            }
+                        }
+                    }
                     //var mainStoreCategory = ENUM_StoreCategory.Store;
                     var mainStoreObj = db.PHRMStore.Where(s => s.Category == ENUM_StoreCategory.Store && s.SubCategory == ENUM_StoreSubCategory.Pharmacy).FirstOrDefault();
                     if (mainStoreObj == null)
@@ -3284,21 +3643,10 @@ namespace DanpheEMR.Controllers
                         }).ToList()
                     };
                     db.StoreRequisition.Add(requisition);
-                    await db.SaveChangesAsync();
+                    db.SaveChanges();
                     requisition.RequisitionItems.ForEach(item => item.RequisitionId = requisition.RequisitionId);
-                    await db.SaveChangesAsync();
-                    int dispatchId=0;
+                    db.SaveChanges();
                     //Add data in store dispatchItem table
-                    if (dispatchedItems[0].DispatchId == null )
-                    {
-                         dispatchId = (from D in db.StoreDispatchItems
-                                          select D.DispatchId).DefaultIfEmpty(0).Max() ?? 0;
-                        dispatchId++;
-                    }
-                    else
-                    {
-                        dispatchId = (int)dispatchedItems[0].DispatchId;
-                    }
                     for (int i = 0; i < dispatchedItems.Count(); i++)
                     {
                         dispatchedItems[i].SourceStoreId = mainStoreObj.StoreId;
@@ -3311,12 +3659,12 @@ namespace DanpheEMR.Controllers
                         db.StoreDispatchItems.Add(dispatchedItems[i]);
                     }
                     //Save Dispatch Items
-                    await db.SaveChangesAsync();
+                    db.SaveChanges();
 
                     //Find the stock to be decreased for each dispatched item
                     foreach (var dispatchItem in dispatchedItems)
                     {
-                        var stockList = await db.StoreStocks.Include(s => s.StockMaster).Where(s => s.StoreId == dispatchItem.SourceStoreId && s.ItemId == dispatchItem.ItemId && s.AvailableQuantity > 0 && s.StockMaster.BatchNo == dispatchItem.BatchNo && s.StockMaster.ExpiryDate == dispatchItem.ExpiryDate && s.StockMaster.CostPrice == dispatchItem.CostPrice && s.StockMaster.SalePrice == dispatchItem.SalePrice && s.IsActive == true).ToListAsync();                        //If no stock found, stop the process
+                        var stockList = db.StoreStocks.Include(s => s.StockMaster).Where(s => s.StoreId == dispatchItem.SourceStoreId && s.ItemId == dispatchItem.ItemId && s.AvailableQuantity > 0 && s.StockMaster.BatchNo == dispatchItem.BatchNo && s.StockMaster.ExpiryDate == dispatchItem.ExpiryDate && s.StockMaster.CostPrice == dispatchItem.CostPrice && s.StockMaster.SalePrice == dispatchItem.SalePrice && s.IsActive == true).ToList();                        //If no stock found, stop the process
                         if (stockList == null) throw new Exception($"Stock is not available for ItemId = {dispatchItem.ItemId}, BatchNo ={dispatchItem.BatchNo}");
                         //If total available quantity is less than the required/dispatched quantity, then stop the process
                         if (stockList.Sum(s => s.AvailableQuantity) < dispatchItem.DispatchedQuantity) throw new Exception($"Stock is not available for ItemId = {dispatchItem.ItemId}, BatchNo ={dispatchItem.BatchNo}");
@@ -3336,7 +3684,7 @@ namespace DanpheEMR.Controllers
 
                             //Increase Stock in PHRM_DispensaryStock
                             //Find if the stock is available in dispensary
-                            var dispensaryStock = await db.StoreStocks.FirstOrDefaultAsync(s => s.StockId == mainStoreStock.StockId && s.StoreId == dispatchItem.TargetStoreId && s.IsActive == true);
+                            var dispensaryStock = db.StoreStocks.FirstOrDefault(s => s.StockId == mainStoreStock.StockId && s.StoreId == dispatchItem.TargetStoreId && s.IsActive == true);
                             // check if receive feature is enabled, to decide whether to increase in stock or increase unconfirmed quantity
                             var isReceiveFeatureEnabled = db.CFGParameters
                                                             .Where(param => param.ParameterGroupName == "Pharmacy" && param.ParameterName == "EnableReceiveItemsInDispensary")
@@ -3352,7 +3700,7 @@ namespace DanpheEMR.Controllers
                                                                 costPrice: dispatchItem.CostPrice,
                                                                 salePrice: dispatchItem.SalePrice);
                                 db.StoreStocks.Add(dispensaryStock);
-                                await db.SaveChangesAsync();
+                                db.SaveChanges();
                             }
                             //Add Txn in PHRM_StockTxnItems table
                             var dispensaryStockTxn = new PHRMStockTransactionModel(dispensaryStock, ENUM_PHRM_StockTransactionType.DispatchedItemReceivingSide, dispatchItem.DispatchedDate ?? currentDateTime, dispatchItem.DispatchItemsId, currentUser.EmployeeId, currentDateTime, currentFiscalYearId);
@@ -3394,7 +3742,7 @@ namespace DanpheEMR.Controllers
 
                             db.StockTransactions.Add(stockTxn);
                             db.StockTransactions.Add(dispensaryStockTxn);
-                            await db.SaveChangesAsync();
+                            db.SaveChanges();
 
                             if (totalRemainingQty == 0)
                             {
@@ -3806,6 +4154,89 @@ namespace DanpheEMR.Controllers
             int referenceNo = (from po in db.PHRMPurchaseOrderItems
                                select po.PurchaseOrderId).DefaultIfEmpty(0).Max();
             return referenceNo + 1;
+        }
+
+        /// <summary>
+        /// This method calculate total sales quantity of particular item within the capping days limit of particular patient.
+        /// </summary>
+        /// <param name="phrmDBContext"></param>
+        /// <param name="itemId"></param>
+        /// <param name="patientId"></param>
+        /// <param name="cappingDaysLimit"></param>
+        /// <returns>Return Total Sales Quantity of particular item within the capping days limit of particular patient.</returns>
+        public static decimal PreviouslySalesQuantityWithinCappingDaysLimit(PharmacyDbContext phrmDBContext, int itemId, int patientId, int cappingDaysLimit)
+        {
+            var checkingDate = DateTime.Now.AddDays(-cappingDaysLimit);
+
+            var result = phrmDBContext.PHRMInvoiceTransactionItems
+                .Where(invitem => invitem.ItemId == itemId && invitem.PatientId == patientId && invitem.CreatedOn >= checkingDate)
+                .GroupJoin(phrmDBContext.PHRMInvoiceReturnItemsModel,
+                    invitem => invitem.InvoiceItemId,
+                    invret => invret.InvoiceItemId,
+                    (invitem, invretGroup) => new
+                    {
+                        SalesQty = invitem.Quantity,
+                        ReturnQty = invretGroup.Sum(ret => (double?)ret.Quantity) ?? 0
+                    })
+                .ToList();
+
+            var totalSalesQty = result.Sum(x => x.SalesQty);
+            var totalReturnQty = result.Sum(x => x.ReturnQty);
+
+            var netQuantity = totalSalesQty - totalReturnQty;
+            return netQuantity > 0 ? (decimal)netQuantity : 0;
+        }
+
+        /// <summary>
+        /// This method check if deposit is available for deduction or return.
+        /// </summary>
+        /// <param name="PatientId"></param>
+        /// <param name="DepositDeductAmount"></param>
+        /// <param name="DepositReturnAmount"></param>
+        /// <param name="_pharmacyDbContext"></param>
+        /// <returns>This method return current deposit balance if available.</returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        public static decimal CurrentDepositBalance(int PatientId, decimal DepositDeductAmount, decimal DepositReturnAmount, PharmacyDbContext _pharmacyDbContext)
+        {
+            // Retrieve the deposit flag once
+            bool depositFlag = _pharmacyDbContext.CFGParameters
+                                 .Where(ap => ap.ParameterGroupName == "Pharmacy" && ap.ParameterName == "UsePharmacyDeposit")
+                                 .Select(param => param.ParameterValue == "true")
+                                 .FirstOrDefault();
+
+            // Group and calculate deposit-related sums in a single query
+            var depositSums = _pharmacyDbContext.BillingDepositModel
+                .Where(bill => bill.PatientId == PatientId &&
+                               (depositFlag ? bill.ModuleName == "Dispensary" : true))
+                .GroupBy(bill => bill.TransactionType)
+                .Select(g => new
+                {
+                    DepositType = g.Key,
+                    SumInAmount = g.Sum(bill => bill.InAmount),
+                    SumOutAmount = g.Sum(bill => bill.OutAmount)
+                })
+                .ToDictionary(x => x.DepositType);
+
+            // Get sums for each transaction type, defaulting to 0 if not present
+            decimal totalDepositAmt = depositSums.TryGetValue(ENUM_DepositTransactionType.Deposit, out var deposit) ? deposit.SumInAmount : 0;
+            decimal totalDepositDeductAmt = depositSums.TryGetValue(ENUM_DepositTransactionType.DepositDeduct, out var deduct) ? deduct.SumOutAmount : 0;
+            decimal totalDepositReturnAmt = depositSums.TryGetValue(ENUM_DepositTransactionType.ReturnDeposit, out var returnAmt) ? returnAmt.SumOutAmount : 0;
+
+            // Calculate the current deposit balance
+            decimal currentDepositBalance = totalDepositAmt - totalDepositDeductAmt - totalDepositReturnAmt;
+
+            // Validate the deposit balance
+            if (currentDepositBalance <= 0 || currentDepositBalance < DepositDeductAmount)
+            {
+                throw new InvalidOperationException("Deposit balance not available for this patient.");
+            }
+
+            if (currentDepositBalance < DepositReturnAmount)
+            {
+                throw new InvalidOperationException("Deposit balance is less than the Deposit Return Amount.");
+            }
+
+            return currentDepositBalance;
         }
     }
 

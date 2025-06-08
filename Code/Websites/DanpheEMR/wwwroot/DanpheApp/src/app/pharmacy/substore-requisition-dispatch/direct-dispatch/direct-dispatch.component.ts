@@ -9,6 +9,7 @@ import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_StoreCategory } from '../../../shared/shared-enums';
 import { SharedModule } from '../../../shared/shared.module';
+import { PharmacyStoreStockDetail } from '../../shared/dtos/pharmacy-store-stock-detail';
 import { PharmacyStore_DTO } from '../../shared/dtos/pharmacy-store.dto';
 import { PharmacyBLService } from '../../shared/pharmacy.bl.service';
 import { PharmacyService } from '../../shared/pharmacy.service';
@@ -22,7 +23,7 @@ import { PHRMStoreDispatchItems } from '../../shared/phrm-store-dispatch-items.m
 export class DirectDispatchComponent implements OnInit {
 
   public dispatchItems: Array<PHRMStoreDispatchItems> = new Array<PHRMStoreDispatchItems>();
-  public stockList: Array<any> = new Array<any>();
+  public stockList: PharmacyStoreStockDetail[] = [];
   public checkIsItemPresent: boolean = false;
   public dispensaryList: Array<PharmacyStore_DTO> = new Array<PharmacyStore_DTO>();
   public filteredDispensaryList: Array<PharmacyStore_DTO> = new Array<PharmacyStore_DTO>();
@@ -41,12 +42,13 @@ export class DirectDispatchComponent implements OnInit {
   DispatchId: number = null;
 
   DispatchNo: number = null;
+  IssueNo: number = null;
   constructor(private _dispensaryService: DispensaryService,
     public changeDetectorRef: ChangeDetectorRef, public pharmacyBLService: PharmacyBLService,
     public securityService: SecurityService, public pharmacyService: PharmacyService,
     public router: Router, public sharedModule: SharedModule,
     public messageBoxService: MessageboxService,
-    public coreService: CoreService,) {
+    public coreService: CoreService, private _pharmacyService: PharmacyService) {
     ////pushing currentPOItem for the first Row in UI 
     this.AddRowRequest();
     this.GetStockForItemDispatch();
@@ -57,20 +59,7 @@ export class DirectDispatchComponent implements OnInit {
   ngOnInit() {
   }
   GetStockForItemDispatch() {
-    this.pharmacyBLService.GetMainStoreStock()
-      .subscribe(res => {
-        if (res.Status == "OK") {
-          this.stockList = res.Results;
-          //filter the stock with 0 quantity
-          this.stockList = this.stockList.filter(s => s.AvailableQuantity > 0);
-        }
-        else {
-          this.messageBoxService.showMessage("error", ["Failed to get Items. " + res.ErrorMessage]);
-        }
-      },
-        err => {
-          this.messageBoxService.showMessage("error", ["Failed to get Items. " + err.ErrorMessage]);
-        });
+    this.stockList = this.pharmacyService.getStockForItemDispatch();
   }
   GetStoresList() {
     // this._dispensaryService.GetAllDispensaryList()
@@ -108,50 +97,56 @@ export class DirectDispatchComponent implements OnInit {
   SelectItemFromSearchBox(Item: any, index) {
     //if proper item is selected then the below code runs ..othewise it goes out side the function
     if (typeof Item === "object" && !Array.isArray(Item) && Item !== null) {
-      //this for loop with if conditon is to check whether the  item is already present in the array or not 
+      //this for loop with if conditon is to check whether the  item is already present in the array or not
       //means to avoid duplication of item
-      for (var i = 0; i < this.dispatchItems.length; i++) {
-        if (this.dispatchItems[i].ItemId == Item.ItemId && this.dispatchItems[i].BatchNo == Item.BatchNo && index != i) {
-          this.checkIsItemPresent = true;
+      let IsItemExpired: boolean = false;
+      IsItemExpired = this.CheckIfItemExpired(Item);
+      if (!IsItemExpired) {
+        for (var i = 0; i < this.dispatchItems.length; i++) {
+          if (this.dispatchItems[i].ItemId == Item.ItemId && this.dispatchItems[i].BatchNo == Item.BatchNo && this.dispatchItems[i].CostPrice == Item.CostPrice && index != i) {
+            this.checkIsItemPresent = true;
+          }
+        }
+        //id item is present the it show alert otherwise it assign the value
+        if (this.checkIsItemPresent == true) {
+          this.messageBoxService.showMessage("notice-message", [`Item: ${Item.ItemName} Batch: ${Item.BatchNo} CostPrice: ${Item.CostPrice} is already add..Please Check!!!`]);
+          this.checkIsItemPresent = false;
+          this.changeDetectorRef.detectChanges();
+          this.dispatchItems.splice(index, 1);
+          this.AddRowRequest();
+          var interval = setTimeout(() => { this.SetFocusOnItemName(index); clearTimeout(interval); }, 300);
+
+        }
+        else {
+          this.dispatchItems[index].ItemId = Item.ItemId;
+          this.dispatchItems[index].ItemCode = Item.Code;
+          this.dispatchItems[index].UOMName = Item.UOMName;
+          this.dispatchItems[index].BatchNo = Item.BatchNo;
+          this.dispatchItems[index].ExpiryDate = Item.ExpiryDate;
+          this.dispatchItems[index].AvailableQuantity = Item.AvailableQuantity;
+          this.dispatchItems[index].SalePrice = Item.SalePrice;
+          this.dispatchItems[index].CostPrice = Item.CostPrice;
+
+          let selectedGeneric = this.genericList.filter(a => a.GenericId == Item.GenericId)
+          this.dispatchItems[index].selectedGeneneric = selectedGeneric[0];
+          this.dispatchItems[index].GenericId = Item.GenericId;
+          this.dispatchItems[index].RackNo = Item.RackNo;
+          this.GetRackByItemId(Item.ItemId, this.dispatchItems[0].TargetStoreId, index);
+
         }
       }
-      //id item is present the it show alert otherwise it assign the value
-      if (this.checkIsItemPresent == true) {
-        this.messageBoxService.showMessage("notice-message", [`Item: ${Item.ItemName} Batch: ${Item.BatchNo} is already add..Please Check!!!`]);
-        this.checkIsItemPresent = false;
-        this.changeDetectorRef.detectChanges();
-        this.dispatchItems.splice(index, 1);
-        this.AddRowRequest();
-        var interval = setTimeout(() => { this.SetFocusOnItemName(index); clearTimeout(interval); }, 300);
-
-      }
       else {
-        this.dispatchItems[index].ItemId = Item.ItemId;
-        this.dispatchItems[index].ItemCode = Item.Code;
-        this.dispatchItems[index].UOMName = Item.UOMName;
-        this.dispatchItems[index].BatchNo = Item.BatchNo;
-        this.dispatchItems[index].ExpiryDate = Item.ExpiryDate;
-        this.dispatchItems[index].AvailableQuantity = Item.AvailableQuantity;
-        this.dispatchItems[index].SalePrice = Item.SalePrice;
-        this.dispatchItems[index].CostPrice = Item.CostPrice;
-
-        let selectedGeneric = this.genericList.filter(a => a.GenericId == Item.GenericId)
-        this.dispatchItems[index].selectedGeneneric = selectedGeneric[0];
-        this.dispatchItems[index].GenericId = Item.GenericId;
-        this.dispatchItems[index].RackNo = Item.RackNo;
-        this.GetRackByItemId(Item.ItemId, this.dispatchItems[0].TargetStoreId, index);
-
+        this.dispatchItems[index] = new PHRMStoreDispatchItems();
       }
     }
   }
   DirectDispatch() {
-    if (this.showSubstore && !this.DispatchNo) {
+    if (this.showSubstore && !this.IssueNo) {
       return this.messageBoxService.showMessage(ENUM_DanpheHTTPResponses.Failed, ["Issue No is required for direct dispatch to Sub Store"]);
     }
-    this.loading = true;
-    var errorMessages: Array<string> = [];
-    var CheckIsValid = true;
-    for (var b in this.directDispatchForm.controls) {
+    let errorMessages: Array<string> = [];
+    let CheckIsValid = true;
+    for (let b in this.directDispatchForm.controls) {
       this.directDispatchForm.controls[b].markAsDirty();
       this.directDispatchForm.controls[b].updateValueAndValidity();
     }
@@ -160,7 +155,7 @@ export class DirectDispatchComponent implements OnInit {
       this.messageBoxService.showMessage("Failed", ["Check all *mandatory fields."])
     }
     else {
-      for (var i = 0; i < this.dispatchItems.length; i++) {
+      for (let i = 0; i < this.dispatchItems.length; i++) {
         //Assign all the dispatchitems with the zero index dispatch items as we are saving all the details in only first dispatch item. 
         this.dispatchItems[i].TargetStoreId = this.selectedDispensary.StoreId;
         this.dispatchItems[i].DispatchedDate = this.dispatchItems[0].DispatchedDate;
@@ -180,11 +175,21 @@ export class DirectDispatchComponent implements OnInit {
           CheckIsValid = false;
         }
       }
+      if (this.dispatchItems && this.dispatchItems.length && this.dispatchItems.some(i => i.DispatchItemValidator.invalid)) {
+        const InvalidItems = this.dispatchItems.filter(i => i.DispatchItemValidator.invalid);
+        if (InvalidItems && InvalidItems.length) {
+          InvalidItems.forEach(item => {
+            errorMessages.push(`Some input fields are not valid for ${item.SelectedItem.ItemName}`);
+          });
+          CheckIsValid = false;
+        }
+      }
     }
     if (CheckIsValid == true) {
-      if (this.showSubstore && this.DispatchNo) {
-        this.dispatchItems.forEach(item => item.DispatchId = this.DispatchNo);
+      if (this.showSubstore && this.IssueNo) {
+        this.dispatchItems.forEach(item => item.IssueNo = this.IssueNo);
       }
+      this.loading = true;
       this.pharmacyBLService.PostDirectDispatch(this.dispatchItems)
         .finally(() => this.loading = false)
         .subscribe((res: DanpheHTTPResponse) => {
@@ -254,16 +259,21 @@ export class DirectDispatchComponent implements OnInit {
   ////used to format display item in ng-autocomplete
   ItemListFormatter(data: any): string {
     let html = "";
-    let todaysDate = new Date();
-    todaysDate.setMonth(todaysDate.getMonth() + 3);
+    let date = new Date();
+    let datenow = date.setMonth(date.getMonth() + 0);
+    let datethreemonth = date.setMonth(date.getMonth() + 3);
     let expiryDate = new Date(data["ExpiryDate"]);
-    if (expiryDate < todaysDate) {
+    let expDate = expiryDate.setMonth(expiryDate.getMonth() + 0);
+    if (expDate < datenow) {
       html = `<font color='crimson'; size=03 >${data["ItemName"]}</font> <b>|Unit |${data["UOMName"]}</b> |E:${moment(data["ExpiryDate"]).format('YYYY-MM-DD')} |B.No.|${data["BatchNo"]} |Qty|${data["AvailableQuantity"]} |SalePrice|${data["SalePrice"]}`;
     }
-    else {
+    if (expDate < datethreemonth && expDate > datenow) {
+
+      html = `<font  color='#FFBF00'; size=03 >${data["ItemName"]}</font><b>|Unit|${data["Unit"]}</b> |E:${moment(data["ExpiryDate"]).format('YYYY-MM-DD')} |B.No.|${data["BatchNo"]} |Qty|${data["AvailableQuantity"]} |SalePrice|${data["SalePrice"]}`;
+    }
+    if (expDate > datethreemonth) {
       html = `<font color='blue'; size=03 >${data["ItemName"]}</font> <b>|Unit |${data["UOMName"]}</b> |E:${moment(data["ExpiryDate"]).format('YYYY-MM-DD')} |B.No.|${data["BatchNo"]} |Qty|${data["AvailableQuantity"]} |SalePrice|${data["SalePrice"]}`;
     }
-    // html = `<font color='blue'; size=03 >${data["ItemName"]}</font> (<i>${data["GenericName"]}</i>)- Batch: ${data.BatchNo} - Qty: ${data.AvailableQuantity}`;
     return html;
   }
   Cancel() {
@@ -318,12 +328,7 @@ export class DirectDispatchComponent implements OnInit {
     }, 20);
   }
   public getGenericList() {
-    this.pharmacyBLService.GetGenericList()
-      .subscribe(res => {
-        if (res.Status == "OK") {
-          this.genericList = res.Results;
-        }
-      });
+    this.genericList = this.pharmacyService.GetGenericList();
   }
   phrmGenericListFormatter(data: any): string {
     let html = "";
@@ -381,6 +386,24 @@ export class DirectDispatchComponent implements OnInit {
     }
     else {
       this.filteredDispensaryList = this.dispensaryList.filter(a => a.Category === ENUM_StoreCategory.Dispensary);
+    }
+  }
+
+  ngOnDestroy() {
+    this.stockList = [];
+    this.pharmacyService.setStockForItemDispatch(this.stockList);
+  }
+  CheckIfItemExpired(Item): boolean {
+    if (Item && Item.ExpiryDate) {
+      let date = new Date();
+      let datenow = date.setMonth(date.getMonth() + 0);
+      let expiryDate = new Date(Item.ExpiryDate);
+      let expDate = expiryDate.setMonth(expiryDate.getMonth() + 0);
+      if (expDate < datenow) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Expired Item cannot be dispatched"])
+        return true;
+      }
+      return false;
     }
   }
 }

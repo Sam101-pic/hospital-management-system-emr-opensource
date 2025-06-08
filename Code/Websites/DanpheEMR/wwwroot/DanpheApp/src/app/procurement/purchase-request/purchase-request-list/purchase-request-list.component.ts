@@ -5,7 +5,7 @@ import { CoreService } from '../../../core/shared/core.service';
 import { InventoryService } from '../../../inventory/shared/inventory.service';
 import { PurchaseRequestModel } from '../../../inventory/shared/purchase-request.model';
 import { GridEmitModel } from '../../../shared/danphe-grid/grid-emit.model';
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
 import ProcurementGridColumns from '../../shared/procurement-grid-column';
@@ -60,6 +60,8 @@ export class PurchaseRequestListComponent implements OnInit {
     }
   }
   GetPORequisition() {
+    this.PurchaseRequestList = [];
+    this.PurchsaeRequestListFiltered = [];
     this.procBLService.GetPORequisition(this.fromDate, this.toDate)
       .subscribe(res => {
         if (res.Status == "OK" && res.Results.length > 0) {

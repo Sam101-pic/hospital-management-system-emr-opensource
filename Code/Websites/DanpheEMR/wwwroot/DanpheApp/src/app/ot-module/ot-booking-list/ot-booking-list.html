@@ -17,11 +17,12 @@
         OT Booking</button>
     <div>
         <danphe-grid [grid-colDefaults]="OTBookingList" [grid-data]="otData"
-            (grid-actions)="OTBookingListGidActions($event)">
+                     (grid-actions)="OTBookingListGidActions($event)">
         </danphe-grid>
     </div>
 </div>
 
-<ot-booking-add *ngIf="showAddPage" [selectedOtPatient]="selectedOtPatientData" [editMode]="editMode"
-    (callBackAddClose)="GetBackFromOtBookingAdd($event)">
+<ot-booking-add
+                *ngIf="showAddPage" [selectedOtPatient]="selectedOtPatientData" [editMode]="editMode"
+                (callBackAddClose)="GetBackFromOtBookingAdd($event)">
 </ot-booking-add>

@@ -7,7 +7,8 @@ import { SecurityService } from "../../security/shared/security.service";
 import { CommonFunctions } from '../../shared/common.functions';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { RouteFromService } from "../../shared/routefrom.service";
-import { ENUM_ACC_RouteFrom } from "../../shared/shared-enums";
+import { ENUM_ACC_RouteFrom, ENUM_DanpheHTTPResponses, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from "../../shared/shared-enums";
+import { FiscalYearModel } from "../settings/shared/fiscalyear.model";
 import { AccountingBLService } from "../shared/accounting.bl.service";
 import { AccountingService } from "../shared/accounting.service";
 import { TransactionViewModel } from "./shared/transaction.model";
@@ -40,17 +41,12 @@ export class TransactionViewComponent {
   public totaldr: number = 0;
   public totalcr: number = 0;
   public userCashCollection: Array<{ UserName, SalesDr, SalesCr, DepositDr, DepositCr, Total }> = [];
-  public sectionId: number = 0;
   public showExportbtn: boolean = false;
-  // for edit manual voucher to show edit btn
-  // public editmanualVoucher: boolean = false;
   public IsShowReceivedBy: boolean = false;
   public Iseditable: boolean = false;
   public showeditPage: boolean = false;
   public fiscalYearId: number;
-  public fiscalYId: any;
-
-  public editvoucherNumber: string = null;
+  public HospitalId: number = 1;
   public showPrint: boolean = false;
   public printDetaiils: any;
   public IsReverse: boolean = false;
@@ -65,17 +61,28 @@ export class TransactionViewComponent {
     "EnableSubLedger": false,
     "EnableCostCenter": false
   };
+
+  public CurrentActiveHospitalId: number = 1;
+
+  SignatureMenu = [
+    {
+      Action: "",
+      Label: ""
+    }];
+  SelectedVoucherFiscalYear = new FiscalYearModel();
+  IsFiscalYearClosed: boolean = false;
   constructor(public coreService: CoreService,
     public accBLService: AccountingBLService,
     public msgBoxServ: MessageboxService,
     public changeDetector: ChangeDetectorRef, public routeFrom: RouteFromService,
     public accountingService: AccountingService, public router: Router,
     public securityService: SecurityService) {
-    this.fromDate = moment().format('YYYY-MM-DD');
-    this.toDate = moment().format('YYYY-MM-DD');
+    this.fromDate = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
+    this.toDate = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
     this.showExport();
     this.showVoucherHead();
     this.GetParameter();
+    this.CurrentActiveHospitalId = this.securityService.AccHospitalInfo.ActiveHospitalId;
   }
 
   public showEditbtn: boolean = true;
@@ -130,20 +137,28 @@ export class TransactionViewComponent {
       if (param)
         this.AllowVoucherEditAfterVerification = param.EnableVoucherEdit;
     }
+
+    let voucherSignParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Accounting" && a.ParameterName === "AccVoucherSignatures");
+    if (voucherSignParam) {
+      let param = JSON.parse(voucherSignParam.ParameterValue);
+      if (param) {
+        this.SignatureMenu = param;
+      }
+    }
   }
 
   public GetTxn(transactionId: number) {
     try {
       this.accBLService.GetTransaction(transactionId)
         .subscribe(res => {
-          if (res.Status == "OK") {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
             this.transaction = res.Results;
             this.Calculate(false);
             this.viewTxn = true;
             this.autofocus();
           }
           else {
-            this.msgBoxServ.showMessage("failed", ['Invalid Transaction Id.']);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Invalid Transaction Id.']);
             console.log(res.ErrorMessage)
           }
 
@@ -162,13 +177,13 @@ export class TransactionViewComponent {
       //   this.editmanualVoucher = true;
       // }
 
-      this.accBLService.GetTransactionbyVoucher(vouchernumber, 0, this.fiscalYearId)
+      this.accBLService.GetTransactionbyVoucher(vouchernumber, 0, this.fiscalYearId, this.HospitalId)
         .subscribe(res => {
-          if (res.Status == "OK" && res.Results != null) {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results !== null) {
             let data = res.Results;
             this.voucherNumber = vouchernumber;
-            if (data.txnList != null) {
-              if (data.txnList.IsEditable == true && this.showEditbtn == true) {
+            if (data.txnList !== null) {
+              if (data.txnList.IsEditable === true && this.showEditbtn === true) {
                 this.Iseditable = true;
               }
 
@@ -293,6 +308,16 @@ export class TransactionViewComponent {
                 }
                 this.Calculate(false);
               }
+              let remarks = this.transaction.Remarks;
+              if (remarks) {
+                let index = remarks.indexOf("12:00:00");
+                if (index >= 0) {
+                  this.transaction.Remarks = remarks.substring(0, index);
+                }
+              }
+              if (this.transaction.TransactionItems && this.transaction.TransactionItems.length > 0) {
+                this.sortTransactionItemsByDrCr(this.transaction.TransactionItems);
+              }
               ////NageshBB: 02sep2020: we are showing 0 amount details in voucher page
               // for (var i = 0; i < this.transaction.TransactionItems.length; i++) {
               //   if (this.transaction.TransactionItems[i].Amount == 0) {
@@ -304,12 +329,12 @@ export class TransactionViewComponent {
               this.autofocus();
             }
             else {
-              this.msgBoxServ.showMessage("failed", ['Invalid Voucher Number']);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Invalid Voucher Number']);
             }
           }
           else {
             //  this.msgBoxServ.showMessage("failed", ['Invalid Voucher Number']);
-            this.msgBoxServ.showMessage("Error", [res.ErrorMessage]);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [res.ErrorMessage]);
             //  console.log(res.ErrorMessage)
           }
 
@@ -382,7 +407,12 @@ export class TransactionViewComponent {
       this.fiscalYearId = _fiscalyearid;
     }
   }
-
+  @Input("HospitalId")
+  public set HospitalIds(_hospitalid) {
+    if (_hospitalid) {
+      this.HospitalId = _hospitalid;
+    }
+  }
   @Input("voucherNumber")
   public set value(val: string) {
     if (val) {
@@ -480,7 +510,7 @@ export class TransactionViewComponent {
   public ShowCatchErrMessage(exception) {
     if (exception) {
       let ex: Error = exception;
-      this.msgBoxServ.showMessage("error", ["Check error in Console log !"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Check error in Console log !"]);
       console.log("Error Messsage =>  " + ex.message);
       console.log("Stack Details =>   " + ex.stack);
     }
@@ -588,10 +618,17 @@ export class TransactionViewComponent {
       // this.router.navigate(['/Accounting/Transaction/EditVoucher']);
       // this.showeditPage = true;
       //this.Close();
-      this.accountingService.copyVoucherData = this.transaction;
-      this.routeFrom.RouteFrom = ENUM_ACC_RouteFrom.EditVoucher;
-      this.viewTxn = false;
-      this.showeditPage = true;
+      this.CheckIsFiscalYearClosed();
+      if (this.IsFiscalYearClosed) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['The selected fiscal year is closed. This action is not allowed.']);
+        return;
+      }
+      else {
+        this.accountingService.copyVoucherData = this.transaction;
+        this.routeFrom.RouteFrom = ENUM_ACC_RouteFrom.EditVoucher;
+        this.viewTxn = false;
+        this.showeditPage = true;
+      }
     }
     catch (ex) {
       this.ShowCatchErrMessage(ex);
@@ -656,6 +693,7 @@ export class TransactionViewComponent {
     //  });
     //  //console.log("from edit item component.");
     //  //console.log(this.docDDLSource);
+    console.log("J");
   }
 
   //ngOnDestroy() {
@@ -675,43 +713,48 @@ export class TransactionViewComponent {
   }
   // Reverse Voucher:20-Aug-2020
   reversevoucher() {
-
-    this.txnDetails = this.transaction;
-    var fiscalYearId = this.securityService.AccHospitalInfo.FiscalYearList.filter(f => f.FiscalYearName == this.txnDetails.FiscalYear)[0].FiscalYearId;
-    var prevVoucherNumber = this.txnDetails.VoucherNumber;
-    if (!this.useSameVoucherTypeForReverseVoucher) {
-      this.txnDetails.voucherId = this.ReverseVoucherId;
+    this.CheckIsFiscalYearClosed();
+    if (this.IsFiscalYearClosed) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['The selected fiscal year is closed. So, This reverse Voucher is not allowed.']);
+      return;
     }
+    else {
+      this.txnDetails = this.transaction;
+      var fiscalYearId = this.securityService.AccHospitalInfo.FiscalYearList.filter(f => f.FiscalYearName == this.txnDetails.FiscalYear)[0].FiscalYearId;
+      var prevVoucherNumber = this.txnDetails.VoucherNumber;
+      if (!this.useSameVoucherTypeForReverseVoucher) {
+        this.txnDetails.voucherId = this.ReverseVoucherId;
+      }
 
-    this.txnDetails.BillSyncs = [];
-    this.txnDetails.TransactionLinks = [];
-    this.txnDetails.IsActive = true;
-    this.txnDetails.IsBackDateEntry = false;
-    this.txnDetails.ModifiedBy = 0;
-    this.txnDetails.FiscalYearId = fiscalYearId;
-    this.txnDetails.IsAllowReverseVoucher = false;
-    this.txnDetails.TransactionDate = moment(this.securityService.AccHospitalInfo.TodaysDate).format('YYYY-MM-DD');
-    this.txnDetails.Remarks = "Reverse transaction on " + this.txnDetails.TransactionDate + " against voucher number " + prevVoucherNumber;
-    this.txnDetails.VoucherNumber = this.GettempVoucherNumber(this.useSameVoucherTypeForReverseVoucher ? this.txnDetails.VoucherId : this.ReverseVoucherId, this.txnDetails.SectionId, this.txnDetails.TransactionDate);
+      this.txnDetails.BillSyncs = [];
+      this.txnDetails.TransactionLinks = [];
+      this.txnDetails.IsActive = true;
+      this.txnDetails.IsBackDateEntry = false;
+      this.txnDetails.ModifiedBy = 0;
+      this.txnDetails.FiscalYearId = fiscalYearId;
+      this.txnDetails.IsAllowReverseVoucher = false;
+      this.txnDetails.TransactionDate = moment(this.securityService.AccHospitalInfo.TodaysDate).format('YYYY-MM-DD');
+      this.txnDetails.Remarks = "Reverse transaction on " + this.txnDetails.TransactionDate + " against voucher number " + prevVoucherNumber;
+      this.txnDetails.VoucherNumber = this.GettempVoucherNumber(this.useSameVoucherTypeForReverseVoucher ? this.txnDetails.VoucherId : this.ReverseVoucherId, this.txnDetails.SectionId, this.txnDetails.TransactionDate);
 
-    this.txnDetails.TransactionItems.forEach(t => {
-      t.DrCr = (t.DrCr) ? false : true;
-      t.IsActive = true;
-      t.SubLedgers.forEach(sub => {
-        let temp = sub.DrAmount;
-        sub.DrAmount = sub.CrAmount;
-        sub.CrAmount = temp;
-        sub.IsActive = true;
-        sub.Description = this.txnDetails.Remarks;
+      this.txnDetails.TransactionItems.forEach(t => {
+        t.DrCr = (t.DrCr) ? false : true;
+        t.IsActive = true;
+        t.SubLedgers.forEach(sub => {
+          let temp = sub.DrAmount;
+          sub.DrAmount = sub.CrAmount;
+          sub.CrAmount = temp;
+          sub.IsActive = true;
+          sub.Description = this.txnDetails.Remarks;
+        });
       });
-    });
-    this.viewTxn = false;
+      this.viewTxn = false;
 
-    this.txnDetails.PrevTransactionId = this.transaction.TransactionId;
-    this.txnDetails.IsReverseVoucher = true;
-    this.txnDetails.HospitalId = this.transaction.HospitalId;
+      this.txnDetails.PrevTransactionId = this.transaction.TransactionId;
+      this.txnDetails.IsReverseVoucher = true;
+      this.txnDetails.HospitalId = this.transaction.HospitalId;
+    }
   }
-
 
   SaveReverseVoucher() {
     if (this.VoucherVerificationEnable) {
@@ -722,16 +765,16 @@ export class TransactionViewComponent {
     }
     this.accBLService.PostToTransaction(this.txnDetails).
       subscribe(res => {
-        if (res.Status == 'OK') {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.transaction.VoucherNumber = res.Results.VoucherNumber;
           this.IsReverse = false;
           this.viewTxn = true;
-          this.msgBoxServ.showMessage("success", ["Reverse voucher saved"]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Reverse voucher saved"]);
           this.Close();//mumbai-team-june2021-danphe-accounting-cache-change
           this.GetTxnbyVoucher(res.Results.VoucherNumber);
         }
         else {
-          this.msgBoxServ.showMessage("failed", ['failed to create transaction.']);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['failed to create transaction.']);
         }
       });
   }
@@ -740,12 +783,12 @@ export class TransactionViewComponent {
 
     this.accBLService.GettempVoucherNumber(voucherId, sectionId, transactionDate)
       .subscribe(res => {
-        if (res.Status == "OK") {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.TempVoucherNumber = res.Results;
           this.IsReverse = true;
         }
         else {
-          this.msgBoxServ.showMessage("failed", ['failed to Get Provisional Voucher Number.']);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['failed to Get Provisional Voucher Number.']);
 
         }
       });
@@ -771,6 +814,7 @@ export class TransactionViewComponent {
     this.routeFrom.RouteFrom = ENUM_ACC_RouteFrom.VoucherReportCopy;
     this.viewTxn = false;
     this.callbackCopy.emit();
+    this.callbackClose.emit();
     this.router.navigate(["/Accounting/Transaction/VoucherEntry"]);
   }
 
@@ -780,5 +824,59 @@ export class TransactionViewComponent {
     this.viewTxn = false;
     this.callbackCopy.emit();
     this.router.navigate(["/Accounting/Transaction/VoucherEntry"]);
+  }
+
+  RemoveSignature(index: number): void {
+    this.CheckIsFiscalYearClosed();
+    if (this.IsFiscalYearClosed) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['The selected fiscal year is closed. This remove signature action is not allowed.']);
+      return;
+    }
+    else {
+      this.SignatureMenu.splice(index, 1);
+    }
+  }
+
+
+
+  /**
+ * Sorts the `TransactionItems` array in descending order based on the `DrCr` property.
+ * - Debit entries (`DrCr = true`) are prioritized over Credit entries (`DrCr = false`).
+ * 
+ * Preconditions:
+ * - Ensures that `TransactionItems` is defined and has at least one item to avoid runtime errors.
+ * 
+ * Postconditions:
+ * - The `TransactionItems` array is sorted in-place with Debit entries appearing before Credit entries.
+ * 
+ * Time Complexity:
+ * - Sorting operates with a time complexity of O(n log n), where `n` is the number of items in the array.
+ * 
+ * Usage:
+ * Call this method to reorder the `TransactionItems` array based on `DrCr` values.
+ * 
+ * @param transactionItems - The array of transaction items to be sorted.
+ */
+  private sortTransactionItemsByDrCr(transactionItems): void {
+    if (transactionItems && transactionItems.length > 0) {
+      transactionItems.sort((a, b) => {
+        // Convert the `DrCr` boolean values to numbers and sort in descending order
+        return Number(b.DrCr) - Number(a.DrCr);
+      });
+    }
+  }
+
+  CheckIsFiscalYearClosed() {
+    let fiscalyearList = this.securityService.AccHospitalInfo.FiscalYearList;
+    if (fiscalyearList && fiscalyearList.length > 0) {
+      this.SelectedVoucherFiscalYear = fiscalyearList.find((fy) => fy.FiscalYearId === this.transaction.FiscalYearId);
+
+      if (this.SelectedVoucherFiscalYear && this.SelectedVoucherFiscalYear.IsClosed) {
+        this.IsFiscalYearClosed = this.SelectedVoucherFiscalYear.IsClosed;
+      }
+      else {
+        this.IsFiscalYearClosed = false;
+      }
+    }
   }
 }

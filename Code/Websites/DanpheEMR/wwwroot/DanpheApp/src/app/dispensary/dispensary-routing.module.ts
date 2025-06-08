@@ -1,14 +1,16 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { PageNotFound } from '../404-error/404-not-found.component';
-import { PHRMFinalizeConsumptionWrapperComponent } from '../pharmacy/patient-consumption/finalize-consumption-wrapper/phrm-finalize-consumption-wrapper.component';
 import { PHRMFinalizeInvoiceComponent } from '../pharmacy/patient-consumption/Finalize-Invoice/phrm-finalize-invoice.component';
+import { PHRMFinalizeConsumptionWrapperComponent } from '../pharmacy/patient-consumption/finalize-consumption-wrapper/phrm-finalize-consumption-wrapper.component';
 import { PHRMPatientConsumptionAddComponent } from '../pharmacy/patient-consumption/new-consumption/phrm-patient-consumption-add.component';
 import { PHRMPatientConsumptionListComponent } from '../pharmacy/patient-consumption/patient-consumption-list/phrm-patient-consumption-list.component';
 import { PatientConsumptionMainComponent } from '../pharmacy/patient-consumption/patient-consumption-main.component';
 import { PHRMPatientConsumptionFinalizeComponent } from '../pharmacy/patient-consumption/phrm-finalize-consumption-list/phrm-finalize-consumption-component';
 import { PHRMReturnPatientConsumptionComponent } from '../pharmacy/patient-consumption/return-consumption-items/return-consumption-items.component';
 import { ReturnConsumptionListComponent } from '../pharmacy/patient-consumption/return-consumption-list/return-consumption-list.component';
+import { PHRMBillSummaryReportDetailComponent } from '../pharmacy/report/bills-summary/phrm-bills-summary-report-detail.component';
+import { PHRMBillSummaryReportComponent } from '../pharmacy/report/bills-summary/phrm-bills-summary-report.component';
 import { AuthGuardService } from '../security/shared/auth-guard.service';
 import { ActivateDispensaryComponent } from './activate-dispensary/activate-dispensary.component';
 import { ActivateCounterComponent } from './dispensary-main/activate-counter/activate-counter.component';
@@ -19,12 +21,15 @@ import { PrescriptionListComponent } from './dispensary-main/prescription-main/p
 import { PrescriptionMainComponent } from './dispensary-main/prescription-main/prescription-main.component';
 import { DispCashCollectionSummaryReportComponent } from './dispensary-main/reports-main/disp-cash-collection-summary-report/disp-cash-collection-summary-report.component';
 import { DispDailySalesReportComponent } from './dispensary-main/reports-main/disp-daily-sales-report/disp-daily-sales-report.component';
+import { DispDepositBalanceReportComponent } from './dispensary-main/reports-main/disp-deposit-balance-report/disp-deposit-balance-report.component';
+import { DispensaryInvoiceBillingReportComponent } from './dispensary-main/reports-main/disp-invoice-billing-report/disp-invoice-billing-report.component.';
 import { DispUserwiseCollectionReportComponent } from './dispensary-main/reports-main/disp-user-wise-collection-report/disp-userwise-collection-report.component';
 import { DISPNarcoticsDailySalesReportComponent } from './dispensary-main/reports-main/narcotis-dailysales/disp-narcotis-daily-sales-report.component';
 import { PaymentmodeWiseReportComponent } from './dispensary-main/reports-main/paymentmode-wise-report/paymentmode-wise-report.component';
 import { ReportsMainComponent } from './dispensary-main/reports-main/reports-main.component';
 import { SettlementSummaryReportComponent } from './dispensary-main/reports-main/settlement-summary-report/settlement-summary-report.component';
-import { CreditBillsComponent } from './dispensary-main/sales-main/credit-bills/credit-bills.component';
+import { DISPStockSummaryReportComponent } from './dispensary-main/reports-main/stock-summary/disp-stock-summary-report.component';
+import { PHRMDepositListComponent } from './dispensary-main/sales-main/deposit-receipt/phrm-deposit-list.component';
 import { NewSalesComponent } from './dispensary-main/sales-main/new-sales/new-sales.component';
 import { PrintReceiptComponent } from './dispensary-main/sales-main/print-receipt/print-receipt.component';
 import { ProvisionalReturnComponent } from './dispensary-main/sales-main/provisional-return/provisional-return.component';
@@ -45,6 +50,10 @@ import { TransferCreateComponent } from './dispensary-main/stock-main/transfer-m
 import { TransferListComponent } from './dispensary-main/stock-main/transfer-main/transfer-list/transfer-list.component';
 import { TransferViewComponent } from './dispensary-main/stock-main/transfer-main/transfer-view/transfer-view.component';
 import { DispensaryGuardService } from './shared/dispensary-guard.service';
+import { ProvisionalBillsComponent } from './dispensary-main/sales-main/provisional-bills/provisional-bills.component';
+import { ProvisionalBillsUpdateComponent } from './dispensary-main/sales-main/provisional-bills/provisional-bills-update/provisional-bills-update.component';
+import { ProvisionalBillsFinalizeComponent } from './dispensary-main/sales-main/provisional-bills/provisional-bills-finalize/provisional-bills-finalize.component';
+import { DispensaryProvisionalSalesReportComponent } from './dispensary-main/reports-main/disp-provisional-sales-report/disp-provisional-sales-report.component';
 
 const routes: Routes = [
   { path: 'ActivateDispensary', component: ActivateDispensaryComponent },
@@ -81,7 +90,15 @@ const routes: Routes = [
           { path: 'Return', component: SalesReturnComponent },
           { path: 'ReturnList', component: SalesReturnListComponent },
           { path: 'ReceiptPrint', component: PrintReceiptComponent },
-          { path: 'CreditBills', component: CreditBillsComponent },
+          {
+            path: 'CreditBills', component: ProvisionalBillsComponent,
+            children: [
+              { path: '', redirectTo: 'UpdateProvisionalBills', pathMatch: 'full' },
+              { path: 'UpdateProvisionalBills', component: ProvisionalBillsUpdateComponent },
+              { path: 'FinalizeProvisionalBills', component: ProvisionalBillsFinalizeComponent },
+            ]
+          },
+          { path: 'DepositReceipt', component: PHRMDepositListComponent },
           {
             path: 'Settlement', component: SettlementComponent,
             children: [
@@ -148,6 +165,12 @@ const routes: Routes = [
       { path: 'Reports/DISPDailySalesReport', component: DispDailySalesReportComponent },
       { path: 'Reports/SettlementSummaryReport', component: SettlementSummaryReportComponent },
       { path: 'Reports/PaymentModeWiseReport', component: PaymentmodeWiseReportComponent },
+      { path: 'Reports/StockSummaryReport', component: DISPStockSummaryReportComponent },
+      { path: 'Reports/DepositBalanceReport', component: DispDepositBalanceReportComponent },
+      { path: 'Reports/InvoiceBillingReport', component: DispensaryInvoiceBillingReportComponent },
+      { path: 'Reports/BillSummary', component: PHRMBillSummaryReportComponent },
+      { path: 'Reports/BillSummaryDetail', component: PHRMBillSummaryReportDetailComponent },
+      { path: 'Reports/ProvisionalSales', component: DispensaryProvisionalSalesReportComponent },
       { path: "**", component: PageNotFound }
     ]
   },

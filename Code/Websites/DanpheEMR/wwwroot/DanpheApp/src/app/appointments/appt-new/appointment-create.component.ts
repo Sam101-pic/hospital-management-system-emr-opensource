@@ -1,24 +1,22 @@
-import { Component, OnInit } from "@angular/core";
+import { Component } from "@angular/core";
 import { Router } from '@angular/router';
-import { AppointmentService } from '../shared/appointment.service';
-import { AppointmentBLService } from '../shared/appointment.bl.service';
-import { SecurityService } from '../../security/shared/security.service';
-import { Appointment } from "../shared/appointment.model";
-import * as moment from 'moment/moment';//Parse, validate, manipulate, and display dates and times in JS.
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { PatientService } from "../../patients/shared/patient.service";
-import { CallbackService } from '../../shared/callback.service';
-import { RouteFromService } from '../../shared/routefrom.service';
+import * as moment from 'moment/moment'; //Parse, validate, manipulate, and display dates and times in JS.
+import { CoreService } from "../../core/shared/core.service";
 import { Patient } from "../../patients/shared/patient.model";
+import { SecurityService } from '../../security/shared/security.service';
+import { Department } from "../../settings-new/shared/department.model";
+import { DanpheHTTPResponse } from "../../shared/common-models";
 import GridColumnSettings from "../../shared/danphe-grid/grid-column-settings.constant";
 import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
-import { DanpheHTTPResponse } from "../../shared/common-models";
-import { CoreBLService } from "../../core/shared/core.bl.service";
-import { APIsByType } from "../../shared/search.service";
-import { VisitService } from "../shared/visit.service";
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { RouteFromService } from "../../shared/routefrom.service";
+import { ENUM_APP_RouteFrom, ENUM_AppointmentType, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../shared/shared-enums";
+import { AppointmentBLService } from '../shared/appointment.bl.service';
+import { Appointment } from "../shared/appointment.model";
+import { AppointmentService } from '../shared/appointment.service';
+import { PatientLastVisitDetail_DTO } from "../shared/dto/patient-previous-visit-detail.dto";
 import { VisitBLService } from "../shared/visit.bl.service";
-import { Department } from "../../settings-new/shared/department.model";
-import { CoreService } from "../../core/shared/core.service";
+import { VisitService } from "../shared/visit.service";
 
 @Component({
   templateUrl: "./create-appointment.html" //"/AppointmentView/CreateAppointment" 
@@ -27,7 +25,7 @@ import { CoreService } from "../../core/shared/core.service";
 export class AppointmentCreateComponent {
   public CurrentAppointment: Appointment = new Appointment();
   patients: Array<Patient> = new Array<Patient>();
-  AppointmentpatientGridColumns: Array<any> = null;
+  AppointmentpatientGridColumns: typeof GridColumnSettings.AppointmentAllPatientSearch;
   public showApptPanel: boolean = false;
   public Update: boolean = false;
   public departmentId: number = 0;
@@ -50,27 +48,27 @@ export class AppointmentCreateComponent {
   public patGirdDataApi: string = "";
   searchText: string = '';
   public enableServerSideSearch: boolean = false;
-  public appointmentType : string = "New";
-  constructor(public appointmentBLService: AppointmentBLService,
-    public appointmentService: AppointmentService,
-    public callbackservice: CallbackService,
-    public securityService: SecurityService,
-    public router: Router,
-    public msgBoxServ: MessageboxService,
-    public patientService: PatientService,
-    public routeFromService: RouteFromService,
-    public coreBlService: CoreBLService,
-    public visitService: VisitService,
-    public visitBLService: VisitBLService,
-    public coreService: CoreService) {
-
-    this.visitService.ApptApplicableDoctorsList;
+  public appointmentType: string = "New";
+  public PatientPreviousVisitDetail = new PatientLastVisitDetail_DTO();
+  ActionMode: string = "";
+  constructor(
+    private _appointmentBLService: AppointmentBLService,
+    private _appointmentService: AppointmentService,
+    private _securityService: SecurityService,
+    private _router: Router,
+    private _msgBoxServ: MessageboxService,
+    private _visitService: VisitService,
+    private _visitBLService: VisitBLService,
+    private _coreService: CoreService,
+    private _routeFrom: RouteFromService
+  ) {
+    this._visitService.ApptApplicableDoctorsList;
     this.getParamter();
     this.LoadPatients("");
-
     this.AppointmentpatientGridColumns = GridColumnSettings.AppointmentAllPatientSearch;
-    //this.patGirdDataApi = APIsByType.PatByName;
-
+    if (this._routeFrom.RouteFrom.toLowerCase() === ENUM_APP_RouteFrom.AppointmentList.toLowerCase()) {
+      this.SwitchToUpdate();
+    }
   }
   ngOnInit() {
     this.getDepts();
@@ -81,37 +79,37 @@ export class AppointmentCreateComponent {
     this.LoadPatients(this.searchText);
   }
   getParamter() {
-    let parameterData = this.coreService.Parameters.find(p => p.ParameterGroupName == "Common" && p.ParameterName == "ServerSideSearchComponent").ParameterValue;
+    let parameterData = this._coreService.Parameters.find(p => p.ParameterGroupName == "Common" && p.ParameterName == "ServerSideSearchComponent").ParameterValue;
     var data = JSON.parse(parameterData);
     this.enableServerSideSearch = data["PatientSearchPatient"];
   }
   GetDepartments() {
     //this.departmentList = this.visitService.ApptApplicableDepartmentList; 
     // to edit previous phonebook appointment 
-    if (this.appointmentService.globalAppointment.AppointmentId != 0) {
-      this.CurrentAppointment.AppointmentId = this.appointmentService.globalAppointment.AppointmentId;
-      this.CurrentAppointment.FirstName = this.appointmentService.globalAppointment.FirstName;
-      this.CurrentAppointment.LastName = this.appointmentService.globalAppointment.LastName;
-      this.CurrentAppointment.MiddleName = this.appointmentService.globalAppointment.MiddleName;
-      this.CurrentAppointment.Gender = this.appointmentService.globalAppointment.Gender;
-      this.CurrentAppointment.AppointmentDate = moment(this.appointmentService.globalAppointment.AppointmentDate).format('YYYY-MM-DD');
-      this.CurrentAppointment.AppointmentStatus = this.appointmentService.globalAppointment.AppointmentStatus;
-      this.CurrentAppointment.AppointmentTime = this.appointmentService.globalAppointment.AppointmentTime;
-      this.CurrentAppointment.AppointmentType = this.appointmentService.globalAppointment.AppointmentType;
-      this.CurrentAppointment.ContactNumber = this.appointmentService.globalAppointment.ContactNumber;
-      this.CurrentAppointment.CreatedOn = this.appointmentService.globalAppointment.CreatedOn;
-      this.CurrentAppointment.AgeUnit = this.appointmentService.globalAppointment.AgeUnit;
-      this.CurrentAppointment.PerformerName = this.appointmentService.globalAppointment.PerformerName;
-      this.CurrentAppointment.Reason = this.appointmentService.globalAppointment.Reason;
-      this.CurrentAppointment.Age = this.appointmentService.globalAppointment.Age;
-      this.SwitchToUpdate();
+    if (this._appointmentService.globalAppointment.AppointmentId != 0) {
+      this.CurrentAppointment.AppointmentId = this._appointmentService.globalAppointment.AppointmentId;
+      this.CurrentAppointment.FirstName = this._appointmentService.globalAppointment.FirstName;
+      this.CurrentAppointment.LastName = this._appointmentService.globalAppointment.LastName;
+      this.CurrentAppointment.MiddleName = this._appointmentService.globalAppointment.MiddleName;
+      this.CurrentAppointment.Gender = this._appointmentService.globalAppointment.Gender;
+      this.CurrentAppointment.AppointmentDate = moment(this._appointmentService.globalAppointment.AppointmentDate).format('YYYY-MM-DD');
+      this.CurrentAppointment.AppointmentStatus = this._appointmentService.globalAppointment.AppointmentStatus;
+      this.CurrentAppointment.AppointmentTime = this._appointmentService.globalAppointment.AppointmentTime;
+      this.CurrentAppointment.AppointmentType = this._appointmentService.globalAppointment.AppointmentType;
+      this.CurrentAppointment.ContactNumber = this._appointmentService.globalAppointment.ContactNumber;
+      this.CurrentAppointment.CreatedOn = this._appointmentService.globalAppointment.CreatedOn;
+      this.CurrentAppointment.AgeUnit = this._appointmentService.globalAppointment.AgeUnit;
+      this.CurrentAppointment.PerformerName = this._appointmentService.globalAppointment.PerformerName;
+      this.CurrentAppointment.Reason = this._appointmentService.globalAppointment.Reason;
+      this.CurrentAppointment.Age = this._appointmentService.globalAppointment.Age;
+
       if (this.CurrentAppointment.PerformerId != null || this.CurrentAppointment.DepartmentId != null || this.CurrentAppointment.PerformerId != 0 || this.CurrentAppointment.DepartmentId != 0) {
-        this.CurrentAppointment.PerformerId = this.appointmentService.globalAppointment.PerformerId;
+        this.CurrentAppointment.PerformerId = this._appointmentService.globalAppointment.PerformerId;
         this.selectedDoctor = this.CurrentAppointment.PerformerName;
-        this.CurrentAppointment.DepartmentId = this.appointmentService.globalAppointment.DepartmentId;
-        this.departmentList = this.visitService.ApptApplicableDepartmentList;
-        if (this.appointmentService.globalAppointment.DepartmentId != null) {
-          this.doctorList = this.visitService.ApptApplicableDoctorsList;
+        this.CurrentAppointment.DepartmentId = this._appointmentService.globalAppointment.DepartmentId;
+        this.departmentList = this._visitService.ApptApplicableDepartmentList;
+        if (this._appointmentService.globalAppointment.DepartmentId != null) {
+          this.doctorList = this._visitService.ApptApplicableDoctorsList;
           this.filteredDocList = this.doctorList.filter(doc => doc.DepartmentId == this.departmentId);
           this.selectedDepartment = this.departmentList.find(a => a.DepartmentId == this.CurrentAppointment.DepartmentId).DepartmentName;
         }
@@ -121,14 +119,14 @@ export class AppointmentCreateComponent {
 
   GetVisitDoctors() {
     this.enablePreview = true;
-    this.filteredDocList = this.doctorList = this.visitService.ApptApplicableDoctorsList;
+    this.filteredDocList = this.doctorList = this._visitService.ApptApplicableDoctorsList;
     //this.AssignSelectedDoctor();
   }
 
   public GetAppointmentList() {
     let performerId = this.selectedDoctor ? this.selectedDoctor.PerformerId : null;
     if (performerId) {
-      this.appointmentBLService.GetAppointmentProviderList(performerId, this.CurrentAppointment.AppointmentDate)
+      this._appointmentBLService.GetAppointmentProviderList(performerId, this.CurrentAppointment.AppointmentDate)
         .subscribe(res => {
           if (res.Status == 'OK') {
             this.aptList = res.Results;
@@ -152,11 +150,11 @@ export class AppointmentCreateComponent {
             }
           }
           else {
-            this.msgBoxServ.showMessage("error", [res.ErrorMessage]);
+            this._msgBoxServ.showMessage("error", [res.ErrorMessage]);
           }
         },
           err => {
-            this.msgBoxServ.showMessage("error", [err.ErrorMessage]);
+            this._msgBoxServ.showMessage("error", [err.ErrorMessage]);
           });
     } else {
       this.aptList = new Array<Appointment>();
@@ -183,7 +181,7 @@ export class AppointmentCreateComponent {
     }
   }
   LoadPatients(searchTxt): void {
-    this.appointmentBLService.GetPatients(searchTxt)
+    this._appointmentBLService.GetPatients(searchTxt)
       .subscribe(res => {
         if (res.Status == 'OK') {
           this.patients = res.Results;
@@ -191,20 +189,20 @@ export class AppointmentCreateComponent {
           this.GetDepartments();
         }
         else {
-          this.msgBoxServ.showMessage("error", [res.ErrorMessage]);
+          this._msgBoxServ.showMessage("error", [res.ErrorMessage]);
         }
       },
         err => {
-          this.msgBoxServ.showMessage("error", ["failed to get  patients"] + err);
+          this._msgBoxServ.showMessage("error", ["failed to get  patients"] + err);
         });
   }
 
   getDepts() {
-    this.visitBLService.GetDepartment()
+    this._visitBLService.GetDepartment()
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status == "OK") {
-          this.visitService.ApptApplicableDepartmentList = res.Results;
-          this.visitService.ApptApplicableDepartmentList = this.coreService.Masters.Departments.filter(d => d.IsAppointmentApplicable == true && d.IsActive == true).map(d => {
+          this._visitService.ApptApplicableDepartmentList = res.Results;
+          this._visitService.ApptApplicableDepartmentList = this._coreService.Masters.Departments.filter(d => d.IsAppointmentApplicable == true && d.IsActive == true).map(d => {
             return {
               DepartmentId: d.DepartmentId,
               DepartmentName: d.DepartmentName
@@ -216,10 +214,10 @@ export class AppointmentCreateComponent {
   }
 
   getDocts() {
-    this.visitBLService.GetVisitDoctors()
+    this._visitBLService.GetVisitDoctors()
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status == "OK") {
-          this.visitService.ApptApplicableDoctorsList = res.Results;
+          this._visitService.ApptApplicableDoctorsList = res.Results;
         }
       });
   }
@@ -229,7 +227,7 @@ export class AppointmentCreateComponent {
     this.showApptPanel = !this.showApptPanel;
     this.aptList = new Array<Appointment>();
     if (this.showApptPanel) {
-      this.CurrentAppointment = this.appointmentService.CreateNewGlobal();
+      this.CurrentAppointment = this._appointmentService.CreateNewGlobal();
       this.CurrentAppointment.AppointmentDate = moment().format('YYYY-MM-DD');
       //rounds off to nearest 10 minutes
       this.CurrentAppointment.AppointmentTime = moment().add((10 - moment().minute() % 10), 'minutes').format('HH:mm');
@@ -244,7 +242,7 @@ export class AppointmentCreateComponent {
   }
 
   public AssignSelectedDepartment() {
-    this.departmentList = this.visitService.ApptApplicableDepartmentList;
+    this.departmentList = this._visitService.ApptApplicableDepartmentList;
     let department = null;
     this.selectedDoctor = "";
     if (this.selectedDepartment == "") {
@@ -299,16 +297,16 @@ export class AppointmentCreateComponent {
     this.filteredDocList;
     let doctor = null;
     if (this.selectedDoctor == "" || this.selectedDoctor == undefined) {
-      this.filteredDocList = this.doctorList = this.visitService.ApptApplicableDoctorsList;
+      this.filteredDocList = this.doctorList = this._visitService.ApptApplicableDoctorsList;
       this.aptList = new Array<Appointment>();
       this.CurrentAppointment.IsValidSelProvider = true;
 
       if (this.CurrentAppointment.DepartmentId == null) {
-        this.departmentList = this.visitService.ApptApplicableDepartmentList;
-        this.filteredDocList = this.doctorList = this.visitService.ApptApplicableDoctorsList;
+        this.departmentList = this._visitService.ApptApplicableDepartmentList;
+        this.filteredDocList = this.doctorList = this._visitService.ApptApplicableDoctorsList;
       }
       if (this.CurrentAppointment.DepartmentId != null) {
-        this.filteredDocList = this.doctorList = this.visitService.ApptApplicableDoctorsList;
+        this.filteredDocList = this.doctorList = this._visitService.ApptApplicableDoctorsList;
         this.filteredDocList = this.doctorList.filter(doc => doc.DepartmentId == this.CurrentAppointment.DepartmentId);
       }
       this.CurrentAppointment.PerformerId = null;
@@ -382,62 +380,92 @@ export class AppointmentCreateComponent {
       this.CurrentAppointment.LastName = this.CurrentAppointment.LastName.trim();
 
       this.loading = true;
-      this.CurrentAppointment.AppointmentType = this.appointmentType;
+      //! Bibek 26th Nov: The logic below checks the selected visit type from the dropdown.
+      // If the "New Patient" option is selected, we further check if the patient has a previous visit.
+      // - If a previous visit exists , mark the appointment type as "Revisit".
+      // - Otherwise,  retain the appointment type as "New".
+      if (this.appointmentType === ENUM_AppointmentType.new) {
+        this.CurrentAppointment.AppointmentType = this.PatientPreviousVisitDetail.PatientVisitId
+          ? ENUM_AppointmentType.revisit
+          : this.appointmentType;
+      } else {
+        // For visit types other than "New Patient", assign the selected type directly i.e. Follow up .
+        this.CurrentAppointment.AppointmentType = this.appointmentType;
+      }
+
       this.CurrentAppointment.AppointmentStatus = "Initiated"
 
-      this.CurrentAppointment.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
+      this.CurrentAppointment.CreatedBy = this._securityService.GetLoggedInUser().EmployeeId;
       this.CurrentAppointment.CreatedOn = moment().format('YYYY-MM-DD HH:mm:ss');
 
-      this.appointmentBLService.CheckForClashingAppointment(this.CurrentAppointment.PatientId, this.CurrentAppointment.AppointmentDate, this.CurrentAppointment.PerformerId)
+      this._appointmentBLService.CheckForClashingAppointment(this.CurrentAppointment.PatientId, this.CurrentAppointment.AppointmentDate, this.CurrentAppointment.PerformerId)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status == "OK") {
             let isClashingAppointment: boolean = res.Results;
 
             if (isClashingAppointment) {
               this.loading = false;
-              this.msgBoxServ.showMessage("failed", ['This patient already has appointment / visit with ' + this.CurrentAppointment.PerformerName + ' on ' + this.CurrentAppointment.AppointmentDate]);
+              this._msgBoxServ.showMessage("failed", ['This patient already has appointment / visit with ' + this.CurrentAppointment.PerformerName + ' on ' + this.CurrentAppointment.AppointmentDate]);
             }
             else {
-              this.appointmentBLService.AddAppointment(this.CurrentAppointment)
+              this._appointmentBLService.AddAppointment(this.CurrentAppointment)
                 .subscribe((res: DanpheHTTPResponse) => {
                   if (res.Status == "OK") {
                     this.loading = false;
                     this.selectedDoctor = null;
                     this.selectedDepartment = null;
                     this.showApptPanel = false;
-                    this.msgBoxServ.showMessage("success", ['Your Appointment is Created. Your AppointmentID is ' + res.Results.AppointmentId]);
-                  } else { this.msgBoxServ.showMessage("failed", ['Failed!! Cannot create appointment.']); }
+                    this._msgBoxServ.showMessage("success", ['Your Appointment is Created. Your AppointmentID is ' + res.Results.AppointmentId]);
+                  } else { this._msgBoxServ.showMessage("failed", ['Failed!! Cannot create appointment.']); }
                 },
                   err => {
-                    this.msgBoxServ.showMessage("failes", [err.ErrorMessage]);
+                    this._msgBoxServ.showMessage("failes", [err.ErrorMessage]);
                   });
               this.loading = false;
             }
 
           }
           else {
-            this.appointmentBLService.AddAppointment(this.CurrentAppointment)
+            this._appointmentBLService.AddAppointment(this.CurrentAppointment)
               .subscribe((res: DanpheHTTPResponse) => {
                 if (res.Status == "OK") {
                   this.loading = false;
                   this.showApptPanel = false;
                   this.selectedDoctor = null;
                   this.selectedDepartment = null;
-                  this.msgBoxServ.showMessage("success", ['Your Appointment is Created. Your AppointmentID is ' + res.Results.AppointmentId]);
-                } else { this.msgBoxServ.showMessage("failed", ['Failed!! Cannot create appointment.']); }
+                  this._msgBoxServ.showMessage("success", ['Your Appointment is Created. Your AppointmentID is ' + res.Results.AppointmentId]);
+                } else { this._msgBoxServ.showMessage("failed", ['Failed!! Cannot create appointment.']); }
               },
                 err => {
-                  this.msgBoxServ.showMessage("failed", [err.ErrorMessage]);
+                  this._msgBoxServ.showMessage("failed", [err.ErrorMessage]);
                 });
             this.loading = false;
           }
         });
     }
     else {
-      this.msgBoxServ.showMessage("failed", ['Failed!! Cannot create appointment. Check the Details Correctly.']);
+      this._msgBoxServ.showMessage("failed", ['Failed!! Cannot create appointment. Check the Details Correctly.']);
     }
   }
+  LoadPatientLastVisit(patientId) {
+    if (patientId) {
+      this._visitBLService.GetPatientLastVisitDetail(patientId).subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          if (res.Results) {
+            this.PatientPreviousVisitDetail = res.Results;
+          } else {
+            this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`This is a new Patient`]);
+          }
+        } else {
+          this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Cannot load the patients previous visit`]);
+        }
+      }, err => {
+        console.log(err);
+        this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [err]);
+      });
+    }
 
+  }
   UpdateTelephoneAppointment() {
     for (var i in this.CurrentAppointment.AppointmentValidator.controls) {
       this.CurrentAppointment.AppointmentValidator.controls[i].markAsDirty();
@@ -446,35 +474,35 @@ export class AppointmentCreateComponent {
     if (this.CurrentAppointment.IsValidCheck(undefined, undefined)
       && this.CurrentAppointment.IsValidSelDepartment
       && this.CurrentAppointment.IsValidSelProvider) {
-      this.appointmentBLService.CheckForClashingAppointment(this.CurrentAppointment.PatientId, this.CurrentAppointment.AppointmentDate, this.CurrentAppointment.PerformerId)
+      this._appointmentBLService.CheckForClashingAppointment(this.CurrentAppointment.PatientId, this.CurrentAppointment.AppointmentDate, this.CurrentAppointment.PerformerId)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status == "OK") {
             let isClashingAppointment: boolean = res.Results;
 
             if (isClashingAppointment) {
               this.loading = false;
-              this.msgBoxServ.showMessage("failed", ['This patient already has appointment / visit with ' + this.CurrentAppointment.PerformerName + ' on ' + this.CurrentAppointment.AppointmentDate]);
+              this._msgBoxServ.showMessage("failed", ['This patient already has appointment / visit with ' + this.CurrentAppointment.PerformerName + ' on ' + this.CurrentAppointment.AppointmentDate]);
             }
             else {
-              this.appointmentBLService.PutAppointment(this.CurrentAppointment)
+              this._appointmentBLService.PutAppointment(this.CurrentAppointment)
                 .subscribe(res => {
                   if (res.Status == 'OK') {
                     this.patients = res.Results;
-                    this.router.navigate(['/Appointment/ListAppointment']);
+                    this._router.navigate(['/Appointment/ListAppointment']);
                   }
                   else {
-                    this.msgBoxServ.showMessage("error", [res.ErrorMessage]);
+                    this._msgBoxServ.showMessage("error", [res.ErrorMessage]);
                   }
                 },
                   err => {
-                    this.msgBoxServ.showMessage("error", ["failed to update appointment"] + err);
+                    this._msgBoxServ.showMessage("error", ["failed to update appointment"] + err);
                   });
               this.loading = false;
             }
           }
         });
     }
-    else { this.msgBoxServ.showMessage("Failed", ["Please fill the form properly."]); }
+    else { this._msgBoxServ.showMessage("Failed", ["Please fill the form properly."]); }
 
 
   }
@@ -506,6 +534,7 @@ export class AppointmentCreateComponent {
           this.aptList = new Array<Appointment>();
 
           this.showApptPanel = true;
+          this.LoadPatientLastVisit(this.CurrentAppointment.PatientId);
         }
         break;
 
@@ -526,5 +555,8 @@ export class AppointmentCreateComponent {
 
   OnTimeChange() {
     console.log("Time change");
+  }
+  ngOnDestroy() {
+    this._routeFrom.RouteFrom = '';
   }
 }

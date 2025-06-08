@@ -111,6 +111,15 @@ export class PHRMUnitOfMeasurementManageComponent {
             this.CurrentUnitOfMeasurement.UnitOfMeasurementValidator.controls[i].markAsDirty();
             this.CurrentUnitOfMeasurement.UnitOfMeasurementValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.unitofmeasurementList && this.unitofmeasurementList.length) {
+            const isUnitOfMeasurementAlreadyExists = this.unitofmeasurementList.some(s => s.UOMName.toLowerCase() === this.CurrentUnitOfMeasurement.UOMName.toLowerCase());
+            if (isUnitOfMeasurementAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add Unit of Measurement as the Unit of measurement "${this.CurrentUnitOfMeasurement.UOMName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.CurrentUnitOfMeasurement.IsValidCheck(undefined, undefined)) {
             this.CurrentUnitOfMeasurement.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
             this.CurrentUnitOfMeasurement.CreatedOn = moment().format('YYYY-MM-DD');
@@ -137,6 +146,15 @@ export class PHRMUnitOfMeasurementManageComponent {
             this.CurrentUnitOfMeasurement.UnitOfMeasurementValidator.controls[i].markAsDirty();
             this.CurrentUnitOfMeasurement.UnitOfMeasurementValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.unitofmeasurementList && this.unitofmeasurementList.length) {
+            const isUnitOfMeasurementAlreadyExists = this.unitofmeasurementList.some(s => s.UOMName.toLowerCase() === this.CurrentUnitOfMeasurement.UOMName.toLowerCase() && s.UOMId !== this.CurrentUnitOfMeasurement.UOMId);
+            if (isUnitOfMeasurementAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update Unit of Measurement as the Unit of measurement "${this.CurrentUnitOfMeasurement.UOMName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.CurrentUnitOfMeasurement.IsValidCheck(undefined, undefined)) {
             this.CurrentUnitOfMeasurement.CreatedOn = moment().format('YYYY-MM-DD');
             this.pharmacyBLService.UpdateUnitOfMeasurement(this.CurrentUnitOfMeasurement)
@@ -214,6 +232,7 @@ export class PHRMUnitOfMeasurementManageComponent {
         this.selectedItem = null;
         this.update = false;
         this.showUnitOfMeasurementAddPage = false;
+        this.callbackAdd.emit();
     }
 
     AddUpdateResponseEmitter(uom) {

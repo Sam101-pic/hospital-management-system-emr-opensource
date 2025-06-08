@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import * as moment from 'moment';
 import { CoreService } from '../../../core/shared/core.service';
@@ -31,7 +31,7 @@ export class PurchaseOrderViewComponent implements OnInit {
   public editPO: boolean = false;
   public showNepaliReceipt: boolean;
   showPopUp: boolean;
-  printDetaiils: HTMLElement;
+  printDetails: HTMLElement;
   showPrint: boolean;
   poFormParameterValue: any;
   poEximCodeParameterValue: any;
@@ -45,6 +45,8 @@ export class PurchaseOrderViewComponent implements OnInit {
   HospitalDirectorVerificationDetails: any = null;
   CEO_DeanVerificationDetails: any = null;
   public GeneralFieldLabel = new GeneralFieldLabels();
+
+  @ViewChild('closeModal') closeModal: ElementRef;
 
   constructor(
     public procBLService: ProcurementBLService,
@@ -134,10 +136,24 @@ export class PurchaseOrderViewComponent implements OnInit {
     if (this.editPO == false) {
       this.inventoryService.POId = 0;
     }
+    this.inventoryService.PurchaseOrderStatus = null;
   }
   ShowPurchaseOrderDetails(res) {
     if (res.Status == "OK") {
-      this.purchaseorderItemsDetails = res.Results.poItems.filter(itm => itm.POItemStatus != "cancelled");
+      if (this.inventoryService.PurchaseOrderStatus != null) {
+        const filterConditions = {
+          'all': () => true,
+          'pending': (item) => ['pending', 'active', 'partial', 'initiated'].includes(item.POItemStatus),
+          'default': (item) => item.POItemStatus === this.inventoryService.PurchaseOrderStatus
+        };
+
+        const filterFunction = filterConditions[this.inventoryService.PurchaseOrderStatus] || filterConditions['default'];
+
+        this.purchaseorderItemsDetails = res.Results.poItems.filter(filterFunction);
+      }
+      else {
+        this.purchaseorderItemsDetails = res.Results.poItems;
+      }
       this.purchaseorderDetails = res.Results.poDetails;
       this.creator = res.Results.creator;
       this.authorizer = res.Results.authorizer;
@@ -171,10 +187,9 @@ export class PurchaseOrderViewComponent implements OnInit {
 
   //this is used to print the receipt
   print() {
-    this.printDetaiils = document.getElementById("printpage");
+    this.printDetails = document.getElementById("printpage");
     if (!this.showNepaliReceipt) {
-      const style = document.createElement('style');
-      style.textContent = `<style>
+      const style = `<style>
     .printStyle {
         border: dotted 1px;
         margin: 10px 100px;
@@ -235,13 +250,33 @@ export class PurchaseOrderViewComponent implements OnInit {
     table, th, td {
       border: 1px solid;
    }
-                          </style>`
-      document.getElementById('printpage').appendChild(style)
+   .table_data {
+    border-spacing:0px;
     }
-    this.showPrint = true;
+    @page { size: auto;  margin: 1000px; }
+     </style>`
+
+      var contents = this.printDetails.innerHTML;
+      var iframe = document.createElement('iframe');
+      document.body.appendChild(iframe);
+      let documentContent = "<html><head>";
+      documentContent += '<link rel="stylesheet" type="text/css" media="print" href="../../../themes/theme-default/PrintStyle.css"/>';
+      documentContent += '<link rel="stylesheet" type="text/css" href="../../../themes/theme-default/DanpheStyle.css" />';
+      documentContent += '</head>';
+      documentContent += '<body onload="window.print()">' + contents + '</body></html>'
+      var htmlToPrint = style;
+      htmlToPrint += documentContent;
+      iframe.contentWindow.document.open();
+      iframe.contentWindow.document.write(htmlToPrint);
+      iframe.contentWindow.document.close();
+
+      setTimeout(function () {
+        document.body.removeChild(iframe);
+      }, 500);
+    }
   }
   callBackPrint() {
-    this.printDetaiils = null;
+    this.printDetails = null;
     this.showPrint = false;
   }
   //route to purchase order list page
@@ -318,9 +353,9 @@ export class PurchaseOrderViewComponent implements OnInit {
       this.messageBoxService.showMessage("error", ["Please enter parameter values for BillingHeader"]);
   }
 
-  KeysPressed(event) {
-    if (event.keyCode == 27) { ////if ESCAPE_KEYCODE key is pressed
-      this.purchaseorderList();
+  KeysPressed(event: KeyboardEvent) {
+    if (event.keyCode == 27) {
+      this.closeModal.nativeElement.click();
     }
   }
 

@@ -1,11 +1,9 @@
 import {
-  NgForm,
-  FormGroup,
-  FormControl,
-  Validators,
   FormBuilder,
-  ReactiveFormsModule
-} from '@angular/forms'
+  FormControl,
+  FormGroup,
+  Validators
+} from '@angular/forms';
 import { ItemMaster } from '../../inventory/shared/item-master.model';
 export class WardInventoryConsumptionModel {
   public ConsumptionId: number = 0;
@@ -26,14 +24,18 @@ export class WardInventoryConsumptionModel {
   public StoreId: number = 0;
   public ConsumeQuantity: number = 1;
   public SelectedItem: ItemMaster = null;
-
+  public ConsumptionTypeId: number = null;
   public ConsumptionValidator: FormGroup = null;
+  public CostPrice: number = 0;
+  MRP: number = 0;
+  BatchNo: string = '';
+  ExpiryDate: string = '';
   constructor() {
     var _formBuilder = new FormBuilder();
     this.ConsumptionValidator = _formBuilder.group({
-      'ConsumeQuantity': ['', Validators.compose([Validators.required, Validators.min(1)])],
+      'ConsumeQuantity': ['', Validators.compose([Validators.required, this.positiveNumberValidator])],
       'ItemName': ['', Validators.compose([Validators.required])]
-      
+
     });
   }
   public IsDirty(fieldName): boolean {
@@ -50,5 +52,12 @@ export class WardInventoryConsumptionModel {
     }
     else
       return !(this.ConsumptionValidator.hasError(validator, fieldName));
+  }
+  positiveNumberValidator(control: FormControl): { [key: string]: boolean } {
+    if (control) {
+      if (control.value <= 0)
+        return { 'invalidNumber': true };
+    }
+
   }
 }

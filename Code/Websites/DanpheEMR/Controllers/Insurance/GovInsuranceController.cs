@@ -8,6 +8,7 @@ using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.InsuranceModels;
+using DanpheEMR.ServerModel.SSFModels;
 using DanpheEMR.Sync.IRDNepal.Models;
 using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Mvc;
@@ -20,9 +21,15 @@ using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Net.Http.Headers;
+using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
-
+using DanpheEMR.Services.Insurance;
+using DanpheEMR.Core.Parameters;
+using static DanpheEMR.Services.Insurance.HIBApiResponses;
+using DanpheEMR.Sync.IRDNepal;
 namespace DanpheEMR.Controllers
 {
     public class GovInsuranceController : CommonController
@@ -35,7 +42,7 @@ namespace DanpheEMR.Controllers
         private readonly AdmissionDbContext _admissionDbContext;
         private readonly CoreDbContext _coreDbContext;
 
-        public GovInsuranceController(IOptions<MyConfiguration> _config) : base(_config)
+        public GovInsuranceController(IOptions<MyConfiguration> _config, IInsuranceService iInsuranceService) : base(_config)
         {
             realTimeRemoteSyncEnabled = _config.Value.RealTimeRemoteSyncEnabled;
             _govInsuranceDbContext = new InsuranceDbContext(connString);
@@ -373,7 +380,7 @@ namespace DanpheEMR.Controllers
             //   if (reqType == "GetMatchingPatList")
             Func<object> func = () => (from pat in _govInsuranceDbContext.Patients
                                            //.Include("Insurances")
-                                       //join membership in _govInsuranceDbContext.Schemes on pat.MembershipTypeId equals membership.SchemeId
+                                           //join membership in _govInsuranceDbContext.Schemes on pat.MembershipTypeId equals membership.SchemeId
                                        join subDiv in _govInsuranceDbContext.CountrySubDivisions on pat.CountrySubDivisionId equals subDiv.CountrySubDivisionId
                                        where (pat.FirstName.ToLower() == firstName.ToLower() && pat.LastName.ToLower() == lastName.ToLower() && pat.Age.ToLower() == age.ToLower()
                                            && pat.Gender.ToLower() == gender.ToLower())
@@ -491,7 +498,7 @@ namespace DanpheEMR.Controllers
             Func<object> func = () => GetPatientVisitHistoryToday(patientId);
             return InvokeHttpGetFunction(func);
         }
-        
+
 
         [HttpGet]
         [Route("PatientsVisits")]
@@ -502,7 +509,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
 
         }
-       
+
 
         [HttpGet]
         [Route("VisitInfoForStickerPrint")]
@@ -513,7 +520,7 @@ namespace DanpheEMR.Controllers
 
         }
 
-        
+
         [HttpGet]
         [Route("InsuranceApplicableBillCfgItems")]
         public IActionResult InsuranceApplicableBillCfgItems()
@@ -555,7 +562,7 @@ namespace DanpheEMR.Controllers
             Func<object> func = () => GetLatestVisitClaimCodesome(patientId);
             return InvokeHttpGetFunction(func);
         }
-       
+
 
         [HttpGet]
         [Route("InPatientDetailForPartialBilling")]
@@ -566,7 +573,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
 
         }
-       
+
 
         [HttpGet]
         [Route("AppointmentApplicableDoctors")]
@@ -620,7 +627,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
         }
 
-        
+
 
         [HttpGet]
         [Route("PerformerWisePatientVisits")]
@@ -631,7 +638,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
         }
 
-       
+
 
         [HttpGet]
         [Route("PatientDeposits")]
@@ -662,7 +669,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
         }
 
-      
+
 
         [HttpGet]
         [Route("AppointmentApplicableEmployees")]
@@ -672,7 +679,7 @@ namespace DanpheEMR.Controllers
             Func<object> func = () => GetProviderLists();
             return InvokeHttpGetFunction(func);
         }
-       
+
 
         [HttpGet]
         [Route("PatientPendingItems")]
@@ -683,7 +690,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
 
         }
-       
+
 
         [HttpGet]
         [Route("CheckCreditBill")]
@@ -694,7 +701,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
 
         }
-       
+
 
         [HttpGet]
         [Route("DischargeReceipt")]
@@ -778,7 +785,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
 
         }
-       
+
 
         [HttpGet]
         [Route("PatientsByClaimCode")]
@@ -805,7 +812,26 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
 
         }
+        [HttpGet]
+        [Route("PreviousSalesQuantityWithInCappingDaysLimit")]
+        public IActionResult GetPatientInvoiceHistory(int patientId, int cappingDaysLimit, int itemId)
+        {
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
 
+            try
+            {
+                InsuranceDbContext insuranceDBContext = new InsuranceDbContext(connString);
+                var SalesQty = PreviouslySalesQuantityWithinCappingDaysLimit(insuranceDBContext, itemId, patientId, cappingDaysLimit);
+                responseData.Results = SalesQty;
+                responseData.Status = ENUM_DanpheHttpResponseText.OK;
+            }
+            catch (Exception ex)
+            {
+                responseData.Status = ENUM_DanpheHttpResponseText.Failed;
+                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
+            }
+            return Ok(responseData);
+        }
         //[HttpGet]
         //public string Get(string reqType, string searchText, DateTime toDate, DateTime fromDate, string status, int dayslimit, string search, string firstName, string lastName, string Gender,
         //    string Age, string phoneNumber, int patientId, string patientCode, string admitStatus, bool IsInsurance, string IMISCode, string Ins_NshiNumber, int requisitionId, string departmentName,
@@ -3134,7 +3160,7 @@ namespace DanpheEMR.Controllers
             Func<object> func = () => SaveGovInsurancePatient(ipDataStr, currentSessionUser);
             return InvokeHttpPostFunction(func);
         }
-       
+
 
         [HttpPost]
         [Route("CreateVisit")]
@@ -3159,7 +3185,7 @@ namespace DanpheEMR.Controllers
 
         }
 
-      
+
         [HttpPost]
         [Route("FreeFollowup")]
         public IActionResult FreeFollowup()
@@ -3194,7 +3220,7 @@ namespace DanpheEMR.Controllers
 
         }
 
-       
+
         [HttpPost]
         [Route("CreateBillingVisit")]
         public IActionResult BillingVisits()
@@ -3205,7 +3231,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpPostFunction(func);
 
         }
-       
+
 
         [HttpPost]
         [Route("Lab/Requisition")]
@@ -3218,7 +3244,7 @@ namespace DanpheEMR.Controllers
 
 
         }
-      
+
 
         [HttpPost]
         [Route("Radiology/Requisition")]
@@ -3233,7 +3259,7 @@ namespace DanpheEMR.Controllers
 
         }
 
-       
+
         [HttpPost]
         [Route("PatientDeposit")]
         public IActionResult PatientDeposit()
@@ -3246,7 +3272,7 @@ namespace DanpheEMR.Controllers
 
 
         }
-       
+
 
         [HttpPost]
         [Route("Discharge")]
@@ -3260,7 +3286,7 @@ namespace DanpheEMR.Controllers
 
         }
 
-       
+
         [HttpPost]
         [Route("BillingTransaction")]
         public IActionResult BillingTransaction()
@@ -3284,14 +3310,14 @@ namespace DanpheEMR.Controllers
             // if (reqType == "update-gov-insurance-patient")
             string ipDataStr = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => UpdateGovInsurancePat(ipDataStr,currentUser);
+            Func<object> func = () => UpdateGovInsurancePat(ipDataStr, currentUser);
             return InvokeHttpPutFunction(func);
         }
-       
+
         [HttpPut]
         [Route("AppointmentStatus")]
         //update appointmentStatus
-        public IActionResult AppointmentStatus( int appointmentId, string status)
+        public IActionResult AppointmentStatus(int appointmentId, string status)
         {
             //if (reqType == "updateAppStatus" && !string.IsNullOrEmpty(status))
             string ipDataStr = this.ReadPostData();
@@ -3299,32 +3325,32 @@ namespace DanpheEMR.Controllers
             return InvokeHttpPutFunction(func);
 
         }
-      
+
 
         [HttpPut]
         [Route("PrintCount")]
         //Update the Print Count on Bill transaction after the Receipt print
-        public IActionResult PrintCountafterPrint(int PrintCount,int billingTransactionId)
+        public IActionResult PrintCountafterPrint(int PrintCount, int billingTransactionId)
         {
             // if (reqType == "UpdatePrintCountafterPrint")
             string ipDataStr = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => UpdatePrintCountafterPrint(billingTransactionId,currentUser,PrintCount);
+            Func<object> func = () => UpdatePrintCountafterPrint(billingTransactionId, currentUser, PrintCount);
             return InvokeHttpPutFunction(func);
         }
-       
+
         [HttpPut]
         [Route("Procedure")]
-        public IActionResult Procedure(int AdmissionPatientId, string ProcedureType )
+        public IActionResult Procedure(int AdmissionPatientId, string ProcedureType)
         {
             //if (reqType == "update-Procedure")
             string ipDataStr = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => UpdateProcedure(AdmissionPatientId, ProcedureType,currentUser);
+            Func<object> func = () => UpdateProcedure(AdmissionPatientId, ProcedureType, currentUser);
             return InvokeHttpPutFunction(func);
 
         }
-       
+
 
         [HttpPut]
         [Route("EditItemPriceQtyDiscAndProvider")]
@@ -3333,10 +3359,10 @@ namespace DanpheEMR.Controllers
             // if (reqType == "EditItemPrice_Qty_Disc_Provider")
             string ipDataStr = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => UpdateItemPriceQtyDiscProvider(currentUser,ipDataStr);
+            Func<object> func = () => UpdateItemPriceQtyDiscProvider(currentUser, ipDataStr);
             return InvokeHttpPutFunction(func);
         }
-      
+
 
         [HttpPut]
         [Route("Discharge")]
@@ -3345,17 +3371,17 @@ namespace DanpheEMR.Controllers
             //  if (reqType == "discharge-frombilling")
             string ipDataStr = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => UpdateDischargeFromBilling(ipDataStr,currentUser);
+            Func<object> func = () => UpdateDischargeFromBilling(ipDataStr, currentUser);
             return InvokeHttpPutFunction(func);
 
         }
-       
+
 
         [HttpPut]
         [Route("CancelBillingTransactionItems")]
-         //to cancel multiple items at once--needed in provisional items cancellation.sud:12May'18
+        //to cancel multiple items at once--needed in provisional items cancellation.sud:12May'18
         public IActionResult CancelBillingTransactionItems()
-        { 
+        {
             // if (reqType == "cancelBillTxnItems")
             string ipDataStr = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
@@ -3363,7 +3389,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpPutFunction(func);
 
         }
-      
+
 
         [HttpPut]
         [Route("BillingTransactionItems")]
@@ -3376,7 +3402,7 @@ namespace DanpheEMR.Controllers
             return InvokeHttpPutFunction(func);
 
         }
-      
+
 
         [HttpPut]
         [Route("Balance")]
@@ -3394,588 +3420,588 @@ namespace DanpheEMR.Controllers
 
 
         //    [HttpPost]// POST api/values
-//    public string Post()
-//    {
-//        DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
-//        int CreatedBy = ToInt(this.ReadQueryStringData("CreatedBy"));
-//        RbacUser currentSessionUser = HttpContext.Session.Get<RbacUser>("currentuser");
-//        responseData.Status = "OK";
-//        string ipDataString = this.ReadPostData();
-//        string reqType = this.ReadQueryStringData("reqType");
-//        string PrinterName = this.ReadQueryStringData("PrinterName");
-//        string FilePath = this.ReadQueryStringData("FilePath");
-//        try
-//        {
-//            string str = this.ReadPostData();
-//            InsuranceDbContext insuranceDbContext = new InsuranceDbContext(connString);
-//            RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+        //    public string Post()
+        //    {
+        //        DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+        //        int CreatedBy = ToInt(this.ReadQueryStringData("CreatedBy"));
+        //        RbacUser currentSessionUser = HttpContext.Session.Get<RbacUser>("currentuser");
+        //        responseData.Status = "OK";
+        //        string ipDataString = this.ReadPostData();
+        //        string reqType = this.ReadQueryStringData("reqType");
+        //        string PrinterName = this.ReadQueryStringData("PrinterName");
+        //        string FilePath = this.ReadQueryStringData("FilePath");
+        //        try
+        //        {
+        //            string str = this.ReadPostData();
+        //            InsuranceDbContext insuranceDbContext = new InsuranceDbContext(connString);
+        //            RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
 
-//            /* if (reqType == "gov-insurance-patient")
-//             {
-//                 GovInsurancePatientVM govInsClientPatObj = JsonConvert.DeserializeObject<GovInsurancePatientVM>(str);
+        //            /* if (reqType == "gov-insurance-patient")
+        //             {
+        //                 GovInsurancePatientVM govInsClientPatObj = JsonConvert.DeserializeObject<GovInsurancePatientVM>(str);
 
-//                 //PatientModel govInsNewPatient = GetPatientModelFromPatientVM(govInsClientPatObj, connString, insuranceDbContext);
-//                 //InsuranceModel patInsInfo = GetInsuranceModelFromInsPatientVM(govInsClientPatObj);
-//                 //patInsInfo.CreatedBy = currentSessionUser.EmployeeId;
+        //                 //PatientModel govInsNewPatient = GetPatientModelFromPatientVM(govInsClientPatObj, connString, insuranceDbContext);
+        //                 //InsuranceModel patInsInfo = GetInsuranceModelFromInsPatientVM(govInsClientPatObj);
+        //                 //patInsInfo.CreatedBy = currentSessionUser.EmployeeId;
 
-//                 //govInsNewPatient.Insurances = new List<InsuranceModel>();
-//                 //govInsNewPatient.Insurances.Add(patInsInfo);
+        //                 //govInsNewPatient.Insurances = new List<InsuranceModel>();
+        //                 //govInsNewPatient.Insurances.Add(patInsInfo);
 
-//                 //govInsNewPatient.CreatedBy = currentSessionUser.EmployeeId;
-//                 //govInsNewPatient.CreatedOn = DateTime.Now;
+        //                 //govInsNewPatient.CreatedBy = currentSessionUser.EmployeeId;
+        //                 //govInsNewPatient.CreatedOn = DateTime.Now;
 
-//                 //insuranceDbContext.Patients.Add(govInsNewPatient);
-//                 //insuranceDbContext.SaveChanges();
+        //                 //insuranceDbContext.Patients.Add(govInsNewPatient);
+        //                 //insuranceDbContext.SaveChanges();
 
-//                 PatientModel govInsNewPatient = CreateInsurancePatient(insuranceDbContext, govInsClientPatObj, currentSessionUser, connString); //Krishna,18th,Jul'22 , This function will register a patient(handling duplictae PatientNo i.e. It will be recursive until the unique PatientNo is received.)
+        //                 PatientModel govInsNewPatient = CreateInsurancePatient(insuranceDbContext, govInsClientPatObj, currentSessionUser, connString); //Krishna,18th,Jul'22 , This function will register a patient(handling duplictae PatientNo i.e. It will be recursive until the unique PatientNo is received.)
 
-//                 PatientMembershipModel patMembership = new PatientMembershipModel();
+        //                 PatientMembershipModel patMembership = new PatientMembershipModel();
 
-//                 List<MembershipTypeModel> allMemberships = insuranceDbContext.MembershipTypes.ToList();
-//                 MembershipTypeModel currPatMembershipModel = allMemberships.Where(a => a.MembershipTypeId == govInsNewPatient.MembershipTypeId).FirstOrDefault();
-
-
-//                 patMembership.PatientId = govInsNewPatient.PatientId;
-//                 patMembership.MembershipTypeId = govInsNewPatient.MembershipTypeId.Value;
-//                 patMembership.StartDate = System.DateTime.Now;//set today's datetime as start date.
-//                 int expMths = currPatMembershipModel.ExpiryMonths != null ? currPatMembershipModel.ExpiryMonths.Value : 0;
-
-//                 patMembership.EndDate = System.DateTime.Now.AddMonths(expMths);//add membership type's expiry date to current date for expiryDate.
-//                 patMembership.CreatedBy = currentSessionUser.EmployeeId;
-//                 patMembership.CreatedOn = System.DateTime.Now;
-//                 patMembership.IsActive = true;
-
-//                 insuranceDbContext.PatientMemberships.Add(patMembership);
-//                 insuranceDbContext.SaveChanges();
-
-//                 responseData.Results = govInsNewPatient;
-//                 responseData.Status = "OK";
-//             }*/
-//            // else
-//            /*  if (!string.IsNullOrEmpty(reqType) && reqType == "patientVisitCreate")
-//              {
-//                  //This method for do the patient visit transaction
-//                  //In this transaction- Post data to Patient, Visit,BillTransaction, BillTransactionItems tables
-//                  return PatientVisitTransaction(ipDataString);
-//              }
-//              else*/
-//            /*
-//                            if (reqType == "saveHTMLfile")
-//                            {
-//                                //ipDataString is input (HTML string)
-//                                if (ipDataString.Length > 0)
-//                                {
-//                                    //right now we are naming file as printerName + employeeId.html so that there is no mis match in htmlfile from different users.
-//                                    var fileName = PrinterName + currentUser.EmployeeId + ".html";
-//                                    byte[] htmlbytearray = System.Text.Encoding.ASCII.GetBytes(ipDataString);
-//                                    //saving file to default folder, html file need to be delete after print is called.
-//                                    System.IO.File.WriteAllBytes(@FilePath + fileName, htmlbytearray);
-
-//                                    responseData.Status = "OK";
-//                                    responseData.Results = 1;
-//                                }
-//                            }
-//                            else*/
-//            /*
-//                            if (!string.IsNullOrEmpty(reqType) && reqType == "ins-free-followup-visit")
-//                            {
-//                                VisitModel vis = JsonConvert.DeserializeObject<VisitModel>(str);
-//                                //to avoid clashing of visits
-//                                if (InsuranceBL.HasDuplicateVisitWithSameProvider(insuranceDbContext, vis.PatientId, vis.PerformerId, vis.VisitDate) && vis.VisitType == "outpatient")
-//                                {
-//                                    responseData.Status = "Failed";
-//                                    responseData.ErrorMessage = "Patient already has appointment with this Doctor today.";
-//                                }
-//                                else
-//                                {
-//                                    //get provider name from providerId
-//                                    if (vis.PerformerId != null && vis.PerformerId != 0)
-//                                    {
-//                                        vis.PerformerName = InsuranceBL.GetProviderName(vis.PerformerId, connString);
-//                                    }
-
-//                                    //vis.VisitCode = InsuranceBL.CreateNewPatientVisitCode(vis.VisitType, connString);
-//                                    insuranceDbContext.Visit.Add(vis);
-//                                    vis.Ins_HasInsurance = true;
-//                                    //insuranceDbContext.SaveChanges();
-//                                    GenerateVisitCodeAndSave(insuranceDbContext, vis, connString);
+        //                 List<MembershipTypeModel> allMemberships = insuranceDbContext.MembershipTypes.ToList();
+        //                 MembershipTypeModel currPatMembershipModel = allMemberships.Where(a => a.MembershipTypeId == govInsNewPatient.MembershipTypeId).FirstOrDefault();
 
 
-//                                    //updateIsContinuedStatus in case of referral visit and followup visit
-//                                    if (vis.AppointmentType.ToLower() == ENUM_AppointmentType.referral.ToLower() // "referral"
-//                                        || vis.AppointmentType.ToLower() == ENUM_AppointmentType.followup.ToLower() // "followup"
-//                                        || vis.AppointmentType.ToLower() == ENUM_AppointmentType.transfer.ToLower()) // "transfer")
-//                                    {
-//                                        UpdateIsContinuedStatus(vis.ParentVisitId,
-//                                            vis.AppointmentType,
-//                                            true,
-//                                            currentUser.EmployeeId,
-//                                            insuranceDbContext);
-//                                    }
+        //                 patMembership.PatientId = govInsNewPatient.PatientId;
+        //                 patMembership.MembershipTypeId = govInsNewPatient.MembershipTypeId.Value;
+        //                 patMembership.StartDate = System.DateTime.Now;//set today's datetime as start date.
+        //                 int expMths = currPatMembershipModel.ExpiryMonths != null ? currPatMembershipModel.ExpiryMonths.Value : 0;
+
+        //                 patMembership.EndDate = System.DateTime.Now.AddMonths(expMths);//add membership type's expiry date to current date for expiryDate.
+        //                 patMembership.CreatedBy = currentSessionUser.EmployeeId;
+        //                 patMembership.CreatedOn = System.DateTime.Now;
+        //                 patMembership.IsActive = true;
+
+        //                 insuranceDbContext.PatientMemberships.Add(patMembership);
+        //                 insuranceDbContext.SaveChanges();
+
+        //                 responseData.Results = govInsNewPatient;
+        //                 responseData.Status = "OK";
+        //             }*/
+        //            // else
+        //            /*  if (!string.IsNullOrEmpty(reqType) && reqType == "patientVisitCreate")
+        //              {
+        //                  //This method for do the patient visit transaction
+        //                  //In this transaction- Post data to Patient, Visit,BillTransaction, BillTransactionItems tables
+        //                  return PatientVisitTransaction(ipDataString);
+        //              }
+        //              else*/
+        //            /*
+        //                            if (reqType == "saveHTMLfile")
+        //                            {
+        //                                //ipDataString is input (HTML string)
+        //                                if (ipDataString.Length > 0)
+        //                                {
+        //                                    //right now we are naming file as printerName + employeeId.html so that there is no mis match in htmlfile from different users.
+        //                                    var fileName = PrinterName + currentUser.EmployeeId + ".html";
+        //                                    byte[] htmlbytearray = System.Text.Encoding.ASCII.GetBytes(ipDataString);
+        //                                    //saving file to default folder, html file need to be delete after print is called.
+        //                                    System.IO.File.WriteAllBytes(@FilePath + fileName, htmlbytearray);
+
+        //                                    responseData.Status = "OK";
+        //                                    responseData.Results = 1;
+        //                                }
+        //                            }
+        //                            else*/
+        //            /*
+        //                            if (!string.IsNullOrEmpty(reqType) && reqType == "ins-free-followup-visit")
+        //                            {
+        //                                VisitModel vis = JsonConvert.DeserializeObject<VisitModel>(str);
+        //                                //to avoid clashing of visits
+        //                                if (InsuranceBL.HasDuplicateVisitWithSameProvider(insuranceDbContext, vis.PatientId, vis.PerformerId, vis.VisitDate) && vis.VisitType == "outpatient")
+        //                                {
+        //                                    responseData.Status = "Failed";
+        //                                    responseData.ErrorMessage = "Patient already has appointment with this Doctor today.";
+        //                                }
+        //                                else
+        //                                {
+        //                                    //get provider name from providerId
+        //                                    if (vis.PerformerId != null && vis.PerformerId != 0)
+        //                                    {
+        //                                        vis.PerformerName = InsuranceBL.GetProviderName(vis.PerformerId, connString);
+        //                                    }
+
+        //                                    //vis.VisitCode = InsuranceBL.CreateNewPatientVisitCode(vis.VisitType, connString);
+        //                                    insuranceDbContext.Visit.Add(vis);
+        //                                    vis.Ins_HasInsurance = true;
+        //                                    //insuranceDbContext.SaveChanges();
+        //                                    GenerateVisitCodeAndSave(insuranceDbContext, vis, connString);
+
+
+        //                                    //updateIsContinuedStatus in case of referral visit and followup visit
+        //                                    if (vis.AppointmentType.ToLower() == ENUM_AppointmentType.referral.ToLower() // "referral"
+        //                                        || vis.AppointmentType.ToLower() == ENUM_AppointmentType.followup.ToLower() // "followup"
+        //                                        || vis.AppointmentType.ToLower() == ENUM_AppointmentType.transfer.ToLower()) // "transfer")
+        //                                    {
+        //                                        UpdateIsContinuedStatus(vis.ParentVisitId,
+        //                                            vis.AppointmentType,
+        //                                            true,
+        //                                            currentUser.EmployeeId,
+        //                                            insuranceDbContext);
+        //                                    }
 
 
 
-//                                    //Return Model should be in same format as that of the ListVisit since it's appended in the samae list.
-//                                    ListVisitsVM returnVisit = (from visit in insuranceDbContext.Visit
-//                                                                where visit.PatientVisitId == vis.PatientVisitId && visit.Ins_HasInsurance == true
-//                                                                join department in insuranceDbContext.Departments on visit.DepartmentId equals department.DepartmentId
-//                                                                join patient in insuranceDbContext.Patients on visit.PatientId equals patient.PatientId
-//                                                                select new ListVisitsVM
-//                                                                {
-//                                                                    PatientVisitId = visit.PatientVisitId,
-//                                                                    ParentVisitId = visit.ParentVisitId,
-//                                                                    VisitDate = visit.VisitDate,
-//                                                                    VisitTime = visit.VisitTime,
-//                                                                    PatientId = patient.PatientId,
-//                                                                    PatientCode = patient.PatientCode,
-//                                                                    ShortName = patient.FirstName + " " + (string.IsNullOrEmpty(patient.MiddleName) ? "" : patient.MiddleName + " ") + patient.LastName,
-//                                                                    PhoneNumber = patient.PhoneNumber,
-//                                                                    DateOfBirth = patient.DateOfBirth,
-//                                                                    Gender = patient.Gender,
-//                                                                    DepartmentId = department.DepartmentId,
-//                                                                    DepartmentName = department.DepartmentName,
-//                                                                    PerformerId = visit.PerformerId,
-//                                                                    PerformerName = visit.PerformerName,
-//                                                                    VisitType = visit.VisitType,
-//                                                                    AppointmentType = visit.AppointmentType,
-//                                                                    BillStatus = visit.BillingStatus,
-//                                                                    Patient = patient,
-//                                                                    ClaimCode = visit.ClaimCode,
-//                                                                    Ins_NshiNumber = patient.Ins_NshiNumber
-//                                                                }).FirstOrDefault();
+        //                                    //Return Model should be in same format as that of the ListVisit since it's appended in the samae list.
+        //                                    ListVisitsVM returnVisit = (from visit in insuranceDbContext.Visit
+        //                                                                where visit.PatientVisitId == vis.PatientVisitId && visit.Ins_HasInsurance == true
+        //                                                                join department in insuranceDbContext.Departments on visit.DepartmentId equals department.DepartmentId
+        //                                                                join patient in insuranceDbContext.Patients on visit.PatientId equals patient.PatientId
+        //                                                                select new ListVisitsVM
+        //                                                                {
+        //                                                                    PatientVisitId = visit.PatientVisitId,
+        //                                                                    ParentVisitId = visit.ParentVisitId,
+        //                                                                    VisitDate = visit.VisitDate,
+        //                                                                    VisitTime = visit.VisitTime,
+        //                                                                    PatientId = patient.PatientId,
+        //                                                                    PatientCode = patient.PatientCode,
+        //                                                                    ShortName = patient.FirstName + " " + (string.IsNullOrEmpty(patient.MiddleName) ? "" : patient.MiddleName + " ") + patient.LastName,
+        //                                                                    PhoneNumber = patient.PhoneNumber,
+        //                                                                    DateOfBirth = patient.DateOfBirth,
+        //                                                                    Gender = patient.Gender,
+        //                                                                    DepartmentId = department.DepartmentId,
+        //                                                                    DepartmentName = department.DepartmentName,
+        //                                                                    PerformerId = visit.PerformerId,
+        //                                                                    PerformerName = visit.PerformerName,
+        //                                                                    VisitType = visit.VisitType,
+        //                                                                    AppointmentType = visit.AppointmentType,
+        //                                                                    BillStatus = visit.BillingStatus,
+        //                                                                    Patient = patient,
+        //                                                                    ClaimCode = visit.ClaimCode,
+        //                                                                    Ins_NshiNumber = patient.Ins_NshiNumber
+        //                                                                }).FirstOrDefault();
 
 
-//                                    responseData.Results = returnVisit;
-//                                    responseData.Status = "OK";
-//                                }
+        //                                    responseData.Results = returnVisit;
+        //                                    responseData.Status = "OK";
+        //                                }
 
-//                            }
-//                            else */
-//            /* if (!string.IsNullOrEmpty(reqType) && reqType == "ins-paid-followup-visit")
-//             {
-//                 QuickVisitVM qckVisit = PaidFollowupVisitTransaction(str);
-//                 responseData.Status = "OK";
-//                 responseData.Results = qckVisit;
-//             }
-//*//*
-//                else*/
-//            /* if (reqType == "post-billingTransactionItems")
-//             {
-//                 //Transaction Begins 
-//                 List<BillingTransactionItemModel> billTranItems = DanpheJSONConvert.DeserializeObject<List<BillingTransactionItemModel>>(ipDataString);
-//                 using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
-//                 {
-//                     try
-//                     {
-//                         if (billTranItems != null && billTranItems.Count > 0)
-//                         {
-//                             billTranItems = InsuranceBL.PostUpdateBillingTransactionItems(insuranceDbContext,
-//                                 connString,
-//                                 billTranItems,
-//                                 currentUser,
-//                                 DateTime.Now,
-//                                 billTranItems[0].BillStatus,
-//                                 billTranItems[0].CounterId);
+        //                            }
+        //                            else */
+        //            /* if (!string.IsNullOrEmpty(reqType) && reqType == "ins-paid-followup-visit")
+        //             {
+        //                 QuickVisitVM qckVisit = PaidFollowupVisitTransaction(str);
+        //                 responseData.Status = "OK";
+        //                 responseData.Results = qckVisit;
+        //             }
+        //*//*
+        //                else*/
+        //            /* if (reqType == "post-billingTransactionItems")
+        //             {
+        //                 //Transaction Begins 
+        //                 List<BillingTransactionItemModel> billTranItems = DanpheJSONConvert.DeserializeObject<List<BillingTransactionItemModel>>(ipDataString);
+        //                 using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
+        //                 {
+        //                     try
+        //                     {
+        //                         if (billTranItems != null && billTranItems.Count > 0)
+        //                         {
+        //                             billTranItems = InsuranceBL.PostUpdateBillingTransactionItems(insuranceDbContext,
+        //                                 connString,
+        //                                 billTranItems,
+        //                                 currentUser,
+        //                                 DateTime.Now,
+        //                                 billTranItems[0].BillStatus,
+        //                                 billTranItems[0].CounterId);
 
-//                             var userName = (from emp in insuranceDbContext.Employee where emp.EmployeeId == currentUser.EmployeeId select emp.FirstName).FirstOrDefault();
-//                             billTranItems.ForEach(usr => usr.RequestingUserName = userName);
+        //                             var userName = (from emp in insuranceDbContext.Employee where emp.EmployeeId == currentUser.EmployeeId select emp.FirstName).FirstOrDefault();
+        //                             billTranItems.ForEach(usr => usr.RequestingUserName = userName);
 
-//                             responseData.Results = billTranItems;//check if we need to send back all the input object back to client.--sudarshan
-//                             dbContextTransaction.Commit(); //end of transaction
-//                             responseData.Status = "OK";
-//                         }
-//                     }
-//                     catch (Exception ex)
-//                     {
-//                         //rollback all changes if any error occurs
-//                         dbContextTransaction.Rollback();
-//                         throw ex;
-//                     }
-//                 }
+        //                             responseData.Results = billTranItems;//check if we need to send back all the input object back to client.--sudarshan
+        //                             dbContextTransaction.Commit(); //end of transaction
+        //                             responseData.Status = "OK";
+        //                         }
+        //                     }
+        //                     catch (Exception ex)
+        //                     {
+        //                         //rollback all changes if any error occurs
+        //                         dbContextTransaction.Rollback();
+        //                         throw ex;
+        //                     }
+        //                 }
 
-//             }
-//             else*/
-//            /* if (!string.IsNullOrEmpty(reqType) && reqType == "billing-visits")
-//             {
-//                 List<VisitModel> visits = JsonConvert.DeserializeObject<List<VisitModel>>(str);
-//                 visits.ForEach(visit =>
-//                 {
-//                     visit.VisitCode = VisitBL.CreateNewPatientVisitCode(visit.VisitType, connString);
-//                     insuranceDbContext.Visit.Add(visit);
+        //             }
+        //             else*/
+        //            /* if (!string.IsNullOrEmpty(reqType) && reqType == "billing-visits")
+        //             {
+        //                 List<VisitModel> visits = JsonConvert.DeserializeObject<List<VisitModel>>(str);
+        //                 visits.ForEach(visit =>
+        //                 {
+        //                     visit.VisitCode = VisitBL.CreateNewPatientVisitCode(visit.VisitType, connString);
+        //                     insuranceDbContext.Visit.Add(visit);
 
-//                 });
-//                 insuranceDbContext.SaveChanges();
-//                 responseData.Results = visits;
-//                 responseData.Status = "OK";
-//             }
-//             else*/
-//            /* if (reqType == "addNewRequisitions") //comes here from doctor and nurse orders.
-//             {
-//                 List<LabRequisitionModel> labReqListFromClient = DanpheJSONConvert.DeserializeObject<List<LabRequisitionModel>>(str);
-//                 LabVendorsModel defaultVendor = insuranceDbContext.LabVendors.Where(val => val.IsDefault == true).FirstOrDefault();
-//                 var currDateTime = DateTime.Now;
+        //                 });
+        //                 insuranceDbContext.SaveChanges();
+        //                 responseData.Results = visits;
+        //                 responseData.Status = "OK";
+        //             }
+        //             else*/
+        //            /* if (reqType == "addNewRequisitions") //comes here from doctor and nurse orders.
+        //             {
+        //                 List<LabRequisitionModel> labReqListFromClient = DanpheJSONConvert.DeserializeObject<List<LabRequisitionModel>>(str);
+        //                 LabVendorsModel defaultVendor = insuranceDbContext.LabVendors.Where(val => val.IsDefault == true).FirstOrDefault();
+        //                 var currDateTime = DateTime.Now;
 
-//                 if (labReqListFromClient != null && labReqListFromClient.Count > 0)
-//                 {
-//                     PatientDbContext patientContext = new PatientDbContext(connString);
-//                     List<LabTestModel> allLabTests = insuranceDbContext.LabTests.ToList();
-//                     int patId = labReqListFromClient[0].PatientId;
-//                     //get patient as querystring from client side rather than searching it from request's list.
-//                     PatientModel currPatient = patientContext.Patients.Where(p => p.PatientId == patId)
-//                         .FirstOrDefault<PatientModel>();
+        //                 if (labReqListFromClient != null && labReqListFromClient.Count > 0)
+        //                 {
+        //                     PatientDbContext patientContext = new PatientDbContext(connString);
+        //                     List<LabTestModel> allLabTests = insuranceDbContext.LabTests.ToList();
+        //                     int patId = labReqListFromClient[0].PatientId;
+        //                     //get patient as querystring from client side rather than searching it from request's list.
+        //                     PatientModel currPatient = patientContext.Patients.Where(p => p.PatientId == patId)
+        //                         .FirstOrDefault<PatientModel>();
 
-//                     if (currPatient != null)
-//                     {
+        //                     if (currPatient != null)
+        //                     {
 
-//                         labReqListFromClient.ForEach(req =>
-//                         {
-//                             req.ResultingVendorId = defaultVendor.LabVendorId;
-//                             LabTestModel labTestdb = allLabTests.Where(a => a.LabTestId == req.LabTestId).FirstOrDefault<LabTestModel>();
-//                             //get PatientId from clientSide
-//                             if (labTestdb.IsValidForReporting == true)
-//                             {
-//                                 req.ReportTemplateId = labTestdb.ReportTemplateId ?? default(int);
-//                                 req.LabTestSpecimen = null;
-//                                 req.LabTestSpecimenSource = null;
-//                                 req.LabTestName = labTestdb.LabTestName;
-//                                 req.RunNumberType = labTestdb.RunNumberType;
-//                                 //req.OrderStatus = "active";
-//                                 req.LOINC = "LOINC Code";
-//                                 req.BillCancelledBy = null;
-//                                 req.BillCancelledOn = null;
-//                                 if (req.PrescriberId != null && req.PrescriberId != 0)
-//                                 {
-//                                     var emp = insuranceDbContext.Employee.Where(a => a.EmployeeId == req.PrescriberId).FirstOrDefault();
-//                                     req.PrescriberName = emp.FullName;
-//                                 }
+        //                         labReqListFromClient.ForEach(req =>
+        //                         {
+        //                             req.ResultingVendorId = defaultVendor.LabVendorId;
+        //                             LabTestModel labTestdb = allLabTests.Where(a => a.LabTestId == req.LabTestId).FirstOrDefault<LabTestModel>();
+        //                             //get PatientId from clientSide
+        //                             if (labTestdb.IsValidForReporting == true)
+        //                             {
+        //                                 req.ReportTemplateId = labTestdb.ReportTemplateId ?? default(int);
+        //                                 req.LabTestSpecimen = null;
+        //                                 req.LabTestSpecimenSource = null;
+        //                                 req.LabTestName = labTestdb.LabTestName;
+        //                                 req.RunNumberType = labTestdb.RunNumberType;
+        //                                 //req.OrderStatus = "active";
+        //                                 req.LOINC = "LOINC Code";
+        //                                 req.BillCancelledBy = null;
+        //                                 req.BillCancelledOn = null;
+        //                                 if (req.PrescriberId != null && req.PrescriberId != 0)
+        //                                 {
+        //                                     var emp = insuranceDbContext.Employee.Where(a => a.EmployeeId == req.PrescriberId).FirstOrDefault();
+        //                                     req.PrescriberName = emp.FullName;
+        //                                 }
 
-//                                 //req.PatientVisitId = visitId;//assign above visitid to this requisition.
-//                                 if (String.IsNullOrEmpty(currPatient.MiddleName))
-//                                     req.PatientName = currPatient.FirstName + " " + currPatient.LastName;
-//                                 else
-//                                     req.PatientName = currPatient.FirstName + " " + currPatient.MiddleName + " " + currPatient.LastName;
+        //                                 //req.PatientVisitId = visitId;//assign above visitid to this requisition.
+        //                                 if (String.IsNullOrEmpty(currPatient.MiddleName))
+        //                                     req.PatientName = currPatient.FirstName + " " + currPatient.LastName;
+        //                                 else
+        //                                     req.PatientName = currPatient.FirstName + " " + currPatient.MiddleName + " " + currPatient.LastName;
 
-//                                 req.OrderDateTime = currDateTime;
-//                                 req.CreatedOn = currDateTime;
-//                                 insuranceDbContext.LabRequisitions.Add(req);
-//                                 insuranceDbContext.SaveChanges();
-//                             }
-//                         });
+        //                                 req.OrderDateTime = currDateTime;
+        //                                 req.CreatedOn = currDateTime;
+        //                                 insuranceDbContext.LabRequisitions.Add(req);
+        //                                 insuranceDbContext.SaveChanges();
+        //                             }
+        //                         });
 
-//                         responseData.Results = labReqListFromClient;
-//                         responseData.Status = "OK";
-//                     }
-//                 }
-//                 else
-//                 {
-//                     responseData.Status = "Failed";
-//                     responseData.ErrorMessage = "Invalid input request.";
-//                 }
+        //                         responseData.Results = labReqListFromClient;
+        //                         responseData.Status = "OK";
+        //                     }
+        //                 }
+        //                 else
+        //                 {
+        //                     responseData.Status = "Failed";
+        //                     responseData.ErrorMessage = "Invalid input request.";
+        //                 }
 
-//             }*/
-//            //else 
-//            /* if (reqType == "postRequestItems")
-//             {
-//                 List<ImagingRequisitionModel> imgrequests = JsonConvert.DeserializeObject<List<ImagingRequisitionModel>>(str);
-//                 MasterDbContext masterContext = new MasterDbContext(base.connString);
+        //             }*/
+        //            //else 
+        //            /* if (reqType == "postRequestItems")
+        //             {
+        //                 List<ImagingRequisitionModel> imgrequests = JsonConvert.DeserializeObject<List<ImagingRequisitionModel>>(str);
+        //                 MasterDbContext masterContext = new MasterDbContext(base.connString);
 
-//                 PatientDbContext patientContext = new PatientDbContext(connString);
+        //                 PatientDbContext patientContext = new PatientDbContext(connString);
 
-//                 //getting the imagingtype because imagingtypename is needed in billing for getting service department
-//                 List<RadiologyImagingTypeModel> Imgtype = masterContext.ImagingTypes
-//                                     .ToList<RadiologyImagingTypeModel>();
+        //                 //getting the imagingtype because imagingtypename is needed in billing for getting service department
+        //                 List<RadiologyImagingTypeModel> Imgtype = masterContext.ImagingTypes
+        //                                     .ToList<RadiologyImagingTypeModel>();
 
-//                 var notValidForReportingItem = masterContext.ImagingItems.Where(i => i.IsValidForReporting == false).Select(m => m.ImagingItemId);
+        //                 var notValidForReportingItem = masterContext.ImagingItems.Where(i => i.IsValidForReporting == false).Select(m => m.ImagingItemId);
 
-//                 if (imgrequests != null && imgrequests.Count > 0)
-//                 {
-//                     foreach (var req in imgrequests)
-//                     {
-//                         req.ImagingDate = System.DateTime.Now;
-//                         req.CreatedOn = DateTime.Now;
-//                         req.CreatedBy = currentUser.EmployeeId;
-//                         req.IsActive = true;
-//                         if (req.PrescriberId != null && req.PrescriberId != 0)
-//                         {
-//                             var emp = insuranceDbContext.Employee.Where(a => a.EmployeeId == req.PrescriberId).FirstOrDefault();
-//                             req.PrescriberName = emp.FullName;
-//                         }
-//                         if (req.ImagingTypeId != null)
-//                         {
-//                             req.ImagingTypeName = Imgtype.Where(a => a.ImagingTypeId == req.ImagingTypeId).Select(a => a.ImagingTypeName).FirstOrDefault();
-//                             req.Urgency = string.IsNullOrEmpty(req.Urgency) ? "normal" : req.Urgency;
-//                             //req.WardName = ;
-//                         }
-//                         else
-//                         {
-//                             req.ImagingTypeId = Imgtype.Where(a => a.ImagingTypeName == req.ImagingTypeName).Select(a => a.ImagingTypeId).FirstOrDefault();
-//                         }
-//                         if (!notValidForReportingItem.Contains(req.ImagingItemId.Value))
-//                         {
-//                             insuranceDbContext.RadiologyImagingRequisitions.Add(req);
-//                         }
-//                     }
-//                     insuranceDbContext.SaveChanges();
-//                     responseData.Status = "OK";
-//                     responseData.Results = imgrequests;
-//                 }
-//                 else
-//                 {
-//                     responseData.ErrorMessage = "imgrequests is null";
-//                     responseData.Status = "Failed";
-//                 }
-//             }*/
-//            /*                //else
-//                            if (reqType == "Deposit")
-//                            {
-//                                BillingDeposit deposit = DanpheJSONConvert.DeserializeObject<BillingDeposit>(ipDataString);
-//                                deposit.CreatedOn = System.DateTime.Now;
-//                                deposit.CreatedBy = currentUser.EmployeeId;
-//                                BillingFiscalYear fiscYear = BillingBL.GetFiscalYear(connString);
-//                                deposit.FiscalYearId = fiscYear.FiscalYearId;
-//                                if (deposit.DepositType != ENUM_BillDepositType.DepositDeduct)
-//                                    deposit.ReceiptNo = BillingBL.GetDepositReceiptNo(connString);
-//                                deposit.FiscalYear = fiscYear.FiscalYearFormatted;
-//                                EmployeeModel currentEmp = insuranceDbContext.Employee.Where(emp => emp.EmployeeId == currentUser.EmployeeId).FirstOrDefault();
-//                                deposit.BillingUser = currentEmp.FirstName + " " + currentEmp.LastName;
-//                                deposit.IsActive = true;
-//                                insuranceDbContext.BillingDeposits.Add(deposit);
-//                                insuranceDbContext.SaveChanges();
-//                                responseData.Status = "OK";
-//                                responseData.Results = deposit;//check if we need to send back the whole input object back to client.--sudarshan
-//                            }
-//                            else*/
-//            /* if (reqType == "post-ins-dischargeBill")//submit
-//             {
-//                 DateTime currentDate = DateTime.Now;
-//                 BillingTransactionModel billTransaction = DanpheJSONConvert.DeserializeObject<BillingTransactionModel>(ipDataString);
-//                 bool transactionSuccess = false;
-//                 if (billTransaction != null)
-//                 {
-//                     //check if discharge valid or not before entering other code logic.
-//                     if (InsuranceBL.IsValidForDischarge(billTransaction.PatientId, billTransaction.PatientVisitId, insuranceDbContext))
-//                     {
-//                         //Transaction Begins  
-//                         using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
-//                         {
-//                             try
-//                             {
-//                                 //step:1 -- make copy of billingTxnItems into new list, so thate EF doesn't add txn items again.
-//                                 //step:2-- if there's deposit deduction, then add to deposit table.
-//                                 billTransaction = InsuranceBL.PostBillingTransaction(insuranceDbContext, connString, billTransaction, currentUser, currentDate);
-//                                 if (billTransaction.IsInsuranceBilling == true)
-//                                 {
-//                                     InsuranceBL.UpdateInsuranceCurrentBalance(connString, billTransaction.PatientId, billTransaction.InsuranceProviderId ?? default(int), currentUser.EmployeeId, billTransaction.TotalAmount ?? default(int), true);
+        //                 if (imgrequests != null && imgrequests.Count > 0)
+        //                 {
+        //                     foreach (var req in imgrequests)
+        //                     {
+        //                         req.ImagingDate = System.DateTime.Now;
+        //                         req.CreatedOn = DateTime.Now;
+        //                         req.CreatedBy = currentUser.EmployeeId;
+        //                         req.IsActive = true;
+        //                         if (req.PrescriberId != null && req.PrescriberId != 0)
+        //                         {
+        //                             var emp = insuranceDbContext.Employee.Where(a => a.EmployeeId == req.PrescriberId).FirstOrDefault();
+        //                             req.PrescriberName = emp.FullName;
+        //                         }
+        //                         if (req.ImagingTypeId != null)
+        //                         {
+        //                             req.ImagingTypeName = Imgtype.Where(a => a.ImagingTypeId == req.ImagingTypeId).Select(a => a.ImagingTypeName).FirstOrDefault();
+        //                             req.Urgency = string.IsNullOrEmpty(req.Urgency) ? "normal" : req.Urgency;
+        //                             //req.WardName = ;
+        //                         }
+        //                         else
+        //                         {
+        //                             req.ImagingTypeId = Imgtype.Where(a => a.ImagingTypeName == req.ImagingTypeName).Select(a => a.ImagingTypeId).FirstOrDefault();
+        //                         }
+        //                         if (!notValidForReportingItem.Contains(req.ImagingItemId.Value))
+        //                         {
+        //                             insuranceDbContext.RadiologyImagingRequisitions.Add(req);
+        //                         }
+        //                     }
+        //                     insuranceDbContext.SaveChanges();
+        //                     responseData.Status = "OK";
+        //                     responseData.Results = imgrequests;
+        //                 }
+        //                 else
+        //                 {
+        //                     responseData.ErrorMessage = "imgrequests is null";
+        //                     responseData.Status = "Failed";
+        //                 }
+        //             }*/
+        //            /*                //else
+        //                            if (reqType == "Deposit")
+        //                            {
+        //                                BillingDeposit deposit = DanpheJSONConvert.DeserializeObject<BillingDeposit>(ipDataString);
+        //                                deposit.CreatedOn = System.DateTime.Now;
+        //                                deposit.CreatedBy = currentUser.EmployeeId;
+        //                                BillingFiscalYear fiscYear = BillingBL.GetFiscalYear(connString);
+        //                                deposit.FiscalYearId = fiscYear.FiscalYearId;
+        //                                if (deposit.DepositType != ENUM_BillDepositType.DepositDeduct)
+        //                                    deposit.ReceiptNo = BillingBL.GetDepositReceiptNo(connString);
+        //                                deposit.FiscalYear = fiscYear.FiscalYearFormatted;
+        //                                EmployeeModel currentEmp = insuranceDbContext.Employee.Where(emp => emp.EmployeeId == currentUser.EmployeeId).FirstOrDefault();
+        //                                deposit.BillingUser = currentEmp.FirstName + " " + currentEmp.LastName;
+        //                                deposit.IsActive = true;
+        //                                insuranceDbContext.BillingDeposits.Add(deposit);
+        //                                insuranceDbContext.SaveChanges();
+        //                                responseData.Status = "OK";
+        //                                responseData.Results = deposit;//check if we need to send back the whole input object back to client.--sudarshan
+        //                            }
+        //                            else*/
+        //            /* if (reqType == "post-ins-dischargeBill")//submit
+        //             {
+        //                 DateTime currentDate = DateTime.Now;
+        //                 BillingTransactionModel billTransaction = DanpheJSONConvert.DeserializeObject<BillingTransactionModel>(ipDataString);
+        //                 bool transactionSuccess = false;
+        //                 if (billTransaction != null)
+        //                 {
+        //                     //check if discharge valid or not before entering other code logic.
+        //                     if (InsuranceBL.IsValidForDischarge(billTransaction.PatientId, billTransaction.PatientVisitId, insuranceDbContext))
+        //                     {
+        //                         //Transaction Begins  
+        //                         using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
+        //                         {
+        //                             try
+        //                             {
+        //                                 //step:1 -- make copy of billingTxnItems into new list, so thate EF doesn't add txn items again.
+        //                                 //step:2-- if there's deposit deduction, then add to deposit table.
+        //                                 billTransaction = InsuranceBL.PostBillingTransaction(insuranceDbContext, connString, billTransaction, currentUser, currentDate);
+        //                                 if (billTransaction.IsInsuranceBilling == true)
+        //                                 {
+        //                                     InsuranceBL.UpdateInsuranceCurrentBalance(connString, billTransaction.PatientId, billTransaction.InsuranceProviderId ?? default(int), currentUser.EmployeeId, billTransaction.TotalAmount ?? default(int), true);
 
-//                                 }
-//                                 //step:3-- if there's deposit balance, then add a return transaction to deposit table. 
-//                                 if (billTransaction.PaymentMode != ENUM_BillPaymentMode.credit // "credit" 
-//                                     && billTransaction.DepositBalance != null && billTransaction.DepositBalance > 0)
-//                                 {
-//                                     BillingDeposit dep = new BillingDeposit()
-//                                     {
-//                                         DepositType = ENUM_BillDepositType.ReturnDeposit, // "ReturnDeposit",
-//                                         Remarks = "Deposit Refunded from InvoiceNo. " + billTransaction.InvoiceCode + billTransaction.InvoiceNo,
-//                                         //Remarks = "ReturnDeposit" + " for transactionid:" + billTransaction.BillingTransactionId,
-//                                         Amount = billTransaction.DepositBalance,
-//                                         IsActive = true,
-//                                         BillingTransactionId = billTransaction.BillingTransactionId,
-//                                         DepositBalance = 0,
-//                                         FiscalYearId = billTransaction.FiscalYearId,
-//                                         CounterId = billTransaction.CounterId,
-//                                         CreatedBy = billTransaction.CreatedBy,
-//                                         CreatedOn = currentDate,
-//                                         PatientId = billTransaction.PatientId,
-//                                         PatientVisitId = billTransaction.PatientVisitId,
-//                                         PaymentMode = billTransaction.PaymentMode,
-//                                         PaymentDetails = billTransaction.PaymentDetails,
+        //                                 }
+        //                                 //step:3-- if there's deposit balance, then add a return transaction to deposit table. 
+        //                                 if (billTransaction.PaymentMode != ENUM_BillPaymentMode.credit // "credit" 
+        //                                     && billTransaction.DepositBalance != null && billTransaction.DepositBalance > 0)
+        //                                 {
+        //                                     BillingDeposit dep = new BillingDeposit()
+        //                                     {
+        //                                         DepositType = ENUM_BillDepositType.ReturnDeposit, // "ReturnDeposit",
+        //                                         Remarks = "Deposit Refunded from InvoiceNo. " + billTransaction.InvoiceCode + billTransaction.InvoiceNo,
+        //                                         //Remarks = "ReturnDeposit" + " for transactionid:" + billTransaction.BillingTransactionId,
+        //                                         Amount = billTransaction.DepositBalance,
+        //                                         IsActive = true,
+        //                                         BillingTransactionId = billTransaction.BillingTransactionId,
+        //                                         DepositBalance = 0,
+        //                                         FiscalYearId = billTransaction.FiscalYearId,
+        //                                         CounterId = billTransaction.CounterId,
+        //                                         CreatedBy = billTransaction.CreatedBy,
+        //                                         CreatedOn = currentDate,
+        //                                         PatientId = billTransaction.PatientId,
+        //                                         PatientVisitId = billTransaction.PatientVisitId,
+        //                                         PaymentMode = billTransaction.PaymentMode,
+        //                                         PaymentDetails = billTransaction.PaymentDetails,
 
-//                                     };
-//                                     if (billTransaction.ReceiptNo == null)
-//                                     {
-//                                         dep.ReceiptNo = BillingBL.GetDepositReceiptNo(connString);
-//                                     }
-//                                     else
-//                                     {
-//                                         dep.ReceiptNo = billTransaction.ReceiptNo;
-//                                     }
+        //                                     };
+        //                                     if (billTransaction.ReceiptNo == null)
+        //                                     {
+        //                                         dep.ReceiptNo = BillingBL.GetDepositReceiptNo(connString);
+        //                                     }
+        //                                     else
+        //                                     {
+        //                                         dep.ReceiptNo = billTransaction.ReceiptNo;
+        //                                     }
 
 
-//                                     insuranceDbContext.BillingDeposits.Add(dep);
-//                                     insuranceDbContext.SaveChanges();
-//                                 }
+        //                                     insuranceDbContext.BillingDeposits.Add(dep);
+        //                                     insuranceDbContext.SaveChanges();
+        //                                 }
 
-//                                 //For cancel BillingTransactionItems
-//                                 List<BillingTransactionItemModel> item = (from itm in insuranceDbContext.BillingTransactionItems
-//                                                                           where itm.PatientId == billTransaction.PatientId && itm.PatientVisitId == billTransaction.PatientVisitId && itm.BillStatus == "provisional" && itm.Quantity == 0
-//                                                                           select itm).ToList();
-//                                 if (item.Count() > 0)
-//                                 {
-//                                     item.ForEach(itm =>
-//                                     {
-//                                         var txnItem = InsuranceBL.UpdateTxnItemBillStatus(insuranceDbContext, itm, "adtCancel", currentUser, currentDate, billTransaction.CounterId, null);
-//                                     });
-//                                 }
+        //                                 //For cancel BillingTransactionItems
+        //                                 List<BillingTransactionItemModel> item = (from itm in insuranceDbContext.BillingTransactionItems
+        //                                                                           where itm.PatientId == billTransaction.PatientId && itm.PatientVisitId == billTransaction.PatientVisitId && itm.BillStatus == "provisional" && itm.Quantity == 0
+        //                                                                           select itm).ToList();
+        //                                 if (item.Count() > 0)
+        //                                 {
+        //                                     item.ForEach(itm =>
+        //                                     {
+        //                                         var txnItem = InsuranceBL.UpdateTxnItemBillStatus(insuranceDbContext, itm, "adtCancel", currentUser, currentDate, billTransaction.CounterId, null);
+        //                                     });
+        //                                 }
 
-//                                 if (realTimeRemoteSyncEnabled)
-//                                 {
-//                                     if (billTransaction.Patient == null)
-//                                     {
-//                                         PatientModel pat = insuranceDbContext.Patients.Where(p => p.PatientId == billTransaction.PatientId).FirstOrDefault();
-//                                         billTransaction.Patient = pat;
-//                                     }
+        //                                 if (realTimeRemoteSyncEnabled)
+        //                                 {
+        //                                     if (billTransaction.Patient == null)
+        //                                     {
+        //                                         PatientModel pat = insuranceDbContext.Patients.Where(p => p.PatientId == billTransaction.PatientId).FirstOrDefault();
+        //                                         billTransaction.Patient = pat;
+        //                                     }
 
-//                                     Task.Run(() => InsuranceBL.SyncBillToRemoteServer(billTransaction, "sales", insuranceDbContext));
+        //                                     Task.Run(() => InsuranceBL.SyncBillToRemoteServer(billTransaction, "sales", insuranceDbContext));
 
-//                                 }
+        //                                 }
 
-//                                 var allPatientBedInfos = (from bedInfos in insuranceDbContext.PatientBedInfos
-//                                                           where bedInfos.PatientVisitId == billTransaction.PatientVisitId
-//                                                           && bedInfos.IsActive == true
-//                                                           select bedInfos
-//                                                           ).OrderByDescending(a => a.PatientBedInfoId).Take(2).ToList();
+        //                                 var allPatientBedInfos = (from bedInfos in insuranceDbContext.PatientBedInfos
+        //                                                           where bedInfos.PatientVisitId == billTransaction.PatientVisitId
+        //                                                           && bedInfos.IsActive == true
+        //                                                           select bedInfos
+        //                                                           ).OrderByDescending(a => a.PatientBedInfoId).Take(2).ToList();
 
-//                                 if (allPatientBedInfos.Count > 0)
-//                                 {
-//                                     allPatientBedInfos.ForEach(bed =>
-//                                     {
-//                                         var b = insuranceDbContext.Beds.FirstOrDefault(fd => fd.BedId == bed.BedId);
-//                                         if (b != null)
-//                                         {
-//                                             b.OnHold = null;
-//                                             b.HoldedOn = null;
-//                                             insuranceDbContext.Entry(b).State = EntityState.Modified;
-//                                             insuranceDbContext.Entry(b).Property(x => x.OnHold).IsModified = true;
-//                                             insuranceDbContext.Entry(b).Property(x => x.HoldedOn).IsModified = true;
-//                                             insuranceDbContext.SaveChanges();
-//                                         }
-//                                     });
-//                                 }
+        //                                 if (allPatientBedInfos.Count > 0)
+        //                                 {
+        //                                     allPatientBedInfos.ForEach(bed =>
+        //                                     {
+        //                                         var b = insuranceDbContext.Beds.FirstOrDefault(fd => fd.BedId == bed.BedId);
+        //                                         if (b != null)
+        //                                         {
+        //                                             b.OnHold = null;
+        //                                             b.HoldedOn = null;
+        //                                             insuranceDbContext.Entry(b).State = EntityState.Modified;
+        //                                             insuranceDbContext.Entry(b).Property(x => x.OnHold).IsModified = true;
+        //                                             insuranceDbContext.Entry(b).Property(x => x.HoldedOn).IsModified = true;
+        //                                             insuranceDbContext.SaveChanges();
+        //                                         }
+        //                                     });
+        //                                 }
 
-//                                 dbContextTransaction.Commit();
-//                                 transactionSuccess = true;
-//                             }
-//                             catch (Exception ex)
-//                             {
-//                                 transactionSuccess = false;
-//                                 //rollback all changes if any error occurs
-//                                 dbContextTransaction.Rollback();
-//                                 throw ex;
-//                             }
-//                         }
+        //                                 dbContextTransaction.Commit();
+        //                                 transactionSuccess = true;
+        //                             }
+        //                             catch (Exception ex)
+        //                             {
+        //                                 transactionSuccess = false;
+        //                                 //rollback all changes if any error occurs
+        //                                 dbContextTransaction.Rollback();
+        //                                 throw ex;
+        //                             }
+        //                         }
 
-//                         if (transactionSuccess)
-//                         {
-//                             //Starts: This code is for Temporary solution for Checking and Updating the Invoice Number if there is duplication Found
-//                             List<SqlParameter> paramList = new List<SqlParameter>() {
-//                                 new SqlParameter("@fiscalYearId", billTransaction.FiscalYearId),
-//                                 new SqlParameter("@billingTransactionId", billTransaction.BillingTransactionId),
-//                                 new SqlParameter("@invoiceNumber", billTransaction.InvoiceNo)
-//                             };
+        //                         if (transactionSuccess)
+        //                         {
+        //                             //Starts: This code is for Temporary solution for Checking and Updating the Invoice Number if there is duplication Found
+        //                             List<SqlParameter> paramList = new List<SqlParameter>() {
+        //                                 new SqlParameter("@fiscalYearId", billTransaction.FiscalYearId),
+        //                                 new SqlParameter("@billingTransactionId", billTransaction.BillingTransactionId),
+        //                                 new SqlParameter("@invoiceNumber", billTransaction.InvoiceNo)
+        //                             };
 
-//                             DataSet dataFromSP = DALFunctions.GetDatasetFromStoredProc("SP_BIL_Update_Duplicate_Invoice_If_Exists", paramList, insuranceDbContext);
-//                             var data = new List<object>();
-//                             if (dataFromSP.Tables.Count > 0)
-//                             {
-//                                 billTransaction.InvoiceNo = Convert.ToInt32(dataFromSP.Tables[0].Rows[0]["LatestInvoiceNumber"].ToString());
-//                             }
-//                             //Ends
-//                             responseData.Results = billTransaction;
-//                         }
+        //                             DataSet dataFromSP = DALFunctions.GetDatasetFromStoredProc("SP_BIL_Update_Duplicate_Invoice_If_Exists", paramList, insuranceDbContext);
+        //                             var data = new List<object>();
+        //                             if (dataFromSP.Tables.Count > 0)
+        //                             {
+        //                                 billTransaction.InvoiceNo = Convert.ToInt32(dataFromSP.Tables[0].Rows[0]["LatestInvoiceNumber"].ToString());
+        //                             }
+        //                             //Ends
+        //                             responseData.Results = billTransaction;
+        //                         }
 
-//                     }
-//                     else
-//                     {
-//                         responseData.Status = "Failed";
-//                         responseData.ErrorMessage = "Patient is already discharged.";
-//                     }
-//                 }
-//                 else
-//                 {
-//                     responseData.Status = "Failed";
-//                     responseData.ErrorMessage = "billTransaction is invalid";
-//                 }
-//             }*/
-//            // else 
-//            /*if (reqType == "post-billingTransaction")
-//            {
-//                bool transactionSuccess = false;
-//                BillingTransactionModel billTransaction = DanpheJSONConvert.DeserializeObject<BillingTransactionModel>(ipDataString);
-//                using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
-//                {
-//                    try
-//                    {
-//                        billTransaction = InsuranceBL.PostBillingTransaction(insuranceDbContext, connString, billTransaction, currentUser, DateTime.Now);
-//                        //RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
-//                        if (billTransaction.IsInsuranceBilling == true)
-//                        {
-//                            InsuranceBL.UpdateInsuranceCurrentBalance(connString, billTransaction.PatientId, billTransaction.InsuranceProviderId ?? default(int), currentUser.EmployeeId, billTransaction.TotalAmount ?? default(int), true);
+        //                     }
+        //                     else
+        //                     {
+        //                         responseData.Status = "Failed";
+        //                         responseData.ErrorMessage = "Patient is already discharged.";
+        //                     }
+        //                 }
+        //                 else
+        //                 {
+        //                     responseData.Status = "Failed";
+        //                     responseData.ErrorMessage = "billTransaction is invalid";
+        //                 }
+        //             }*/
+        //            // else 
+        //            /*if (reqType == "post-billingTransaction")
+        //            {
+        //                bool transactionSuccess = false;
+        //                BillingTransactionModel billTransaction = DanpheJSONConvert.DeserializeObject<BillingTransactionModel>(ipDataString);
+        //                using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
+        //                {
+        //                    try
+        //                    {
+        //                        billTransaction = InsuranceBL.PostBillingTransaction(insuranceDbContext, connString, billTransaction, currentUser, DateTime.Now);
+        //                        //RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+        //                        if (billTransaction.IsInsuranceBilling == true)
+        //                        {
+        //                            InsuranceBL.UpdateInsuranceCurrentBalance(connString, billTransaction.PatientId, billTransaction.InsuranceProviderId ?? default(int), currentUser.EmployeeId, billTransaction.TotalAmount ?? default(int), true);
 
-//                        }
+        //                        }
 
-//                        //Billing User should be assigned from the server side avoiding assigning from client side 
-//                        //which is causing issue in billing receipt while 2 user loggedIn in the same browser
-//                        billTransaction.BillingUserName = currentUser.UserName;//Yubaraj: 28June'19
+        //                        //Billing User should be assigned from the server side avoiding assigning from client side 
+        //                        //which is causing issue in billing receipt while 2 user loggedIn in the same browser
+        //                        billTransaction.BillingUserName = currentUser.UserName;//Yubaraj: 28June'19
 
-//                        responseData.Results = billTransaction;//check if we need to send back all the input object back to client.--sudarshan
+        //                        responseData.Results = billTransaction;//check if we need to send back all the input object back to client.--sudarshan
 
-//                        dbContextTransaction.Commit(); //end of transaction
-//                        transactionSuccess = true;
+        //                        dbContextTransaction.Commit(); //end of transaction
+        //                        transactionSuccess = true;
 
-//                        //send to IRD only after transaction is committed successfully: sud-23Dec'18
-//                        //Below is asynchronous call, so even if IRD api is down, it won't hold the execution of other code..
-//                        if (realTimeRemoteSyncEnabled)
-//                        {
-//                            if (billTransaction.Patient == null)
-//                            {
-//                                PatientModel pat = insuranceDbContext.Patients.Where(p => p.PatientId == billTransaction.PatientId).FirstOrDefault();
-//                                billTransaction.Patient = pat;
-//                            }
-//                            Task.Run(() => InsuranceBL.SyncBillToRemoteServer(billTransaction, "sales", insuranceDbContext));
-//                        }
-//                        responseData.Status = "OK";
-//                    }
-//                    catch (Exception ex)
-//                    {
-//                        transactionSuccess = false;
-//                        dbContextTransaction.Rollback();
-//                        throw ex;
-//                    }
-//                }
-//                if (transactionSuccess)
-//                {
-//                    //Starts: This code is for Temporary solution for Checking and Updating the Invoice Number if there is duplication Found
-//                    List<SqlParameter> paramList = new List<SqlParameter>() {
-//                                new SqlParameter("@fiscalYearId", billTransaction.FiscalYearId),
-//                                new SqlParameter("@billingTransactionId", billTransaction.BillingTransactionId),
-//                                new SqlParameter("@invoiceNumber", billTransaction.InvoiceNo)
-//                            };
+        //                        //send to IRD only after transaction is committed successfully: sud-23Dec'18
+        //                        //Below is asynchronous call, so even if IRD api is down, it won't hold the execution of other code..
+        //                        if (realTimeRemoteSyncEnabled)
+        //                        {
+        //                            if (billTransaction.Patient == null)
+        //                            {
+        //                                PatientModel pat = insuranceDbContext.Patients.Where(p => p.PatientId == billTransaction.PatientId).FirstOrDefault();
+        //                                billTransaction.Patient = pat;
+        //                            }
+        //                            Task.Run(() => InsuranceBL.SyncBillToRemoteServer(billTransaction, "sales", insuranceDbContext));
+        //                        }
+        //                        responseData.Status = "OK";
+        //                    }
+        //                    catch (Exception ex)
+        //                    {
+        //                        transactionSuccess = false;
+        //                        dbContextTransaction.Rollback();
+        //                        throw ex;
+        //                    }
+        //                }
+        //                if (transactionSuccess)
+        //                {
+        //                    //Starts: This code is for Temporary solution for Checking and Updating the Invoice Number if there is duplication Found
+        //                    List<SqlParameter> paramList = new List<SqlParameter>() {
+        //                                new SqlParameter("@fiscalYearId", billTransaction.FiscalYearId),
+        //                                new SqlParameter("@billingTransactionId", billTransaction.BillingTransactionId),
+        //                                new SqlParameter("@invoiceNumber", billTransaction.InvoiceNo)
+        //                            };
 
-//                    DataSet dataFromSP = DALFunctions.GetDatasetFromStoredProc("SP_BIL_Update_Duplicate_Invoice_If_Exists", paramList, insuranceDbContext);
-//                    var data = new List<object>();
-//                    if (dataFromSP.Tables.Count > 0)
-//                    {
-//                        billTransaction.InvoiceNo = Convert.ToInt32(dataFromSP.Tables[0].Rows[0]["LatestInvoiceNumber"].ToString());
-//                    }
-//                    //Ends
-//                    responseData.Results = billTransaction;
-//                }
-//            }
-//            else
-//            {
-//                responseData.Status = "failed";
-//                responseData.ErrorMessage = "Invalid request type.";
-//            }*/
-//            }
+        //                    DataSet dataFromSP = DALFunctions.GetDatasetFromStoredProc("SP_BIL_Update_Duplicate_Invoice_If_Exists", paramList, insuranceDbContext);
+        //                    var data = new List<object>();
+        //                    if (dataFromSP.Tables.Count > 0)
+        //                    {
+        //                        billTransaction.InvoiceNo = Convert.ToInt32(dataFromSP.Tables[0].Rows[0]["LatestInvoiceNumber"].ToString());
+        //                    }
+        //                    //Ends
+        //                    responseData.Results = billTransaction;
+        //                }
+        //            }
+        //            else
+        //            {
+        //                responseData.Status = "failed";
+        //                responseData.ErrorMessage = "Invalid request type.";
+        //            }*/
+        //            }
 
-//            catch (Exception ex)
-//            {
-//                responseData.Status = "failed";
-//                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
-//            }
-//            return DanpheJSONConvert.SerializeObject(responseData, true);
+        //            catch (Exception ex)
+        //            {
+        //                responseData.Status = "failed";
+        //                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
+        //            }
+        //            return DanpheJSONConvert.SerializeObject(responseData, true);
 
-//        }
+        //        }
 
         private PatientModel CreateInsurancePatient(InsuranceDbContext insuranceDbContext, GovInsurancePatientVM govInsClientPatObj, RbacUser currentSessionUser, string connString)
         {
@@ -4046,371 +4072,371 @@ namespace DanpheEMR.Controllers
         }
 
         //        [HttpPut]
-//        public string Put(string reqType, int settlementId)
-//        {
-//            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
-//            responseData.Status = "OK";//by default status would be OK, hence assigning at the top
-//            try
-//            {
-//                int patientId = ToInt(this.ReadQueryStringData("patientId"));
-//                int insuranceProviderId = ToInt(this.ReadQueryStringData("insuranceProviderId"));
-//                int updatedInsBalance = ToInt(this.ReadQueryStringData("updatedInsBalance"));
-//                InsuranceDbContext insuranceDbContext = new InsuranceDbContext(connString);
-//                RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
-//                string status = this.ReadQueryStringData("status");
-//                int appointmentId = ToInt(this.ReadQueryStringData("appointmentId"));
-//                int billingTransactionId = ToInt(this.ReadQueryStringData("billingTransactionId"));
-//                int PrintCount = ToInt(this.ReadQueryStringData("PrintCount"));
-//                int AdmissionPatientId = ToInt(this.ReadQueryStringData("AdmissionPatientId"));
-//                string ProcedureType = this.ReadQueryStringData("ProcedureType");
+        //        public string Put(string reqType, int settlementId)
+        //        {
+        //            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+        //            responseData.Status = "OK";//by default status would be OK, hence assigning at the top
+        //            try
+        //            {
+        //                int patientId = ToInt(this.ReadQueryStringData("patientId"));
+        //                int insuranceProviderId = ToInt(this.ReadQueryStringData("insuranceProviderId"));
+        //                int updatedInsBalance = ToInt(this.ReadQueryStringData("updatedInsBalance"));
+        //                InsuranceDbContext insuranceDbContext = new InsuranceDbContext(connString);
+        //                RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+        //                string status = this.ReadQueryStringData("status");
+        //                int appointmentId = ToInt(this.ReadQueryStringData("appointmentId"));
+        //                int billingTransactionId = ToInt(this.ReadQueryStringData("billingTransactionId"));
+        //                int PrintCount = ToInt(this.ReadQueryStringData("PrintCount"));
+        //                int AdmissionPatientId = ToInt(this.ReadQueryStringData("AdmissionPatientId"));
+        //                string ProcedureType = this.ReadQueryStringData("ProcedureType");
 
-//               /* if (reqType == "update-gov-insurance-patient")
-//                {
-//                    string str = this.ReadPostData();
-//                    GovInsurancePatientVM insPatObjFromClient = JsonConvert.DeserializeObject<GovInsurancePatientVM>(str);
+        //               /* if (reqType == "update-gov-insurance-patient")
+        //                {
+        //                    string str = this.ReadPostData();
+        //                    GovInsurancePatientVM insPatObjFromClient = JsonConvert.DeserializeObject<GovInsurancePatientVM>(str);
 
-//                    using (TransactionScope scope = new TransactionScope())
-//                    {
-//                        try
-//                        {
-//                            if (insPatObjFromClient != null && insPatObjFromClient.PatientId != 0)
-//                            {
-//                                PatientModel patFromDb = insuranceDbContext.Patients.Include("Insurances")
-//                                    .Where(p => p.PatientId == insPatObjFromClient.PatientId).FirstOrDefault();
-//                                //duplicate check on update
-//                                var checkDuplicateNSHI = (from pat in insuranceDbContext.Patients
-//                                                          where pat.PatientId != insPatObjFromClient.PatientId &&
-//                                                          pat.Ins_NshiNumber == insPatObjFromClient.Ins_NshiNumber
-//                                                          select pat).Count();
-//                                if (checkDuplicateNSHI > 0)
-//                                {
-//                                    responseData.Status = "Failed";
-//                                    responseData.Results = null;
-//                                    responseData.ErrorMessage = "Duplicate NSHI Number not allowed, please change it.";
-//                                    return DanpheJSONConvert.SerializeObject(responseData, true);
-//                                }
-//                                //if insurance info is not found then add new, else update that.
-//                                if (patFromDb.Insurances == null || patFromDb.Insurances.Count == 0)
-//                                {
-//                                    InsuranceModel insInfo = InsuranceBL.GetInsuranceModelFromInsPatVM(insPatObjFromClient, currentUser.EmployeeId);
-//                                    InsuranceBL.UpdatePatientInfoFromInsurance(insuranceDbContext, patFromDb, insPatObjFromClient);
-//                                    patFromDb.Insurances = new List<InsuranceModel>();
-//                                    patFromDb.Insurances.Add(insInfo);
-//                                }
-//                                else
-//                                {
-//                                    InsuranceBL.UpdatePatientInfoFromInsurance(insuranceDbContext, patFromDb, insPatObjFromClient);
+        //                    using (TransactionScope scope = new TransactionScope())
+        //                    {
+        //                        try
+        //                        {
+        //                            if (insPatObjFromClient != null && insPatObjFromClient.PatientId != 0)
+        //                            {
+        //                                PatientModel patFromDb = insuranceDbContext.Patients.Include("Insurances")
+        //                                    .Where(p => p.PatientId == insPatObjFromClient.PatientId).FirstOrDefault();
+        //                                //duplicate check on update
+        //                                var checkDuplicateNSHI = (from pat in insuranceDbContext.Patients
+        //                                                          where pat.PatientId != insPatObjFromClient.PatientId &&
+        //                                                          pat.Ins_NshiNumber == insPatObjFromClient.Ins_NshiNumber
+        //                                                          select pat).Count();
+        //                                if (checkDuplicateNSHI > 0)
+        //                                {
+        //                                    responseData.Status = "Failed";
+        //                                    responseData.Results = null;
+        //                                    responseData.ErrorMessage = "Duplicate NSHI Number not allowed, please change it.";
+        //                                    return DanpheJSONConvert.SerializeObject(responseData, true);
+        //                                }
+        //                                //if insurance info is not found then add new, else update that.
+        //                                if (patFromDb.Insurances == null || patFromDb.Insurances.Count == 0)
+        //                                {
+        //                                    InsuranceModel insInfo = InsuranceBL.GetInsuranceModelFromInsPatVM(insPatObjFromClient, currentUser.EmployeeId);
+        //                                    InsuranceBL.UpdatePatientInfoFromInsurance(insuranceDbContext, patFromDb, insPatObjFromClient);
+        //                                    patFromDb.Insurances = new List<InsuranceModel>();
+        //                                    patFromDb.Insurances.Add(insInfo);
+        //                                }
+        //                                else
+        //                                {
+        //                                    InsuranceBL.UpdatePatientInfoFromInsurance(insuranceDbContext, patFromDb, insPatObjFromClient);
 
-//                                    //InsuranceModel patInsInfo = patFromDb.Insurances[0];
-//                                    InsuranceModel patInsInfo = insuranceDbContext.Insurances
-//                                    .Where(p => p.PatientId == insPatObjFromClient.PatientId).FirstOrDefault();
-//                                    patInsInfo.IMISCode = insPatObjFromClient.IMISCode;
-//                                    patInsInfo.InsuranceProviderId = insPatObjFromClient.InsuranceProviderId;
-//                                    patInsInfo.InsuranceName = insPatObjFromClient.InsuranceName;
-//                                    //update only current balance, don't update initial balance.
-//                                    patInsInfo.Ins_IsFirstServicePoint = insPatObjFromClient.Ins_IsFirstServicePoint;
-//                                    patInsInfo.Ins_FamilyHeadName = insPatObjFromClient.Ins_FamilyHeadName;
-//                                    patInsInfo.Ins_FamilyHeadNshi = insPatObjFromClient.Ins_FamilyHeadNshi;
-//                                    patInsInfo.Ins_IsFamilyHead = insPatObjFromClient.Ins_IsFamilyHead;
-//                                    patInsInfo.Ins_NshiNumber = insPatObjFromClient.Ins_NshiNumber;
-//                                    patInsInfo.Ins_HasInsurance = insPatObjFromClient.Ins_HasInsurance;
-//                                    patInsInfo.Ins_InsuranceBalance = insPatObjFromClient.Ins_InsuranceBalance;
-//                                    patInsInfo.ModifiedOn = DateTime.Now;
-//                                    patInsInfo.ModifiedBy = currentUser.EmployeeId;
+        //                                    //InsuranceModel patInsInfo = patFromDb.Insurances[0];
+        //                                    InsuranceModel patInsInfo = insuranceDbContext.Insurances
+        //                                    .Where(p => p.PatientId == insPatObjFromClient.PatientId).FirstOrDefault();
+        //                                    patInsInfo.IMISCode = insPatObjFromClient.IMISCode;
+        //                                    patInsInfo.InsuranceProviderId = insPatObjFromClient.InsuranceProviderId;
+        //                                    patInsInfo.InsuranceName = insPatObjFromClient.InsuranceName;
+        //                                    //update only current balance, don't update initial balance.
+        //                                    patInsInfo.Ins_IsFirstServicePoint = insPatObjFromClient.Ins_IsFirstServicePoint;
+        //                                    patInsInfo.Ins_FamilyHeadName = insPatObjFromClient.Ins_FamilyHeadName;
+        //                                    patInsInfo.Ins_FamilyHeadNshi = insPatObjFromClient.Ins_FamilyHeadNshi;
+        //                                    patInsInfo.Ins_IsFamilyHead = insPatObjFromClient.Ins_IsFamilyHead;
+        //                                    patInsInfo.Ins_NshiNumber = insPatObjFromClient.Ins_NshiNumber;
+        //                                    patInsInfo.Ins_HasInsurance = insPatObjFromClient.Ins_HasInsurance;
+        //                                    patInsInfo.Ins_InsuranceBalance = insPatObjFromClient.Ins_InsuranceBalance;
+        //                                    patInsInfo.ModifiedOn = DateTime.Now;
+        //                                    patInsInfo.ModifiedBy = currentUser.EmployeeId;
 
-//                                    //not sure if we've to allow to update imis code..
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.IMISCode).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.InsuranceProviderId).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.InsuranceName).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_InsuranceBalance).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.ModifiedOn).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.ModifiedBy).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_HasInsurance).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_IsFirstServicePoint).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_FamilyHeadNshi).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_FamilyHeadName).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_IsFamilyHead).IsModified = true;
-//                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_NshiNumber).IsModified = true;
+        //                                    //not sure if we've to allow to update imis code..
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.IMISCode).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.InsuranceProviderId).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.InsuranceName).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_InsuranceBalance).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.ModifiedOn).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.ModifiedBy).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_HasInsurance).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_IsFirstServicePoint).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_FamilyHeadNshi).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_FamilyHeadName).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_IsFamilyHead).IsModified = true;
+        //                                    insuranceDbContext.Entry(patInsInfo).Property(a => a.Ins_NshiNumber).IsModified = true;
 
-//                                }
-//                                insuranceDbContext.SaveChanges();
-//                            }
-//                            ///After All Files Added Commit the Transaction
-//                            scope.Complete();
-//                            responseData.Results = "Patient Information updated successfully.";
-//                            responseData.Status = "OK";
-//                        }
-//                        catch (Exception ex)
-//                        {
-//                            scope.Dispose();
-//                            responseData.Results = ex;
-//                            responseData.Status = "Failed";
-//                            throw ex;
-//                        }
-//                    }
-//                }*/
-//                //update appointmentStatus
-//               // else
-//                /*if (reqType == "updateAppStatus" && !string.IsNullOrEmpty(status))
-//                {
-//                    AppointmentModel dbAppointment = insuranceDbContext.Appointments
-//                                                    .Where(a => a.AppointmentId == appointmentId)
-//                                                    .FirstOrDefault<AppointmentModel>();
-//                    var performerId = ToInt(ReadQueryStringData("PerformerId"));
-//                    var performerName = ReadQueryStringData("PerformerName");
+        //                                }
+        //                                insuranceDbContext.SaveChanges();
+        //                            }
+        //                            ///After All Files Added Commit the Transaction
+        //                            scope.Complete();
+        //                            responseData.Results = "Patient Information updated successfully.";
+        //                            responseData.Status = "OK";
+        //                        }
+        //                        catch (Exception ex)
+        //                        {
+        //                            scope.Dispose();
+        //                            responseData.Results = ex;
+        //                            responseData.Status = "Failed";
+        //                            throw ex;
+        //                        }
+        //                    }
+        //                }*/
+        //                //update appointmentStatus
+        //               // else
+        //                /*if (reqType == "updateAppStatus" && !string.IsNullOrEmpty(status))
+        //                {
+        //                    AppointmentModel dbAppointment = insuranceDbContext.Appointments
+        //                                                    .Where(a => a.AppointmentId == appointmentId)
+        //                                                    .FirstOrDefault<AppointmentModel>();
+        //                    var performerId = ToInt(ReadQueryStringData("PerformerId"));
+        //                    var performerName = ReadQueryStringData("PerformerName");
 
-//                    dbAppointment.AppointmentStatus = status.ToLower();
-//                    if (status == "checkedin")
-//                    {
-//                        dbAppointment.PatientId = insuranceDbContext.Visit
-//                                                .Where(a => a.AppointmentId == appointmentId)
-//                                                .Select(a => a.PatientId).FirstOrDefault();
-//                    }
-
-
-//                    dbAppointment.PerformerId = performerId;
-//                    dbAppointment.PerformerName = performerName;
-//                    insuranceDbContext.Appointments.Attach(dbAppointment);
-//                    insuranceDbContext.Entry(dbAppointment).State = EntityState.Modified;
-//                    insuranceDbContext.Entry(dbAppointment).Property(x => x.PerformerId).IsModified = true;
-//                    insuranceDbContext.Entry(dbAppointment).Property(x => x.PerformerName).IsModified = true;
-//                    insuranceDbContext.SaveChanges();
-
-//                    responseData.Status = "OK";
-//                    responseData.Results = "Appointment information updated successfully.";
-//                }*/
-//                // Update the Print Count on Bill transaction after the Receipt print 
-//               // else
-//                /*if (reqType == "UpdatePrintCountafterPrint")
-//                {
+        //                    dbAppointment.AppointmentStatus = status.ToLower();
+        //                    if (status == "checkedin")
+        //                    {
+        //                        dbAppointment.PatientId = insuranceDbContext.Visit
+        //                                                .Where(a => a.AppointmentId == appointmentId)
+        //                                                .Select(a => a.PatientId).FirstOrDefault();
+        //                    }
 
 
-//                    BillingTransactionModel dbBillPrintReq = insuranceDbContext.BillingTransactions
-//                                            .Where(a => a.BillingTransactionId == billingTransactionId)
-//                                            .FirstOrDefault<BillingTransactionModel>();
-//                    if (dbBillPrintReq != null)
-//                    {
-//                        dbBillPrintReq.PrintCount = PrintCount;
-//                        dbBillPrintReq.PrintedOn = System.DateTime.Now;
-//                        dbBillPrintReq.PrintedBy = currentUser.EmployeeId;
-//                        insuranceDbContext.Entry(dbBillPrintReq).State = EntityState.Modified;
-//                    }
+        //                    dbAppointment.PerformerId = performerId;
+        //                    dbAppointment.PerformerName = performerName;
+        //                    insuranceDbContext.Appointments.Attach(dbAppointment);
+        //                    insuranceDbContext.Entry(dbAppointment).State = EntityState.Modified;
+        //                    insuranceDbContext.Entry(dbAppointment).Property(x => x.PerformerId).IsModified = true;
+        //                    insuranceDbContext.Entry(dbAppointment).Property(x => x.PerformerName).IsModified = true;
+        //                    insuranceDbContext.SaveChanges();
+
+        //                    responseData.Status = "OK";
+        //                    responseData.Results = "Appointment information updated successfully.";
+        //                }*/
+        //                // Update the Print Count on Bill transaction after the Receipt print 
+        //               // else
+        //                /*if (reqType == "UpdatePrintCountafterPrint")
+        //                {
 
 
-//                    insuranceDbContext.SaveChanges();
-//                    responseData.Status = "OK";
-//                    responseData.Results = "Print count updated successfully.";
-//                }
-//                else 
-//*//*                if (reqType == "update-Procedure")
-//                {
-//                    AdmissionModel patAdms = (from patAdmission in insuranceDbContext.Admissions
-//                                              where patAdmission.PatientAdmissionId == AdmissionPatientId
-//                                              select patAdmission).FirstOrDefault();
+        //                    BillingTransactionModel dbBillPrintReq = insuranceDbContext.BillingTransactions
+        //                                            .Where(a => a.BillingTransactionId == billingTransactionId)
+        //                                            .FirstOrDefault<BillingTransactionModel>();
+        //                    if (dbBillPrintReq != null)
+        //                    {
+        //                        dbBillPrintReq.PrintCount = PrintCount;
+        //                        dbBillPrintReq.PrintedOn = System.DateTime.Now;
+        //                        dbBillPrintReq.PrintedBy = currentUser.EmployeeId;
+        //                        insuranceDbContext.Entry(dbBillPrintReq).State = EntityState.Modified;
+        //                    }
 
-//                    if (patAdms != null)
-//                    {
-//                        patAdms.ProcedureType = ProcedureType;
-//                        patAdms.ModifiedBy = currentUser.EmployeeId;
-//                        patAdms.ModifiedOn = currentUser.ModifiedOn;
-//                        insuranceDbContext.Entry(patAdms).Property(a => a.ProcedureType).IsModified = true;
-//                        insuranceDbContext.Entry(patAdms).Property(a => a.ModifiedBy).IsModified = true;
-//                        insuranceDbContext.Entry(patAdms).Property(a => a.ModifiedOn).IsModified = true;
 
-//                        insuranceDbContext.SaveChanges();
-//                        responseData.Status = "OK";
-//                    }
+        //                    insuranceDbContext.SaveChanges();
+        //                    responseData.Status = "OK";
+        //                    responseData.Results = "Print count updated successfully.";
+        //                }
+        //                else 
+        //*//*                if (reqType == "update-Procedure")
+        //                {
+        //                    AdmissionModel patAdms = (from patAdmission in insuranceDbContext.Admissions
+        //                                              where patAdmission.PatientAdmissionId == AdmissionPatientId
+        //                                              select patAdmission).FirstOrDefault();
 
-//                }
-//                else 
-//*/              /*  if (reqType == "update-adtItems-duration")
-//                {
-//                    var str = this.ReadPostData();
-//                    List<BedDurationTxnDetailsVM> bedDurationDetails = DanpheJSONConvert.DeserializeObject<List<BedDurationTxnDetailsVM>>(str);
-//                    if (bedDurationDetails != null && bedDurationDetails.Count > 0)
-//                    {
-//                        double totalDuration = bedDurationDetails[0].Days;
-//                        int patientVisitId = bedDurationDetails[0].PatientVisitId;
-//                        BillingTransactionItemModel billItem = new BillingTransactionItemModel();
-//                        //update duration for Medical and Resident officer/Nursing Charges
-//                        billItem = (from bill in insuranceDbContext.BillingTransactionItems
-//                                    join itmCfg in insuranceDbContext.BillItemPrice on new { bill.ServiceDepartmentId, bill.ItemId } equals new { itmCfg.ServiceDepartmentId, itmCfg.ItemId }
-//                                    where bill.PatientVisitId == patientVisitId && itmCfg.IntegrationName == "Medical and Resident officer/Nursing Charges"
-//                                    select bill).FirstOrDefault();
-//                        if (billItem != null)
-//                        {
-//                            billItem.Quantity = totalDuration > 0 ? totalDuration : 1;
-//                            billItem.SubTotal = billItem.Price * billItem.Quantity;
-//                            billItem.DiscountAmount = (billItem.SubTotal * billItem.DiscountPercent) / 100;
-//                            billItem.TotalAmount = billItem.SubTotal - billItem.DiscountAmount;
-//                            insuranceDbContext.Entry(billItem).Property(a => a.Quantity).IsModified = true;
-//                            insuranceDbContext.Entry(billItem).Property(a => a.SubTotal).IsModified = true;
-//                            insuranceDbContext.Entry(billItem).Property(a => a.DiscountAmount).IsModified = true;
-//                            insuranceDbContext.Entry(billItem).Property(a => a.TotalAmount).IsModified = true;
-//                            insuranceDbContext.Entry(billItem).Property(a => a.NonTaxableAmount).IsModified = true;
+        //                    if (patAdms != null)
+        //                    {
+        //                        patAdms.ProcedureType = ProcedureType;
+        //                        patAdms.ModifiedBy = currentUser.EmployeeId;
+        //                        patAdms.ModifiedOn = currentUser.ModifiedOn;
+        //                        insuranceDbContext.Entry(patAdms).Property(a => a.ProcedureType).IsModified = true;
+        //                        insuranceDbContext.Entry(patAdms).Property(a => a.ModifiedBy).IsModified = true;
+        //                        insuranceDbContext.Entry(patAdms).Property(a => a.ModifiedOn).IsModified = true;
 
-//                        }
-//                        responseData.Status = "OK";
-//                        insuranceDbContext.SaveChanges();
-//                        responseData.Results = "quantity updated";
-//                    }
+        //                        insuranceDbContext.SaveChanges();
+        //                        responseData.Status = "OK";
+        //                    }
 
-//                    else
-//                    {
-//                        responseData.Status = "Failed";
-//                        responseData.ErrorMessage = "Unable to upadate bed duration details.";
-//                    }
+        //                }
+        //                else 
+        //*/              /*  if (reqType == "update-adtItems-duration")
+        //                {
+        //                    var str = this.ReadPostData();
+        //                    List<BedDurationTxnDetailsVM> bedDurationDetails = DanpheJSONConvert.DeserializeObject<List<BedDurationTxnDetailsVM>>(str);
+        //                    if (bedDurationDetails != null && bedDurationDetails.Count > 0)
+        //                    {
+        //                        double totalDuration = bedDurationDetails[0].Days;
+        //                        int patientVisitId = bedDurationDetails[0].PatientVisitId;
+        //                        BillingTransactionItemModel billItem = new BillingTransactionItemModel();
+        //                        //update duration for Medical and Resident officer/Nursing Charges
+        //                        billItem = (from bill in insuranceDbContext.BillingTransactionItems
+        //                                    join itmCfg in insuranceDbContext.BillItemPrice on new { bill.ServiceDepartmentId, bill.ItemId } equals new { itmCfg.ServiceDepartmentId, itmCfg.ItemId }
+        //                                    where bill.PatientVisitId == patientVisitId && itmCfg.IntegrationName == "Medical and Resident officer/Nursing Charges"
+        //                                    select bill).FirstOrDefault();
+        //                        if (billItem != null)
+        //                        {
+        //                            billItem.Quantity = totalDuration > 0 ? totalDuration : 1;
+        //                            billItem.SubTotal = billItem.Price * billItem.Quantity;
+        //                            billItem.DiscountAmount = (billItem.SubTotal * billItem.DiscountPercent) / 100;
+        //                            billItem.TotalAmount = billItem.SubTotal - billItem.DiscountAmount;
+        //                            insuranceDbContext.Entry(billItem).Property(a => a.Quantity).IsModified = true;
+        //                            insuranceDbContext.Entry(billItem).Property(a => a.SubTotal).IsModified = true;
+        //                            insuranceDbContext.Entry(billItem).Property(a => a.DiscountAmount).IsModified = true;
+        //                            insuranceDbContext.Entry(billItem).Property(a => a.TotalAmount).IsModified = true;
+        //                            insuranceDbContext.Entry(billItem).Property(a => a.NonTaxableAmount).IsModified = true;
 
-//                }*/
-//               // else 
-//               /* if (reqType == "EditItemPrice_Qty_Disc_Provider")
-//                {
-//                    var str = this.ReadPostData();
-//                    BillingTransactionItemModel txnItmFromClient = DanpheJSONConvert.DeserializeObject<BillingTransactionItemModel>(str);
-//                    txnItmFromClient.ModifiedBy = currentUser.EmployeeId;
-//                    InsuranceBL.UpdateBillingTransactionItems(insuranceDbContext, txnItmFromClient);
-//                    if (txnItmFromClient.ModifiedBy != null)
-//                    {
-//                        var ModifiedByName = (from emp in insuranceDbContext.Employee
-//                                              where emp.EmployeeId == txnItmFromClient.ModifiedBy
-//                                              select emp.FirstName + " " + emp.LastName).FirstOrDefault();
-//                        txnItmFromClient.ModifiedByName = ModifiedByName;
-//                    }
-//                    responseData.Status = "OK";
-//                    responseData.Results = txnItmFromClient;
-//                }
-//                else*/
-                
-                
-//                /*if (reqType == "discharge-frombilling")
-//                {
-//                    string str = this.ReadPostData();
-//                    DischargeDetailVM dischargeDetail = DanpheJSONConvert.DeserializeObject<DischargeDetailVM>(str);
-//                    AdmissionModel admission = insuranceDbContext.Admissions.FirstOrDefault(adt => adt.PatientVisitId == dischargeDetail.PatientVisitId);
-//                    if (dischargeDetail != null && dischargeDetail.PatientId != 0)
-//                    {
-//                        //Transaction Begins  
-//                        using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
-//                        {
-//                            try
-//                            {
-//                                PatientBedInfo bedInfo = insuranceDbContext.PatientBedInfos
-//                        .Where(bed => bed.PatientVisitId == dischargeDetail.PatientVisitId)
-//                        .OrderByDescending(bed => bed.PatientBedInfoId).FirstOrDefault();
+        //                        }
+        //                        responseData.Status = "OK";
+        //                        insuranceDbContext.SaveChanges();
+        //                        responseData.Results = "quantity updated";
+        //                    }
 
-//                                admission.AdmissionStatus = "discharged";
-//                                admission.DischargeDate = dischargeDetail.DischargeDate;
-//                                admission.BillStatusOnDischarge = dischargeDetail.BillStatus;
-//                                admission.DischargedBy = currentUser.EmployeeId;
-//                                admission.ModifiedBy = currentUser.EmployeeId;
-//                                admission.ModifiedOn = DateTime.Now;
-//                                admission.ProcedureType = dischargeDetail.ProcedureType;
+        //                    else
+        //                    {
+        //                        responseData.Status = "Failed";
+        //                        responseData.ErrorMessage = "Unable to upadate bed duration details.";
+        //                    }
 
-//                                FreeBed(insuranceDbContext, bedInfo.PatientBedInfoId, dischargeDetail.DischargeDate, admission.AdmissionStatus);
+        //                }*/
+        //               // else 
+        //               /* if (reqType == "EditItemPrice_Qty_Disc_Provider")
+        //                {
+        //                    var str = this.ReadPostData();
+        //                    BillingTransactionItemModel txnItmFromClient = DanpheJSONConvert.DeserializeObject<BillingTransactionItemModel>(str);
+        //                    txnItmFromClient.ModifiedBy = currentUser.EmployeeId;
+        //                    InsuranceBL.UpdateBillingTransactionItems(insuranceDbContext, txnItmFromClient);
+        //                    if (txnItmFromClient.ModifiedBy != null)
+        //                    {
+        //                        var ModifiedByName = (from emp in insuranceDbContext.Employee
+        //                                              where emp.EmployeeId == txnItmFromClient.ModifiedBy
+        //                                              select emp.FirstName + " " + emp.LastName).FirstOrDefault();
+        //                        txnItmFromClient.ModifiedByName = ModifiedByName;
+        //                    }
+        //                    responseData.Status = "OK";
+        //                    responseData.Results = txnItmFromClient;
+        //                }
+        //                else*/
 
-//                                insuranceDbContext.Entry(admission).Property(a => a.DischargedBy).IsModified = true;
-//                                insuranceDbContext.Entry(admission).Property(a => a.AdmissionStatus).IsModified = true;
-//                                insuranceDbContext.Entry(admission).Property(a => a.DischargeDate).IsModified = true;
-//                                insuranceDbContext.Entry(admission).Property(a => a.BillStatusOnDischarge).IsModified = true;
-//                                insuranceDbContext.Entry(admission).Property(a => a.ModifiedBy).IsModified = true;
-//                                insuranceDbContext.Entry(admission).Property(a => a.ProcedureType).IsModified = true;
 
-//                                insuranceDbContext.SaveChanges();
-//                                dbContextTransaction.Commit(); //end of transaction
-//                                responseData.Status = "OK";
-//                            }
-//                            catch (Exception ex)
-//                            {
-//                                //rollback all changes if any error occurs
-//                                dbContextTransaction.Rollback();
-//                                throw ex;
-//                            }
-//                        }
-//                    }
-//                }*/
-//               /* //to cancel multiple items at once--needed in provisional items cancellation.sud:12May'18
-//               // else 
-//                if (reqType == "cancelBillTxnItems")
-//                {
-//                    var str = this.ReadPostData();
-//                    List<BillingTransactionItemModel> txnItemsToCancel = DanpheJSONConvert.DeserializeObject<List<BillingTransactionItemModel>>(str);
+        //                /*if (reqType == "discharge-frombilling")
+        //                {
+        //                    string str = this.ReadPostData();
+        //                    DischargeDetailVM dischargeDetail = DanpheJSONConvert.DeserializeObject<DischargeDetailVM>(str);
+        //                    AdmissionModel admission = insuranceDbContext.Admissions.FirstOrDefault(adt => adt.PatientVisitId == dischargeDetail.PatientVisitId);
+        //                    if (dischargeDetail != null && dischargeDetail.PatientId != 0)
+        //                    {
+        //                        //Transaction Begins  
+        //                        using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
+        //                        {
+        //                            try
+        //                            {
+        //                                PatientBedInfo bedInfo = insuranceDbContext.PatientBedInfos
+        //                        .Where(bed => bed.PatientVisitId == dischargeDetail.PatientVisitId)
+        //                        .OrderByDescending(bed => bed.PatientBedInfoId).FirstOrDefault();
 
-//                    if (txnItemsToCancel != null && txnItemsToCancel.Count > 0)
-//                    {
-//                        //Transaction Begins  
-//                        using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
-//                        {
-//                            try
-//                            {
-//                                for (int i = 0; i < txnItemsToCancel.Count; i++)
-//                                {
-//                                    txnItemsToCancel[i] = InsuranceBL.UpdateTxnItemBillStatus(insuranceDbContext,
-//                                  txnItemsToCancel[i],
-//                                  "cancel",
-//                                  currentUser,
-//                                  DateTime.Now);
-//                                }
-//                                insuranceDbContext.SaveChanges();
-//                                dbContextTransaction.Commit(); //end of transaction
-//                                responseData.Status = "OK";
-//                                responseData.Results = txnItemsToCancel;
-//                            }
-//                            catch (Exception ex)
-//                            {
-//                                //rollback all changes if any error occurs
-//                                dbContextTransaction.Rollback();
-//                                throw ex;
-//                            }
-//                        }
-//                    }
-//                }
-//                else */
-//              /*  if (reqType == "update-billtxnItem")
-//                {
-//                    var str = this.ReadPostData();
-//                    List<BillingTransactionItemModel> txnItems = DanpheJSONConvert.DeserializeObject<List<BillingTransactionItemModel>>(str);
-//                    if (txnItems != null)
-//                    {
-//                        txnItems.ForEach(item =>
-//                        {
-//                            item.ModifiedBy = currentUser.EmployeeId;
-//                            InsuranceBL.UpdateBillingTransactionItems(insuranceDbContext, item);
-//                        });
-//                    }
+        //                                admission.AdmissionStatus = "discharged";
+        //                                admission.DischargeDate = dischargeDetail.DischargeDate;
+        //                                admission.BillStatusOnDischarge = dischargeDetail.BillStatus;
+        //                                admission.DischargedBy = currentUser.EmployeeId;
+        //                                admission.ModifiedBy = currentUser.EmployeeId;
+        //                                admission.ModifiedOn = DateTime.Now;
+        //                                admission.ProcedureType = dischargeDetail.ProcedureType;
 
-//                    responseData.Status = "OK";
-//                }
-//                else*/
-//                /*
-//                if (reqType == "update-insurance-balance")
-//                {
-//                    var str = this.ReadPostData();
-//                    InsuranceBalanceHistoryModel insBalance = DanpheJSONConvert.DeserializeObject<InsuranceBalanceHistoryModel>(str);
-//                    if (insBalance != null)
-//                    {
-//                        InsuranceBL.UpdateInsuranceCurrentBalance(connString, insBalance.PatientId.Value,
-//                         insBalance.InsuranceProviderId.Value,
-//                         currentUser.EmployeeId,
-//                         Convert.ToDouble(insBalance.UpdatedAmount), false, insBalance.Remark);
-//                    }
-//                    responseData.Results = null;
-//                    responseData.Status = "OK";
-//                }
-//                else*/
-//                {
-//                    responseData.Results = null;
-//                    responseData.Status = "failed";
-//                    responseData.ErrorMessage = "Invalid request type.";
-//                }
+        //                                FreeBed(insuranceDbContext, bedInfo.PatientBedInfoId, dischargeDetail.DischargeDate, admission.AdmissionStatus);
 
-//            }
-//            catch (Exception ex)
-//            {
-//                responseData.Status = "Failed";
-//                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
-//            }
-//            return DanpheJSONConvert.SerializeObject(responseData, true);
-//        }
+        //                                insuranceDbContext.Entry(admission).Property(a => a.DischargedBy).IsModified = true;
+        //                                insuranceDbContext.Entry(admission).Property(a => a.AdmissionStatus).IsModified = true;
+        //                                insuranceDbContext.Entry(admission).Property(a => a.DischargeDate).IsModified = true;
+        //                                insuranceDbContext.Entry(admission).Property(a => a.BillStatusOnDischarge).IsModified = true;
+        //                                insuranceDbContext.Entry(admission).Property(a => a.ModifiedBy).IsModified = true;
+        //                                insuranceDbContext.Entry(admission).Property(a => a.ProcedureType).IsModified = true;
+
+        //                                insuranceDbContext.SaveChanges();
+        //                                dbContextTransaction.Commit(); //end of transaction
+        //                                responseData.Status = "OK";
+        //                            }
+        //                            catch (Exception ex)
+        //                            {
+        //                                //rollback all changes if any error occurs
+        //                                dbContextTransaction.Rollback();
+        //                                throw ex;
+        //                            }
+        //                        }
+        //                    }
+        //                }*/
+        //               /* //to cancel multiple items at once--needed in provisional items cancellation.sud:12May'18
+        //               // else 
+        //                if (reqType == "cancelBillTxnItems")
+        //                {
+        //                    var str = this.ReadPostData();
+        //                    List<BillingTransactionItemModel> txnItemsToCancel = DanpheJSONConvert.DeserializeObject<List<BillingTransactionItemModel>>(str);
+
+        //                    if (txnItemsToCancel != null && txnItemsToCancel.Count > 0)
+        //                    {
+        //                        //Transaction Begins  
+        //                        using (var dbContextTransaction = insuranceDbContext.Database.BeginTransaction())
+        //                        {
+        //                            try
+        //                            {
+        //                                for (int i = 0; i < txnItemsToCancel.Count; i++)
+        //                                {
+        //                                    txnItemsToCancel[i] = InsuranceBL.UpdateTxnItemBillStatus(insuranceDbContext,
+        //                                  txnItemsToCancel[i],
+        //                                  "cancel",
+        //                                  currentUser,
+        //                                  DateTime.Now);
+        //                                }
+        //                                insuranceDbContext.SaveChanges();
+        //                                dbContextTransaction.Commit(); //end of transaction
+        //                                responseData.Status = "OK";
+        //                                responseData.Results = txnItemsToCancel;
+        //                            }
+        //                            catch (Exception ex)
+        //                            {
+        //                                //rollback all changes if any error occurs
+        //                                dbContextTransaction.Rollback();
+        //                                throw ex;
+        //                            }
+        //                        }
+        //                    }
+        //                }
+        //                else */
+        //              /*  if (reqType == "update-billtxnItem")
+        //                {
+        //                    var str = this.ReadPostData();
+        //                    List<BillingTransactionItemModel> txnItems = DanpheJSONConvert.DeserializeObject<List<BillingTransactionItemModel>>(str);
+        //                    if (txnItems != null)
+        //                    {
+        //                        txnItems.ForEach(item =>
+        //                        {
+        //                            item.ModifiedBy = currentUser.EmployeeId;
+        //                            InsuranceBL.UpdateBillingTransactionItems(insuranceDbContext, item);
+        //                        });
+        //                    }
+
+        //                    responseData.Status = "OK";
+        //                }
+        //                else*/
+        //                /*
+        //                if (reqType == "update-insurance-balance")
+        //                {
+        //                    var str = this.ReadPostData();
+        //                    InsuranceBalanceHistoryModel insBalance = DanpheJSONConvert.DeserializeObject<InsuranceBalanceHistoryModel>(str);
+        //                    if (insBalance != null)
+        //                    {
+        //                        InsuranceBL.UpdateInsuranceCurrentBalance(connString, insBalance.PatientId.Value,
+        //                         insBalance.InsuranceProviderId.Value,
+        //                         currentUser.EmployeeId,
+        //                         Convert.ToDouble(insBalance.UpdatedAmount), false, insBalance.Remark);
+        //                    }
+        //                    responseData.Results = null;
+        //                    responseData.Status = "OK";
+        //                }
+        //                else*/
+        //                {
+        //                    responseData.Results = null;
+        //                    responseData.Status = "failed";
+        //                    responseData.ErrorMessage = "Invalid request type.";
+        //                }
+
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                responseData.Status = "Failed";
+        //                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
+        //            }
+        //            return DanpheJSONConvert.SerializeObject(responseData, true);
+        //        }
 
         //NageshBB: 11 Feb 2021- Move below statuc methods to InsuranceBL 
         //If InsuranceBL not created then we will create separte only for Business logic like below methods
@@ -4884,6 +4910,7 @@ namespace DanpheEMR.Controllers
         //had to pass patient db context, since it is called inside db-transaction of PatientDbContext
         private static void SyncBillToRemoteServer(object billToPost, string billType, InsuranceDbContext dbContext)
         {
+            var irdConfisg = GetIrdConfigurations(dbContext);
             if (billType == "sales")
             {
 
@@ -4892,7 +4919,7 @@ namespace DanpheEMR.Controllers
                 try
                 {
                     IRD_BillViewModel bill = IRD_BillViewModel.GetMappedSalesBillForIRD(billTxn, true);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesBillToIRD(bill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesBillToIRD(bill, irdConfisg);
                 }
                 catch (Exception ex)
                 {
@@ -4924,7 +4951,7 @@ namespace DanpheEMR.Controllers
                 try
                 {
                     IRD_BillReturnViewModel salesRetBill = IRD_BillReturnViewModel.GetMappedSalesReturnBillForIRD(billRet, true);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesReturnBillToIRD(salesRetBill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesReturnBillToIRD(salesRetBill, irdConfisg);
                 }
                 catch (Exception ex)
                 {
@@ -4951,6 +4978,16 @@ namespace DanpheEMR.Controllers
             }
         }
 
+        private static IrdConfigsDTO GetIrdConfigurations(InsuranceDbContext dbContext)
+        {
+            var param = dbContext.CFGParameters.FirstOrDefault(p => p.ParameterGroupName == "IRD" && p.ParameterName == "IrdSyncConfig");
+            if (param != null)
+            {
+                var irdConfigs = DanpheJSONConvert.DeserializeObject<IrdConfigsDTO>(param.ParameterValue);
+                return irdConfigs;
+            }
+            return new IrdConfigsDTO();
+        }
         private void UpdateIsContinuedStatus(int? patientVisitId,
          string appointmentType,
          bool status, int? currentEmployeeId, InsuranceDbContext dbContext)
@@ -5419,7 +5456,7 @@ namespace DanpheEMR.Controllers
                                      Address = pat.Address,
                                      ContactNo = pat.PhoneNumber,
                                      InpatientNo = visitNAdmission.VisitCode,
-                                     CountrySubDivision = sub.CountrySubDivisionName,
+                                     CountrySubDivisionName = sub.CountrySubDivisionName,
                                      PANNumber = pat.PANNumber
                                  }).FirstOrDefault();
 
@@ -5998,7 +6035,7 @@ namespace DanpheEMR.Controllers
                                          Address = pat.Address,
                                          ContactNo = pat.PhoneNumber,
                                          InpatientNo = visitNAdmission.VisitCode,
-                                         CountrySubDivision = sub.CountrySubDivisionName,
+                                         CountrySubDivisionName = sub.CountrySubDivisionName,
                                          PANNumber = pat.PANNumber,
                                          Ins_NshiNumber = pat.Ins_NshiNumber,
                                          ClaimCode = visitNAdmission.ClaimCode
@@ -6158,7 +6195,7 @@ namespace DanpheEMR.Controllers
                                        join billItem in _govInsuranceDbContext.BillItemPrice on emp.EmployeeId equals billItem.IntegrationItemId
                                        join priceCatServItem in _govInsuranceDbContext.BillPriceCategoryServiceItems on billItem.ServiceItemId equals priceCatServItem.ServiceItemId
                                        where billItem.ServiceDepartmentId == srvDept.ServiceDepartmentId && priceCatServItem.PriceCategoryId == 1 //Krishna, 13thMarch'23, 1 is for Normal and Hard Coded for Now
-                                        // && billItem.InsuranceApplicable == true
+                                                                                                                                                  // && billItem.InsuranceApplicable == true
                                        select new
                                        {
                                            DepartmentId = dept.DepartmentId,
@@ -7298,7 +7335,7 @@ namespace DanpheEMR.Controllers
             return null;
         }
 
-        
+
         private object UpdateItemPriceQtyDiscProvider(RbacUser currentUser, string ipDataStr)
         {
             BillingTransactionItemModel txnItmFromClient = DanpheJSONConvert.DeserializeObject<BillingTransactionItemModel>(ipDataStr);
@@ -7427,5 +7464,21 @@ namespace DanpheEMR.Controllers
 
         }
 
+        public static decimal PreviouslySalesQuantityWithinCappingDaysLimit(InsuranceDbContext insuranceDbContext, int itemId, int patientId, int cappingDaysLimit)
+        {
+            var currentDate = DateTime.Now;
+            var checkingDate = currentDate.AddDays(-cappingDaysLimit);
+
+            // Query to calculate the total quantity
+            var salesQtyResult = insuranceDbContext.BillingTransactionItems
+                                        .Where(item => item.ServiceItemId == itemId
+                                                           && item.PatientId == patientId
+                                                           && DbFunctions.TruncateTime(item.CreatedOn) >= DbFunctions.TruncateTime(checkingDate))
+                                        .Sum(i => (double?)i.Quantity) ?? 0;
+
+            decimal salesQtyDecimal = (decimal)salesQtyResult;
+
+            return salesQtyDecimal;
+        }
     }
 }

@@ -1,5 +1,5 @@
 <div>
-  <a class="btn blue bordered" style="background-color:#337ab7;" name="name" (click)="AddCOAPopup()">
+  <a class="btn green btn-success" style="background-color:#337ab7;" name="name" (click)="AddCOAPopup()">
     <span class="glyphicon glyphicon-plus"></span>Create COA
   </a>
 </div>
@@ -31,13 +31,13 @@
                 <label class="control-label col-md-5">Primary Group<sup>*</sup><b>:</b></label>
                 <div class="col-md-7">
                   <select class="form-control" maxlength="30" type="text" [(ngModel)]="coaObj.PrimaryGroupId"
-                    id="PrimaryGroup" (change)="PrimaryGroupChanged()" placeholder="PrimaryGroup"
-                    formControlName="primaryGroup">
+                          id="PrimaryGroup" (change)="PrimaryGroupChanged()" placeholder="PrimaryGroup"
+                          [attr.disabled]="coaObj.IsSystemDefault ? true : null" formControlName="primaryGroup">
                     <option *ngFor="let pg of primaryGroupList" value={{pg.PrimaryGroupId}}>
                       {{pg.PrimaryGroupName}}</option>
                   </select>
                   <span class="color-red font-sm"
-                    [hidden]="coaObj.IsValidCheck('primaryGroup','required') || !(coaObj.IsDirty('primaryGroup'))">COA
+                        [hidden]="coaObj.IsValidCheck('primaryGroup','required') || !(coaObj.IsDirty('primaryGroup'))">COA
                     name is required</span>
                 </div>
               </div>
@@ -45,9 +45,9 @@
                 <label class="control-label col-md-5">COA Name<sup>*</sup><b>:</b></label>
                 <div class="col-md-7">
                   <input class="form-control" maxlength="30" type="text" [(ngModel)]="coaObj.ChartOfAccountName"
-                    formControlName="COAName" id="COAName" placeholder="COAName" />
+                         [attr.disabled]="coaObj.IsSystemDefault ? true : null" formControlName="COAName" id="COAName" placeholder="COAName" />
                   <span class="color-red font-sm"
-                    [hidden]="coaObj.IsValidCheck('COAName','required') || !(coaObj.IsDirty('COAName'))">COA
+                        [hidden]="coaObj.IsValidCheck('COAName','required') || !(coaObj.IsDirty('COAName'))">COA
                     name is required</span>
 
                 </div>
@@ -59,12 +59,12 @@
                   [ngModelOptions]="{standalone: true}" id="COACode" placeholder="COACode" />
                 </div>
               </div> -->
-             
+
               <div class="form-group">
                 <label class="control-label col-md-5">Description<b>:</b></label>
                 <div class="col-md-7">
                   <input class="form-control" maxlength="200" type="text" [(ngModel)]="coaObj.Description"
-                    [ngModelOptions]="{standalone: true}" id="Description" placeholder="Description" />
+                         [ngModelOptions]="{standalone: true}" id="Description" placeholder="Description" />
 
                 </div>
               </div>

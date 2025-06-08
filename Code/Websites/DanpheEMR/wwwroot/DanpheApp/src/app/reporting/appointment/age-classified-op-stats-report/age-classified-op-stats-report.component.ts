@@ -6,6 +6,8 @@ import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { DLService } from '../../../shared/dl.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { AgeClassificationSummary_DTO } from '../../shared/dto/age-classification-summary-report.dto';
+import { AgeClassification_DTO } from '../../shared/dto/age-classification.dto';
 import { DynamicReport } from '../../shared/dynamic-report.model';
 
 @Component({
@@ -22,6 +24,9 @@ export class RPT_APPT_AgeClassifiedOPStatsReportComponent {
     public deptId: number = 0;
     public AgeClassifiedOPStatsReportData: Array<any> = new Array<any>();
     public ReportColumns: Array<any> = new Array<any>();
+    IsFreeVisit: boolean = false;
+    AgeGroups = new Array<AgeClassification_DTO>();
+    SummaryData = new Array<AgeClassificationSummary_DTO>();
     constructor(
         public dlService: DLService,
         public msgBoxServ: MessageboxService,
@@ -29,6 +34,7 @@ export class RPT_APPT_AgeClassifiedOPStatsReportComponent {
         this.selectedAgeClassifiedOPStatsParameter.fromDate = moment().format('YYYY-MM-DD');
         this.selectedAgeClassifiedOPStatsParameter.toDate = moment().format('YYYY-MM-DD');
         this.GetDepartments();
+        this.GetAgeGroups();
     }
     OnFromToDateChange($event) {
         this.fromDate = $event ? $event.fromDate : this.fromDate;
@@ -64,7 +70,7 @@ export class RPT_APPT_AgeClassifiedOPStatsReportComponent {
             this.dlService.Read("/Reporting/AgeClassifiedOPStatsReport?FromDate="
                 + this.selectedAgeClassifiedOPStatsParameter.fromDate +
                 "&ToDate=" + this.selectedAgeClassifiedOPStatsParameter.toDate +
-                "&DepartmentId=" + this.deptId)
+                "&DepartmentId=" + this.deptId + "&IsFreeVisit=" + this.IsFreeVisit)
                 .map((res: DanpheHTTPResponse) => res)
                 .subscribe(res => this.Success(res),
                     res => this.Error(res));
@@ -77,8 +83,6 @@ export class RPT_APPT_AgeClassifiedOPStatsReportComponent {
     Error(err) {
         this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [err]);
     }
-
-    public dynamicHeaders = [];
     Success(res) {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
             if (Array.isArray(res.Results)) {
@@ -88,8 +92,6 @@ export class RPT_APPT_AgeClassifiedOPStatsReportComponent {
             }
 
             this.DynamicHeadersForGrid(res);
-            this.dynamicHeaders = Object.keys(this.AgeClassifiedOPStatsReportData[0] || {}).slice(1);
-
             for (let i = 0; i < this.AgeClassifiedOPStatsReportData.length; i++) {
                 const rowData = this.AgeClassifiedOPStatsReportData[i];
                 for (const key in rowData) {
@@ -101,12 +103,6 @@ export class RPT_APPT_AgeClassifiedOPStatsReportComponent {
         } else {
             this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
         }
-    }
-
-
-
-    calculateColumnSum(header) {
-        return this.AgeClassifiedOPStatsReportData.reduce((sum, row) => sum + row[header], 0);
     }
 
     DynamicHeadersForGrid(res) {
@@ -129,6 +125,44 @@ export class RPT_APPT_AgeClassifiedOPStatsReportComponent {
         }
         this.ReportColumns = ReportColumns;
         this.AgeClassifiedOPStatsReportData = res.Results;
+        if (this.AgeClassifiedOPStatsReportData && this.AgeClassifiedOPStatsReportData.length && this.AgeGroups && this.AgeGroups.length) {
+            this.CalculateSummary();
+        }
+    }
+    IsFreeVisitChecked() {
+        this.IsFreeVisit = !this.IsFreeVisit;
+    }
+    GetAgeGroups() {
+        this.dlService.GetAgeGroups().subscribe((res: DanpheHTTPResponse) => {
+            if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+                this.AgeGroups = res.Results
+            }
+        });
+    }
+    CalculateSummary() {
+        this.SummaryData = this.AgeGroups.map(ageGroup => {
+            let maleCount = 0;
+            let femaleCount = 0;
+            let otherCount = 0;
+
+            // Iterate over the departments and calculate counts
+            this.AgeClassifiedOPStatsReportData.forEach(department => {
+                const male = department[`${ageGroup.AgeName}M`];
+                const female = department[`${ageGroup.AgeName}F`];
+                const other = department[`${ageGroup.AgeName}O`];
+
+                if (male) maleCount += male;
+                if (female) femaleCount += female;
+                if (other) otherCount += other;
+            });
+
+            return {
+                AgeGroup: ageGroup.AgeName,
+                MaleCount: maleCount,
+                FemaleCount: femaleCount,
+                otherCount: otherCount
+            };
+        });
     }
 
 }

@@ -19,6 +19,7 @@ namespace DanpheEMR.ServerModel
         public int LabSequence { get; set; }
         public string ProcedureCode { get; set; }
         public string LabTestName { get; set; }
+        public string LabTestShortName { get; set; }
         public string LabTestSynonym { get; set; }
         public string LabTestSpecimen { get; set; }
         public string LabTestSpecimenSource { get; set; }

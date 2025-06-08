@@ -1,16 +1,18 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ChangeDetectorRef, Component } from "@angular/core";
 import * as moment from 'moment/moment';
-import { DLService } from "../../../shared/dl.service";
-import { DanpheHTTPResponse } from "../../../shared/common-models";
-import { SecurityService } from "../../../security/shared/security.service";
-import GridColumnSettings from "../../../shared/danphe-grid/grid-column-settings.constant";
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import { IncentiveBLService } from "../../shared/incentive.bl.service";
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { Observable } from "rxjs";
+import { BillingItemVM } from "../../../billing/shared/billing-item.view-model";
+import { Patient_DTO } from "../../../claim-management/shared/DTOs/patient.dto";
 import { CoreService } from "../../../core/shared/core.service";
+import { SecurityService } from "../../../security/shared/security.service";
+import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { DLService } from "../../../shared/dl.service";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { IncentiveBLService } from "../../shared/incentive.bl.service";
 import { INCTVGridColumnSettings } from "../../shared/inctv-grid-column-settings";
-import { CommonFunctions } from "../../../shared/common.functions";
 
 @Component({
   templateUrl: './inctv-billtxnitems-list.html'
@@ -24,14 +26,25 @@ export class INCTV_BillTxnItemListComponent {
   public billTxnItmGridColumns: Array<any> = null;
 
   public NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
+  public patientSearchMinCharacterCount: number = 0;
 
-
+  public patientObj: Patient_DTO = new Patient_DTO();
+  public ServiceItems: BillingItemVM[] = [];
+  public SelectedItem: {
+    ServiceItemId: 0,
+    ItemName: string | null,
+    ServiceDepartmentId: 0,
+    ServiceDepartmentName: null,
+    IsActive: true
+  };
+  public searchText: string = '';
+  public itemName: string = '';
   constructor(public msgBoxServ: MessageboxService,
     public dlService: DLService,
     public securityService: SecurityService,
     public incentiveBLService: IncentiveBLService,
     public changeDetectorRef: ChangeDetectorRef,
-    public coreService: CoreService
+    public coreService: CoreService,
   ) {
 
     this.billTxnItmGridColumns = INCTVGridColumnSettings.Incentive_BillTxnItemList_GridCols;
@@ -40,24 +53,27 @@ export class INCTV_BillTxnItemListComponent {
     //this.LoadEmpProfileMap();
     this.GetEmpIncentiveInfo();
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('TransactionDate', true));
-
-
+    this.GetItemsList();
+    this.GetPatientSearchMinCharacterCountParameter();
   }
 
-  LoadIncentiveTxnItemsList($event) {
-
+  OnFromToDateChange($event) {
     this.fromDate = $event ? $event.fromDate : this.fromDate;
     this.toDate = $event ? $event.toDate : this.toDate;
-
-    this.dlService.Read(`/api/Incentive/TransactionItems?fromDate=${this.fromDate}&toDate=${this.toDate}`)
-      .map(res => res)
+    this.dateRange = "<b>Date:</b>&nbsp;" + this.fromDate + "&nbsp;<b>To</b>&nbsp;" + this.toDate;
+  }
+  LoadIncentiveTxnItemsList() {
+    this.dlService.Read(`/api/Incentive/TransactionItems?fromDate=${this.fromDate}&toDate=${this.toDate}&searchText=${this.searchText}&itemName=${this.itemName}`)
+      .map(res => res).finally(() => {
+        this.btndisabled = false;
+      })
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status == "OK") {
           this.allBillTxnItemsList = res.Results;
 
         }
         else {
-          this.msgBoxServ.showMessage("failed", ["Unable to get transaction items."]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Unable to get transaction items."]);
           console.log(res.ErrorMessage);
         }
       });
@@ -66,7 +82,10 @@ export class INCTV_BillTxnItemListComponent {
 
   public showEditFraction: boolean = false;
   public selectedBillTxnItem: any = null;
-
+  public btndisabled: boolean = false;
+  LoadData() {
+    this.LoadIncentiveTxnItemsList();
+  }
   TxnItemGridActions($event: GridEmitModel) {
 
     switch ($event.Action) {
@@ -172,7 +191,7 @@ export class INCTV_BillTxnItemListComponent {
 
         }
         else {
-          this.msgBoxServ.showMessage("failed", ["Unable to get transaction items."]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Unable to get transaction items."]);
           console.log(res.ErrorMessage);
         }
       });
@@ -188,7 +207,7 @@ export class INCTV_BillTxnItemListComponent {
           this.EmpIncentiveInfo = res.Results;
         }
         else {
-          this.msgBoxServ.showMessage("failed", ["Unable to get Data."]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Unable to get Data."]);
           console.log(res.ErrorMessage);
         }
       });
@@ -196,7 +215,7 @@ export class INCTV_BillTxnItemListComponent {
 
   gridExportOptions = {
     fileName: 'InvoiceItemLevelIncentive_' + moment().format('YYYY-MM-DD') + '.xls',
-    displayColumns: ['TransactionDate', 'PatientName', 'ServiceDepartmentName', 'ItemName', 'InvoiceNo', 'ReferredByEmpName', 'AssignedToEmpName', 'TotalAmount','FractionCount']
+    displayColumns: ['TransactionDate', 'PatientName', 'ServiceDepartmentName', 'ItemName', 'InvoiceNo', 'ReferredByEmpName', 'AssignedToEmpName', 'TotalAmount', 'FractionCount']
   };
 
   public ExportAllIncentiveDate() {
@@ -215,7 +234,72 @@ export class INCTV_BillTxnItemListComponent {
         res => this.ErrorMsg(res));
   }
   ErrorMsg(err) {
-    this.msgBoxServ.showMessage("error", ["Sorry!!! Not able export the excel file."]);
+    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Sorry!!! Not able export the excel file."]);
     console.log(err.ErrorMessage);
+  }
+
+  PatientInfoChanged() {
+    if (this.patientObj && this.patientObj.ShortName) {
+      this.searchText = this.patientObj.ShortName.trim();
+    } else {
+      this.searchText = '';
+    }
+  }
+
+
+  OnItemSelected($event: any) {
+    if ($event) {
+      this.SelectedItem = $event;
+      if (this.SelectedItem.ItemName) {
+        this.itemName = this.SelectedItem.ItemName.trim();
+      } else {
+        this.itemName = '';
+      }
+    }
+    else {
+      this.SelectedItem = null;
+      this.itemName = '';
+    }
+  }
+
+
+  public SetFocusOn(idToSelect: string): void {
+    if (document.getElementById(idToSelect)) {
+      let nextEl = <HTMLInputElement>document.getElementById(idToSelect);
+      nextEl.focus();
+    }
+  }
+  public GetPatientSearchMinCharacterCountParameter(): void {
+    let param = this.coreService.Parameters.find(a => a.ParameterGroupName === 'Common' && a.ParameterName === 'PatientSearchMinCharacterCount');
+    if (param) {
+      let obj = JSON.parse(param.ParameterValue);
+      this.patientSearchMinCharacterCount = parseInt(obj.MinCharacterCount);
+    }
+  }
+  GetItemsList() {
+    this.incentiveBLService.GetMasterServiceItems().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+        this.ServiceItems = res.Results;
+      } else {
+        this.msgBoxServ.showMessage(ENUM_DanpheHTTPResponses.Failed, ['No items found']);
+      }
+    }, (error) => {
+      console.log('Error retrieving items list:', error.message);
+    });
+  }
+  ItemsListFormatter(data: any): string {
+    let html: string = "";
+    html = data["ItemName"].toUpperCase();
+    html += "(<i>" + data["ServiceDepartmentName"] + "</i>)"; "</b>";
+    return html;
+  }
+  public AllPatientSearchAsync = (keyword: any): Observable<any[]> => {
+    return this.incentiveBLService.GetPatientsWithVisitsInfo(keyword);
+  }
+  public PatientListFormatter(data: any): string {
+    let html: string = "";
+    html = "<font size=03>" + "[" + data["PatientCode"] + "]" + "</font>&nbsp;-&nbsp;&nbsp;<font color='blue'; size=03 ><b>" + data["ShortName"] +
+      "</b></font>&nbsp;&nbsp;" + "(" + data["Age"] + '/' + data["Gender"] + ")" + "(" + data["PhoneNumber"] + ")" + '' + "</b></font>";
+    return html;
   }
 }

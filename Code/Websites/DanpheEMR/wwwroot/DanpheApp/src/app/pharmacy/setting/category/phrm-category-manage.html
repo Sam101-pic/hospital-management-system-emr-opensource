@@ -24,15 +24,21 @@
               <div class="form-group">
                 <label class="control-label col-md-5">Category Name<sup>*</sup><b>:</b></label>
                 <div class="col-md-7">
-                  <input id="cat" class="form-control" type="text" maxlength="50" [(ngModel)]="CurrentCategory.CategoryName" formControlName="CategoryName" value="" (keyup.enter)="!update?setFocusById('save'):setFocusById('update')" placeholder="Enter Category Name" />
-                  <span class="color-red font-sm" [hidden]="CurrentCategory.IsValidCheck('CategoryName','required') || !(CurrentCategory.IsDirty('CategoryName'))">Category name is required</span>
-                  <span class="color-red font-sm" *ngIf="CurrentCategory.IsDirty('CategoryName')" [hidden]="CurrentCategory.IsValidCheck('CategoryName','maxlength')"> Length is not proper</span>
+                  <input id="cat" class="form-control" type="text" maxlength="50" [(ngModel)]="CurrentCategory.CategoryName"
+                         formControlName="CategoryName" value="" (keyup.enter)="!update?setFocusById('save'):setFocusById('update')"
+                         placeholder="Enter Category Name" />
+                  <span class="color-red font-sm"
+                        [hidden]="CurrentCategory.IsValidCheck('CategoryName','required') || !(CurrentCategory.IsDirty('CategoryName'))">Category name
+                    is required</span>
+                  <span class="color-red font-sm" *ngIf="CurrentCategory.IsDirty('CategoryName')"
+                        [hidden]="CurrentCategory.IsValidCheck('CategoryName','maxlength')"> Length is not proper</span>
                 </div>
               </div>
               <div class="form-group">
                 <label class="control-label col-md-5">Description<b>:</b></label>
                 <div class="col-md-7">
-                  <input class="form-control" type="text" maxlength="100" [(ngModel)]="CurrentCategory.Description" [ngModelOptions]="{standalone: true}" value="" placeholder="Enter Description" />
+                  <input class="form-control" type="text" maxlength="100" [(ngModel)]="CurrentCategory.Description"
+                         [ngModelOptions]="{standalone: true}" value="" placeholder="Enter Description" />
                 </div>
               </div>
               <div class="form-group">
@@ -41,14 +47,15 @@
                   <div class="input-group">
                     <div class="icheck-inline">
                       <label class="mt-checkbox mt-checkbox-outline">
-                        <input name="IsActive" type="checkbox" value="IsActive" [(ngModel)]="CurrentCategory.IsActive" [ngModelOptions]="{standalone: true}">
+                        <input name="IsActive" type="checkbox" value="IsActive" [(ngModel)]="CurrentCategory.IsActive"
+                               [ngModelOptions]="{standalone: true}">
                         <span></span>
                       </label>
                     </div>
                   </div>
                 </div>
               </div>
-              <div class="all-buttons text-right">
+              <div class="all-buttons text-right" style="margin-bottom:10px;">
                 <button type="button" id="save" class="btn green btn-success" *ngIf="!update" (click)="Add()">Save</button>
                 <button type="button" id="update" class="btn green btn-success" *ngIf="update" (click)="Update()">Update</button>
               </div>

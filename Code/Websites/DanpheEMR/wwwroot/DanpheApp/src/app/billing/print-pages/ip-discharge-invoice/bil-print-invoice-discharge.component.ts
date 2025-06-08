@@ -11,6 +11,8 @@ import { ENUM_BillPaymentMode, ENUM_Country, ENUM_DanpheHTTPResponses, ENUM_Memb
 import { BillingBLService } from "../../shared/billing.bl.service";
 import { BillingService } from "../../shared/billing.service";
 import { BilPrint_VM } from "../../shared/invoice-print-vms";
+import { PrintTemplateType } from "../../shared/print-template-type.model";
+
 
 @Component({
   selector: "bil-print-invoice-discharge",
@@ -41,18 +43,8 @@ export class BIL_Print_Invoice_Discharge_Component {
 
   public InvoiceDisplaySettings = { ShowHeader: true, ShowQR: true, ShowHospLogo: true, HeaderType: '' };
   public InvoiceFooterNoteSettings: any = { ShowFooter: true, ShowEnglish: true, ShowNepali: false, EnglishText: "Please bring this invoice on your next visit.", NepaliText: "कृपया अर्को पटक आउँदा यो बिल अनिवार्य रुपमा लिएर आउनुहोला ।" };
-
   public currTime: string = "";
   public hospitalCode: string = "";
-
-  // public Enable_Dotmatrix_Printer: boolean;
-  // public Dotmatrix_Printer = { BillingReceipt: "EPSON" };
-  // public printerNameSelected: any = null;
-  // public printerName: string = null;
-  // public showPrinterChange: boolean = false;
-  // public dotPrinterDimensions: any;
-  // public billingDotMatrixPrinters: any;
-
   public headerRightColLen: number = 32;
   public nline: any = '\n';
 
@@ -70,6 +62,22 @@ export class BIL_Print_Invoice_Discharge_Component {
   public SSFMembershipTypeName: string = ENUM_MembershipTypeName.SSF;
   public ECHSMembershipTypeName: string = ENUM_MembershipTypeName.ECHS;
   public OtherCurrencyDetail: OtherCurrencyDetail = { CurrencyCode: '', ExchangeRate: 0, BaseAmount: 0, ConvertedAmount: 0 };
+  receipt: BilPrint_VM = new BilPrint_VM();
+  messageBoxService: any;
+  public OpBilling = {
+    "PrintType": "op-billing",
+    "Enable": true
+  };
+  public IpBilling = {
+    "PrintType": "ip-billing",
+    "Enable": true
+  };
+  public IpDischarge = {
+    "PrintType": "ip-discharge",
+    "Enable": true
+  };
+  public PrintTemplateTypeSettings = new PrintTemplateType();
+
 
 
   constructor(
@@ -103,10 +111,14 @@ export class BIL_Print_Invoice_Discharge_Component {
   public finalAge: string = null;
   public ipdNumber: string = null;
   public isInsurance: boolean = false;
+  DynamicInvoicePrintTemplate: string = "";
+  public loading: boolean = false;
 
   ngOnInit() {
 
     if (this.invoice) {
+      this.ReadReceiptPrintDisplaySettingParameter();
+      this.DynamicInvoicePrintTemplate = this.invoice.InvoicePrintTemplate;
       if (this.invoice.InvoiceInfo.OtherCurrencyDetail) {
         this.OtherCurrencyDetail = JSON.parse(this.invoice.InvoiceInfo.OtherCurrencyDetail);
       } else {
@@ -124,17 +136,72 @@ export class BIL_Print_Invoice_Discharge_Component {
             Hospital No: [ ${this.invoice.PatientInfo.PatientCode} ]
             Invoice No: ${this.invoice.InvoiceInfo.InvoiceNumFormatted}`;
 
+
     }
   }
 
+
+
   ngAfterViewInit() {
-    var btnObj = document.getElementById('btnPrintDischargeInvoice');
+    let btnObj = document.getElementById('btnPrintDischargeInvoice');
     if (btnObj && this.focusPrintBtn) {
       btnObj.focus();
     }
+
+    this.RenderDynamicPrintReceipt();
   }
 
-  public loading: boolean = false;
+  private RenderDynamicPrintReceipt() {
+    if (document.getElementById('id_dynamic_discharge_billing') && this.PrintTemplateTypeSettings && this.PrintTemplateTypeSettings.Enable) {
+      let dischargeInvoiceData = document.createElement('div');
+      dischargeInvoiceData.innerHTML = this.invoice.InvoicePrintTemplate;
+      this.DynamicInvoicePrintTemplate = this.invoice.InvoicePrintTemplate;
+      document.getElementById('id_dynamic_discharge_billing').appendChild(dischargeInvoiceData);
+
+      this.changeDetector.detectChanges();
+
+      let btnObj = document.getElementById('id_btn_ip_dynamic_invoice_print');
+      if (btnObj && this.focusPrintBtn) {
+        btnObj.focus();
+      }
+    }
+  }
+  ReadReceiptPrintDisplaySettingParameter() {
+    let currParam = this.CoreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "UseDynamicInvoicePrint");
+    if (currParam && currParam.ParameterValue) {
+      const paramValue = JSON.parse(currParam.ParameterValue) as Array<PrintTemplateType>;
+
+      if (paramValue) {
+        this.PrintTemplateTypeSettings = paramValue.find(p => p.PrintType === this.invoice.InvoiceInfo.PrintTemplateType);
+        //!Manual Change Detection is done here in order to reflect the changes of dynamic print receipts, if not done, the dom element is not rendered and will face issues in rendering the receipt.
+        this.changeDetector.detectChanges();
+      }
+    }
+  }
+
+  public PrintDynamicPrintReceipt() {
+    this.loading = true;
+    //Open 'Browser Print' if printer not found or selected printing type is Browser.
+    if (!this.selectedPrinter || this.selectedPrinter.PrintingType === ENUM_PrintingType.browser) {
+      this.GenerateDynamicInvoicePrintBrowser(this.DynamicInvoicePrintTemplate);
+      this.loading = false;
+    }
+  }
+  GenerateDynamicInvoicePrintBrowser(dataToPrint: string) {
+    let iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.contentWindow.document.open();
+    iframe.contentWindow.document.write(dataToPrint);
+    iframe.contentWindow.document.close();
+
+    setTimeout(function () {
+      document.body.removeChild(iframe);
+    }, 500);
+
+
+    this.UpdatePrintCount();
+  }
+
   public print() {
     this.loading = true;
     //Open 'Browser Print' if printer not found or selected printing type is Browser.

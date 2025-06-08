@@ -3,6 +3,7 @@ using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.CommonModels;
+using DanpheEMR.ServerModel.FonePayLog;
 using DanpheEMR.ServerModel.MasterModels;
 using DanpheEMR.ServerModel.MedicareModels;
 using DanpheEMR.ServerModel.PatientModels;
@@ -11,6 +12,7 @@ using DanpheEMR.ServerModel.PharmacyModels.Provisional;
 using DanpheEMR.ServerModel.VerificationModels.Pharmacy;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Data.Entity;
 using System.Data.Entity.ModelConfiguration.Conventions;
@@ -84,6 +86,8 @@ namespace DanpheEMR.DalLayer
         public DbSet<WARDConsumptionModel> WardConsumption { get; set; }
 
         public DbSet<CountrySubDivisionModel> CountrySubDivision { get; set; }
+        public DbSet<CountryModel> Countries { get; set; }
+        public DbSet<MunicipalityModel> Municipalities { get; set; }
 
         public DbSet<DepartmentModel> Departments { get; set; }
         public DbSet<PHRMStoreRequisitionModel> StoreRequisition { get; set; }
@@ -118,7 +122,10 @@ namespace DanpheEMR.DalLayer
         public DbSet<PharmacyVerificationModel> VerificationModels { get; set; }
         public DbSet<EmployeeRoleModel> EmployeeRoles { get; set; }
         public DbSet<PHRMTransactionProvisionalReturnItemsModel> ProvisionalReturnItems { get; set; }
-
+        public DbSet<FonePayTransactionLogModel> FonePayTransactionLogs { get; set; }
+        public DbSet<PHRMPackageModel> PharmacyPackages { get; set; }
+        public DbSet<PHRMPackageItemModel> PharmacyPackageItems { get; set; }
+        public DbSet<BillServiceItemModel> BillServiceItems { get; set; }
 
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
@@ -176,6 +183,8 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<WARDConsumptionModel>().ToTable("WARD_Consumption");
             modelBuilder.Entity<PHRMStoreModel>().ToTable("PHRM_MST_Store");
             modelBuilder.Entity<CountrySubDivisionModel>().ToTable("MST_CountrySubDivision");
+            modelBuilder.Entity<CountryModel>().ToTable("MST_Country");
+            modelBuilder.Entity<MunicipalityModel>().ToTable("MST_Municipality");
             modelBuilder.Entity<PHRMStoreSalesCategoryModel>().ToTable("PHRM_MST_SalesCategory");
             modelBuilder.Entity<PHRMStoreRequisitionModel>().ToTable("PHRM_StoreRequisition");
             modelBuilder.Entity<PHRMStoreRequisitionItemsModel>().ToTable("PHRM_StoreRequisitionItems");
@@ -212,6 +221,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<PharmacyVerificationModel>().ToTable("PHRM_TXN_Verification");
             modelBuilder.Entity<EmployeeRoleModel>().ToTable("EMP_EmployeeRole");
             modelBuilder.Entity<PHRMTransactionProvisionalReturnItemsModel>().ToTable("PHRM_TXN_ProvisionalReturnItems");
+            modelBuilder.Entity<FonePayTransactionLogModel>().ToTable("LOG_FonePayTransactions");
 
 
 
@@ -227,6 +237,11 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<PHRMStockMaster>()
                 .HasOptional(a => a.StockBarcode);
 
+
+            modelBuilder.Entity<PHRMPackageModel>().ToTable("PHRM_CFG_Packages");
+            modelBuilder.Entity<PHRMPackageItemModel>().ToTable("PHRM_CFG_PackageItems");
+            modelBuilder.Entity<BillServiceItemModel>().ToTable("BIL_MST_ServiceItem");
+
             //sud/sanjit:4Sept'21--We're converting All Decimal Type properties of all models in this DBContext to Decimal(16,4)---
             //By default decimal take: Decimal(18,2), which was rounding off the input value (after 2digits)
             //and giving wrong calculation of SubTotal value (GrItemPrice*ReceivedQuantity)
@@ -235,8 +250,9 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Conventions.Remove<DecimalPropertyConvention>();
             modelBuilder.Conventions.Add(new DecimalPropertyConvention(16, 4));
 
-
-
+            modelBuilder.Entity<PharmacyFiscalYear>()
+                .Property(e => e.FiscalYearId)
+                .HasDatabaseGeneratedOption(DatabaseGeneratedOption.None);
         }
 
 
@@ -272,5 +288,16 @@ namespace DanpheEMR.DalLayer
             return RackItems;
         }
         #endregion
+
+        public DataTable GetAllStoreStock(int? StoreId, bool ShowZeroQuantity)
+        {
+            List<SqlParameter> paramList = new List<SqlParameter>() 
+            { 
+                new SqlParameter("@StoreId", StoreId),
+                new SqlParameter("@ShowZeroQuantity", ShowZeroQuantity)
+            };
+            DataTable stockItems = DALFunctions.GetDataTableFromStoredProc("SP_PHRM_GetAllStoreStock", paramList, this);
+            return stockItems;
+        }
     }
 }

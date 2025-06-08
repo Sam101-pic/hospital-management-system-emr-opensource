@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { CoreService } from "../../../core/shared/core.service";
+import { Patient } from "../../../patients/shared/patient.model";
 import { PriceCategory } from "../../../settings-new/shared/price.category.model";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
@@ -18,7 +19,7 @@ import { ServiceItemDetails_DTO } from "../../shared/dto/service-item-details.dt
 export class BillEditProvisionalItemsComponent {
 
   @Input("patientDetails")
-  PatientDetails: any = null;
+  PatientDetails = new Patient();
 
   @Input("items-to-edit")
   ProvisionalItemsToUpdate = new Array<BillingTransactionItem>();
@@ -38,11 +39,13 @@ export class BillEditProvisionalItemsComponent {
   UpdatePriceConfigurations = { EnableInIpBilling: false, EnableInProvisionalClearance: false };
 
 
-  constructor(public coreService: CoreService,
+  constructor(
+    public coreService: CoreService,
     private _msgBoxService: MessageboxService,
     private _billingBlService: BillingBLService,
     private _billingInvoiceService: BillingInvoiceBlService,
-    private _billingMasterBlService: BillingMasterBlService) {
+    private _billingMasterBlService: BillingMasterBlService
+  ) {
     this.GetDoctors();
     const allPriceCategories = this.coreService.Masters.PriceCategories;
     if (allPriceCategories && allPriceCategories.length > 0) {
@@ -67,8 +70,13 @@ export class BillEditProvisionalItemsComponent {
 
       this.FilterDiscountApplicableItemsAndPriceChangeAllowed();
     }
+    this.PatientDetails.AgeSex = this.SetAgeAndGender(this.PatientDetails.DateOfBirth, this.PatientDetails.Gender);
   }
-
+  SetAgeAndGender(dateOfBirth: string, gender: string): string {
+    const age = this.coreService.CalculateAge(dateOfBirth);
+    const Agesex = this.coreService.FormateAgeSex(age, gender);
+    return Agesex;
+  }
   //Find and Get the DiscountApplicable item disable textBox for DiscountApplicable=false
   FilterDiscountApplicableItemsAndPriceChangeAllowed() {
 

@@ -1,4 +1,5 @@
 import { Injectable } from "@angular/core";
+import { BehaviorSubject } from "rxjs";
 import { DanpheHTTPResponse } from "../../shared/common-models";
 import { ENUM_DanpheHTTPResponses } from "../../shared/shared-enums";
 import { BillingMasterDlService } from "./billing-master.dl.service";
@@ -11,7 +12,8 @@ import { ServiceItemDetails_DTO } from "./dto/service-item-details.dto";
 })
 export class BillingMasterBlService {
 
-  public ServiceItems = new Array<ServiceItemDetails_DTO>();
+  private serviceItemsSubject = new BehaviorSubject<ServiceItemDetails_DTO[]>([]);
+  public ServiceItems = this.serviceItemsSubject.asObservable();
   public PriceCategoryId: number = null;
   public SchemeId: number = null;
   public ServiceItemsForIp = new Array<ServiceItemDetails_DTO>();
@@ -50,7 +52,8 @@ export class BillingMasterBlService {
     this.PriceCategoryId = priceCategoryId;
     this.billingMasterDlService.GetServiceItems(serviceBillingContext, schemeId, priceCategoryId).subscribe((res: DanpheHTTPResponse) => {
       if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-        this.ServiceItems = res.Results;
+        this.serviceItemsSubject.next(res.Results);
+        console.log('Service items are :', this.ServiceItems)
       }
     });
   }
@@ -74,6 +77,11 @@ export class BillingMasterBlService {
   }
   GetServiceItemsByPriceCategoryId(priceCategoryId: number) {
     return this.billingMasterDlService.GetServiceItemsByPriceCategoryId(priceCategoryId).map(res => {
+      return res;
+    });
+  }
+  GetMasterServiceItems() {
+    return this.billingMasterDlService.GetMasterServiceItems().map(res => {
       return res;
     });
   }

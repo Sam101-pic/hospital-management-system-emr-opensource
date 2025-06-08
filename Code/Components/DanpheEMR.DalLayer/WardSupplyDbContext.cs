@@ -97,6 +97,10 @@ namespace DanpheEMR.DalLayer
                 .HasKey(a => new { a.ReturnItemId, a.FixedAssetStockId })
                 .HasRequired(a => a.Asset);
 
+            modelBuilder.Entity<MAP_DispatchItems_FixedAssetStock>().ToTable("INV_MAP_DispatchItems_FixedAssetStock")
+                .HasKey(a => new { a.DispatchItemsId, a.FixedAssetStockId })
+                .HasRequired(a => a.Asset);
+
             modelBuilder.Entity<ItemSubCategoryMasterModel>().ToTable("INV_MST_ItemSubCategory");
             modelBuilder.Entity<PHRMStoreRequisitionModel>().ToTable("PHRM_StoreRequisition");
             modelBuilder.Entity<PHRMStoreRequisitionItemsModel>().ToTable("PHRM_StoreRequisitionItems");
@@ -108,7 +112,9 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<PHRMStockTransactionModel>().ToTable("PHRM_TXN_StockTransaction");
             modelBuilder.Entity<PHRMRackModel>().ToTable("PHRM_MST_Rack");
             modelBuilder.Entity<PHRM_MAP_ItemToRack>().ToTable("PHRM_MAP_ItemToRack");
-
+            modelBuilder.Entity<InventoryConsumptionTypeMasterModel>().ToTable("INV_MST_ConsumptionTypes");
+            modelBuilder.Entity<DispatchItemsModel>().ToTable("INV_TXN_DispatchItems");
+            modelBuilder.Entity<CfgParameterModel>().ToTable("CORE_CFG_Parameters");
         }
         public DbSet<WardModel> WardModel { get; set; }
         public DbSet<PHRMStoreModel> StoreModel { get; set; }
@@ -173,6 +179,8 @@ namespace DanpheEMR.DalLayer
         public DbSet<PHRMStockTransactionModel> PHRMStockTransactions { get; set; }
         public DbSet<PHRMRackModel> PHRMRack { get; set; }
         public DbSet<PHRM_MAP_ItemToRack> PHRMRackItem { get; set; }
-
+        public DbSet<InventoryConsumptionTypeMasterModel> ConsumptionTypes { get; set; }
+        public DbSet<DispatchItemsModel> DispatchItems { get; set; }
+        public DbSet<CfgParameterModel> CfgParameters { get; set; }
     }
 }

@@ -16,10 +16,13 @@
         <form [formGroup]="currentLaboratoryServices.DyanamicValidator" class="form-horizontal">
           <div class="form-body">
             <div class="col-md-12">
-              <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject">Laboratory Services </span> </div>
+              <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject">Laboratory Services
+                </span> </div>
               <div class="row">
                 <div class="col-md-6 col-xs-12">
-                  <from-to-date-select (on-change)="OnFromToDateChange($event)"> </from-to-date-select>
+                  <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                                       [date-settings-name]="'common-range-with-today'">
+                  </from-to-date-select>
                 </div>
                 <div class="col-md-2 col-xs-12">
                   <div class="form-group">

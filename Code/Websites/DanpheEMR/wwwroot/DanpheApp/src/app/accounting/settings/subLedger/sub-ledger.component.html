@@ -39,6 +39,7 @@
                         <label class="control-label col-md-5">SubLedger Name<sup>*</sup><b>:</b></label>
                         <div class="col-md-7">
                            <input class="form-control" maxlength="30" type="text" [(ngModel)]="subLedger.SubLedgerName"
+                                  [attr.disabled]="subLedger.IsSystemDefault ? true : null"
                                   id="subLedgerName" placeholder="SubLedgername" />
                         </div>
                      </div>
@@ -113,7 +114,7 @@
                                   placeholder="Select LedgerGroup Name"
                                   display-property-name="LedgerGroupName"
                                   value-property-name="null"
-                                  (focusout)="FilterLedgerList()"
+                                  (ngModelChange)="FilterLedgerList()"
                                   [list-formatter]="'LedgerGroupName'"
                                   max-num-list="15"
                                   onclick="this.select()"

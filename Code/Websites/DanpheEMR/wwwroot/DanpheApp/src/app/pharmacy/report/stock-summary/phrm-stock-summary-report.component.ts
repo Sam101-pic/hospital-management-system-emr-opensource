@@ -5,6 +5,8 @@ import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { PHRMStockSummaryReportModel } from '../../shared/Phrm-Stock-summary-report-model';
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
+import { PHRMGenericModel } from '../../shared/phrm-generic.model';
+import { PHRMItemMasterModel } from '../../shared/phrm-item-master.model';
 import { PHRMReportsModel } from '../../shared/phrm-reports-model';
 
 @Component({
@@ -30,14 +32,15 @@ export class PHRMStockSummaryReportComponent {
     public allItemList: any[] = [];
     public footerContent = '';
     public dateRange: string = "";
-    public StoreList: any[] = [];
+    StoreList: { StoreId: number, Name: string }[] = [];
     StockSummaryReportList: Array<PHRMStockSummaryReportModel> = new Array<PHRMStockSummaryReportModel>();
-    selectedStore: any;
-
+    SelectedStore: { StoreId: number, Name: string };
     public pharmacy: string = "pharmacy";
     public loading: boolean = false;
     preselectedColList: any[] = [];
-
+    selectedItem: PHRMItemMasterModel = new PHRMItemMasterModel();
+    GenericList: Array<PHRMGenericModel> = new Array<PHRMGenericModel>();
+    SelectedGeneric: { GenericId: number, GenericName: string };
     constructor(public pharmacyBLService: PharmacyBLService, public dlService: DLService, public ref: ChangeDetectorRef, public msgBoxServ: MessageboxService, public changeDetector: ChangeDetectorRef) {
         this.phrmReports.FromDate = moment().format("YYYY-MM-DD");
         this.phrmReports.ToDate = moment().format("YYYY-MM-DD");
@@ -51,12 +54,15 @@ export class PHRMStockSummaryReportComponent {
 
         this.AssignGridColDefaults();
         this.GetItemList();
+        this.GetGenericList();
         this.GetActiveStore();
         this.CreateDynamicColumnList()
         this.showDataGrid = true;
     }
     ngAfterViewChecked() {
-        this.footerContent = document.getElementById("print_summary").innerHTML;
+        if (document.getElementById("print_phrm_stock_summary_report")) {
+            this.footerContent = document.getElementById("print_phrm_stock_summary_report").innerHTML;
+        }
     }
     GetActiveStore() {
         this.pharmacyBLService.GetActiveStore()
@@ -77,6 +83,19 @@ export class PHRMStockSummaryReportComponent {
             .subscribe(res => {
                 if (res.Status == 'OK') {
                     this.allItemList = res.Results;
+                }
+                else {
+                    this.msgBoxServ.showMessage("Notice-Message", ["Failed to load item data."]);
+                }
+            }, () => {
+                this.msgBoxServ.showMessage("Failed", ["Failed to load item data."]);
+            });
+    }
+    GetGenericList() {
+        this.pharmacyBLService.GetGenericListWithoutPriceCategory()
+            .subscribe(res => {
+                if (res.Status == 'OK') {
+                    this.GenericList = res.Results;
                 }
                 else {
                     this.msgBoxServ.showMessage("Notice-Message", ["Failed to load item data."]);
@@ -211,6 +230,7 @@ export class PHRMStockSummaryReportComponent {
             this.GrandTotalReportData = new PHRMStockSummaryReportModel();
             this.pharmacyBLService.GetStockSummaryReport(this.phrmReports).finally(() => {
                 this.loading = false;
+                this.ClearInputFields();
             }).subscribe(res => {
                 if (res.Status == 'OK' && res.Results.StkSummary.length > 0) {
                     ////Assign  Result to DailyStockSummaryReportData
@@ -218,7 +238,6 @@ export class PHRMStockSummaryReportComponent {
                     this.StockSummaryReportData = res.Results.StkSummary;
                     this.GrandTotalReportData = res.Results.GrandTotal;
                     this.changeDetector.detectChanges();
-                    this.footerContent = document.getElementById("print_summary").innerHTML;
                 }
                 else if (res.Status == 'OK' && res.Results.length == 0) {
                     this.StockSummaryReportData = new Array<PHRMStockSummaryReportModel>();
@@ -229,6 +248,14 @@ export class PHRMStockSummaryReportComponent {
             });
         }
 
+    }
+    private ClearInputFields() {
+        this.phrmReports.ItemId = null;
+        this.phrmReports.GenericId = null;
+        this.phrmReports.StoreId = null;
+        this.selectedItem = null;
+        this.SelectedGeneric = null;
+        this.SelectedStore = null;
     }
     StockSummaryGridAction($event: GridEmitModel) {
         switch ($event.Action) {
@@ -242,25 +269,25 @@ export class PHRMStockSummaryReportComponent {
                 break;
         }
     }
-    OnChangeItem($event) {
-        //show item txn summary
-        this.selectedItemId = $event.ItemId;
-        this.selectedItemName = $event.ItemName;
+    OnChangeItem() {
+        if (this.selectedItem && this.selectedItem.ItemId > 0) {
+            this.phrmReports.ItemId = this.selectedItem.ItemId;
+        }
+        else {
+            this.phrmReports.ItemId = null;
+        }
     }
-
+    onChangeGeneric() {
+        if (this.SelectedGeneric && this.SelectedGeneric.GenericId > 0) {
+            this.phrmReports.GenericId = this.SelectedGeneric.GenericId;
+        }
+        else {
+            this.phrmReports.GenericId = null;
+        }
+    }
     onChangeStore() {
-        let store = null;
-        if (!this.selectedStore) {
-            this.phrmReports.StoreId = null;
-        }
-        else if (typeof (this.selectedStore) == 'string') {
-            store = this.StoreList.find(a => a.Name.toLowerCase() == this.selectedStore.toLowerCase());
-        }
-        else if (typeof (this.selectedStore) == "object") {
-            store = this.selectedStore;
-        }
-        if (store) {
-            this.phrmReports.StoreId = store.StoreId;
+        if (this.SelectedStore && this.SelectedStore.StoreId > 0) {
+            this.phrmReports.StoreId = this.SelectedStore.StoreId;
         }
         else {
             this.phrmReports.StoreId = null;
@@ -295,7 +322,9 @@ export class PHRMStockSummaryReportComponent {
     ItemListFormatter(data: any): string {
         return data["ItemName"];
     }
-
+    GenericListFormatter(data: any): string {
+        return data["GenericName"];
+    }
     StoreListFormatter(data: any): string {
         return data["Name"];
     }

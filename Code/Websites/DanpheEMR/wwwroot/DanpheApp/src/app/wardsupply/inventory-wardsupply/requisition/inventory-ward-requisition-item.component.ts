@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
+import { ChangeDetectorRef, Component, EventEmitter, OnDestroy, Output } from '@angular/core';
 import { Router } from '@angular/router';
 import * as moment from 'moment/moment';
 import { CoreBLService } from "../../../core/shared/core.bl.service";
@@ -14,11 +14,14 @@ import { MessageboxService } from '../../../shared/messagebox/messagebox.service
 import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_GRItemCategory, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { WardSupplyBLService } from '../../shared/wardsupply.bl.service';
 import { InventoryWardRequisitionVerifier_DTO } from './shared/inventory-ward-requisition-verifier.dto';
-@Component({ templateUrl: "./inventory-ward-requisition-item.html" })
+@Component({
+    templateUrl: "./inventory-ward-requisition-item.html",
+    selector: 'inventory-ward-requisition-item'
+})
 export class InventoryWardRequisitionItemComponent implements OnDestroy {
     public CurrentStoreId: number = 0;
     ////binding logic
-    public currentRequItem: RequisitionItems = new RequisitionItems();
+    public currentRequisitionItem: RequisitionItems = new RequisitionItems();
     public requisition: Requisition = new Requisition();
     ////this Item is used for search button(means auto complete button)...
     public ItemList: any[] = [];
@@ -39,10 +42,13 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
     loading: boolean;
     CurrentItemId: number = 0;
     ItemByStoreId: Item = new Item();
+    HasPermission: boolean = false;
 
     public IsVerificationActivated: boolean = true;
     public VerifierList: InventoryWardRequisitionVerifier_DTO[] = [];
     showInventoryRequisitionDetails: boolean = false;
+    @Output('call-back-close-popup') callBackClosePopup: EventEmitter<object> = new EventEmitter<object>();
+    AllowPreviousFiscalYear: boolean = false;
 
     constructor(public changeDetectorRef: ChangeDetectorRef, public inventoryBLService: InventoryBLService, public inventoryService: InventoryService, public wardsupplyBLService: WardSupplyBLService, public securityService: SecurityService, public router: Router, public messageBoxService: MessageboxService, public coreBLService: CoreBLService, public coreService: CoreService) {
         this.GetInventoryList();
@@ -51,19 +57,36 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
         this.GetSigningPanelConfiguration();
 
     }
-
     ngOnInit() {
-        this.CheckForSubstoreActivation();
+        this.CheckForSubStoreActivation();
+        if (this.inventoryService.RequisitionId > 0) {
+            this.InitializeRequisitionItems();
+        }
+        if (this.securityService.HasPermission('btn-wardsupply-inventory-requisition-verification')) {
+            this.HasPermission = true;
+        }
+        else {
+            this.HasPermission = false;
+        }
     }
-    ngAfterViewInit() {
-        this.SetFocusById('activeInventory');
-
+    ngOnDestroy(): void {
+        this.inventoryService.PurchaseRequestId = 0;
+        this.inventoryService.isRecreateMode = false;
+        this.inventoryService.RequisitionId = 0;
+        this.isEditMode = false;
     }
     GetInventoryList() {
         this.inventoryBLService.GetActiveInventoryList()
             .subscribe(res => {
                 if (res.Status === ENUM_DanpheHTTPResponses.OK) {
                     this.inventoryList = res.Results;
+                    let inventory = null;
+                    inventory = this.inventoryList.find(a => a.IsDefault === true);
+                    if (inventory && !this.isEditMode) {
+                        this.requisition.RequestToStoreId = inventory.StoreId;
+                        this.requisition.RequisitionValidator.get("RequestToStoreId").setValue(inventory.StoreId);
+                        this.selectedInventory = inventory.Name;
+                    }
                 }
             })
     }
@@ -84,31 +107,37 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
         }, 600);
     }
     GetItemListByItemCategory(itmCategory: string) {
-        let retItemList = this.filteredItemList.filter(item => item.ItemType === itmCategory);
-        return retItemList;
+        // this.filteredItemList = this.ItemList.filter(item => item.StoreId == this.requisition.RequestToStoreId);
+        if (this.filteredItemList.length > 0) {
+            let retItemList = this.filteredItemList.filter(item => item.ItemType === itmCategory);
+            return retItemList;
+        }
     }
-    ngOnDestroy(): void {
-        this.inventoryService.PurchaseRequestId = 0;
-        this.inventoryService.isRecreateMode = false;
-    }
-
     LoadRequisition(requisitionId) {
         this.inventoryBLService.GetToRequistion(requisitionId)
-            .subscribe(res => {
-                if (res.Status == "OK") {
+            .subscribe((res: DanpheHTTPResponse) => {
+                if (res.Status === ENUM_DanpheHTTPResponses.OK) {
                     let Requisition = res.Results;
                     this.SetVerifiersFromVerifierIdsObj(Requisition.VerifierIds);
 
                     this.requisition.RequestFromStoreId = Requisition.RequestFromStoreId;
-
+                    this.requisition.RequisitionId = Requisition.RequisitionId;
+                    this.requisition.RequisitionNo = Requisition.RequisitionNo;
                     this.requisition.RequisitionStatus = Requisition.RequisitionStatus;
-                    if (this.isRecreateMode == false) {
+                    this.requisition.IsVerificationEnabled = Requisition.IsVerificationEnabled;
+
+                    if (this.isRecreateMode) {
                         this.requisition.RequisitionId = this.inventoryService.RequisitionId;
                         this.requisition.RequisitionNo = Requisition.RequisitionNo;
                         this.requisition.IssueNo = Requisition.IssueNo;
                         this.requisition.RequisitionDate = moment(Requisition.RequisitionDate).format("YYYY-MM-DD");
+                        let inventory = this.inventoryList.find(a => a.StoreId == Requisition.RequestToStoreId);
+                        if (inventory) {
+                            this.requisition.RequestToStoreId = inventory.StoreId;
+                            this.selectedInventory = inventory.Name;
+                        }
                     }
-                    if (this.isEditMode == true) {
+                    if (this.isEditMode) {
                         let inventory = null;
                         inventory = this.inventoryList.find(a => a.StoreId == Requisition.RequestToStoreId);
                         if (inventory) {
@@ -122,6 +151,7 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
                             let newItem = new RequisitionItems();
                             newItem.Quantity = Requisition.RequisitionItems[i].Quantity;
                             newItem.PendingQuantity = Requisition.RequisitionItems[i].PendingQuantity;
+                            newItem.AvailableQuantity = Requisition.RequisitionItems[i].AvailableQuantity;
                             newItem.ItemName = Requisition.RequisitionItems[i].ItemName;
                             newItem.Code = Requisition.RequisitionItems[i].Code;
                             newItem.AuthorizedBy = Requisition.RequisitionItems[i].AuthorizedBy;
@@ -140,10 +170,11 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
                                 newItem.IssueNo = Requisition.RequisitionItems[i].IssueNo;
                                 newItem.IsEditApplicable = false;
                             }
+                            newItem.filteredItemList = this.GetItemListByItemCategory(Requisition.RequisitionItems[i].ItemCategory);
                             this.requisition.RequisitionItems.push(newItem);
                             this.requisition.RequisitionItems[this.requisition.RequisitionItems.length - 1].RequisitionItemValidator.controls["ItemId"].setValue(newItem.ItemId);
                             this.requisition.RequisitionItems[this.requisition.RequisitionItems.length - 1].RequisitionItemValidator.controls["Quantity"].setValue(newItem.Quantity);
-                            this.currentRequItem = newItem;
+                            this.currentRequisitionItem = newItem;
                         }
 
                     }
@@ -161,7 +192,7 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
             })
     }
 
-    CheckForSubstoreActivation() {
+    CheckForSubStoreActivation() {
         this.CurrentStoreId = this.securityService.getActiveStore().StoreId;
         this.ReqDisGroupId = this.securityService.getActiveStore().INV_ReqDisGroupId;
         try {
@@ -177,7 +208,7 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
     }
     private InitializeRequisitionItems() {
         if (this.inventoryService.RequisitionId > 0) {
-            if (this.inventoryService.isRecreateMode == true) {
+            if (this.inventoryService.isRecreateMode) {
                 this.isRecreateMode = true;
             }
             else {
@@ -186,30 +217,24 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
             this.LoadRequisition(this.inventoryService.RequisitionId);
         }
         else {
-            this.requisition.RequisitionItems.push(this.currentRequItem);
+            this.requisition.RequisitionItems.push(this.currentRequisitionItem);
             this.requisition.RequestFromStoreId = this.CurrentStoreId;
-            this.currentRequItem.Quantity = 1;
+            this.currentRequisitionItem.Quantity = 1;
             this.SetFocusById('activeInventory');
         }
     }
 
-    ////to load the item in the start
     LoadItemList(): void {
         this.ItemList = this.inventoryService.LoadInventoryWardItemList();
-        if (this.ItemList.length) {
-            if (this.inventoryService.RequisitionId > 0) {
-                this.filterItemsBasedOnInventory();
-            }
-        }
-        else {
+        if (!this.ItemList.length) {
             this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['Items not found']);
         }
     }
     private filterItemsBasedOnInventory() {
         this.InitializeRequisitionItems();
-        this.filteredItemList = this.ItemList.filter(item => item.StoreId == this.requisition.RequestToStoreId);
+        if (this.requisition && this.requisition.RequestToStoreId > 0)
+            this.filteredItemList = this.ItemList;
     }
-
     AddRowRequest() {
         for (let i = 0; i < this.requisition.RequisitionItems.length; i++) {
             for (let a in this.requisition.RequisitionItems[i].RequisitionItemValidator.controls) {
@@ -218,12 +243,16 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
             }
         }
         this.rowCount++;
-        this.currentRequItem = new RequisitionItems();
-        this.currentRequItem.ItemCategory = ENUM_GRItemCategory.Consumables;
-        this.currentRequItem.filteredItemList = this.GetItemListByItemCategory(this.currentRequItem.ItemCategory);//load item list for 1st row based on itemcategory.
-        this.currentRequItem.filteredItemList = this.currentRequItem.filteredItemList.slice();
-        this.currentRequItem.Quantity = 1;
-        this.requisition.RequisitionItems.push(this.currentRequItem);
+        this.currentRequisitionItem = new RequisitionItems();
+        if (this.isEditMode) {
+            if (this.requisition && this.requisition.RequestToStoreId > 0)
+                this.filteredItemList = this.ItemList;
+        }
+        this.currentRequisitionItem.ItemCategory = ENUM_GRItemCategory.Consumables;
+        this.currentRequisitionItem.filteredItemList = this.GetItemListByItemCategory(this.currentRequisitionItem.ItemCategory);//load item list for 1st row based on itemcategory.
+        this.currentRequisitionItem.filteredItemList = this.currentRequisitionItem.filteredItemList.slice();
+        this.currentRequisitionItem.Quantity = 1;
+        this.requisition.RequisitionItems.push(this.currentRequisitionItem);
 
         let nextInputIndex = this.requisition.RequisitionItems.length - 1;
     }
@@ -232,8 +261,8 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
         this.SetFocusById(elementToBeFocused);
     }
     OnPressedEnterKeyInQuantityField(index) {
-        let isinputvalid = this.requisition.RequisitionItems.every(item => item.Quantity > 0)
-        if (isinputvalid == true) {
+        let isInputValid = this.requisition.RequisitionItems.every(item => item.Quantity > 0)
+        if (isInputValid == true) {
             //If index is last element of array, then create new row
             if (index == (this.requisition.RequisitionItems.length - 1)) {
                 this.AddRowRequest();
@@ -271,32 +300,34 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
         return data["Name"];
     }
     OnInventoryChange() {
-        let inventory = null;
-        if (!this.selectedInventory) {
-            this.requisition.RequestToStoreId = null;
-        }
-        else if (typeof (this.selectedInventory) == 'string') {
-            inventory = this.inventoryList.find(a => a.Name.toLowerCase() == this.selectedInventory.toLowerCase());
-        }
-        else if (typeof (this.selectedInventory) == "object") {
-            inventory = this.selectedInventory;
-        }
-        if (inventory) {
-            this.requisition.RequestToStoreId = inventory.StoreId;
-            this.requisition.RequisitionItems = [];
-            this.filterItemsBasedOnInventory();
-            if (this.requisition.RequisitionItems.length) {
-                this.requisition.RequisitionItems[0].ItemCategory = ENUM_GRItemCategory.Consumables;
-                this.requisition.RequisitionItems[0].filteredItemList = this.GetItemListByItemCategory(this.requisition.RequisitionItems[0].ItemCategory);
-                this.requisition.RequisitionItems[0].filteredItemList = this.requisition.RequisitionItems[0].filteredItemList.slice();
-
+        if (!this.isEditMode && !this.isRecreateMode) {
+            let inventory = null;
+            if (!this.selectedInventory) {
+                this.requisition.RequestToStoreId = null;
             }
-            //this.requisition.RequisitionValidator.get("TargetStoreId").setValue(inventory.StoreId);
-            this.SetFocusById('itemName');
-            this.SetFocusOnItemName(0);
-        }
-        else {
-            this.requisition.RequestToStoreId = null;
+            else if (typeof (this.selectedInventory) == 'string') {
+                inventory = this.inventoryList.find(a => a.Name.toLowerCase() == this.selectedInventory.toLowerCase());
+            }
+            else if (typeof (this.selectedInventory) == "object") {
+                inventory = this.selectedInventory;
+            }
+            if (inventory) {
+                this.requisition.RequestToStoreId = inventory.StoreId;
+                this.requisition.RequisitionItems = [];
+                this.filterItemsBasedOnInventory();
+                if (this.requisition.RequisitionItems.length) {
+                    this.requisition.RequisitionItems[0].ItemCategory = ENUM_GRItemCategory.Consumables;
+                    this.requisition.RequisitionItems[0].filteredItemList = this.GetItemListByItemCategory(this.requisition.RequisitionItems[0].ItemCategory);
+                    this.requisition.RequisitionItems[0].filteredItemList = this.requisition.RequisitionItems[0].filteredItemList.slice();
+
+                }
+                //this.requisition.RequisitionValidator.get("TargetStoreId").setValue(inventory.StoreId);
+                this.SetFocusById('itemName');
+                this.SetFocusOnItemName(0);
+            }
+            else {
+                this.requisition.RequestToStoreId = null;
+            }
         }
     }
 
@@ -361,13 +392,13 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
                 this.checkIsItemPresent = false;
                 this.changeDetectorRef.detectChanges();
                 this.requisition.RequisitionItems.splice(index, 1);
-                this.currentRequItem = new RequisitionItems();
+                this.currentRequisitionItem = new RequisitionItems();
                 // this.currentRequItem.Quantity = 1;
-                this.currentRequItem.ItemCategory = ENUM_GRItemCategory.Consumables;
-                this.currentRequItem.filteredItemList = this.GetItemListByItemCategory(this.currentRequItem.ItemCategory);
+                this.currentRequisitionItem.ItemCategory = ENUM_GRItemCategory.Consumables;
+                this.currentRequisitionItem.filteredItemList = this.GetItemListByItemCategory(this.currentRequisitionItem.ItemCategory);
                 // this.currentRequItem.UOMName = Item.UOMName;
                 // this.currentRequItem.Code = Item.Code;
-                this.requisition.RequisitionItems.push(this.currentRequItem);
+                this.requisition.RequisitionItems.push(this.currentRequisitionItem);
             }
             else {
                 for (var a = 0; a < this.requisition.RequisitionItems.length; a++) {
@@ -398,6 +429,14 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
         this.requisition.ReqDisGroupId = this.ReqDisGroupId;
         this.requisition.RequisitionValidator.get("RequestFromStoreId").setValue(this.CurrentStoreId);
 
+        if (this.requisition.IsVerificationEnabled && this.requisition.VerifierList.some(v => !v.Name)) {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Please provide verification info or you can uncheck verification!"]);
+            return;
+        }
+        if (this.requisition.RequisitionItems.length === 0) {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Please Add some Items."]);
+            return;
+        }
         if (this.requisition.IsValidCheck(undefined, undefined) == false) {
             for (let a in this.requisition.RequisitionValidator.controls) {
                 this.requisition.RequisitionValidator.controls[a].markAsDirty();
@@ -407,7 +446,7 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
         }
         for (let i = 0; i < this.requisition.RequisitionItems.length; i++) {
             if (this.requisition.RequisitionItems[i].IsValidCheck(undefined, undefined) == false) {
-                for (var a in this.requisition.RequisitionItems[i].RequisitionItemValidator.controls) {
+                for (let a in this.requisition.RequisitionItems[i].RequisitionItemValidator.controls) {
                     this.requisition.RequisitionItems[i].RequisitionItemValidator.controls[a].markAsDirty();
                     this.requisition.RequisitionItems[i].RequisitionItemValidator.controls[a].updateValueAndValidity();
                 }
@@ -433,14 +472,16 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
                         this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Requisition is Generated and Saved"]);
                         this.requisition.RequisitionItems = new Array<RequisitionItems>();
                         this.requisition = new Requisition();
-                        this.currentRequItem = new RequisitionItems();
-                        this.currentRequItem.Quantity = 1;
-                        this.requisition.RequisitionItems.push(this.currentRequItem);
+                        this.currentRequisitionItem = new RequisitionItems();
+                        this.currentRequisitionItem.Quantity = 1;
+                        this.requisition.RequisitionItems.push(this.currentRequisitionItem);
                         this.inventoryService.RequisitionId = res.Results;
                         this.inventoryService.isModificationAllowed = true;
                         this.showInventoryRequisitionDetails = true;
+                        this.callBackClosePopup.emit();
                     }
                     else {
+                        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['failed to add Requisition..' + res.ErrorMessage]);
                         err => {
                             this.messageBoxService.showMessage("failed", ['failed to add Requisition.. please check log for details.']);
                             this.logError(err.ErrorMessage);
@@ -457,6 +498,12 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
         let CheckIsValid = true;
         this.requisition.RequestFromStoreId = this.CurrentStoreId;
         this.requisition.RequisitionValidator.get("RequestFromStoreId").setValue(this.CurrentStoreId);
+
+        if (this.requisition.IsVerificationEnabled && this.requisition.VerifierList.some(v => !v.Name)) {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Please provide verification info or you can uncheck verification!"]);
+            return;
+        }
+
         if (this.requisition.IsValidCheck(undefined, undefined) == false) {
             for (let b in this.requisition.RequisitionValidator.controls) {
                 this.requisition.RequisitionValidator.controls[b].markAsDirty();
@@ -504,17 +551,16 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
 
                         this.requisition.RequisitionItems = new Array<RequisitionItems>();
                         this.requisition = new Requisition();
-                        this.currentRequItem = new RequisitionItems();
-                        this.currentRequItem.Quantity = 1;
-                        this.requisition.RequisitionItems.push(this.currentRequItem);
+                        this.currentRequisitionItem = new RequisitionItems();
+                        this.currentRequisitionItem.Quantity = 1;
+                        this.requisition.RequisitionItems.push(this.currentRequisitionItem);
                         this.inventoryService.RequisitionId = res.Results;
+                        this.inventoryService.isModificationAllowed = true;
                         this.showInventoryRequisitionDetails = true;
+                        this.callBackClosePopup.emit();
                     }
                     else {
-
-                        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['failed to add Requisition.. please check log for details.']);
-                        this.logError(res.ErrorMessage);
-
+                        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['failed to add Requisition.. ' + res.ErrorMessage]);
                     }
                 });
         }
@@ -523,9 +569,9 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
     Cancel() {
         this.requisition.RequisitionItems = new Array<RequisitionItems>();
         this.requisition = new Requisition();
-        this.currentRequItem = new RequisitionItems()
-        this.currentRequItem.Quantity = 1;
-        this.requisition.RequisitionItems.push(this.currentRequItem);
+        this.currentRequisitionItem = new RequisitionItems()
+        this.currentRequisitionItem.Quantity = 1;
+        this.requisition.RequisitionItems.push(this.currentRequisitionItem);
         this.router.navigate(['/WardSupply/Inventory/InventoryRequisitionList']);
     }
     logError(err: any) {
@@ -548,10 +594,10 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
             "ItemId": item.ItemId, "ItemName": item.ItemName, StandardRate: item.StandardRate, VAT: item.VAT, ItemType: item.ItemType
         });
         this.filterItemsBasedOnInventory();
-        this.currentRequItem = new RequisitionItems();
+        this.currentRequisitionItem = new RequisitionItems();
         if (item.ItemType == 'Consumables') {
-            this.currentRequItem.Quantity = 1;
-            this.requisition.RequisitionItems.splice(this.index, 1, this.currentRequItem);
+            this.currentRequisitionItem.Quantity = 1;
+            this.requisition.RequisitionItems.splice(this.index, 1, this.currentRequisitionItem);
             this.requisition.RequisitionItems[this.index].SelectedItem = item;
         }
         else {
@@ -611,13 +657,16 @@ export class InventoryWardRequisitionItemComponent implements OnDestroy {
         if (typeof $event == "object") {
             this.requisition.VerifierList[index] = $event;
         }
+        else if (typeof $event == "string") {
+            this.requisition.VerifierList[index].Name = '';
+        }
     }
 
     CheckIfDeleteVerifierAllowed() {
         return this.requisition.VerifierList.length <= 1;
     }
     CheckIfAddVerifierAllowed() {
-        return this.requisition.VerifierList.some(V => V.Id == undefined) || this.requisition.VerifierList.length >= this.VerificationLevel;
+        return this.requisition.VerifierList.length >= this.VerificationLevel;
     }
 
 

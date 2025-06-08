@@ -125,11 +125,11 @@ export class TransferCreateComponent implements OnInit {
         }
 
       }
-      this.itemList = this.stockList.filter(a => a.IsInsuranceApplicable == true);
     }
-    else {
-      this.itemList = this.stockList;
-    }
+    // This is not needed as everything is handled through Scheme.
+    // this.itemList = this.stockList.filter(a => a.IsInsuranceApplicable == true);
+    this.itemList = this.stockList;
+
   }
 
   StoreListFormatter(data: any): string {
@@ -137,7 +137,24 @@ export class TransferCreateComponent implements OnInit {
   }
   ////used to format display item in ng-autocomplete
   ItemListFormatter(data: any): string {
-    let html = `<font color='blue'; size=03 >${data["ItemName"]}</font> (<i>${data["GenericName"]}</i>)- Batch: ${data.BatchNo} - Qty: ${data.AvailableQuantity}`;
+    let html = "";
+    let date = new Date();
+    let dateNow = date.setMonth(date.getMonth() + 0);
+    let dateThreeMonth = date.setMonth(date.getMonth() + 3);
+    if (data["ItemId"]) {
+      let expiryDate = new Date(data["ExpiryDate"]);
+      let expDate = expiryDate.setMonth(expiryDate.getMonth() + 0);
+      if (expDate < dateNow) {
+        html = `<font color='crimson'; size=03 >${data["ItemName"]}</font> (<i>${data["GenericName"]}</i>)- Batch: ${data.BatchNo} - Qty: ${data.AvailableQuantity}`;
+      }
+      if (expDate < dateThreeMonth && expDate > dateNow) {
+
+        html = `<font  color='#FFBF00'; size=03 >${data["ItemName"]}</font> (<i>${data["GenericName"]}</i>)- Batch: ${data.BatchNo} - Qty: ${data.AvailableQuantity}`;
+      }
+      if (expDate > dateThreeMonth) {
+        html = `<font color='blue'; size=03 >${data["ItemName"]}</font> (<i>${data["GenericName"]}</i>)- Batch: ${data.BatchNo} - Qty: ${data.AvailableQuantity}`;
+      }
+    }
     return html;
   }
   Cancel() {

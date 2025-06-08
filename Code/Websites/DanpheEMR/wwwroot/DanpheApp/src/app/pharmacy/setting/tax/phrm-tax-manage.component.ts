@@ -76,6 +76,16 @@ export class PHRMTAXManageComponent {
             this.currentTAX.TAXValidator.controls[i].markAsDirty();
             this.currentTAX.TAXValidator.controls[i].updateValueAndValidity();
         }
+
+
+        if (this.taxList && this.taxList.length) {
+            const isTaxNameAlreadyExists = this.taxList.some(s => s.TAXName.toLowerCase() === this.currentTAX.TAXName.toLowerCase());
+            if (isTaxNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add tax as the Tax Name "${this.currentTAX.TAXName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.currentTAX.IsValidCheck(undefined, undefined)) {
             this.currentTAX.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
             this.currentTAX.CreatedOn = moment().format('YYYY-MM-DD');
@@ -102,6 +112,15 @@ export class PHRMTAXManageComponent {
             this.currentTAX.TAXValidator.controls[i].markAsDirty();
             this.currentTAX.TAXValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.taxList && this.taxList.length) {
+            const isTaxNameAlreadyExists = this.taxList.some(s => s.TAXName.toLowerCase() === this.currentTAX.TAXName.toLowerCase() && s.TAXId !== this.currentTAX.TAXId);
+            if (isTaxNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update tax as the Tax Name "${this.currentTAX.TAXName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.currentTAX.IsValidCheck(undefined, undefined)) {
             this.currentTAX.CreatedOn = moment().format('YYYY-MM-DD');
             this.pharmacyBLService.UpdateTAX(this.currentTAX)

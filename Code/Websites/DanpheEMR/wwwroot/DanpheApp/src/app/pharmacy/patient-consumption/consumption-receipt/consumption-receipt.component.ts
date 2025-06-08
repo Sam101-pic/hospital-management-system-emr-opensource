@@ -37,6 +37,7 @@ export class ConsumptionReceiptComponent {
   public browserPrintContentObj: any = { innerHTML: '' };
   public GeneralFieldLabel = new GeneralFieldLabels();
   @Output("call-back-print") callBackPrint: EventEmitter<object> = new EventEmitter();
+  showRackNoInPrint: boolean = false;
 
 
   constructor(public coreService: CoreService,
@@ -54,6 +55,8 @@ export class ConsumptionReceiptComponent {
 
     if (this.PatientConsumptionId) {
       this.GetPatientConsumptionInfo(this.PatientConsumptionId);
+      this.GetRackNoParameterSettings();
+
     }
   }
 
@@ -165,5 +168,11 @@ export class ConsumptionReceiptComponent {
   CallBackBillPrint($event) {
 
   }
-
+  GetRackNoParameterSettings(): void {
+    let RackNoPrintSetting = this.coreService.Parameters.find(p => p.ParameterName == "ShowRackNoInPharmacyReceipt" && p.ParameterGroupName == "Pharmacy");
+    if (RackNoPrintSetting) {
+      let showRackNoInPrint = JSON.parse(RackNoPrintSetting.ParameterValue);
+      this.showRackNoInPrint = showRackNoInPrint.ShowRackNoInNormalPharmacyReceipt;
+    }
+  }
 }

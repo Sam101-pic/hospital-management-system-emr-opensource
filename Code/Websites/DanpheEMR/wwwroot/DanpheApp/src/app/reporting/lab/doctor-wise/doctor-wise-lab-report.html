@@ -3,7 +3,8 @@
     <form [formGroup]="currentdoctorwiselab.DoctorWiseLabValidator" class="form-horizontal">
       <div class="form-body">
         <div class="col-md-12">
-          <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject">Doctor Wise Lab Count</span> </div>
+          <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <span class="caption-subject">Doctor Wise Lab Count</span>
+          </div>
           <!--<div class="col-md-5 col-xs-12">
             <div class="form-group">
               <label class="control-label col-md-3">From Date<b class="color-red"> *</b><b style="float:right;">:</b></label>
@@ -24,7 +25,9 @@
           </div>-->
           <div class="row">
             <div class="col-md-6 col-xs-12">
-              <from-to-date-select (on-change)="OnFromToDateChange($event)"> </from-to-date-select>
+              <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                                   [date-settings-name]="'common-range-with-today'">
+              </from-to-date-select>
             </div>
             <div class="col-md-2 col-xs-12">
               <div class="form-group">

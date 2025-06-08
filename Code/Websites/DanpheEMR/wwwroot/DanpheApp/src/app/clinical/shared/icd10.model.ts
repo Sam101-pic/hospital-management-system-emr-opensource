@@ -7,4 +7,6 @@
     public Active: boolean = true;
     public IsPatientReferred: boolean;
     public ReferredBy: string;
+    public IcdVersion: string = null;
+    DiseaseGroupId: number = 0;
 }

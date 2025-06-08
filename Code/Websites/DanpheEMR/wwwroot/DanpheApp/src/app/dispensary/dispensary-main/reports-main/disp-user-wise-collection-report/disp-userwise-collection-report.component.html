@@ -30,7 +30,8 @@
     <div class="col-md-12">
       <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i>
         <!-- <span class="caption-subject font-red-sunglo bold uppercase">User Collection&nbsp;  Report</span> -->
-        <span *ngIf="!IsSummaryViewMode" class="caption-subject">User Collection Report (Detailed)</span> <span *ngIf="IsSummaryViewMode" class="caption-subject ">User Collection Report (Summary)</span>
+        <span *ngIf="!IsSummaryViewMode" class="caption-subject">User Collection Report (Detailed)</span> <span *ngIf="IsSummaryViewMode"
+              class="caption-subject ">User Collection Report (Summary)</span>
       </div>
 
     </div>
@@ -42,7 +43,10 @@
         <div class="form-group row">
           <label class="control-label col-md-5">Select Dispensary<b style="float:right;">:</b></label>
           <div class="col-md-7">
-            <input danphe-auto-complete [(ngModel)]="selectedDispensary" class="form-control" [list-formatter]="DispensaryListFormatter" [source]="dispensaryList" placeholder="Enter Dispensary Name" display-property-name="Name" value-property-name=null onclick="this.select();" id="dispensary" (valueChanged)="OnDispensaryChange()" max-num-list="10" [ngModelOptions]="{standalone: true}" />
+            <input danphe-auto-complete [(ngModel)]="selectedDispensary" class="form-control" [list-formatter]="DispensaryListFormatter"
+                   [source]="dispensaryList" placeholder="Enter Dispensary Name" display-property-name="Name" value-property-name=null
+                   onclick="this.select();" id="dispensary" (ngModelChange)="OnDispensaryChange()" max-num-list="10"
+                   [ngModelOptions]="{standalone: true}" />
           </div>
         </div>
       </div>
@@ -54,8 +58,8 @@
             <label class="control-label col-md-6">Counter<b style="float:right;">:</b></label>
             <div class="col-md-6">
               <select id="ddlCounter" [(ngModel)]="phrmReports.CounterId" class="form-control" [ngModelOptions]="{standalone: true}">
-                <option value="0">All</option>
-                <option *ngFor="let counter of counterlist" value="{{counter.CounterId}}">{{counter.CounterName}}</option>
+                <option value="null">All</option>
+                <option *ngFor="let counter of CounterList" value="{{counter.CounterId}}">{{counter.CounterName}}</option>
               </select>
             </div>
           </div>
@@ -64,7 +68,9 @@
           <div class="form-group row">
             <label class="control-label col-md-5">User<b style="float:right;">:</b></label>
             <div class="col-md-7">
-              <input class="form-control" value="" [(ngModel)]="phrmReports.CreatedBy" [ngModelOptions]="{standalone: true}" placeholder="Enter User Name" />
+              <input danphe-auto-complete [(ngModel)]="SelectedUser" class="form-control" [list-formatter]="UserListFormatter" [source]="UserList"
+                     placeholder="Select User Name" display-property-name="EmployeeName" value-property-name=null onclick="this.select();" id="user"
+                     (valueChanged)="OnUserChange()" max-num-list="10" [ngModelOptions]="{standalone: true}" />
             </div>
           </div>
         </div>
@@ -88,7 +94,9 @@
 </div>
 <div class="row" *ngIf="!IsSummaryViewMode">
   <div class="col-lg-12 col-sm-12">
-    <danphe-grid [grid-colDefaults]="PHRMUserReportColumn" [grid-data]="PHRMUserReportData" [NepaliDateInGridParams]="NepaliDateInGridSettings" [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" (grid-onExport)="OnGridExport($event)" [grid-footer-content]="footerContent" [report-for]="'pharmacy'"> </danphe-grid>
+    <danphe-grid [grid-colDefaults]="PHRMUserReportColumn" [grid-data]="PHRMUserReportData" [NepaliDateInGridParams]="NepaliDateInGridSettings"
+                 [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" (grid-onExport)="OnGridExport($event)"
+                 [grid-footer-content]="footerContent" [report-for]="'pharmacy'"> </danphe-grid>
   </div>
 </div>
 <hr style="font-weight: 1px;">
@@ -245,4 +253,5 @@
 
 
 <!-- for header print -->
-<print-header style="display:none;padding:0px" id="headerForPrint" [unit-name]="'Department Of Pharmacy'" [show-pan-number]="headerDetailParam.showPANNo" [show-phone-number]="headerDetailParam.showPhoneNumber"></print-header>
+<print-header style="display:none;padding:0px" id="headerForPrint" [unit-name]="'Department Of Pharmacy'"
+              [show-pan-number]="headerDetailParam.showPANNo" [show-phone-number]="headerDetailParam.showPhoneNumber"></print-header>

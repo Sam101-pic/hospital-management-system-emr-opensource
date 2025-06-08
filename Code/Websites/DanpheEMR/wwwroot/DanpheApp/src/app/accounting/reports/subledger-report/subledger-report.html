@@ -15,48 +15,46 @@
     </h3>
   </div>
   <div class="row" style="background: #bcbcbc; padding-top: 0px;">
-    <div class="col-md-5 col-xs-12">
+    <div class="col-md-8 col-xs-12">
       <div class="form-group">
-        <label class="control-label" style="margin-left: 5px;">Select Fiscal Year <b class="color-red"> *</b>
+        <label class="control-label col-md-3">Select Fiscal Year <b class="color-red"> *</b>
           <b style="float:right;">:</b>
         </label>
-        <div>
+        <div class="col-md-9">
           <fiscal-year-calendar [showSingleDatePicker]="false" [showAllFiscalYear]="true"
                                 (fiscalYearDate)="selectDate($event)"></fiscal-year-calendar>
         </div>
       </div>
     </div>
-    <div class="col-md-7">
+    <div class="col-md-4">
+      <label class=" col-md-5" style="margin-top: 20px;">Account Section <b class="color-red"> *</b>:</label><br>
+      <div class="col-md-7">
+        <select [(ngModel)]="SelectedHospital" class="form-control" (ngModelChange)="AssignHospital($event)">
+          <option *ngFor="let h of HospitalList" value="{{h.HospitalId}}">{{ h.HospitalLongName }}</option>
+        </select>
+      </div>
+    </div>
+    <div class="col-md-12">
       <div class="col-md-5 col-xs-12" style="padding: 5px 5px !important;margin-top:8px">
-        <label class="control-label">Select Ledger :</label>
-        <br>
-        <div style="margin-top: 5px;">
-          <div>
-            <danphe-multiselect [ddl-data]="ledgerList" [placeholder-text]="'Ledger Name'" [value-property-name]="'LedgerId'"
-                                (selected-items-list)="OnLedgerSelected($event)" [display-property-name]="'LedgerName'"
-                                [single-selection]="false"></danphe-multiselect>
-          </div>
+        <label class="control-label col-md-5" style="margin-top: 12px;">Select Ledger :</label>
+        <div class="col-md-7" style="margin-top: 5px;">
+          <danphe-multiselect [ddl-data]="FilteredLedgerList" [placeholder-text]="'Ledger Name'" [value-property-name]="'LedgerId'"
+                              (selected-items-list)="OnLedgerSelected($event)" [display-property-name]="'LedgerName'"
+                              [single-selection]="false"></danphe-multiselect>
         </div>
       </div>
       <div class="col-md-5 col-xs-12" style="padding: 5px 5px !important;margin-top:8px">
-        <label class="control-label"> Select SubLedger <b class="color-red"> *</b>
+        <label class="control-label col-md-5" style="margin-top: 12px;"> Select SubLedger :<b class="color-red"> *</b>
         </label>
-        <div style="margin-top: 5px;">
-          <div>
-            <danphe-multiselect [ddl-data]="filteredSubLedgerList" [placeholder-text]="'SubLedger Name'" [value-property-name]="'SubLedgerId'"
-                                (selected-items-list)="OnSubLedgerSelected($event)" [display-property-name]="'SubLedgerName'"
-                                [single-selection]="false"></danphe-multiselect>
-          </div>
+        <div class="col-md-7" style="margin-top: 5px;">
+          <danphe-multiselect [ddl-data]="FilteredSubLedgerList" [placeholder-text]="'SubLedger Name'" [value-property-name]="'SubLedgerId'"
+                              (selected-items-list)="OnSubLedgerSelected($event)" [display-property-name]="'SubLedgerName'"
+                              [single-selection]="false"></danphe-multiselect>
         </div>
       </div>
-      <div class="col-md-2">
-        <div class="col-md-6 col-xs-12">
-          <div class="form-group mt10">
-            <br>
-            <button class="btn green btn-success" type="button" [disabled]="loading" (click)="GetSubLedgerReport()">
-              <i class="fa fa-refresh"></i> Load </button>
-          </div>
-        </div>
+      <div class="col-md-2" style="margin-top: 20px;">
+        <button class="btn green btn-success" type="button" [disabled]="loading" (click)="GetSubLedgerReport()">
+          <i class="fa fa-refresh"></i> Load </button>
       </div>
     </div>
   </div>
@@ -68,7 +66,7 @@
       <div class="col-md-12 col-xs-12">
         <table style="width:100% !important;" class="hidden-print">
           <tr>
-            <td style="text-align: left;"> Printed On: &nbsp; {{todayDate}}  {{todayDate | nepaliDate:'format':'YYYY-MM-DD'}}  </td>
+            <td style="text-align: left;"> Printed On: &nbsp; {{todayDate}} {{todayDate | nepaliDate:'format':'YYYY-MM-DD'}} </td>
             <td style="text-align: right;"> For the period (AD): &nbsp; {{ fromDate }} To {{ toDate }}
             </td>
           </tr>
@@ -145,7 +143,7 @@
                       </th>
                       <th>Voucher No.</th>
                       <th>Voucher Type</th>
-                      <th></th>
+                      <th>Description</th>
                       <th>Debit</th>
                       <th>Credit</th>
                       <th>Balance</th>
@@ -177,7 +175,7 @@
                         <td>{{txnItm.VoucherNumber}}</td>
                         <td>{{txnItm.VoucerTypeName}}</td>
                         <td class="tr">
-                          <!-- {{txnItm.Description}} -->
+                          {{txnItm.Description}}
                         </td>
                         <td>
                           <p>{{txnItm.DrAmount | Currency:'4'}}</p>
@@ -233,5 +231,5 @@
     </div>
   </div>
 </div>
-<transaction-view [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId">
+<transaction-view [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId" [HospitalId]="ActiveHospital">
 </transaction-view>

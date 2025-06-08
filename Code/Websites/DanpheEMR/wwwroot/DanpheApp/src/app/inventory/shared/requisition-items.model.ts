@@ -85,6 +85,7 @@ export class RequisitionItems {
   ReceivedDate: string = '';
   IsDirectDispatched: boolean = false;
   CostPrice: number = 0;
+  CancelledByName: string = null;
   constructor() {
 
     var _formBuilder = new FormBuilder();

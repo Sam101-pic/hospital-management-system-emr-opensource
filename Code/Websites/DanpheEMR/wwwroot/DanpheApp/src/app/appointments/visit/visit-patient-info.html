@@ -3,6 +3,22 @@
     <form [formGroup]="patient.PatientValidator " class="form-horizontal hm-form">
       <div>
         <div class="form-group">
+          <label class="control-label col-md-3">Salutation<b>:</b></label>
+          <div class="col-md-9">
+            <div class="col-wrapper">
+              <div class="col">
+                <div class="input-group">
+                  <select #id_visit_patient_info_salutation class="form-control" [(ngModel)]="patient.Salutation"
+                          (change)="SetFocusById('firstname')" formControlName="SalutationName">
+                    <option [ngValue]="null" disabled selected>-- Select --</option>
+                    <option *ngFor="let sal of SalutationList" [value]="sal.SalutationName">{{ sal.SalutationName }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
           <label class="control-label col-md-3">Name<sup>*</sup><b>:</b></label>
           <div class="col-md-9">
             <div class="col-wrapper">
@@ -27,9 +43,10 @@
               </div>
               <div class="col">
                 <input #lastname class="form-control" maxlength="30" type="text" formControlName="LastName"
-                       [(ngModel)]="patient.LastName"
+                       [(ngModel)]="patient.LastName" (input)="ClearEthnicGroup()"
+                       (keyup.enter)="patient.EthnicGroup ? SetFocusById('txtAgeInput') : SetFocusById('id_select_ethnic_group')"
                        required value="{{patient.LastName | CapitalFirstLetter}}" placeholder="Last Name"
-                       (keyup.enter)="SetFocusById('txtAgeInput')" (focusout)="onLastNameChanged($event)" />
+                       (focusout)="onLastNameChanged($event)" />
                 <span class="color-red font-sm" *ngIf="patient.IsDirty('LastName')"
                       [hidden]="patient.IsValidCheck('LastName','required')">
                   Last Name is required.</span> <span class="color-red font-sm" *ngIf="patient.IsDirty('LastName')"
@@ -75,7 +92,9 @@
             <div class="col-wrapper">
               <div class="col">
                 <select-ethnic-group [lastName]="patientLastName" (on-ethnic-group-change)="onEthnicGroupChangeCallBack($event)"
-                                     [patient-ethnic-group]="patientEthnicGroup" [disable-select]="disableSelectEthnicGroup">
+                                     [patient-ethnic-group]="patient.EthnicGroup ? patient.EthnicGroup : ''"
+                                     [disable-select]="disableSelectEthnicGroup"
+                                     (change)="SetFocusById('txtAgeInput')">
                 </select-ethnic-group>
               </div>
             </div>
@@ -132,12 +151,32 @@
           </div>
         </div>
         <div class="form-group">
+          <label class="control-label col-md-3">Marital Status <b>:</b> </label>
+          <div class="col-md-9">
+            <label style="margin-right: 30px; font-weight: 600; display: inline-block;">
+              <input style="zoom: 1.5; vertical-align: middle;" type="checkbox" [checked]="patient.MaritalStatus === MaritalStatus.Married"
+                     (change)="UpdateMaritalStatus(MaritalStatus.Married, $event.target.checked)" />
+              <span
+                    style="vertical-align: sub; margin-left: 5px;">Married
+              </span>
+            </label>
+
+            <label style="font-weight: 600; display: inline-block;">
+              <input style="zoom: 1.5; vertical-align: middle;" type="checkbox" [checked]="patient.MaritalStatus === MaritalStatus.UnMarried"
+                     (change)="UpdateMaritalStatus(MaritalStatus.UnMarried, $event.target.checked)" />
+              <span
+                    style="vertical-align: sub; margin-left: 5px;">UnMarried
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
           <label class="control-label col-md-3">Phone No. <sup *ngIf="isPhoneMandatory"> *</sup> <b>:</b> </label>
           <div class="col-md-9">
             <div class="col-wrapper">
               <div class="col">
                 <input id="txtPhone" class="form-control" maxlength="11" type="tel" [(ngModel)]="patient.PhoneNumber"
-                       formControlName="PhoneNumber" placeholder="Mobile Number *"
+                       formControlName="PhoneNumber" placeholder="Mobile Number"
                        (keyup.enter)="SetFocusById('ddlCountrySubdivision')" />
                 <span class="color-red font-sm" *ngIf="patient.IsDirty('PhoneNumber')"
                       [hidden]="patient.IsValidCheck('PhoneNumber','pattern')">Please enter valid contact number.</span> <span
@@ -145,12 +184,13 @@
                       [hidden]="patient.IsValidCheck('PhoneNumber','required')">Cell number is required.</span>
               </div>
               <div class="col">
-                <input class="form-control" maxlength="11" type="tel" [(ngModel)]="patient.LandLineNumber"
+                <input class="form-control" type="tel" [(ngModel)]="patient.LandLineNumber"
                        formControlName="LandLineNumber"
-                       placeholder="LandLine Number" />
+                       placeholder="Secondary Number" />
                 <span class="color-red font-sm" *ngIf="patient.IsDirty('LandLineNumber')"
-                      [hidden]="patient.IsValidCheck('LandLineNumber','pattern')">Please enter valid landline number.</span>
+                      [hidden]="patient.IsValidCheck('LandLineNumber','pattern')">Please enter a valid secondary number.</span>
               </div>
+
             </div>
           </div>
           <!-- <div class="col-md-3"></div> -->
@@ -244,74 +284,75 @@
         </div>
 
       </div>
+      <div class="form-horizontal hm-form">
+        <div class="form-group">
+          <label class="control-label col-md-3">Care of Person<b>:</b></label>
+          <div class="col-md-9">
+            <div class="col-wrapper">
+              <div class="col">
+                <input class="form-control" [(ngModel)]="patient.CareTaker.CareTakerName"
+                       placeholder="Care Taker Person" formControlName="CareTakerName"
+                       id="id_CareTaker_CareTakerName" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="control-label col-md-3">Relation With Patient<b>:</b></label>
+          <div class="col-md-9">
+            <div class="col-wrapper">
+              <div class="col">
+                <select id="id_CareTaker_RelationWithPatient" class="form-control"
+                        [(ngModel)]="patient.CareTaker.RelationWithPatient"
+
+                        formControlName="RelationWithPatient">
+                  <option value="Grandfather">Grandfather</option>
+                  <option value="Grandmother">Grandmother</option>
+                  <option value="Father">Father</option>
+                  <option value="Fatherinlaw">Father-in-law</option>
+                  <option value="Mother">Mother</option>
+                  <option value="Motherinlaw">Mother-in-law</option>
+                  <option value="Husband">Husband</option>
+                  <option value="Wife">Wife</option>
+                  <option value="Son">Son</option>
+                  <option value="Soninlaw">Son-in-law</option>
+                  <option value="Grandson">Grandson</option>
+                  <option value="Daughter">Daughter</option>
+                  <option value="Daughterinlaw">Daughter-in-law</option>
+                  <option value="Granddaughter">Granddaughter</option>
+                  <option value="Brother">Brother</option>
+                  <option value="Brotherinlaw">Brother-in-law</option>
+                  <option value="Sister">Sister</option>
+                  <option value="Sisterinlaw">Sister-in-law</option>
+                  <option value="Uncle">Uncle</option>
+                  <option value="Aunty">Aunty</option>
+                  <option value="Cousin">Cousin</option>
+                  <option value="Nephew">Nephew</option>
+                  <option value="Niece">Niece</option>
+                  <option value="friend">Friend</option>
+                  <option value="Others">Other</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="control-label col-md-3">Care of Person Contact<b>:</b></label>
+          <div class="col-md-9">
+            <div class="col-wrapper">
+              <div class="col">
+                <input class="form-control" type="number" [(ngModel)]="patient.CareTaker.CareTakerContact"
+                       placeholder="Care Takers Contact"
+                       formControlName="CareTakerContact"
+                       id="id_CareTaker_CareTakerContact" />
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </form>
-    <div class="form-horizontal hm-form">
-      <div class="form-group">
-        <label class="control-label col-md-3">Care of Person<b>:</b></label>
-        <div class="col-md-9">
-          <div class="col-wrapper">
-            <div class="col">
-              <input class="form-control" [(ngModel)]="patient.CareTaker.CareTakerName"
-                     placeholder="Care Taker Person"
-                     id="id_CareTaker_CareTakerName" />
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div class="form-group">
-        <label class="control-label col-md-3">Relation With Patient<b>:</b></label>
-        <div class="col-md-9">
-          <div class="col-wrapper">
-            <div class="col">
-              <select id="id_CareTaker_RelationWithPatient" class="form-control"
-                      [(ngModel)]="patient.CareTaker.RelationWithPatient"
-
-                      [ngModelOptions]="{standalone: true}">
-                <option value="Grandfather">Grandfather</option>
-                <option value="Grandmother">Grandmother</option>
-                <option value="Father">Father</option>
-                <option value="Fatherinlaw">Father-in-law</option>
-                <option value="Mother">Mother</option>
-                <option value="Motherinlaw">Mother-in-law</option>
-                <option value="Husband">Husband</option>
-                <option value="Wife">Wife</option>
-                <option value="Son">Son</option>
-                <option value="Soninlaw">Son-in-law</option>
-                <option value="Grandson">Grandson</option>
-                <option value="Daughter">Daughter</option>
-                <option value="Daughterinlaw">Daughter-in-law</option>
-                <option value="Granddaughter">Granddaughter</option>
-                <option value="Brother">Brother</option>
-                <option value="Brotherinlaw">Brother-in-law</option>
-                <option value="Sister">Sister</option>
-                <option value="Sisterinlaw">Sister-in-law</option>
-                <option value="Uncle">Uncle</option>
-                <option value="Aunty">Aunty</option>
-                <option value="Cousin">Cousin</option>
-                <option value="Nephew">Nephew</option>
-                <option value="Niece">Niece</option>
-                <option value="friend">Friend</option>
-                <option value="Others">Other</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="control-label col-md-3">Care of Person Contact<b>:</b></label>
-        <div class="col-md-9">
-          <div class="col-wrapper">
-            <div class="col">
-              <input class="form-control" type="number" [(ngModel)]="patient.CareTaker.CareTakerContact"
-                     placeholder="Care Takers Contact"
-
-                     id="id_CareTaker_CareTakerContact" />
-
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </div>

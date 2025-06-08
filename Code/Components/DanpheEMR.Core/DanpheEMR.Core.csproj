@@ -333,6 +333,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Caching.cs" />
+    <Compile Include="Caching\CacheService.cs" />
+    <Compile Include="Caching\ICacheService.cs" />
     <Compile Include="DynamicTemplate\FieldMasterModel.cs" />
     <Compile Include="DynamicTemplate\TemplateFieldMappingModel.cs" />
     <Compile Include="DynamicTemplate\TemplateModel.cs" />

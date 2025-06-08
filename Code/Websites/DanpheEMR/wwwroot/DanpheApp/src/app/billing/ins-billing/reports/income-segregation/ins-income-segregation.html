@@ -26,7 +26,8 @@
     </div>
   </div>-->
           <div class="col-md-7 col-xs-12">
-            <from-to-date-select (on-change)="OnFromToDateChange($event)">
+            <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                                 [date-settings-name]="'billing-reports'">
             </from-to-date-select>
           </div>
           <div class="col-md-2 col-xs-12">
@@ -41,8 +42,8 @@
   <div class="row">
     <div class="col-lg-12 col-sm-12" *ngIf="IncomeSegregationData.length>0">
       <danphe-grid [grid-colDefaults]="IncomeSegregationColumns"
-                 [grid-data]="IncomeSegregationData"
-                 [grid-exportOptions]="gridExportOptions" [grid-showExportNew]="true" (grid-onExport)="OnGridExport($event)"> </danphe-grid>
+                   [grid-data]="IncomeSegregationData"
+                   [grid-exportOptions]="gridExportOptions" [grid-showExportNew]="true" (grid-onExport)="OnGridExport($event)"> </danphe-grid>
       <div class="table-responsive">
         <table class="table-hover tblReport" border="1" width="100%" style="background-color:initial;margin-top:10px">
           <tbody>
@@ -155,7 +156,8 @@
               Credit Receivables: <br />
               Advance Received:<br />
               Advance Settled:<br />
-              CashCollection: </div>
+              CashCollection:
+            </div>
             <div class="col-md-5  table-hover "> <b></b><br />
               <b>{{tot_Price}}</b> <br />
               <b>{{tot_DiscntAmt}}</b> <br />
@@ -168,7 +170,8 @@
               <b>{{tot_CreditSales}}</b><br />
               <b>{{tot_AdvanceReceived}} </b><br />
               <b>{{tot_AdvanceSettlement}}</b><br />
-              <b>{{tot_NetCashCollection}}</b> </div>
+              <b>{{tot_NetCashCollection}}</b>
+            </div>
           </div>
         </div>
       </div>

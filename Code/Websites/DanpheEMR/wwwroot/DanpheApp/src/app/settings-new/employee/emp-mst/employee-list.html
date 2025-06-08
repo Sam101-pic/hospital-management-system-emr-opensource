@@ -11,7 +11,8 @@
 <div *ngIf="showGrid" class="row">
     <div class="col-md-12 col-xs-12 col-sm-12">
         <danphe-grid [grid-colDefaults]="employeeGridColumns" [grid-data]="employeeList" (grid-actions)="EmployeeGridActions($event)"
-                     [show-print-button]="false">
+                     [grid-showExport]="true" [grid-exportOptions]="gridExportOptions"
+                     [report-header]="'Employee List'" [show-print-button]="true" [report-for]="'common'">
         </danphe-grid>
     </div>
 </div>

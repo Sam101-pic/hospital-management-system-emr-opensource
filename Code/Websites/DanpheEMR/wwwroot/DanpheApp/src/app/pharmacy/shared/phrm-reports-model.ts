@@ -1,11 +1,3 @@
-import {
-    NgForm,
-    FormGroup,
-    FormControl,
-    Validators,
-    FormBuilder,
-    ReactiveFormsModule
-} from '@angular/forms'
 
 export class PHRMReportsModel {
 
@@ -13,9 +5,11 @@ export class PHRMReportsModel {
     public ToDate: string = null;
     public Status: string = null;
     public FiscalYearId: number = 0;
-    public CounterId: string = "";
-    public CreatedBy: string = "";
+    public CounterId: number = null;
+    public EmployeeId: number = null;
     public StoreId: number = null;
+    public GenericId: number = null;
+    public ItemId: number = null;
     /// public CompanyValidator: FormGroup = null;
 
     constructor() {

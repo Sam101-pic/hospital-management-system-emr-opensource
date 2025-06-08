@@ -6,7 +6,9 @@ import { SecurityService } from '../../../security/shared/security.service';
 //Parse, validate, manipulate, and display dates and times in JS.
 import * as moment from 'moment/moment';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { AccountingService } from "../../shared/accounting.service";
+import { ChartofAccountModel } from "../shared/chart-of-account.model";
 
 
 @Component({
@@ -23,9 +25,10 @@ export class LedgerGroupAddComponent {
 
     public CurrentLedgerGroup: ledgerGroupModel;
     public primaryGroupList: any[];
-    public coaList: any[];
-    public allcoaList: any[];
+    public coaList: Array<ChartofAccountModel> = new Array<ChartofAccountModel>();
+    public allcoaList: Array<ChartofAccountModel> = new Array<ChartofAccountModel>();
     loading: boolean = false;
+    @Input()
     update: boolean = false;
     public selLedgerGroup: any;
     public completeledgerGroupList: Array<ledgerGroupModel> = new Array<ledgerGroupModel>();
@@ -55,12 +58,16 @@ export class LedgerGroupAddComponent {
 
             let primaryGroupId = this.primaryGroupList.filter(p => p.PrimaryGroupName == this.CurrentLedgerGroup.PrimaryGroup)[0].PrimaryGroupId;
             this.coaList = this.allcoaList.filter(c => c.PrimaryGroupId == primaryGroupId);
-            this.CurrentLedgerGroup.COAId = (this.selectedLedgerGroup.COA != null) ? this.coaList.filter(c => c.ChartOfAccountName == this.selectedLedgerGroup.COA)[0].ChartOfAccountId : 0;
+            this.CurrentLedgerGroup.COAId = 0;
+            if (this.selectedLedgerGroup.COA != null) {
+                let coa = this.coaList.find(c => c.ChartOfAccountName == this.selectedLedgerGroup.COA);
+                if (coa) {
+                    this.CurrentLedgerGroup.COAId = coa.ChartOfAccountId;
+                }
+            }
             this.ledgerGroupList = this.ledgerGroupList.filter(ledger => (ledger.LedgerGroupId != this.selectedLedgerGroup.LedgerGroupId));
-            this.update = true;
         }
         else {
-            this.update = false;
             this.CurrentLedgerGroup = new ledgerGroupModel();
             this.CurrentLedgerGroup.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
         }
@@ -90,12 +97,12 @@ export class LedgerGroupAddComponent {
             this.CurrentLedgerGroup.LedgerGroupValidator.controls[i].updateValueAndValidity();
         }
         if (this.CurrentLedgerGroup.IsValidCheck(undefined, undefined)) {
-            this.CurrentLedgerGroup.CreatedOn = moment().format("YYYY-MM-DD");
+            this.CurrentLedgerGroup.CreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
             this.accountingSettingsBLService.AddLedgersGroup(this.CurrentLedgerGroup)
                 .subscribe(
                     res => {
-                        if (res.Status == "OK") {
-                            this.msgBoxServ.showMessage("success", ["Ledger Group Added"]);
+                        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Ledger Group Added"]);
                             //this.CurrentLedgerGroup
                             this.CallBackAddLedgerGroup(res);
                             this.CurrentLedgerGroup = new ledgerGroupModel();
@@ -103,7 +110,7 @@ export class LedgerGroupAddComponent {
                             this.selLedgerGroup = null;
                         }
                         else {
-                            this.msgBoxServ.showMessage("error", ["Duplicate ledger not allowed"]);
+                            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Duplicate ledger not allowed"]);
                             this.loading = false;
                         }
                     },
@@ -126,31 +133,32 @@ export class LedgerGroupAddComponent {
             this.CurrentLedgerGroup.LedgerGroupValidator.controls[i].updateValueAndValidity();
         }
         if (this.CurrentLedgerGroup.IsValidCheck(undefined, undefined)) {
-            this.CurrentLedgerGroup.ModifiedBy = this.securityService.GetLoggedInUser().UserId;
-            this.accountingSettingsBLService.UpdateLedgersGroup(this.CurrentLedgerGroup)
-                .subscribe(
-                    res => {
-                        if (res.Status == "OK") {
-                            this.msgBoxServ.showMessage("success", ["Ledger Group Updated"]);
-                            //this.CurrentLedgerGroup
-                            // remove the element which was edited
-                            let index = this.accountingService.accCacheData.Ledgers.findIndex(x => x.LedgerGroupId == this.CurrentLedgerGroup.LedgerGroupId)//mumbai-team-june2021-danphe-accounting-cache-change
-                            this.accountingService.accCacheData.LedgerGroups.splice(index, 1); //mumbai-team-june2021-danphe-accounting-cache-change
-                            this.CallBackAddLedgerGroup(res);
-                            this.CurrentLedgerGroup = new ledgerGroupModel();
-                            this.loading = false;
-                            this.selLedgerGroup = null;
-                        }
-                        else {
-                            this.msgBoxServ.showMessage("error", ["Duplicate ledger not allowed"]);
-                            this.loading = false;
-                        }
-                    },
-                    err => {
-                        this.logError(err);
-                        this.loading = false;
-                    });
+            const loggedInUserId = this.securityService.GetLoggedInUser().UserId;
+            this.CurrentLedgerGroup.ModifiedBy = loggedInUserId;
+
+            this.accountingSettingsBLService.UpdateLedgersGroup(this.CurrentLedgerGroup).subscribe(
+                res => {
+                    this.loading = false;
+                    if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Ledger Group Updated"]);
+
+                        this.CallBackAddLedgerGroup(res);
+                        this.CurrentLedgerGroup = new ledgerGroupModel();
+                        this.selLedgerGroup = null;
+                    } else if (res.Status === ENUM_DanpheHTTPResponses.Failed) {
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Failed to update ledgergroup"]);
+                    } else {
+                        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Duplicate ledger not allowed"]);
+                    }
+                },
+                err => {
+                    this.loading = false;
+                    this.logError(err);
+                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, err.ErrorMessage);
+                }
+            );
         }
+
     }
     Close() {
         this.selectedLedgerGroup = null;
@@ -163,17 +171,19 @@ export class LedgerGroupAddComponent {
 
     //after adding Ledger is succesfully added  then this function is called.
     CallBackAddLedgerGroup(res) {
-        if (res.Status == "OK" && res.Results != null) {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results != null) {
             let currentLedger = new ledgerGroupModel();
             let tempLedgerGroupObj = res.Results;//mumbai-team-june2021-danphe-accounting-cache-change
             currentLedger = Object.assign(currentLedger, res.Results);//mumbai-team-june2021-danphe-accounting-cache-change
             tempLedgerGroupObj.PrimaryGroup = currentLedger.PrimaryGroup = this.CurrentLedgerGroup.PrimaryGroup;//mumbai-team-june2021-danphe-accounting-cache-change
             tempLedgerGroupObj.COA = currentLedger.COA = this.CurrentLedgerGroup.COA;//mumbai-team-june2021-danphe-accounting-cache-change
-            this.accountingService.accCacheData.LedgerGroups.push(tempLedgerGroupObj);//mumbai-team-june2021-danphe-accounting-cache-change
+            const index = this.accountingService.accCacheData.LedgerGroups.findIndex(x => x.LedgerGroupId == this.CurrentLedgerGroup.LedgerGroupId);
+            this.accountingService.accCacheData.LedgerGroups.splice(index, 1, currentLedger);
+            // this.accountingService.accCacheData.LedgerGroups.push(tempLedgerGroupObj);//mumbai-team-june2021-danphe-accounting-cache-change
             this.callbackAdd.emit({ currentLedger });
         }
         else {
-            this.msgBoxServ.showMessage("error", ['Check log for details']);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Check log for details']);
             console.log(res.ErrorMessage);
         }
 

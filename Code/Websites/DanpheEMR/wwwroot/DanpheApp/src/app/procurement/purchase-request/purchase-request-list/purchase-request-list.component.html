@@ -1,5 +1,4 @@
 <style>
-
   .bg-modal {
     background-color: rgba(0, 0, 0, 0.8);
     width: 100%;
@@ -60,7 +59,8 @@
                  [rangeType]="dateRange"
                  (onDateChange)="onDateChange($event)"
                  [show-CustomDate]="true"
-                 [NepaliDateInGridParams]="NepaliDateInGridSettings">
+                 [NepaliDateInGridParams]="NepaliDateInGridSettings"
+                 [date-settings-name]="'common-range-with-today'">
     </danphe-grid>
   </div>
 </div>

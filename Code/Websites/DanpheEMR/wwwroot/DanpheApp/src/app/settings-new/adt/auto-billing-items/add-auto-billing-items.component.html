@@ -138,6 +138,21 @@
                 </div>
               </div>
 
+              <div class="form-group">
+                <label class="control-label col-md-4">Allow Auto Cancellation? <b>:</b> </label>
+                <div class="col-md-8">
+                  <div class="input-group">
+                    <div class="icheck-inline">
+                      <label class="mt-checkbox mt-checkbox-outline">
+                        <input id="id_allow_auto_cancellation" name="AllowAutoCancellation" type="checkbox" value=""
+                               [(ngModel)]="AutoBillingItems.AllowAutoCancellation"
+                               [ngModelOptions]="{standalone: true}">
+                        <span></span> </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </form>
           <div class="panel-footer" style="text-align: right;">

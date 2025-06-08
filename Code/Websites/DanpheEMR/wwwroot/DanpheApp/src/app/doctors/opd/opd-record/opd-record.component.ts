@@ -1,10 +1,11 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
-import { FormGroup, FormBuilder, Validators, FormControl } from '@angular/forms';
+import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
+import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import * as moment from 'moment';
 import { ADT_DLService } from '../../../adt/shared/adt.dl.service';
 import { Visit } from '../../../appointments/shared/visit.model';
 import { VisitService } from '../../../appointments/shared/visit.service';
+import { ClinicalPatientService } from '../../../clinical-new/shared/clinical-patient.service';
 import { Patient } from '../../../patients/shared/patient.model';
 import { PatientService } from '../../../patients/shared/patient.service';
 import { SecurityService } from '../../../security/shared/security.service';
@@ -76,7 +77,8 @@ export class OpdRecordComponent implements OnDestroy {
     public routeFromService: RouteFromService,
     public changeDetector: ChangeDetectorRef,
     public securityService: SecurityService,
-    public admissionBLService: ADT_DLService,) {
+    public admissionBLService: ADT_DLService,
+    private _selectedPatientService: ClinicalPatientService) {
     this._patientservice = _patientService;
     this._visitService = _visitServ;
     this._callbackService = _callbackService;
@@ -219,6 +221,24 @@ export class OpdRecordComponent implements OnDestroy {
     this.router.navigate(['/Doctors/PatientOverviewMain/PatientOverview']);
   }
 
+
+  RouteToNewPatientOverview(selectedVisit: Visit) {
+    let currPatient = this._selectedPatientService.GetGlobal();
+    currPatient.PatientId = selectedVisit.Patient.PatientId;
+    currPatient.PatientCode = selectedVisit.Patient.PatientCode;
+    currPatient.Address = selectedVisit.Patient.Address;
+    currPatient.PhoneNumber = selectedVisit.Patient.PhoneNumber;
+    currPatient.PatientVisitId = selectedVisit.PatientVisitId;
+    currPatient.FirstName = selectedVisit.Patient.FirstName;
+    currPatient.LastName = selectedVisit.Patient.LastName;
+    currPatient.Gender = selectedVisit.Patient.Gender;
+    currPatient.DateOfBirth = selectedVisit.Patient.DateOfBirth;
+    currPatient.Age = selectedVisit.Patient.Age;
+    currPatient.Name = selectedVisit.Patient.ShortName;
+    currPatient.VisitType = selectedVisit.VisitType.toLowerCase();
+    this._selectedPatientService.SelectedPatient = currPatient;
+    this.router.navigate(['/Doctors/Clinical-Overview']);
+  }
   //check the assignment logic below properly... 
   SelectVisit(selectedVisit: Visit) {
     let currPatient = this._patientservice.getGlobal();
@@ -319,7 +339,7 @@ export class OpdRecordComponent implements OnDestroy {
     switch ($event.Action) {
       case "preview":
         {
-          this.RouteToPatientOverview($event.Data);
+          this.RouteToNewPatientOverview($event.Data);
         }
         break;
       case "addfavorite":
@@ -328,6 +348,24 @@ export class OpdRecordComponent implements OnDestroy {
           let patientId = $event.Data.PatientId;
           let itemId = JSON.stringify($event.Data.PatientId);
           let preferenceType = "Patient";
+
+          this.OPDPatientGridData.map((a) => {
+            if (a.PatientId === patientId) {
+              a.IsFavorite = true;
+            }
+          });
+          this.FilteredOPDPatientGridData.map((a) => {
+            if (a.PatientId == patientId) {
+              a.IsFavorite = true;
+            }
+          });
+          this.FavoritePatients = this.FavoritePatients.concat(
+            this.OPDPatientGridData.filter(
+              (a) => a.PatientId == patientId
+            )
+          );
+          this.changeDetector.detectChanges();
+
           this.admissionBLService
             .AddToFavorites(itemId, preferenceType, patientId)
             .subscribe((res) => {
@@ -363,6 +401,24 @@ export class OpdRecordComponent implements OnDestroy {
         let patientId = $event.Data.PatientId;
         let itemId = JSON.stringify($event.Data.PatientId);
         let preferenceType = "Patient";
+
+        this.OPDPatientGridData.map((a) => {
+          if (a.PatientId === patientId) {
+            a.IsFavorite = false;
+          }
+        });
+
+        this.FilteredOPDPatientGridData.map((a) => {
+          if (a.PatientId == patientId) {
+            a.IsFavorite = false;
+          }
+        });
+
+        this.FavoritePatients = this.FavoritePatients.filter(
+          (a) => a.PatientId != patientId
+        );
+
+        this.changeDetector.detectChanges();
         this.admissionBLService
           .RemoveFromFavorites(itemId, preferenceType)
           .subscribe((res) => {
@@ -401,6 +457,23 @@ export class OpdRecordComponent implements OnDestroy {
           let patientId = $event.Data.PatientId;
           let itemId = JSON.stringify($event.Data.PatientId);
           let preferenceType = "FollowUp";
+
+          this.OPDPatientGridData.map((a) => {
+            if (a.PatientId == patientId) {
+              a.IsFollowUp = true;
+            }
+          });
+          this.FilteredOPDPatientGridData.map((a) => {
+            if (a.PatientId == patientId) {
+              a.IsFollowUp = true;
+            }
+          });
+          this.FollowUpPatients = this.FollowUpPatients.concat(
+            this.OPDPatientGridData.filter(
+              (a) => a.PatientId == patientId
+            )
+          );
+          this.changeDetector.detectChanges();
           this.admissionBLService
             .AddToFavorites(itemId, preferenceType, patientId)
             .subscribe((res) => {
@@ -436,6 +509,21 @@ export class OpdRecordComponent implements OnDestroy {
         let patientId = $event.Data.PatientId;
         let itemId = JSON.stringify($event.Data.PatientId);
         let preferenceType = "FollowUp";
+
+        this.OPDPatientGridData.map((a) => {
+          if (a.PatientId == patientId) {
+            a.IsFollowUp = false;
+          }
+        });
+        this.FilteredOPDPatientGridData.map((a) => {
+          if (a.PatientId == patientId) {
+            a.IsFollowUp = false;
+          }
+        });
+        this.FollowUpPatients = this.FollowUpPatients.filter(
+          (a) => a.PatientId != patientId
+        );
+        this.changeDetector.detectChanges();
         this.admissionBLService
           .RemoveFromFavorites(itemId, preferenceType)
           .subscribe((res) => {

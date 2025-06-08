@@ -87,6 +87,9 @@ export class BIL_Print_SettlementSlip_Component {
           this.DepositInfo = this.settlementDetails.DepositInfo;
           this.localDate = this.GetLocalDate(this.SettlementInfo.SettlementDate);
           this.CalculateTotals();
+          if (this.PatientInfo) {
+            this.PatientInfo.Age = this.coreService.CalculateAge(this.PatientInfo.DateOfBirth);
+          }
 
         }
       )

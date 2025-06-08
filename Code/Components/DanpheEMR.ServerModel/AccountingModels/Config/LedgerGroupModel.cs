@@ -40,5 +40,7 @@ namespace DanpheEMR.ServerModel
         //sud-nagesh: 20June'20-- for Acc-Hospital Separation.
         public int HospitalId { get; set; }
         public int COAId { get; set; }
+        public bool IsSystemDefault { get; set; }
+
     }
 }

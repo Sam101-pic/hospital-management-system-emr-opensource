@@ -15,24 +15,16 @@ import { EmployeeBLService } from '../shared/employee.bl.service';
 export class ChangePasswordComponent {
     public http: HttpClient;
     public needsPasswordUpdate: boolean = false;
-    public DemoVersionEnabled: boolean = false;
     public currentPassModel: ChangePasswordModel = new ChangePasswordModel();
     constructor(public securityService: SecurityService, _http: HttpClient
         , public employeeBLService: EmployeeBLService
         , public msgBoxServ: MessageboxService
-        , public router: Router
-        , public coreservice: CoreService) {
+        , public router: Router,
+        public coreservice: CoreService) {
         this.http = _http;
         this.currentPassModel.UserName = this.securityService.GetLoggedInUser().UserName;
         this.needsPasswordUpdate = this.securityService.GetLoggedInUser().NeedsPasswordUpdate;
-        const DemoParameter = coreservice.Parameters.find(x => x.ParameterGroupName == "Demo" && x.ParameterName == "DemoVersion");
-        if (DemoParameter) {
-            const parsedParameter = JSON.parse(DemoParameter.ParameterValue);
-            if (typeof parsedParameter.IsDemoVersion === 'boolean') {
-                this.DemoVersionEnabled = parsedParameter.IsDemoVersion;
-            }
 
-        }
 
     }
 
@@ -76,10 +68,24 @@ export class ChangePasswordComponent {
 
     ///this method is to clear the property during cancel click and during route after success and Error
     ClearChangePasswordData() {
-        this.currentPassModel.Password = "";
-        this.currentPassModel.NewPassword = "";
-        this.currentPassModel.ConfirmPassword = "";
+
+        // Resetting the form controls to ensure no validation errors remain
+        const passwordControl = this.currentPassModel.ChangePasswordValidator.controls['Password'];
+        const newPasswordControl = this.currentPassModel.ChangePasswordValidator.controls['NewPassword'];
+        const confirmPasswordControl = this.currentPassModel.ChangePasswordValidator.controls['ConfirmPassword'];
+
+        // Clearing values for each control
+        passwordControl.setValue('');
+        newPasswordControl.setValue('');
+        confirmPasswordControl.setValue('');
+
+        // Clearing any validation errors
+        passwordControl.setErrors(null);
+        newPasswordControl.setErrors(null);
+        confirmPasswordControl.setErrors(null);
+
     }
+
 
 
 

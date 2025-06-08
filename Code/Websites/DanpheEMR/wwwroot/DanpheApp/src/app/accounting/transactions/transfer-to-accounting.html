@@ -80,7 +80,8 @@
       </div> -->
       <div class="col-md-2 col-xs-12">
         <div class="form-group no-margin">
-          <button class="btn blue primary-btn mt25" type="button" (click)="LoadTxnDates()" title="Load records of selected date">
+          <button class="btn green primary-btn mt25" type="button" [disabled]="loading" (click)="LoadTxnDates()"
+                  title="Load records of selected date">
             <i class="fa fa-refresh"></i> Load </button>
         </div>
       </div>
@@ -112,8 +113,8 @@
                            class="fa fa-save"></i> POST
                       </button> -->
 
-                      <button class="btn-primary btn" style="height: 25px;font-size: smaller;" type="button" (click)="Preview(i)"
-                              title="save selected to accounting"> <i
+                      <button class="green primary-btn btn" style="height: 25px;font-size: smaller;" type="button" (click)="Preview(i)"
+                              title="preview selected transaction"> <i
                            class="fa fa-save"></i> Preview
                       </button>
                     </td>

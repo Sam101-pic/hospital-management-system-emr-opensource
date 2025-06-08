@@ -3,11 +3,13 @@ import { Router } from "@angular/router";
 import * as moment from "moment";
 import { CoreService } from "../../../core/shared/core.service";
 import { Employee } from "../../../employee/shared/employee.model";
+import { LabTest } from "../../../labs/shared/lab-test.model";
+import { ImagingItem } from "../../../radiology/shared/imaging-item.model";
 import { SecurityService } from '../../../security/shared/security.service';
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { DanpheCache, MasterType } from "../../../shared/danphe-cache-service-utility/cache-services";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_IntegrationNames, ENUM_MessageBox_Status, ENUM_OTCategories } from "../../../shared/shared-enums";
 import { IntegrationName } from "../../shared/integration-name.model";
 import { ServiceDepartment } from '../../shared/service-department.model';
 import { SettingsService } from "../../shared/settings-service";
@@ -30,6 +32,8 @@ export class BillServiceItemComponent {
   public ServiceCategoryList: Array<ServiceCategories> = new Array<ServiceCategories>();
   @Input('integration-name-list')
   public integrationNameList: Array<IntegrationName> = new Array<IntegrationName>();
+  @Input("service-items")
+  public ServiceItems = new Array<BillServiceItemModel>();
   public allEmployeeList: Array<Employee> = [];
   public docterList: Array<Employee> = [];
   public defaultDoctorList: string;
@@ -43,6 +47,15 @@ export class BillServiceItemComponent {
   @Input('update') update: boolean = false;
   public selectedIntegration: IntegrationName;
   public tempData: { tempItemName: string, tempItemCode: string } = { tempItemName: '', tempItemCode: '' };
+  OTCategories: { CategoryName: string, CategoryValue: string }[] = [];
+  SelectedOTCategory: string = '';
+  LabTests = new Array<LabTest>();
+  ImagingMasterItems = new Array<ImagingItem>();
+  ShowLabTestSelection: boolean = false;
+  ShowImagingItemSelection: boolean = false;
+  SelectedLabTest: LabTest;
+  SelectedImagingItem: ImagingItem;
+
 
   constructor(
     public settingsBLService: SettingsBLService,
@@ -52,12 +65,19 @@ export class BillServiceItemComponent {
     public router: Router,
     public coreService: CoreService, public settingsService: SettingsService) {
     this.GetSrvDeptList();
-    this.GetPriceGategories();
+    this.GetPriceCategories();
+    this.GetLabTests();
+    this.GetImagingMasterItems();
 
     this.allEmployeeList = DanpheCache.GetData(MasterType.Employee, null);
-    this.docterList = this.allEmployeeList.filter(a => a.IsAppointmentApplicable == true);
+    this.docterList = this.allEmployeeList.filter(a => a.IsAppointmentApplicable == true && a.IsActive);
     this.GoToNextInput("ServiceDepartmentName");
 
+    this.OTCategories = Object.keys(ENUM_OTCategories)
+      .map(key => ({
+        CategoryName: key,
+        CategoryValue: ENUM_OTCategories[key as keyof typeof ENUM_OTCategories]
+      }));
 
 
   }
@@ -70,7 +90,7 @@ export class BillServiceItemComponent {
       this.CurrentBillingItem = Object.assign(this.CurrentBillingItem, this.selectedItem);
       this.selectedIntegration = this.integrationNameList.find(i => i.IntegrationName === this.selectedItem.IntegrationName);
       this.selectedServiceCategory = this.ServiceCategoryList.find(c => c.ServiceCategoryId === this.selectedItem.ServiceCategoryId);
-
+      this.SelectedOTCategory = this.selectedItem.OTCategory ? this.selectedItem.OTCategory : "";
 
       if (this.CurrentBillingItem.DefaultDoctorList && this.CurrentBillingItem.DefaultDoctorList.length) {
         this.AssignPreSelectedDocter();
@@ -92,19 +112,34 @@ export class BillServiceItemComponent {
 
   }
 
-  public GetPriceGategories() {
-    let priceCategory = this.coreService.Masters.PriceCategories;
-    let activePriceCategories = priceCategory.filter(a => a.IsActive === true);
-    for (let index = 0; index < activePriceCategories.length; index++) {
-      let temp = new BillServiceItemsPriceCategoryMap();
-      temp.PriceCategoryId = activePriceCategories[index].PriceCategoryId;
-      temp.PriceCategoryName = activePriceCategories[index].PriceCategoryName;
-      temp.ItemLegalCode = '';
-      temp.Price = 0;
-      temp.ItemLegalName = '';
-      this.BillItemsPriceCatMap.push(temp);
-    }
+
+  public GetPriceCategories() {
+    this.settingsBLService.GetPriceCategories().subscribe(
+      (res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          let priceCategories = res.Results;
+          this.coreService.Masters.PriceCategories = priceCategories;
+          let activePriceCategories = priceCategories.filter(a => a.IsActive === true);
+          this.BillItemsPriceCatMap = [];
+          for (let index = 0; index < activePriceCategories.length; index++) {
+            let temp = new BillServiceItemsPriceCategoryMap();
+            temp.PriceCategoryId = activePriceCategories[index].PriceCategoryId;
+            temp.PriceCategoryName = activePriceCategories[index].PriceCategoryName;
+            temp.ItemLegalCode = '';
+            temp.Price = 0;
+            temp.ItemLegalName = '';
+            this.BillItemsPriceCatMap.push(temp);
+          }
+        } else {
+          this.msgBoxServ.showMessage('Failed', ['Failed to get price categories.']);
+          console.error(res.ErrorMessage);
+        }
+      }, err => {
+        this.msgBoxServ.showMessage('Error', ['Error fetching price categories.']);
+        console.error(err);
+      });
   }
+
 
 
   GetBilCfgItemsVsPriceCategory(ServiceItemId: number) {
@@ -118,8 +153,10 @@ export class BillServiceItemComponent {
               let matchedData = billItemsPriceCategoryMapFromServer.find(b => b.PriceCategoryId == a.PriceCategoryId);
               if (matchedData) {
                 a.PriceCategoryServiceItemMapId = matchedData.PriceCategoryServiceItemMapId;
+                if (matchedData.IsActive === true) {
+                  a.IsSelected = true;
+                }
                 a.ServiceItemId = matchedData.ServiceItemId;
-                a.IsSelected = true;
                 a.IsDiscountApplicable = matchedData.IsDiscountApplicable;
                 a.ItemLegalCode = matchedData.ItemLegalCode;
                 a.ItemLegalName = matchedData.ItemLegalName;
@@ -127,8 +164,10 @@ export class BillServiceItemComponent {
                 a.HasAdditionalBillingItems = matchedData.HasAdditionalBillingItems;
                 a.IsIncentiveApplicable = matchedData.IsIncentiveApplicable;
                 a.IsPriceChangeAllowed = matchedData.IsPriceChangeAllowed;
-                a.IsZeroPriceAllowed = matchedData.IsPriceChangeAllowed;
-
+                a.IsZeroPriceAllowed = matchedData.IsZeroPriceAllowed;
+                a.IsCappingEnabled = matchedData.IsCappingEnabled;
+                a.CappingLimitDays = matchedData.CappingLimitDays;
+                a.CappingQuantity = matchedData.CappingQuantity;
               }
             });
           } else {
@@ -143,21 +182,31 @@ export class BillServiceItemComponent {
   }
 
   AssignSelectedDepartment() {
-    if (this.selectedSrvDept) {
+    if (this.selectedSrvDept && !this.selectedItem) {
       const selectedServiceDept = this.srvdeptList.find(dept => dept.ServiceDepartmentName === this.selectedSrvDept.ServiceDepartmentName);
 
       if (selectedServiceDept) {
         this.CurrentBillingItem.BillingItemValidator.get('IntegrationName').setValue(selectedServiceDept.IntegrationName);
         let selIntegration = this.integrationNameList.find(i => i.IntegrationName === selectedServiceDept.IntegrationName);
         if (selIntegration) {
-          this.CurrentBillingItem.IntegrationItemId = selIntegration.IntegrationNameID;
+          this.CurrentBillingItem.IntegrationItemId = 0;//selIntegration.IntegrationNameID;
           this.CurrentBillingItem.IntegrationName = selIntegration.IntegrationName;
+          if (selIntegration.IntegrationName.toLowerCase() === ENUM_IntegrationNames.LAB.toLowerCase()) {
+            this.ShowLabTestSelection = true;
+            this.ShowImagingItemSelection = false;
+          } else if (selIntegration.IntegrationName.toLowerCase() === ENUM_IntegrationNames.Radiology.toLowerCase()) {
+            this.ShowLabTestSelection = false;
+            this.ShowImagingItemSelection = true;
+          } else {
+            this.ShowLabTestSelection = false;
+            this.ShowImagingItemSelection = false;
+          }
         }
       }
       if (selectedServiceDept && selectedServiceDept.IntegrationName == null) {
         let selIntegration = this.integrationNameList.find(i => i.IntegrationName === 'None');
         if (selIntegration) {
-          this.CurrentBillingItem.IntegrationItemId = selIntegration.IntegrationNameID;
+          this.CurrentBillingItem.IntegrationItemId = 0;//selIntegration.IntegrationNameID;
           this.CurrentBillingItem.IntegrationName = selIntegration.IntegrationName;
           this.CurrentBillingItem.BillingItemValidator.get('IntegrationName').setValue(selIntegration.IntegrationName);
         }
@@ -210,8 +259,23 @@ export class BillServiceItemComponent {
 
   Add() {
     this.CurrentBillingItem.BilCfgItemsVsPriceCategoryMap = this.BillItemsPriceCatMap.filter(a => a.IsSelected === true);
+    //check if itemCode is same with already existing items.
+    if (this.ServiceItems && this.ServiceItems.length && !this.update) {
+      const isAlreadyExists = this.ServiceItems.some(s => s.ItemCode === this.CurrentBillingItem.ItemCode);
+      if (isAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add ServiceItems as ItemCode: ${this.CurrentBillingItem.ItemCode} is already Taken!`]);
+        return;
+      }
+    }
     if (this.CheckValidations() && !this.loading) {
       this.CurrentBillingItem.DefaultDoctorList = this.defaultDoctorList ? this.defaultDoctorList : null;
+      if (this.CurrentBillingItem.IsOT) {
+        if (!this.SelectedOTCategory) {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`OT Type is Mandatory.`]);
+          return;
+        }
+        this.CurrentBillingItem.OTCategory = this.SelectedOTCategory;
+      }
       this.settingsBLService.AddServiceItems(this.CurrentBillingItem)
         .subscribe(
           (res: DanpheHTTPResponse) => {
@@ -220,7 +284,7 @@ export class BillServiceItemComponent {
               this.CurrentBillingItem = new BillServiceItemModel();
             }
             else {
-              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to add service Item, check log for details"]);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Failed to add service item!`]);
             }
             this.loading = false;
             this.Close();
@@ -235,6 +299,7 @@ export class BillServiceItemComponent {
     }
   }
 
+
   Discard() {
     this.CurrentBillingItem = new BillServiceItemModel;
     this.selectedItem = null;
@@ -245,7 +310,10 @@ export class BillServiceItemComponent {
 
   AddBillServiceItemsPriceCategoryMap(rowToAdd: BillServiceItemsPriceCategoryMap, index: number) {
     if (rowToAdd.IsSelected) {
-
+      if (rowToAdd.Price < 0) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Row cannot be added as the Price is negative. Please enter the positive value.']);
+        return;
+      }
       rowToAdd.ServiceItemId = this.CurrentBillingItem.ServiceItemId;
       rowToAdd.ServiceDepartmentId = this.CurrentBillingItem.ServiceDepartmentId;
       this.settingsBLService.AddBillServiceItemsPriceCategoryMap(rowToAdd).subscribe(
@@ -253,6 +321,7 @@ export class BillServiceItemComponent {
           if (res.Status == ENUM_DanpheHTTPResponses.OK) {
             this.BillItemsPriceCatMap[index].PriceCategoryServiceItemMapId = res.Results.PriceCategoryMapId;
             this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Successfully added BillServiceItemsPriceCategoryMap!']);
+            // this.GetPriceGategories();
             this.changeDetector.detectChanges();
           }
         },
@@ -269,6 +338,10 @@ export class BillServiceItemComponent {
 
   UpdateServiceItemsPriceCategoryMap(rowToUpdate: BillServiceItemsPriceCategoryMap) {
     if (rowToUpdate) {
+      if (rowToUpdate.Price < 0) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Row cannot be updated as the Price is negative. Please enter the positive value.']);
+        return;
+      }
       rowToUpdate.IsActive = rowToUpdate.IsSelected;
       this.settingsBLService.UpdateBillServiceItemsPriceCategoryMap(rowToUpdate).subscribe(
         (res: DanpheHTTPResponse) => {
@@ -288,10 +361,6 @@ export class BillServiceItemComponent {
       this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Check log for Details "]);
     }
   }
-
-
-
-
 
   ServiceDeptListFormatter(data: any): string {
     return data["ServiceDepartmentName"];
@@ -329,8 +398,32 @@ export class BillServiceItemComponent {
   }
 
   OnIntegrationChange() {
-    if (this.selectedIntegration.IntegrationNameID > 0) {
-      this.CurrentBillingItem.IntegrationItemId = this.selectedIntegration.IntegrationNameID;
+    if (this.selectedIntegration && this.selectedIntegration.IntegrationName) {
+      if (this.selectedIntegration.IntegrationName.toLowerCase() === ENUM_IntegrationNames.LAB.toLowerCase()) {
+        this.SelectedLabTest = undefined;
+        this.ShowLabTestSelection = true;
+        this.ShowImagingItemSelection = false;
+      } else if (this.selectedIntegration.IntegrationName.toLowerCase() === ENUM_IntegrationNames.Radiology.toLowerCase()) {
+        this.SelectedImagingItem = undefined;
+        this.ShowLabTestSelection = false;
+        this.ShowImagingItemSelection = true;
+
+      }
+      else if (this.selectedIntegration.IntegrationName.toLowerCase() === ENUM_IntegrationNames.BedCharges.toLowerCase() && this.selectedItem && this.selectedItem.IntegrationItemId) {
+        this.ShowLabTestSelection = false;
+        this.ShowImagingItemSelection = false;
+        this.CurrentBillingItem.IntegrationItemId = this.selectedItem.IntegrationItemId;
+      }
+      else if (this.selectedIntegration.IntegrationName.toLowerCase() === ENUM_IntegrationNames.OPD.toLowerCase()) {
+        this.ShowLabTestSelection = false;
+        this.ShowImagingItemSelection = false;
+        this.CurrentBillingItem.IntegrationItemId = this.selectedItem.IntegrationItemId;
+      }
+      else {
+        this.ShowLabTestSelection = false;
+        this.ShowImagingItemSelection = false;
+        this.CurrentBillingItem.IntegrationItemId = 0;
+      }
       this.CurrentBillingItem.IntegrationName = this.selectedIntegration.IntegrationName;
     }
     else {
@@ -351,8 +444,33 @@ export class BillServiceItemComponent {
   }
   Update() {
     this.CurrentBillingItem.BilCfgItemsVsPriceCategoryMap = this.BillItemsPriceCatMap.filter(a => a.IsSelected === true);
+    //check if itemCode is same with already existing items.
+    if (this.ServiceItems && this.ServiceItems.length && !this.update) {
+      const isAlreadyExists = this.ServiceItems.some(s => s.ItemCode === this.CurrentBillingItem.ItemCode && s.ServiceItemId !== this.CurrentBillingItem.ServiceItemId);
+      if (isAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update ServiceItems as ItemCode: ${this.CurrentBillingItem.ItemCode} is already Taken!`]);
+        return;
+      }
+    }
+
+    // Checking for negative values in selected rows
+    const hasNegativePrice = this.CurrentBillingItem.BilCfgItemsVsPriceCategoryMap.some(item => item.Price < 0);
+    if (hasNegativePrice) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Cannot update Service Items as one or more rows have a negative price. Please enter valid amounts.']);
+      return;
+    }
+
     if (this.CheckValidations() && !this.loading) {
-      this.CurrentBillingItem.DefaultDoctorList = this.defaultDoctorList ? this.defaultDoctorList : null;
+      if (this.defaultDoctorList) {
+        this.CurrentBillingItem.DefaultDoctorList = this.defaultDoctorList;
+      }
+      if (this.CurrentBillingItem.IsOT) {
+        if (!this.SelectedOTCategory) {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`OT Type is Mandatory.`]);
+          return;
+        }
+        this.CurrentBillingItem.OTCategory = this.SelectedOTCategory;
+      }
       this.settingsBLService.UpdateServiceItem(this.CurrentBillingItem)
         .subscribe(
           (res: DanpheHTTPResponse) => {
@@ -445,11 +563,94 @@ export class BillServiceItemComponent {
       if (!item.ItemLegalName) {
         item.ItemLegalName = this.CurrentBillingItem.ItemName;
       }
+      if (!item.Price) {
+        item.Price = this.CurrentBillingItem.Price;
+      }
     }
     else {
       const item = this.BillItemsPriceCatMap[index];
       item.ItemLegalCode = '';
       item.ItemLegalName = '';
+      item.Price = 0;
+    }
+  }
+
+  generateItemCodeClicked: boolean = false;
+  GenerateItemCodeAutomatically(): void {
+    if (this.CurrentBillingItem && this.CurrentBillingItem.ItemName && this.CurrentBillingItem.ItemName.trim()) {
+      this.generateItemCodeClicked = true;
+      this.settingsBLService.GenerateItemCode(this.CurrentBillingItem.ItemName).finally(() => this.generateItemCodeClicked = false).subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+          this.CurrentBillingItem.ItemCode = res.Results;
+          this.CurrentBillingItem.BillingItemValidator.get('ItemCode').setValue(this.CurrentBillingItem.ItemCode);
+        } else {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Could not generate ItemCode automatically!`]);
+        }
+      }, err => {
+        console.log(err);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Something Went Wrong, Could not generate ItemCode automatically!`]);
+      });
+    } else {
+      this.generateItemCodeClicked = false;
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Please provide ItemName to generate ItemCode automatically!`]);
+    }
+  }
+  onCappingChange(row: any) {
+    if (!row.IsCappingEnabled) {
+      row.CappingLimitDays = 0;
+      row.CappingQuantity = 0;
+    }
+  }
+
+  GetLabTests(): void {
+    this.settingsBLService.GetAllLabTests().subscribe((res: DanpheHTTPResponse) => {
+      if (res && res.Status === ENUM_DanpheHTTPResponses.OK) {
+        const labTests = res.Results;
+        if (labTests && labTests.length) {
+          this.LabTests = labTests.filter(l => l.IsActive === true);
+          if (this.update) {
+            this.SelectedLabTest = this.LabTests.find(a => a.LabTestId === this.CurrentBillingItem.IntegrationItemId);
+          }
+        }
+      }
+    }, err => {
+      console.error(err);
+    });
+  }
+
+  GetImagingMasterItems(): void {
+    this.settingsBLService.GetAllImagingItems().subscribe((res: DanpheHTTPResponse) => {
+      if (res && res.Status === ENUM_DanpheHTTPResponses.OK) {
+        const imagingItems = res.Results;
+        if (imagingItems && imagingItems.length) {
+          this.ImagingMasterItems = imagingItems.filter(i => i.IsActive === true);
+          if (this.update) {
+            this.SelectedImagingItem = this.ImagingMasterItems.find(a => a.ImagingItemId === this.CurrentBillingItem.IntegrationItemId);
+          }
+        }
+      }
+    }, err => {
+      console.error(err);
+    });
+  }
+
+  LabTestFormatter(data): string {
+    return data['LabTestName'];
+  }
+
+  ImagingItemFormatter(data): string {
+    return data['ImagingItemName'];
+  }
+
+  OnLabTestSelected(): void {
+    if (this.SelectedLabTest) {
+      this.CurrentBillingItem.IntegrationItemId = this.SelectedLabTest.LabTestId;
+    }
+  }
+
+  OnImagingItemSelected(): void {
+    if (this.SelectedImagingItem) {
+      this.CurrentBillingItem.IntegrationItemId = this.SelectedImagingItem.ImagingItemId;
     }
   }
 }

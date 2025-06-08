@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DanpheEMR.ServerModel.PharmacyModels;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -61,6 +62,15 @@ namespace DanpheEMR.ServerModel
         public List<EmpCashTransactionModel> empCashTransactionModel { get; set; } //Krishna: 8th,FEB'22
         [NotMapped]
         public int? SelectedDepositId { get; set; }
+        public int? StoreId { get; set; }
+        public int? InvoiceId { get; set; }
+        [NotMapped]
+        public List<PHRMEmployeeCashTransaction> PHRMEmployeeCashTransactions { get; set; }
+        public string CareOfContact { get; set; }
+        [NotMapped]
+        public string DepositorName { get; set; }
+        [NotMapped]
+        public string DepositorContact { get; set; }
 
         public BillingDepositModel()
         {

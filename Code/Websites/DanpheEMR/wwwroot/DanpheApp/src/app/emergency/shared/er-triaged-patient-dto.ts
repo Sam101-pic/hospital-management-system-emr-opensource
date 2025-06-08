@@ -46,4 +46,10 @@ export class EmergencyTriagedPatient_DTO {
     public PerformerName: string;
     public SchemeName: string;
     public PriceCategoryName: string;
+    MunicipalityId: number = 0;
+    CareOfPersonContactNumber: number = 0;
+    BroughtBy: string = "";
+    RelationWithPatient: string = "";
+    IsPoliceCase: boolean = false;
+    WardNo: number = 0;
 }

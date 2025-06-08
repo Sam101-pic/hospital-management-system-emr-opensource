@@ -37,8 +37,21 @@ namespace DanpheEMR.Services.Dispensary.DTOs.PharmacyInvoiceReceipt
         public bool IsReturned { get; set; }
         public int StoreId { get; set; }
         public string StoreName { get; set; }
+        public string PaymentDetails { get; set; }
+        public int? SchemeId { get; set; }
+        public string SchemeApiIntegration { get; set; }
+        public int? PrescriberId { get; set; }
         public PatientInfo_DTO PatientInfo { get; set; }
         public List<PaymentDetailsDTO> PaymentModeDetails { get; set; }
         public List<PharmacyInvoiceReceiptItem_DTO> InvoiceItems { get; set; }
+        public List<DepositDetail_DTO> DepositList { get; set; }
     }
+    public class DepositDetail_DTO
+    {
+        public string ReceiptNo { get; set; }
+        public string TransactionType { get; set; }
+        public decimal DepositAmount { get; set; }
+        public DateTime ReceiptDate { get; set; }
+    }
+
 }

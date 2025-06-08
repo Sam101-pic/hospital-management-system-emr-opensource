@@ -98,6 +98,9 @@ namespace DanpheEMR.Controllers
             retValue.ApplicationVersionNum = this._appSettings.ApplicationVersionNum;
             retValue.highlightAbnormalLabResult = this._appSettings.highlightAbnormalLabResult;
             retValue.CacheExpirationMinutes = this._appSettings.CacheExpirationMinutes;
+            retValue.DemoEnvironment = this._appSettings.DemoEnvironment;
+            retValue.EnableFewaPay = this._appSettings.EnableFewaPay;
+            retValue.EnableDirectFonePay = this._appSettings.EnableDirectFonePay;
             return retValue;
         }
         

@@ -1,9 +1,33 @@
-﻿namespace DanpheEMR.Enums
+﻿using DocumentFormat.OpenXml.Drawing;
+
+namespace DanpheEMR.Enums
 {
 
     //Don't get confused with naming convention, we're using static class + constants instead of enums because enum gave issues while using in LINQ.
     //Also We're using strings in our database, where enum gives number values, so..
     //sud:9Aug'19
+
+    public static class ENUM_DoctorRoles
+    {
+        public static readonly string Doctor = "Doctor";
+        public static readonly string MO = "M.O.";
+        public static readonly string SeniorMOHospitalDirector = "Senior MO/Hospital Director";
+    }
+
+    public static class ENUM_NurseRoles
+    {
+        public static readonly string Nurse = "Nurse";
+        public static readonly string StaffNurseIncharge = "Staff Nurse  (Incharge)";
+        public static readonly string StaffNurse = "Staff Nurse";
+        public static readonly string SeniorStaffNurseIncharge = "Senior Staff Nurse(incharge)";
+        public static readonly string NursingOfficer = "Nursing Officer";
+        public static readonly string NursingOfficerIncharge = "Nurisng Officer (Incharge)";
+        public static readonly string CMA = "C.M.A.";
+        public static readonly string CMAIncharge = "C.M.A. (Incharge)";
+        public static readonly string ANM = "A.N.M";
+        public static readonly string ANMIncharge = "A.N.M. (Incharge)";
+
+    }
 
     public static class ENUM_BillingStatus
     {
@@ -74,6 +98,7 @@
         public static readonly string inpatient = "inpatient";
         public static readonly string outpatient = "outpatient";
         public static readonly string emergency = "emergency";
+        public static readonly string outdoor = "outdoor"; //This is for outdoot patients(running patients) that visit hospital not for consultations but for other services
     }
 
     public static class ENUM_AppointmentType
@@ -82,6 +107,7 @@
         public static readonly string followup = "followup";
         public static readonly string transfer = "Transfer";
         public static readonly string referral = "Referral";
+        public static readonly string revisit = "Revisit";
     }
 
     public static class ENUM_VisitStatus
@@ -105,6 +131,7 @@
     public static class ENUM_LabOrderStatus
     {
         public static readonly string Active = "active";
+        public static readonly string SamplePending = "sample-pending";
         public static readonly string Pending = "pending";
         public static readonly string ResultAdded = "result-added";
         public static readonly string ReportGenerated = "report-generated";
@@ -179,8 +206,6 @@
         public static readonly string PHRMSubStoreConsumption = "consumption-items";
 
         public static readonly string PHRMPatientConsumption = "pat-consumption-item";
-        public static readonly string PHRMPatientConsumptionReturn = "ret-pat-consumption-item";
-
 
     }
     public static class ENUM_INV_StockTransactionType
@@ -255,6 +280,7 @@
         public static readonly string Partial = "partial";
         public static readonly string Active = "active";
         public static readonly string Complete = "complete";
+        public static readonly string Cancelled = "cancelled";
     }
 
     public static class ENUM_InventoryPurchaseOrderStatus
@@ -301,6 +327,11 @@
         public static readonly string PharmacyCreditOrganization = "PHRMCreditOrganization";
         public static readonly string MedicareTypes = "MedicareMember";
         public static readonly string InventoryConsumption = "InventoryConsumption";
+    }
+    public static class ENUM_ACC_ConsumptionLevel
+    {
+        public static readonly string InventorySubCategory = "inventorysubcategory";
+        public static readonly string InventorySubStore = "inventorysubstore";
     }
     public static class ENUM_ACC_VoucherCode
     {
@@ -373,6 +404,7 @@
     {
         public static readonly string CurrentUser = "currentuser";
         public static readonly string ActiveLabType = "activeLabName";
+        public static readonly string ActiveHospitalInformation = "AccSelectedHospitalInfo";
     }
 
     public static class ENUM_DanpheHttpResponseText
@@ -394,6 +426,7 @@
     public static class ENUM_ClaimTypes
     {
         public static readonly string currentUser = "currentUser";
+        public static readonly string userId = "userId";
     }
 
     //Sud:3Feb'23-- We have 2 enums for same purpose, so commented this one. 
@@ -415,8 +448,8 @@
 
     public static class ENUM_PHRM_DepositTypes
     {
-        public static readonly string Deposit = "deposit";
-        public static readonly string DepositReturn = "depositreturn";
+        public static readonly string Deposit = "Deposit";
+        public static readonly string DepositReturn = "ReturnDeposit";
         public static readonly string DepositDeduct = "depositdeduct";
     }
 
@@ -425,7 +458,7 @@
     {
         public static readonly string CashSales = "CashSales";
         public static readonly string SalesReturn = "SalesReturn";
-        public static readonly string DepositAdd = "DepositAdd";
+        public static readonly string DepositAdd = "Deposit";
         public static readonly string DepositDeduct = "DepositDeduct";
         //Sud/Dev:3Feb'23: Keep only one among below Two TransactionTypes (DepositReturn and ReturnDeposit)..
         public static readonly string DepositReturn = "DepositReturn";
@@ -492,6 +525,8 @@
     {
         public static readonly string SSF = "SSF";
         public static readonly string Medicare = "Medicare";
+        public static readonly string NGHIS = "NGHIS";
+        public static readonly string ECHS = "ECHS";
 
     }
     public static class ENUM_PharmacyPurchaseOrderStatus
@@ -535,7 +570,8 @@
     public static class ENUM_SchemeName
     {
         public static readonly string General = "General";
-    }public static class ENUM_ERStatus
+    }
+    public static class ENUM_ERStatus
     {
         public static readonly string New = "New";
         public static readonly string finalized = "finalized";
@@ -550,6 +586,7 @@
         public static readonly string Claim = "Claim/";
         public static readonly string ClaimDetail = "Claim/";
         public static readonly string BookingService = "BookingService";
+        public static readonly string AddAttachment = "attachments";
     }
     //Krishna, 5thNov'23, Below used values are hardcoded values, Please do not change unless changed from SSF side, These values are provided from SSF Side.
     public static class ENUM_SSF_SchemeTypes
@@ -558,6 +595,175 @@
         public static readonly string Medical = "2";
     }
 
+    public static class ENUM_OT_Booking_Status
+    {
+        public static readonly string Booked = "Booked";
+        public static readonly string Scheduled = "Scheduled";
+        public static readonly string InProgress = "InProgress";
+        public static readonly string Concluded = "Concluded";
+        public static readonly string Cancelled = "Cancelled";
+    }
+    public static class ENUM_OnlinePaymentMode
+    {
+        public static readonly string FonePay = "fonepay";
+    }
+
+    public static class ENUM_FonePayTransactionRequestFrom
+    {
+        //public static readonly string OutpatientBilling = "op-billing";
+        //public static readonly string InPatientDischarge = "ip-discharge";
+        //public static readonly string Appointment = "appointment";
+        //public static readonly string BillingOpProvisionalClearance = "op-provisional-clearance";
+        //public static readonly string BillingProvisionalDischargeClearance = "provisional-discharge-clearance";
+        //public static readonly string BillingSettlement = "billing-settlement";
+        //public static readonly string BillingDeposit = "billing-deposit";
+        //public static readonly string PharmacySales = "pharmacy-sales";
+        //public static readonly string PharmacyProvisionalClearance = "pharmacy-provisional-clearance";
+        //public static readonly string PharmacySettlement = "pharmacy-settlement";
+        //public static readonly string PharmacyDeposit = "pharmacy-deposit";
+
+
+        public const string OutpatientBilling = "op-billing";
+        public const string InPatientDischarge = "ip-discharge";
+        public const string Appointment = "appointment";
+        public const string BillingOpProvisionalClearance = "op-provisional-clearance";
+        public const string BillingProvisionalDischargeClearance = "provisional-discharge-clearance";
+        public const string BillingSettlement = "billing-settlement";
+        public const string BillingDeposit = "billing-deposit";
+        public const string ADT_AdmissionBilling = "admission-billing";
+        public const string PharmacySales = "pharmacy-sales";
+        public const string PharmacyProvisionalClearance = "pharmacy-provisional-clearance";
+        public const string PharmacySettlement = "pharmacy-settlement";
+        public const string PharmacyDeposit = "pharmacy-deposit";
+
+
+    }
+
+    public static class ENUM_BedOutAction
+    {
+        public const string Transfer = "transfer";
+        public const string Discharge = "discharged";
+        public const string Exchange = "exchange";
+    }
+
+    public static class ENUM_SSFSchemeTypesSubProduct
+    {
+        public const int MedicalExpenses_IP = 1;
+        public const int MedicalExpenses_OP = 2;
+
+    }
+    public static class ENUM_HIBClaimDocResponseStatus
+    {
+        public static readonly string success = "success";
+        public static readonly string fail = "fail";
+    }
+    public static class ENUM_GRVerificationStatus
+    {
+        public static readonly string pending = "pending";
+        public static readonly string verified = "verified";
+        public static readonly string active = "active";
+
+    }
+
+    public static class ENUM_SMSProviderNames
+    {
+        public static readonly string LumbiniTech = "LumbiniTech";
+        public static readonly string ShivaJiTech = "ShivaJiTech";
+        public static readonly string Sparrow = "Sparrow";
+    }
+
+
+    public static class ENUM_LabVerificationStatus
+    {
+        public static readonly string Pending = "Pending";
+        public static readonly string PreVerified = "Pre-Verified";
+    }
+
+    public static class ENUM_EmployeeSalutation
+    {
+        public static readonly string Dr = "Dr";
+        public static readonly string Mr = "Mr";
+    }
+    public static class ENUM_VitalsEyeScale
+    {
+        public static readonly string Scale1 = "No eye opening";
+        public static readonly string Scale2 = "Eye opening to pain";
+        public static readonly string Scale3 = "Eye opening to sound";
+        public static readonly string Scale4 = "Eyes open spontaneously";
+    }
+    public static class ENUM_VitalVerbalScale
+
+    {
+        public static readonly string Scale1 = "No verbal response";
+        public static readonly string Scale2 = "Incomprehensible sounds";
+        public static readonly string Scale3 = "Inappropriate words";
+        public static readonly string Scale4 = "Confused";
+        public static readonly string Scale5 = "Orientated";
+    }
+    public static class ENUM_VitalsMotorScale
+    {
+        public static readonly string Scale1 = "No motor response";
+        public static readonly string Scale2 = "Abnormal extension to pain";
+        public static readonly string Scale3 = "Abnormal flexion to pain";
+        public static readonly string Scale4 = "Withdrawal from pain";
+        public static readonly string Scale5 = "Localizing pain";
+        public static readonly string Scale6 = "Obeys commands";
+    }
+    public static class ENUM_BillingPackageType
+    {
+        public static readonly string ItemLoadPackage = "ItemLoadPackage";
+        public static readonly string HealthPackage = "HealthPackage";
+
+    }
+
+    public static class ENUM_FHIRReourceTypes
+    {
+        public static readonly string Claim = "Claim";
+    }
+    public static class ENUM_ICDCoding
+    {
+        public static readonly string ICD10 = "icd_0";
+        public static readonly string ICD11 = "icd_1";
+    }
+
+    public static class ENUM_VisitTypeFormattedForHIB
+    {
+        public static readonly string OutpatientAndInPatient = "O";
+        public static readonly string Emergency = "E";
+        public static readonly string Referral = "R";
+    }
+
+    public static class ENUM_HIBCareType
+    {
+        public static readonly string Outpatient = "O";
+        public static readonly string InPatient = "I";
+    }
+
+    public static class ENUM_HIBCodingValue
+    {
+        public static readonly string ACSNCodingSystem = "ACSN";
+        public static readonly string MRCodingSystem = "MR";
+    }
+    public static class ENUM_HIBValueSetIdentifierUrl
+    {
+        public static readonly string system = "https://hl7.org/fhir/valueset-identifier-type.html";
+    }
+    public static class ENUM_HIBIdentifierUseValue
+    {
+        public static readonly string Use = "usual";
+    }
+
+    public static class ENUM_HIBClaimCategory
+    {
+        public static readonly string Service = "service";
+        public static readonly string Product = "product";
+        public static readonly string Item = "item";
+    }
+
+    public static class ENUM_HibClaimInformationCategory
+    {
+        public static readonly string Explanation = "explanation";
+    }
 }
 //public enum ENUM_LabOrderStatus_Test
 //{
@@ -583,3 +789,69 @@
 //        return attributes.Length > 0 ? attributes[0].Description : string.Empty;
 //    }
 //}
+
+public static class ENUM_ClinicalField_InputType
+{
+    public static readonly string Questionnaire = "Questionnaire";
+    public static readonly string Textbox = "Textbox";
+    public static readonly string SingleSelection = "Single Selection";
+    public static readonly string FreeType = "Free Type";
+    public static readonly string MultipleSelect = "Multiple Select";
+    public static readonly string FileUpload = "File Upload";
+    public static readonly string SmartTemplate = "SmartTemplate";
+    public static readonly string Number = "Number";
+    public static readonly string SmartPrintableForm = "SmartPrintableForm";
+}
+
+public static class ENUM_TemplateType
+{
+    public static readonly string Clinical = "Clinical";
+    public static readonly string OT = "OT";
+}
+
+public static class ENUM_PhrasesAccessibility
+{
+    public static readonly string Personal = "Personal";
+    public static readonly string Shared = "Shared";
+}
+
+public static class ENUM_PrescriptionOrderStatus
+{
+    public static readonly string Active = "active";
+    public static readonly string Partial = "partial";
+    public static readonly string Discarded = "discarded";
+    public static readonly string Final = "final";
+}
+
+public static class ENUM_IncentiveTypes
+{
+    public static readonly string Performer = "performer";
+    public static readonly string Prescriber = "prescriber";
+    public static readonly string Referral = "referral";
+}
+
+public static class ENUM_RateLimiterAlgorithms
+{
+    public static readonly string FixedWindow = "FixedWindow";
+    public static readonly string TokenBucket = "TokenBucket";
+    public static readonly string LeakyBucket = "LeakyBucket";
+    public static readonly string SlidingWindowLog = "SlidingWindowLog";
+}
+public static class ENUM_LabPageAction
+{
+    public static readonly string SampleReceive = "sample-receive";
+    public static readonly string ExternalLab = "external-lab";
+    public static readonly string Other = "other";
+}
+
+public static class ENUM_ClinicalSmartPrintableCodes
+{
+    public static readonly string FirstVitals = "VITAL_001";
+    public static readonly string LastVitals = "VITAL_002";
+    public static readonly string AllVitals = "VITAL_003";
+}
+
+public static class ENUM_VisitDepartmentName
+{
+    public static readonly string Emergency = "Emergency";
+}

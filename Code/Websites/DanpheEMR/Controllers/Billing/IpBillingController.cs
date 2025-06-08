@@ -1,4 +1,12 @@
-﻿using DanpheEMR.CommonTypes;
+﻿using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Entity;
+using System.Data.SqlClient;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using DanpheEMR.CommonTypes;
 using DanpheEMR.Controllers.Billing;
 using DanpheEMR.Core;
 using DanpheEMR.Core.Configuration;
@@ -7,16 +15,14 @@ using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.BillingModels;
+using DanpheEMR.ServerModel.BillingModels.ViewModels;
+using DanpheEMR.Services.Billing.DTO;
 using DanpheEMR.Utilities;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Data.Entity;
-using System.Data.SqlClient;
-using System.Linq;
-using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Serilog;
 
 namespace DanpheEMR.Controllers
 {
@@ -66,7 +72,7 @@ namespace DanpheEMR.Controllers
         {
 
             ////if (reqType == "pat-bill-items-for-receipt")
-            Func<DataTable> func = () => _billingDbContext.GetItemsForBillingReceipt(patientId, billingTxnId, billStatus);
+            Func<DataTable> func = () => _billingDbContext.GetItemsForBillingReceipt(patientId, billingTxnId,default, billStatus);
             return InvokeHttpGetFunction<DataTable>(func);
         }
 
@@ -82,6 +88,55 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction<object>(func);
         }
 
+
+
+        [HttpGet]
+        [Route("AdditionalBedReservations")]
+        public IActionResult AdditionalBedReservations(int patientId, int patientVisitId)
+        {
+            Func<object> func = () => GetAdditionalBedReservations(patientId, patientVisitId);
+            return InvokeHttpGetFunction(func);
+        }
+
+        [HttpGet]
+        [Route("GetPreviousProvisional")]
+        public async Task<ActionResult> GetPreviousProvisionals(int patientId, int patientVisitId)
+        {
+            Func<Task<object>> func = async () => await GetPreviousBillingProvisionalAmount(patientId, patientVisitId);
+            return await InvokeHttpGetFunctionAsync(func);
+        }
+
+
+        private object GetAdditionalBedReservations(int patientId, int patientVisitId)
+        {
+            if (patientVisitId == 0)
+            {
+                Log.Error($"{nameof(patientVisitId)} cannot be zero inorder to get additional bed reservations!");
+                throw new ArgumentNullException($"{nameof(patientVisitId)} cannot be zero inorder to get additional bed reservations!");
+            }
+            if (patientId == 0)
+            {
+                Log.Error($"{nameof(patientId)} cannot be zero inorder to get additional bed reservations!");
+                throw new ArgumentNullException($"{nameof(patientId)} cannot be zero inorder to get additional bed reservations!");
+            }
+            List<AdditionalBedReservation_DTO> additionalBedreservations = (from bedRsrv in _admissionDbContext.BedReservation.Where(b => b.PatientId == patientId && b.PatientVisitId == patientVisitId)
+                                                                            join ward in _admissionDbContext.Wards on bedRsrv.WardId equals ward.WardId
+                                                                            join bedfeat in _admissionDbContext.BedFeatures on bedRsrv.BedFeatureId equals bedfeat.BedFeatureId
+                                                                            join bed in _admissionDbContext.Beds on bedRsrv.BedId equals bed.BedId
+                                                                            join bedInfo in _admissionDbContext.PatientBedInfos.Where(b => b.PatientId == patientId && b.PatientVisitId == patientVisitId) on bedRsrv.BedId equals bedInfo.BedId into bedTxnInfo
+                                                                            from bedInfo in bedTxnInfo.DefaultIfEmpty()
+                                                                            select new AdditionalBedReservation_DTO
+                                                                            {
+                                                                                CreatedOn = bedRsrv.ReservedOn.Value,
+                                                                                WardName = ward.WardName,
+                                                                                BedFeatureName = bedfeat.BedFeatureName,
+                                                                                BedNumber = bed.BedNumber,
+                                                                                CareTakerInformation = bedRsrv.CareTakerInformation,
+                                                                                IsActive = bedRsrv.IsActive,
+                                                                                CompletedOn = bedRsrv.CancelledOn
+                                                                            }).ToList();
+            return additionalBedreservations;
+        }
 
         [HttpPost]
         [Route("PostBillTransaction_Unused")]
@@ -126,13 +181,21 @@ namespace DanpheEMR.Controllers
 
         private object GetAdmittedPatientListForIpBilling()
         {
+            var usePharmacyDepositsIndependently = false;
+            usePharmacyDepositsIndependently = ReadDepositConfigureationParam();
 
-            var ipPatients = (from adm in _billingDbContext.Admissions.Include(a => a.Visit.Patient)
+            var ipPatients = (from adm in _billingDbContext.Admissions
+                       .Include(a => a.Visit.Patient)
+                              join scheme in _billingDbContext.BillingSchemes on adm.Visit.SchemeId equals scheme.SchemeId // INNER JOIN with BIL_CFG_Scheme
                               where (adm.AdmissionStatus == "admitted" && adm.IsInsurancePatient != true)
-                              let deposits = _billingDbContext.BillingDeposits.Where(dep => dep.PatientId == adm.PatientId &&
-                                dep.PatientVisitId == adm.PatientVisitId && dep.IsActive == true).ToList()
+                              let deposits = _billingDbContext.BillingDeposits
+                                  .Where(dep => dep.PatientId == adm.PatientId &&
+                                                dep.PatientVisitId == adm.PatientVisitId &&
+                                                dep.IsActive == true
+                                                && ((usePharmacyDepositsIndependently && dep.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && dep.ModuleName == dep.ModuleName)))
                               let bedInformations = (from bedinf in _billingDbContext.PatientBedInfos
-                                                     where bedinf.PatientVisitId == adm.PatientVisitId && bedinf.IsActive == true
+                                                     where bedinf.PatientVisitId == adm.PatientVisitId &&
+                                                           bedinf.IsActive == true && bedinf.EndedOn == null
                                                      select new
                                                      {
                                                          Ward = bedinf.Ward.WardName,
@@ -142,7 +205,10 @@ namespace DanpheEMR.Controllers
                                                      }).OrderByDescending(a => a.StartedOn).FirstOrDefault()
                               let visit = adm.Visit
                               let patient = adm.Visit.Patient
-                              let doc = _billingDbContext.Employee.Where(doc => doc.EmployeeId == adm.AdmittingDoctorId).Select(d => d.FullName).FirstOrDefault() ?? string.Empty
+                              let doc = _billingDbContext.Employee
+                                  .Where(doc => doc.EmployeeId == adm.AdmittingDoctorId)
+                                  .Select(d => d.FullName)
+                                  .FirstOrDefault() ?? string.Empty
                               select new
                               {
                                   PatientId = adm.PatientId,
@@ -161,22 +227,25 @@ namespace DanpheEMR.Controllers
                                   DischargeDate = adm.AdmissionStatus == "admitted" ? adm.DischargeDate : (DateTime?)DateTime.Now,
                                   AdmittingDoctorId = adm.AdmittingDoctorId,
                                   AdmittingDoctorName = doc,
-                                  DepositAdded = (deposits.Where(dep => dep.TransactionType == ENUM_DepositTransactionType.Deposit).Select(a => a.InAmount).DefaultIfEmpty(0).Sum()), // "deposit"
+                                  DepositAdded = deposits.Where(dep => dep.TransactionType == ENUM_DepositTransactionType.Deposit).Select(a => a.InAmount).DefaultIfEmpty(0).Sum(),
 
-                                  DepositReturned = (deposits.Where(dep =>
-                                                 (dep.TransactionType.ToLower() != ENUM_DepositTransactionType.Deposit)
-                                                 ).Select(a => a.OutAmount).DefaultIfEmpty(0).Sum()),
+                                  DepositReturned = deposits.Where(dep => dep.TransactionType.ToLower() != ENUM_DepositTransactionType.Deposit).Select(a => a.OutAmount).DefaultIfEmpty(0).Sum(),
 
                                   BedInformation = bedInformations,
-                                  DateOfBirth = patient.DateOfBirth
+                                  DateOfBirth = patient.DateOfBirth,
+                                  SchemeName = scheme.SchemeName // Include the SchemeName in the result
                               }).ToList();
 
             return ipPatients.OrderByDescending(a => a.AdmittedDate);
+
 
         }
 
         private object GetPendingBillItemsofInPatient(int patientId, int ipVisitId)
         {
+            var usePharmacyDepositsIndependently = false;
+            usePharmacyDepositsIndependently = ReadDepositConfigureationParam();
+
             //Sanjit / Dinesh :We need to check the items with the Itemid as well as servicedepartmentid
             var BedServiceDepartmentId = _billingDbContext.AdminParameters.AsNoTracking().Where(a => a.ParameterGroupName == "ADT" && a.ParameterName == "Bed_Charges_SevDeptId").FirstOrDefault().ParameterValue;
             var intbedservdeptid = Convert.ToInt64(BedServiceDepartmentId);
@@ -194,7 +263,7 @@ namespace DanpheEMR.Controllers
                                         select bedInfo).OrderBy(x => x.PatientBedInfoId).ToList();
 
             var bedPatInfo = bedInfoListByVisitId.LastOrDefault();
-           
+
             DateTime admDate = _billingDbContext.Admissions.AsNoTracking().Where(a => a.PatientVisitId == bedPatInfo.PatientVisitId && a.PatientId == bedPatInfo.PatientId).Select(a => a.AdmissionDate).FirstOrDefault();
             var tempTime = admDate.TimeOfDay;
             var EndDateTime = DateTime.Now.Date + tempTime;
@@ -272,7 +341,7 @@ namespace DanpheEMR.Controllers
 
             if (repeatingTxnItms.Count > 0)
             {
-            _billingDbContext.SaveChanges();
+                _billingDbContext.SaveChanges();
             }
 
             pendingItems = pendingItems.Where(r => r.Quantity > 0).ToList();
@@ -320,7 +389,10 @@ namespace DanpheEMR.Controllers
                            join vis in _billingDbContext.Visit.AsNoTracking()
                            on adm.PatientVisitId equals vis.PatientVisitId
                            let docName = _billingDbContext.Employee.Where(emp => emp.EmployeeId == adm.AdmittingDoctorId).Select(s => s.FullName).FirstOrDefault() ?? string.Empty
-                           let depositDetails = _billingDbContext.BillingDeposits.Where(dep => dep.PatientId == pat.PatientId && dep.IsActive == true).Select(d => d).ToList()
+                           let depositDetails = _billingDbContext.BillingDeposits
+                                                                 .Where(dep => dep.PatientId == pat.PatientId && dep.IsActive == true
+                                                                 && ((usePharmacyDepositsIndependently && dep.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && dep.ModuleName == dep.ModuleName))
+                                                                 ).Select(d => d).ToList()
                            let bedDetails = (from bedInfos in _billingDbContext.PatientBedInfos
                                              join bedFeature in _billingDbContext.BedFeatures on bedInfos.BedFeatureId equals bedFeature.BedFeatureId
                                              join bed in _billingDbContext.Beds on bedInfos.BedId equals bed.BedId
@@ -397,13 +469,25 @@ namespace DanpheEMR.Controllers
                                    Action = s.Action,
                                    //calculated in clientSide
                                    Days = 0,
-                               }).OrderByDescending(a => a.PatientBedInfoId).ToList()
+                               }).OrderByDescending(a => a.PatientBedInfoId).ToList(),
+                               CareOfPersonPhoneNo = adm.CareOfPersonPhoneNo
                            }).FirstOrDefault();
 
 
             var pharmacyPendingBillItems = (from invoice in _billingDbContext.PHRMInvoiceTransactionModels
                                             join invtxnitem in _billingDbContext.PHRMInvoiceTransactionItems on invoice.InvoiceId equals invtxnitem.InvoiceId
                                             join emp in _billingDbContext.Employee on invtxnitem.CreatedBy equals emp.EmployeeId
+                                            join pharmacyReturnedItem in _billingDbContext.PHRMInvoiceReturnItemsModel on invtxnitem.InvoiceItemId equals pharmacyReturnedItem.InvoiceItemId into phrmReturnedItems
+                                            from pharmacyReturnedItemGroup in phrmReturnedItems
+                                                .GroupBy(pr => pr.InvoiceItemId)
+                                                .Select(prGroup => new
+                                                {
+                                                    InvoiceItemId = prGroup.Key,
+                                                    ReturnedQtySum = prGroup.Sum(pr => pr.ReturnedQty),
+                                                    TotalDisAmtSum = prGroup.Sum(pr => pr.TotalDisAmt),
+                                                    TotalAmountSum = prGroup.Sum(pr => pr.TotalAmount)
+                                                })
+                                                .DefaultIfEmpty()
                                             where invoice.PatientId == patientId && invoice.PatientVisitId == ipVisitId && invtxnitem.BilItemStatus == ENUM_BillingStatus.unpaid
                                             select new
                                             {
@@ -411,12 +495,12 @@ namespace DanpheEMR.Controllers
                                                 ItemId = invtxnitem.ItemId,
                                                 ItemName = invtxnitem.ItemName,
                                                 BatchNo = invtxnitem.BatchNo,
-                                                Quantity = invtxnitem.Quantity,
+                                                Quantity = invtxnitem.Quantity - (pharmacyReturnedItemGroup != null ? (double?)pharmacyReturnedItemGroup.ReturnedQtySum : 0),
                                                 SalePrice = invtxnitem.SalePrice,
                                                 Price = invtxnitem.Price,
-                                                TotalDisAmt = invtxnitem.TotalDisAmt,
+                                                TotalDisAmt = invtxnitem.TotalDisAmt - (pharmacyReturnedItemGroup != null ? pharmacyReturnedItemGroup.TotalDisAmtSum : 0),
                                                 SubTotal = invtxnitem.SubTotal,
-                                                TotalAmount = invtxnitem.TotalAmount,
+                                                TotalAmount = invtxnitem.TotalAmount - (pharmacyReturnedItemGroup != null ? pharmacyReturnedItemGroup.TotalAmountSum : 0),
                                                 ExpiryDate = invtxnitem.ExpiryDate,
                                                 CreatedOn = invtxnitem.CreatedOn,
                                                 CounterId = invtxnitem.CounterId,
@@ -424,16 +508,29 @@ namespace DanpheEMR.Controllers
                                                 PrescriberId = invtxnitem.PrescriberId,
                                                 PriceCategoryId = invtxnitem.PriceCategoryId,
                                                 User = emp.FullName
-                                            }).ToList();
+                                            })
+                                            .Where(item => item.Quantity >= 1)
+                                            .ToList();
 
-            decimal TotalPharmacyCreditAmount = _pharmacyDbContext.PHRMInvoiceTransaction
-                                      .Where(bill => bill.PatientId == patientId && bill.PatientVisitId == ipVisitId && bill.BilStatus == ENUM_BillingStatus.unpaid && !bill.IsReturn)
-                                      .Select(a => a.TotalAmount).DefaultIfEmpty().Sum();
+
+            //decimal TotalPharmacyCreditAmount = _pharmacyDbContext.PHRMInvoiceTransaction
+            //                          .Where(bill => bill.PatientId == patientId && bill.PatientVisitId == ipVisitId && bill.BilStatus == ENUM_BillingStatus.unpaid && !bill.IsReturn)
+            //                          .Select(a => a.TotalAmount).DefaultIfEmpty().Sum();
+
+            //Krishna, Below linq is to get the Pharmacy Pending NetAmount after subtracting the Invoice Return Amount.
+
+
+            var pharmacyBillItemsDataTable = PharmacyCreditInvoiceItems(patientId, ipVisitId);
+
+            var pharmacyBillItems = PharmacyCreditBillItem_DTO.MapDataTableToObjectList(pharmacyBillItemsDataTable);
+
+            decimal TotalPharmacyCreditAmount = pharmacyBillItems.Sum(a => a.TotalAmount);
+
             var patIpInfo = new
             {
                 AdmissionInfo = admInfo,
                 PendingBillItems = pendingItems,
-                PharmacyPendingBillsItems = pharmacyPendingBillItems,
+                PharmacyPendingBillsItems = pharmacyBillItems,//pharmacyPendingBillItems,
                 PharmacyTotalAmount = TotalPharmacyCreditAmount
 
                 //allBillItem = billItems, // sud: 30Apr'20-- These two are not needed in this list.. they're already available in client side..
@@ -554,6 +651,8 @@ namespace DanpheEMR.Controllers
 
         private object GetAdditionalInfoForDischargeReceipt(int ipVisitId, int billingTxnId, RbacDbContext _rbacDbContext)
         {
+            var usePharmacyDepositsIndependently = false;
+            usePharmacyDepositsIndependently = ReadDepositConfigureationParam();
             AdmissionDetailVM admInfo = null;
             PatientDetailVM patientDetail = null;
             List<DepositDetailVM> deposits = null;
@@ -576,6 +675,7 @@ namespace DanpheEMR.Controllers
                                 where deposit.PatientId == patId &&
                                 deposit.PatientVisitId == ipVisitId && deposit.TransactionType != ENUM_DepositTransactionType.DepositCancel && //"depositcancel" &&
                                 deposit.IsActive == true
+                                && ((usePharmacyDepositsIndependently && deposit.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && deposit.ModuleName == deposit.ModuleName))
                                 join settlement in _billingDbContext.BillSettlements on deposit.SettlementId
                                 equals settlement.SettlementId into settlementTemp
                                 from billSettlement in settlementTemp.DefaultIfEmpty()
@@ -599,6 +699,7 @@ namespace DanpheEMR.Controllers
                     deposits = (from deposit in _billingDbContext.BillingDeposits
                                 where deposit.PatientId == patId &&
                                 deposit.PatientVisitId == ipVisitId && deposit.IsActive == true
+                                 && ((usePharmacyDepositsIndependently && deposit.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && deposit.ModuleName == deposit.ModuleName))
 
                                 //
                                 //((deposit.IsActive == true && deposit.DepositType == ENUM_BillDepositType.Deposit) // "Deposit")
@@ -661,7 +762,7 @@ namespace DanpheEMR.Controllers
                                      Address = pat.Address,
                                      ContactNo = pat.PhoneNumber,
                                      InpatientNo = visitNAdmission.VisitCode,
-                                     CountrySubDivision = sub.CountrySubDivisionName,
+                                     CountrySubDivisionName = sub.CountrySubDivisionName,
                                      PANNumber = pat.PANNumber,
                                      Ins_NshiNumber = pat.Ins_NshiNumber,
                                      ClaimCode = visitNAdmission.ClaimCode
@@ -907,130 +1008,134 @@ namespace DanpheEMR.Controllers
             //if (isAutoAddBedItems)
             //{
 
-                //get all bed item billing transaction items
-                var allBedItemsOfPatientByVisit = _billingDbContext.BillingTransactionItems.Where(b => (b.PatientVisitId == patientVisitId)
-                                                    && (b.ServiceDepartment.IntegrationName.ToLower() == "bed charges") && (b.BillStatus.ToLower() == "provisional")
-                                                    ).OrderBy(o => o.RequisitionDate).AsEnumerable();
+            //get all bed item billing transaction items
+            var allBedItemsOfPatientByVisit = _billingDbContext.BillingTransactionItems.Where(b => (b.PatientVisitId == patientVisitId)
+                                                && (b.ServiceDepartment.IntegrationName.ToLower() == "bed charges") && (b.BillStatus.ToLower() == "provisional")
+                                                ).OrderBy(o => o.RequisitionDate).AsEnumerable();
 
 
-                //if there are bedItems in billing transaction item table
-                if ((allBedItemsOfPatientByVisit != null) && allBedItemsOfPatientByVisit.Any())
+            //if there are bedItems in billing transaction item table
+            if ((allBedItemsOfPatientByVisit != null) && allBedItemsOfPatientByVisit.Any())
+            {
+                //get all the BedInfo rows for that visit
+                var allBedInfoOfPatient = _billingDbContext.PatientBedInfos.AsNoTracking().Where(b => b.IsActive && (b.PatientVisitId == patientVisitId))
+                                            .Select(d => new
+                                            {
+                                                StartedOn = DbFunctions.TruncateTime(d.StartedOn),
+                                                StartedOnDateTime = d.StartedOn,
+                                                d.EndedOn,
+                                                d.BedFeatureId,
+                                                d.PatientBedInfoId
+                                            }).OrderBy(o => o.StartedOn).ToList();
+
+                if ((allBedInfoOfPatient != null) && (allBedInfoOfPatient.Count > 0))
                 {
+                    //Krishna, 16thJune'23, Replacing below logic with new logic.
+                    //var bedDataGroupedByStartDate = (from b in allBedInfoOfPatient
+                    //                                 group b by b.StartedOn into v
+                    //                                 select new
+                    //                                 {
+                    //                                     StartDate = v.Key,
+                    //                                     Data = v.OrderBy(d => d.StartedOnDateTime).ToList()
+                    //                                 }).OrderBy(o => o.StartDate).ToList();
+
+                    //var bedInfoListOfPreviousDay = bedDataGroupedByStartDate[0].Data;
+                    //var finalBedOfPreviousDay = bedInfoListOfPreviousDay[bedInfoListOfPreviousDay.Count - 1];
+                    //var bedWithDaysCount = allBedInfoOfPatient.Select(s => s.BedFeatureId).Distinct().ToDictionary(k => k, v => 0);
+
+                    //if (bedDataGroupedByStartDate.Count > 1)
+                    //{
+                    //    for (int i = 1; i < bedDataGroupedByStartDate.Count; i++)
+                    //    {
+                    //        //take the last bed for the previous day
+                    //        bedInfoListOfPreviousDay = bedDataGroupedByStartDate[i - 1].Data;
+                    //        finalBedOfPreviousDay = bedInfoListOfPreviousDay[bedInfoListOfPreviousDay.Count - 1];
+
+                    //        //take the last bed for the current day
+                    //        var bedInfoListOfCurrentDay = bedDataGroupedByStartDate[i].Data;
+                    //        var finalBedOfCurrentDay = bedInfoListOfCurrentDay[bedInfoListOfCurrentDay.Count - 1];
+
+                    //        var diffInDays = 0;
+
+                    //        //if previous day and current day both have same BedFeature
+                    //        if (finalBedOfPreviousDay.BedFeatureId == finalBedOfCurrentDay.BedFeatureId)
+                    //        {
+                    //            bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] += (finalBedOfCurrentDay.StartedOn.Value - finalBedOfPreviousDay.StartedOn.Value).Days;
+                    //            if ((i + 1) == bedDataGroupedByStartDate.Count)
+                    //            {
+                    //                bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] += (System.DateTime.Now.Date - finalBedOfCurrentDay.StartedOn.Value).Days;
+                    //            }
+                    //        }
+                    //        else //if previous day and current day both have different BedFeature
+                    //        {
+                    //            diffInDays = (System.DateTime.Now - finalBedOfCurrentDay.StartedOn.Value).Days;
+                    //            bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] += (finalBedOfCurrentDay.StartedOn.Value - finalBedOfPreviousDay.StartedOn.Value).Days;
+
+                    //            //if new bed started today
+                    //            if (finalBedOfCurrentDay.StartedOn.Value.Date == System.DateTime.Now.Date)
+                    //            {
+                    //                bedWithDaysCount[finalBedOfCurrentDay.BedFeatureId] = 1;
+                    //            }
+                    //            else
+                    //            {
+                    //                //bedWithDaysCount[finalBedOfCurrentDay.BedFeatureId] += (finalBedOfCurrentDay.StartedOn.Value - finalBedOfPreviousDay.StartedOn.Value).Days;
+                    //                if ((i + 1) == bedDataGroupedByStartDate.Count)
+                    //                {
+                    //                    bedWithDaysCount[finalBedOfCurrentDay.BedFeatureId] += (System.DateTime.Now.Date - finalBedOfCurrentDay.StartedOn.Value).Days;
+                    //                }
+                    //            }
+                    //        }
+                    //    }
+                    //}
+                    //else
+                    //{
+                    //    if (finalBedOfPreviousDay.StartedOn.Value.Date == System.DateTime.Now.Date)
+                    //    {
+                    //        bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] = 1;
+                    //    }
+                    //    else
+                    //    {
+                    //        var daysDiff = (System.DateTime.Now - finalBedOfPreviousDay.StartedOn.Value).Days;
+                    //        bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] = daysDiff;
+                    //    }
+
+                    //}
+
+                    //sud/Krishna: 19thJan'23--- rewrite the calculation logic..
                     //get all the BedInfo rows for that visit
-                    var allBedInfoOfPatient = _billingDbContext.PatientBedInfos.AsNoTracking().Where(b => b.IsActive && (b.PatientVisitId == patientVisitId))
-                                                .Select(d => new
-                                                {
-                                                    StartedOn = DbFunctions.TruncateTime(d.StartedOn),
-                                                    StartedOnDateTime = d.StartedOn,
-                                                    d.EndedOn,
-                                                    d.BedFeatureId,
-                                                    d.PatientBedInfoId
-                                                }).OrderBy(o => o.StartedOn).ToList();
+                    var patientBedInfos = _billingDbContext.PatientBedInfos.AsNoTracking()
+                                    .Where(b => b.IsActive && (b.PatientVisitId == patientVisitId))
+                                   .Select(b => b).ToList();
 
-                    if ((allBedInfoOfPatient != null) && (allBedInfoOfPatient.Count > 0))
+                    var bedWithDaysCount = CalculateBedCounts(patientBedInfos);
+
+                    foreach (var dictItem in bedWithDaysCount.Keys)
                     {
-                        //Krishna, 16thJune'23, Replacing below logic with new logic.
-                        //var bedDataGroupedByStartDate = (from b in allBedInfoOfPatient
-                        //                                 group b by b.StartedOn into v
-                        //                                 select new
-                        //                                 {
-                        //                                     StartDate = v.Key,
-                        //                                     Data = v.OrderBy(d => d.StartedOnDateTime).ToList()
-                        //                                 }).OrderBy(o => o.StartDate).ToList();
-
-                        //var bedInfoListOfPreviousDay = bedDataGroupedByStartDate[0].Data;
-                        //var finalBedOfPreviousDay = bedInfoListOfPreviousDay[bedInfoListOfPreviousDay.Count - 1];
-                        //var bedWithDaysCount = allBedInfoOfPatient.Select(s => s.BedFeatureId).Distinct().ToDictionary(k => k, v => 0);
-
-                        //if (bedDataGroupedByStartDate.Count > 1)
-                        //{
-                        //    for (int i = 1; i < bedDataGroupedByStartDate.Count; i++)
-                        //    {
-                        //        //take the last bed for the previous day
-                        //        bedInfoListOfPreviousDay = bedDataGroupedByStartDate[i - 1].Data;
-                        //        finalBedOfPreviousDay = bedInfoListOfPreviousDay[bedInfoListOfPreviousDay.Count - 1];
-
-                        //        //take the last bed for the current day
-                        //        var bedInfoListOfCurrentDay = bedDataGroupedByStartDate[i].Data;
-                        //        var finalBedOfCurrentDay = bedInfoListOfCurrentDay[bedInfoListOfCurrentDay.Count - 1];
-
-                        //        var diffInDays = 0;
-
-                        //        //if previous day and current day both have same BedFeature
-                        //        if (finalBedOfPreviousDay.BedFeatureId == finalBedOfCurrentDay.BedFeatureId)
-                        //        {
-                        //            bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] += (finalBedOfCurrentDay.StartedOn.Value - finalBedOfPreviousDay.StartedOn.Value).Days;
-                        //            if ((i + 1) == bedDataGroupedByStartDate.Count)
-                        //            {
-                        //                bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] += (System.DateTime.Now.Date - finalBedOfCurrentDay.StartedOn.Value).Days;
-                        //            }
-                        //        }
-                        //        else //if previous day and current day both have different BedFeature
-                        //        {
-                        //            diffInDays = (System.DateTime.Now - finalBedOfCurrentDay.StartedOn.Value).Days;
-                        //            bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] += (finalBedOfCurrentDay.StartedOn.Value - finalBedOfPreviousDay.StartedOn.Value).Days;
-
-                        //            //if new bed started today
-                        //            if (finalBedOfCurrentDay.StartedOn.Value.Date == System.DateTime.Now.Date)
-                        //            {
-                        //                bedWithDaysCount[finalBedOfCurrentDay.BedFeatureId] = 1;
-                        //            }
-                        //            else
-                        //            {
-                        //                //bedWithDaysCount[finalBedOfCurrentDay.BedFeatureId] += (finalBedOfCurrentDay.StartedOn.Value - finalBedOfPreviousDay.StartedOn.Value).Days;
-                        //                if ((i + 1) == bedDataGroupedByStartDate.Count)
-                        //                {
-                        //                    bedWithDaysCount[finalBedOfCurrentDay.BedFeatureId] += (System.DateTime.Now.Date - finalBedOfCurrentDay.StartedOn.Value).Days;
-                        //                }
-                        //            }
-                        //        }
-                        //    }
-                        //}
-                        //else
-                        //{
-                        //    if (finalBedOfPreviousDay.StartedOn.Value.Date == System.DateTime.Now.Date)
-                        //    {
-                        //        bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] = 1;
-                        //    }
-                        //    else
-                        //    {
-                        //        var daysDiff = (System.DateTime.Now - finalBedOfPreviousDay.StartedOn.Value).Days;
-                        //        bedWithDaysCount[finalBedOfPreviousDay.BedFeatureId] = daysDiff;
-                        //    }
-
-                        //}
-
-                        //sud/Krishna: 19thJan'23--- rewrite the calculation logic..
-                        //get all the BedInfo rows for that visit
-                        var patientBedInfos = _billingDbContext.PatientBedInfos.AsNoTracking()
-                                        .Where(b => b.IsActive && (b.PatientVisitId == patientVisitId))
-                                       .Select(b => b).ToList();
-
-                        var bedWithDaysCount = CalculateBedCounts(patientBedInfos);
-
-                        foreach (var dictItem in bedWithDaysCount.Keys)
+                        var billItem = allBedItemsOfPatientByVisit.Where(d => d.IntegrationItemId == dictItem).FirstOrDefault();
+                        if (allBedItemsOfPatientByVisit != null && billItem != null)
                         {
-                            var billItem = allBedItemsOfPatientByVisit.Where(d => d.IntegrationItemId == dictItem).FirstOrDefault();
-                            if (allBedItemsOfPatientByVisit != null && billItem != null)
+                            var amount = bedWithDaysCount[dictItem];
+                            if (billItem.IsBedChargeQuantityEdited == false && billItem.BedChargeQuantityEditedDate is null)
                             {
-                                var amount = bedWithDaysCount[dictItem];
                                 billItem.Quantity = amount;
-                                billItem.SubTotal = billItem.Price * amount;
-                                billItem.DiscountAmount = ((billItem.DiscountPercent) / 100) * billItem.SubTotal;
-                                billItem.TotalAmount = billItem.SubTotal - (billItem.DiscountAmount);
-                                _billingDbContext.Entry(billItem).Property(a => a.Quantity).IsModified = true;
-                                _billingDbContext.Entry(billItem).Property(a => a.SubTotal).IsModified = true;
-                                _billingDbContext.Entry(billItem).Property(a => a.DiscountAmount).IsModified = true;
-                                _billingDbContext.Entry(billItem).Property(a => a.TotalAmount).IsModified = true;
-                                _billingDbContext.SaveChanges();
                             }
+                            billItem.SubTotal = billItem.Price * billItem.Quantity;
+                            billItem.DiscountAmount = ((billItem.DiscountPercent) / 100) * billItem.SubTotal;
+                            billItem.TotalAmount = billItem.SubTotal - (billItem.DiscountAmount);
+                            _billingDbContext.Entry(billItem).Property(a => a.Quantity).IsModified = true;
+                            _billingDbContext.Entry(billItem).Property(a => a.SubTotal).IsModified = true;
+                            _billingDbContext.Entry(billItem).Property(a => a.DiscountAmount).IsModified = true;
+                            _billingDbContext.Entry(billItem).Property(a => a.TotalAmount).IsModified = true;
                         }
                     }
+                    _billingDbContext.SaveChanges();
+                    UpdateAutoBillingItemsQuantity(patientVisitId, bedWithDaysCount);
                 }
-                else
-                {
-                    return "No bed items are there in BillingTransacitonItm for current visit.";
-                }
+            }
+            else
+            {
+                return "No bed items are there in BillingTransacitonItm for current visit.";
+            }
             //}
             //else
             //{
@@ -1039,6 +1144,36 @@ namespace DanpheEMR.Controllers
 
             return "Bed quantity updated successfully.";
 
+        }
+
+        //Krishna, 22ndJan'24, This method is responsible to update the Quantity of Auto Billing Items during ward transfer. This will update the Quantity of the Auto Billing items only if the transfer took place within the same day.
+        private void UpdateAutoBillingItemsQuantity(int patientVisitId, Dictionary<int, int> bedWithDaysCount)
+        {
+            foreach (var dictItem in bedWithDaysCount.Keys)
+            {
+                var amount = bedWithDaysCount[dictItem];
+                if (amount == 0)
+                {
+                    //Need to chane the logic to read autoBillingItems
+                    var autoBillingItems = _billingDbContext.BillingTransactionItems.Where(a => a.PatientVisitId == patientVisitId && a.BillStatus == ENUM_BillingStatus.provisional);
+                    var itemsToUpdate = (from autoBillItem in _billingDbContext.AdtAutoBillingItems
+                                         join billItems in autoBillingItems on new { ServiceItemId = autoBillItem.ServiceItemId, SchemeId = autoBillItem.SchemeId } equals new { ServiceItemId = billItems.ServiceItemId, SchemeId = billItems.DiscountSchemeId }
+                                         where autoBillItem.AllowAutoCancellation && autoBillItem.BedFeatureId == dictItem
+                                         select billItems).ToList();
+                    foreach (var billItem in itemsToUpdate)
+                    {
+                        billItem.Quantity = amount;
+                        billItem.SubTotal = billItem.Price * amount;
+                        billItem.DiscountAmount = ((billItem.DiscountPercent) / 100) * billItem.SubTotal;
+                        billItem.TotalAmount = billItem.SubTotal - (billItem.DiscountAmount);
+                        _billingDbContext.Entry(billItem).Property(a => a.Quantity).IsModified = true;
+                        _billingDbContext.Entry(billItem).Property(a => a.SubTotal).IsModified = true;
+                        _billingDbContext.Entry(billItem).Property(a => a.DiscountAmount).IsModified = true;
+                        _billingDbContext.Entry(billItem).Property(a => a.TotalAmount).IsModified = true;
+                    }
+                }
+            }
+            _billingDbContext.SaveChanges();
         }
 
         private string UpdateBillingTxnItemsOfInpatient(string ipDataString, RbacUser currentUser)
@@ -1077,7 +1212,7 @@ namespace DanpheEMR.Controllers
             try
             {
                 string ipData = this.ReadPostData();
-                RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+                RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
                 BillingDbContext billingDbContext = new BillingDbContext(connString);
                 IPBillingDiscount_DTO iPBillingDiscountModel = DanpheJSONConvert.DeserializeObject<IPBillingDiscount_DTO>(ipData);
 
@@ -1475,20 +1610,26 @@ namespace DanpheEMR.Controllers
             PatientDetailVM patientDetail = new PatientDetailVM();
             List<DepositDetailVM> deposits = new List<DepositDetailVM>();
             List<PatientBedInfo> patientBeds = new List<PatientBedInfo>();
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
 
             var visitNAdmission = (from visit in _billingDbContext.Visit.Include(v => v.Admission)
                                    where visit.PatientVisitId == ipVisitId && visit.PatientId == patientId
                                    select visit).FirstOrDefault();
 
-            DataTable patBillItems = _billingDbContext.GetItemsForBillingReceipt(patientId, null, "provisional");
+            DataTable patBillItems = _billingDbContext.GetItemsForBillingReceipt(patientId, null,ipVisitId, "provisional");
 
             if (visitNAdmission != null && visitNAdmission.Admission != null)
             {
                 var patId = visitNAdmission.PatientId;
                 var patVisitId = visitNAdmission.PatientVisitId;
+
+                var usePharmacyDepositsIndependently = false;
+                usePharmacyDepositsIndependently = ReadDepositConfigureationParam();
+
                 deposits = (from deposit in _billingDbContext.BillingDeposits
                             where deposit.PatientId == patId &&
                             deposit.PatientVisitId == ipVisitId && deposit.IsActive == true
+                            && ((usePharmacyDepositsIndependently && deposit.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && deposit.ModuleName == deposit.ModuleName))
                             join settlement in _billingDbContext.BillSettlements on deposit.SettlementId
                             equals settlement.SettlementId into settlementTemp
                             from billSettlement in settlementTemp.DefaultIfEmpty()
@@ -1526,7 +1667,10 @@ namespace DanpheEMR.Controllers
                     RoomType = ward != null ? ward.WardName : "",
                     LengthOfStay = CalculateBedStayForAdmission(visitNAdmission.Admission),
                     AdmittingDoctor = visitNAdmission.PerformerName,
-                    ProcedureType = visitNAdmission.Admission.ProcedureType
+                    ProcedureType = visitNAdmission.Admission.ProcedureType,
+                    CarePersonName = visitNAdmission.Admission.CareOfPersonName,
+                    CarePersonContact = visitNAdmission.Admission.CareOfPersonPhoneNo,
+                    Relation = visitNAdmission.Admission.CareOfPersonRelation
                 };
 
                 patientDetail = (from pat in _billingDbContext.Patient
@@ -1553,44 +1697,32 @@ namespace DanpheEMR.Controllers
                                      ContactNo = pat.PhoneNumber,
                                      InpatientNo = visitNAdmission.VisitCode,
                                      CountryName = cnty.CountryName,
-                                     CountrySubDivision = sub.CountrySubDivisionName,
+                                     CountrySubDivisionName = sub.CountrySubDivisionName,
                                      MunicipalityName = munc.MunicipalityName,
                                      WardNumber = pat.WardNumber,
                                      PANNumber = pat.PANNumber,
                                      Ins_NshiNumber = pat.Ins_NshiNumber,
                                      ClaimCode = visitNAdmission.ClaimCode,
                                      SchemeName = patSchemeDetails != null ? patSchemeDetails.SchemeName : "General",
-                                     PolicyNo = patScheme != null ? patScheme.PolicyNo : "",
+                                     FieldSettingsParamName = patSchemeDetails != null ? patSchemeDetails.FieldSettingParamName : "General",
+                                     PolicyNo = patScheme != null ? patScheme.PolicyNo : ""
+
                                  }).FirstOrDefault();
             }
 
-            var pharmacyBillItems = (from invitm in _pharmacyDbContext.PHRMInvoiceTransactionItems
-                                     .Where(invitm => invitm.PatientId == patientId && invitm.BilItemStatus == ENUM_PHRM_InvoiceItemBillStatus.Unpaid)
-                                     join mstitm in _pharmacyDbContext.PHRMItemMaster on invitm.ItemId equals mstitm.ItemId
-                                     group invitm by new { CreatedOn = DbFunctions.TruncateTime(invitm.CreatedOn), invitm.ItemId, invitm.ItemName, mstitm.ItemCode, invitm.BatchNo, invitm.ExpiryDate, invitm.SalePrice } into I
-                                     select new
-                                     {
-                                         PatientId = patientId,
-                                         BillDate = I.Key.CreatedOn,
-                                         ItemId = I.Key.ItemId,
-                                         ItemName = I.Key.ItemName,
-                                         ItemCode = I.Key.ItemCode,
-                                         BatchAndExpiry = I.Key.BatchNo + " | " + I.Key.ExpiryDate,
-                                         Quantity = I.Sum(q => q.Quantity),
-                                         SalePrice = I.Sum(q => q.SalePrice),
-                                         SubTotal = I.Sum(q => q.SubTotal),
-                                         DiscountAmount = I.Sum(q => q.TotalDisAmt),
-                                         VATAmount = I.Sum(q => q.VATAmount),
-                                         TotalAmount = I.Sum(q => q.TotalAmount)
-                                     }).ToList();
+            var pharmacyBillItemsDataTable = PharmacyCreditInvoiceItems(patientId, ipVisitId);
 
+            var pharmacyBillItems = PharmacyCreditBillItem_DTO.MapDataTableToObjectList(pharmacyBillItemsDataTable);
 
-            decimal TotalPharmacyCreditAmount = _pharmacyDbContext.PHRMInvoiceTransaction
-                                       .Where(bill => bill.PatientId == patientId && bill.PatientVisitId == ipVisitId && bill.BilStatus == ENUM_BillingStatus.unpaid && !bill.IsReturn)
-                                       .Select(a => a.TotalAmount).DefaultIfEmpty().Sum();
+            decimal TotalPharmacyCreditAmount = pharmacyBillItems.Sum(a => a.TotalAmount);
 
             var ipBillingSummary = _billingDbContext.GetIpBillingSummary(patientId, ipVisitId, "provisional");
+            var IpBillSummaryData = SeralizeBillingModelView.MapDataTableToObjectList<EstimationDischareBillSummayVM>(ipBillingSummary);
+            var IpBillDetaislData = SeralizeBillingModelView.MapDataTableToObjectList<EstimationDischargeBillItemVM>(patBillItems);
+            string[] PrintTemplateTypes = { "ip-estimation-discharge-summary", "ip-estimation-discharge-Details" };
 
+            var EstimationBillDetails = GetPrintTempleteAndFormat(patientDetail, admInfo, deposits, IpBillSummaryData, IpBillDetaislData, patientBeds, "ip-estimation-discharge-Details", currentUser, TotalPharmacyCreditAmount);
+            var EstimationBillSummary = GetPrintTempleteAndFormat(patientDetail, admInfo, deposits, IpBillSummaryData, IpBillDetaislData, patientBeds, "ip-estimation-discharge-summary", currentUser, TotalPharmacyCreditAmount);
             var estimateBillInfo = new
             {
                 AdmissionInfo = admInfo,
@@ -1600,12 +1732,275 @@ namespace DanpheEMR.Controllers
                 BedItems = patientBeds,
                 PharmacyPendingBillsItems = pharmacyBillItems,
                 PharmacyTotal = TotalPharmacyCreditAmount,
-                IpBillingSummary = ipBillingSummary
+                IpBillingSummary = ipBillingSummary,
+                EstimationBillDetails = EstimationBillDetails,
+                InvoicePrintTemplateSummary = EstimationBillSummary,//This is sent as invoiceprintTemplateSummary because the component that will consume this data is reusable.
+                PrintTemplateTypes = JsonConvert.SerializeObject(PrintTemplateTypes)
             };
             return estimateBillInfo;
         }
 
+        private DataTable PharmacyCreditInvoiceItems(int PatientId, int PatientVisitId)
+        {
+            List<SqlParameter> paramList = new List<SqlParameter>() {
+                                    new SqlParameter("@PatientId", PatientId),
+                                    new SqlParameter("@PatientVisitId", PatientVisitId)
+                                };
 
+            DataTable invoiceItems = DALFunctions.GetDataTableFromStoredProc("SP_PHRM_GetCreditInvoiceItems", paramList, _billingDbContext);
+            return invoiceItems;
+        }
+
+        //Print templage get from database
+        private string GetPrintTempleteAndFormat(PatientDetailVM PatientInfo, AdmissionDetailVM AdmissionInfo, List<DepositDetailVM> deposits,
+            List<EstimationDischareBillSummayVM> EstimationSummaryData, List<EstimationDischargeBillItemVM> EstimationBillDetails, List<PatientBedInfo> patientBeds,
+            string PrintType, RbacUser currentUser, decimal pharmacyTotalCreditAmount)
+        {
+            var invoicePrintTemplate = _billingDbContext.PrintTemplateSettings
+                                                  .FirstOrDefault(p => p.PrintType == PrintType
+                                                                  && p.FieldSettingsName == PatientInfo.FieldSettingsParamName
+                                                                  && p.VisitType == "IPD");
+            if (invoicePrintTemplate == null)
+            {
+                invoicePrintTemplate = _billingDbContext.PrintTemplateSettings
+                                                       .FirstOrDefault(p => p.PrintType == PrintType
+                                                                       && p.FieldSettingsName == "General"
+                                                                       && p.VisitType == "IPD");
+            }
+            if (invoicePrintTemplate != null)
+            {
+                StringBuilder template = new StringBuilder();
+                StringBuilder tempDetailsTemplate = new StringBuilder();
+                StringBuilder printDetailsTemplate = new StringBuilder();
+                StringBuilder printDepositDetails = new StringBuilder();
+                StringBuilder printPharmacyDetails = new StringBuilder();
+                var rawHtmlDetails = invoicePrintTemplate.PrintTemplateDetailsFormat;
+                var arrayOfHtmlDetails = rawHtmlDetails.Split('|');
+                int InvoiceItemSn = 0;
+                if (invoicePrintTemplate != null)
+                {
+
+                    var pharmacyBillItems = (from invitm in _pharmacyDbContext.PHRMInvoiceTransactionItems
+                                   .Where(invitm => invitm.PatientId == PatientInfo.PatientId && invitm.BilItemStatus == ENUM_PHRM_InvoiceItemBillStatus.Unpaid)
+                                             join mstitm in _pharmacyDbContext.PHRMItemMaster on invitm.ItemId equals mstitm.ItemId
+                                             group invitm by new { CreatedOn = DbFunctions.TruncateTime(invitm.CreatedOn), invitm.ItemId, invitm.ItemName, mstitm.ItemCode, invitm.BatchNo, invitm.ExpiryDate, invitm.SalePrice } into I
+                                             select new
+                                             {
+                                                 PatientId = PatientInfo.PatientId,
+                                                 BillDate = I.Key.CreatedOn,
+                                                 ItemId = I.Key.ItemId,
+                                                 ItemName = I.Key.ItemName,
+                                                 ItemCode = I.Key.ItemCode,
+                                                 BatchAndExpiry = I.Key.BatchNo + " | " + I.Key.ExpiryDate,
+                                                 Quantity = I.Sum(q => q.Quantity),
+                                                 SalePrice = I.Sum(q => q.SalePrice),
+                                                 SubTotal = I.Sum(q => q.SubTotal),
+                                                 DiscountAmount = I.Sum(q => q.TotalDisAmt),
+                                                 VATAmount = I.Sum(q => q.VATAmount),
+                                                 TotalAmount = I.Sum(q => q.TotalAmount)
+                                             }).ToList();
+
+
+
+
+
+                    template.Append(invoicePrintTemplate.PrintTemplateMainFormat);
+                    //template.Replace("{image}",)
+
+                    //current logged in user
+                    template.Replace("{CurrentUser}", currentUser.UserName);
+
+                    //PatientInfo Details
+                    template.Replace("{PatientCode}", PatientInfo.HospitalNo.ToString());
+                    template.Replace("{ShortName}", PatientInfo.PatientName.ToString());
+                    template.Replace("{PhoneNumber}", PatientInfo.ContactNo != null ? PatientInfo.ContactNo.ToString() : "");
+                    template.Replace("{FullAddress}", PatientInfo.CountrySubDivisionName != null ? PatientInfo.CountrySubDivisionName.ToString() : "");
+                    template.Replace("{District}", PatientInfo.CountrySubDivisionName != null ? PatientInfo.CountrySubDivisionName.ToString() : "");
+                    template.Replace("{Country}", PatientInfo.CountryName != null ? PatientInfo.CountryName.ToString() : "");
+                    template.Replace("{Municipality}", PatientInfo.MunicipalityName != null ? PatientInfo.MunicipalityName.ToString() : "");
+                    template.Replace("{Address}", PatientInfo.Address != null ? PatientInfo.Address.ToString() : "");
+                    template.Replace("{Ward}", PatientInfo.WardNumber != null ? PatientInfo.WardNumber.ToString() : "");
+                    template.Replace("{CountrySubDivisionName}", PatientInfo.CountrySubDivisionName != null ? PatientInfo.CountrySubDivisionName.ToString() : "");
+                    template.Replace("{PolicyNo}", PatientInfo.PolicyNo != null ? PatientInfo.PolicyNo.ToString() : "");
+                    template.Replace("{finalAge}", PatientInfo.AgeFormatted != null ? PatientInfo.AgeFormatted.ToString() : "");
+                    template.Replace("{SchemeName}", PatientInfo.SchemeName);
+                    template.Replace("{IpNumber}", PatientInfo.InpatientNo);
+
+                    //template.Replace("{finalAge}", PatientInfo.Age != null ? PatientInfo.Age.ToString() : "");
+
+
+
+                    //InvoiceInfo Details
+
+
+                    var localDate = DanpheDateConvertor.ConvertEngToNepDate(DateTime.Now);
+                    string localDateString = localDate != null ? localDate.Year + "-" + localDate.Month + "-" + localDate.Day : "";
+                    template.Replace("{PrintDate}", DateTime.Now.ToString("yyyy-MM-dd"));
+                    template.Replace("{PrintDateBs}", localDateString);
+                    template.Replace("{PrintTime}", DateTime.Now.ToString("HH-mm-ss"));
+
+
+
+                    //Admission information
+
+
+                    var localAdmissionDate = DanpheDateConvertor.ConvertEngToNepDate(AdmissionInfo.AdmissionDate);
+                    string localAdmissionDateString = localAdmissionDate != null ? localAdmissionDate.Year + "-" + localAdmissionDate.Month + "-" + localAdmissionDate.Day : "";
+                    template.Replace("{AdmissionDate}", AdmissionInfo.AdmissionDate != null ? AdmissionInfo.AdmissionDate.ToString("yyyy-MM-dd") : "");
+                    template.Replace("{AdmissionDateBs}", localAdmissionDateString);
+                    template.Replace("{LenghtOfStay}", AdmissionInfo.LengthOfStay.ToString());
+                    template.Replace("{DepartmentName}", AdmissionInfo.Department);
+                    template.Replace("{RoomType}", AdmissionInfo.RoomType);
+                    template.Replace("{ProcedureType}", AdmissionInfo.ProcedureType);
+                    template.Replace("{CarePerson}", AdmissionInfo.CarePersonName);
+                    template.Replace("{CarePersonContact}", AdmissionInfo.CarePersonContact);
+                    template.Replace("{CarePersonRelation}", AdmissionInfo.Relation);
+
+                    var depositTotal = (deposits.Sum(p => p.InAmount)) - (deposits.Sum(p => p.OutAmount));
+                    template.Replace("{TotalDeposit}", (depositTotal != null ? depositTotal : 0).ToString());
+
+                    //Item Summary Data
+
+                    if (PrintType == "ip-estimation-discharge-summary")
+                    {
+                        foreach (var invoiceSummary in EstimationSummaryData)
+                        {
+
+                            tempDetailsTemplate = new StringBuilder(arrayOfHtmlDetails[0].ToString());
+                            InvoiceItemSn = InvoiceItemSn + 1;
+
+                            tempDetailsTemplate.Replace("{SN}", InvoiceItemSn.ToString());
+                            tempDetailsTemplate.Replace("{GroupName}", invoiceSummary.GroupName.ToString());
+                            tempDetailsTemplate.Replace("{SubTotal}", invoiceSummary.SubTotal.ToString());
+                            tempDetailsTemplate.Replace("{TotalAmount}", invoiceSummary.TotalAmount.ToString());
+                            printDetailsTemplate.Append(tempDetailsTemplate);
+                        }
+
+                        template.Replace("{InvoiceDetails}", printDetailsTemplate.ToString());
+
+
+                        tempDetailsTemplate = new StringBuilder(arrayOfHtmlDetails[1].ToString());
+                        if (tempDetailsTemplate.Length > 10)
+                        {
+                            InvoiceItemSn = 0;
+                            foreach (var phrmDetails in pharmacyBillItems)
+                            {
+                                tempDetailsTemplate = new StringBuilder(arrayOfHtmlDetails[1].ToString());
+                                InvoiceItemSn = InvoiceItemSn + 1;
+                                tempDetailsTemplate.Replace("{SN}", InvoiceItemSn.ToString());
+                                tempDetailsTemplate.Replace("{ItemName}", phrmDetails.ItemName);
+                                tempDetailsTemplate.Replace("{BillDate}", phrmDetails.BillDate.ToString());
+                                tempDetailsTemplate.Replace("{ItemCode}", phrmDetails.ItemCode != null ? phrmDetails.ItemCode.ToString() : "");
+                                tempDetailsTemplate.Replace("{ExpiryDate}", phrmDetails.BatchAndExpiry);
+                                tempDetailsTemplate.Replace("{Qnty}", phrmDetails.Quantity.ToString());
+                                tempDetailsTemplate.Replace("{SalesPrice}", phrmDetails.SalePrice.ToString());
+                                tempDetailsTemplate.Replace("{SubTotal}", phrmDetails.SubTotal.ToString());
+                                tempDetailsTemplate.Replace("{DiscountAmount}", phrmDetails.DiscountAmount.ToString());
+                                tempDetailsTemplate.Replace("{VatAmount}", phrmDetails.VATAmount.ToString());
+                                tempDetailsTemplate.Replace("{TotalAmount}", phrmDetails.TotalAmount.ToString());
+                                printPharmacyDetails.Append(tempDetailsTemplate);
+                            }
+                            template.Replace("{pharmacyDetails}", printPharmacyDetails.ToString());
+                        }
+                    }
+                    //Ip estimation details
+                    else
+                    {
+                        foreach (var invoiceItem in EstimationBillDetails)
+                        {
+                            InvoiceItemSn = InvoiceItemSn + 1;
+                            tempDetailsTemplate = new StringBuilder(arrayOfHtmlDetails[0].ToString());
+
+                            tempDetailsTemplate.Replace("{SN}", InvoiceItemSn.ToString());
+                            tempDetailsTemplate.Replace("{BillDate}", invoiceItem.BillDate.ToString());
+                            var billDate_temp = (DateTime)(invoiceItem.BillDate != null ? invoiceItem.BillDate : DateTime.Now);
+                            var billDate = DanpheDateConvertor.ConvertEngToNepDate(billDate_temp);
+                            string billdateDateString = billDate != null ? billDate.Year + "-" + billDate.Month + "-" + billDate.Day : "";
+                            tempDetailsTemplate.Replace("{BillDateBs}", billdateDateString);
+                            tempDetailsTemplate.Replace("{ItemCode}", invoiceItem.ItemCode != null ? invoiceItem.ItemCode.ToString() : string.Empty);
+                            tempDetailsTemplate.Replace("{ItemName}", invoiceItem.ItemName != null ? invoiceItem.ItemName.ToString() : string.Empty);
+                            tempDetailsTemplate.Replace("{Quantity}", invoiceItem.Quantity.ToString());
+                            tempDetailsTemplate.Replace("{Price}", invoiceItem.Price.ToString());
+                            tempDetailsTemplate.Replace("{SubTotal}", invoiceItem.SubTotal.ToString());
+                            tempDetailsTemplate.Replace("{DiscountAmount}", invoiceItem.DiscountAmount.ToString());
+                            tempDetailsTemplate.Replace("{TotalAmount}", invoiceItem.TotalAmount.ToString());
+                            printDetailsTemplate.Append(tempDetailsTemplate);
+                        }
+                        template.Replace("{InvoiceDetails}", printDetailsTemplate.ToString());
+                        tempDetailsTemplate = new StringBuilder(arrayOfHtmlDetails[1].ToString());
+                        if (tempDetailsTemplate.Length > 10)
+                        {
+                            InvoiceItemSn = 0;
+                            if (pharmacyBillItems.Count > 0)
+                            {
+                                foreach (var phrmDetails in pharmacyBillItems)
+                                {
+                                    tempDetailsTemplate = new StringBuilder(arrayOfHtmlDetails[1].ToString());
+                                    InvoiceItemSn = InvoiceItemSn + 1;
+                                    tempDetailsTemplate.Replace("{SN}", InvoiceItemSn.ToString());
+                                    tempDetailsTemplate.Replace("{ItemName}", phrmDetails.ItemName);
+                                    tempDetailsTemplate.Replace("{BillDate}", phrmDetails.BillDate.ToString());
+                                    tempDetailsTemplate.Replace("{ItemCode}", phrmDetails.ItemCode.ToString());
+                                    tempDetailsTemplate.Replace("{ExpiryDate}", phrmDetails.BatchAndExpiry);
+                                    tempDetailsTemplate.Replace("{Qnty}", phrmDetails.Quantity.ToString());
+                                    tempDetailsTemplate.Replace("{SalesPrice}", phrmDetails.SalePrice.ToString());
+                                    tempDetailsTemplate.Replace("{SubTotal}", phrmDetails.SubTotal.ToString());
+                                    tempDetailsTemplate.Replace("{DiscountAmount}", phrmDetails.DiscountAmount.ToString());
+                                    tempDetailsTemplate.Replace("{VatAmount}", phrmDetails.VATAmount.ToString());
+                                    tempDetailsTemplate.Replace("{TotalAmount}", phrmDetails.TotalAmount.ToString());
+
+                                    printPharmacyDetails.Append(tempDetailsTemplate);
+                                }
+                                template.Replace("{pharmacyDetails}", printPharmacyDetails.ToString());
+                            }
+                            else
+                            {
+
+                                template.Replace("{phdisplayClassName}", "pharmacyDetailshide");
+                            }
+                        }
+                        else
+                        {
+                            template.Replace("{phdisplayClassName}", "depositDetailshide");
+                        }
+                        tempDetailsTemplate = new StringBuilder(arrayOfHtmlDetails[2].ToString());
+                        if (tempDetailsTemplate.Length > 10)
+                        {
+                            InvoiceItemSn = 0;
+                            if (deposits.Count > 0)
+                            {
+                                foreach (var depDetails in deposits)
+                                {
+                                    tempDetailsTemplate = new StringBuilder(arrayOfHtmlDetails[2].ToString());
+                                    InvoiceItemSn = InvoiceItemSn + 1;
+                                    tempDetailsTemplate.Replace("{SN}", InvoiceItemSn.ToString());
+                                    tempDetailsTemplate.Replace("{ReceiptNo}", depDetails.ReceiptNo);
+                                    tempDetailsTemplate.Replace("{BillDate}", depDetails.Date.ToString());
+                                    tempDetailsTemplate.Replace("{Amount}", depDetails.InAmount == 0 ? depDetails.ToString() : "0");
+                                    tempDetailsTemplate.Replace("{Balance}", depDetails.Balance.ToString());
+                                    tempDetailsTemplate.Replace("{TransactionType}", depDetails.TransactionType.ToString());
+                                    printDepositDetails.Append(tempDetailsTemplate);
+                                }
+                                template.Replace("{depositDetails}", printDepositDetails.ToString());
+                            }
+                            else
+                            {
+                                template.Replace("{depositDisplayclass}", "depositDetailshide");
+                            }
+                        }
+                        else
+                        {
+                            template.Replace("{depositDisplayclass}", "depositDetailshide");
+                        }
+                    }
+                }
+                return template.ToString();
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
         //Returns BedCount for each BedFeatureIds. 
         static Dictionary<int, int> CalculateBedCounts(List<PatientBedInfo> bedInfos)
         {
@@ -1713,8 +2108,33 @@ namespace DanpheEMR.Controllers
             return dateTimes;
         }
 
+        private bool ReadDepositConfigureationParam()
+        {
+            var usePharmacyDepositsIndependently = false;
+            var param = _billingDbContext.AdminParameters.FirstOrDefault(p => p.ParameterGroupName == "Pharmacy" && p.ParameterName == "UsePharmacyDeposit");
+            if (param != null)
+            {
+                var paramValue = param.ParameterValue;
+                usePharmacyDepositsIndependently = paramValue == "true" ? true : false;
+            }
 
+            return usePharmacyDepositsIndependently;
+        }
+
+        private async Task<object> GetPreviousBillingProvisionalAmount(int patientId, int patientVisitId)
+        {
+            var previousBillingProvisional = await _billingDbContext.BillingTransactionItems
+                .Where(b => b.PatientId == patientId
+                        && b.PatientVisitId != patientVisitId
+                        && b.BillStatus == ENUM_BillingStatus.provisional)
+                .GroupBy(g => g.PatientId)
+                .Select(s => new
+                {
+                    PatientId = s.Key,
+                    BillingProvisionalAmount = s.Sum(x => x.TotalAmount)
+                }).FirstOrDefaultAsync();
+
+            return previousBillingProvisional;
+        }
     }
-
-
 }

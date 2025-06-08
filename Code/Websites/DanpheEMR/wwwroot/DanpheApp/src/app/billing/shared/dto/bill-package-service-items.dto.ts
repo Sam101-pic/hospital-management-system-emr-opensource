@@ -4,6 +4,7 @@ export class BillingPackageServiceItems_DTO {
   public ServiceItemId: number = 0;
   public DiscountPercent: number = 0;
   public Quantity: number = 0;
+  public Price: number = 0;
   public PerformerId: number = null;
   public IsActive: boolean = false;
 }

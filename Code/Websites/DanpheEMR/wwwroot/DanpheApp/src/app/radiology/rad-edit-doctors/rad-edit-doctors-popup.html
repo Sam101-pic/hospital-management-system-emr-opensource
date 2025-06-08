@@ -32,13 +32,17 @@
                 <th class="thBoder">ItemName</th>
                 <th class="thBoder">Reporting Doctor(Radiologist)</th>
                 <th class="thBoder">Prescriber Dr. Name </th>
+                <th class="thBoder">Referrer Name </th>
               </tr>
               <tr>
                 <!--<th>{{SelectedItem.Date}}</th>-->
                 <th class="thBoder">{{SelectedItem.ServiceDepartmentName}}</th>
                 <th class="thBoder">{{SelectedItem.ItemName}}</th>
                 <th class="thBoder">{{SelectedItem.PerformerName}}</th>
-                <th class="thBoder">{{SelectedItem.PrescriberName ? SelectedItem.PrescriberName : 'SELF'}} <a (click)="showPrescriber()">Change?</a></th>
+                <th class="thBoder">{{SelectedItem.PrescriberName ? SelectedItem.PrescriberName : 'SELF'}}
+                  <!-- <a (click)="showPrescriber()">Change?</a> -->
+                </th>
+                <th class="thBoder">{{SelectedItem.ReferrerName}}</th>
               </tr>
             </table>
             <table class="table table-striped table-bordered table-hover">
@@ -46,7 +50,7 @@
                 <td> Reporting Doctor(Radiologist) : </td>
                 <td>
                   <div style="width:200px;">
-                    <input danphe-auto-complete  class="search-textbox"
+                    <input danphe-auto-complete class="search-textbox"
                            [(ngModel)]="newPerformer"
                            [list-formatter]="PerformerListFormatter"
                            [source]="doctorList"
@@ -61,7 +65,7 @@
               <tr *ngIf="showPrescriberChange">
                 <td> Change Prescriber Doctor: </td>
                 <td>
-                  <div  style="width:200px;">
+                  <div style="width:200px;">
                     <input danphe-auto-complete class="search-textbox"
                            [(ngModel)]="newPrescriber"
                            [list-formatter]="PerformerListFormatter"
@@ -74,9 +78,18 @@
                   </div>
                 </td>
               </tr>
+              <tr>
+                <td> Change Referrer: </td>
+                <td>
+                  <select-referrer [selected-ref-id]="SelectedRefId" [allow-external]="true" [default-external]="false"
+                                   [selected-ref-name]="SelectedReferrerName" (on-referrer-change)="OnReferrerChanged($event)"
+                                   class="ref-er">
+                  </select-referrer>
+                </td>
+              </tr>
             </table>
           </div>
-          <div class="panel-footer"><input type="button" class="btn btn-danger" value="Update" (click)="UpdatePeformerAndPrescriber()" /></div>
+          <div class="panel-footer"><input type="button" class="btn btn-danger" value="Update" (click)="UpdatePerformerAndPrescriber()" /></div>
         </div>
       </div>
     </div>

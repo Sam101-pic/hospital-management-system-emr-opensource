@@ -4,7 +4,7 @@ import { Patient } from '../../../patients/shared/patient.model';
 import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { CommonFunctions } from '../../../shared/common.functions';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponses } from '../../../shared/shared-enums';
+import { ENUM_DanpheHTTPResponses, ENUM_IntegrationNames, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { BillingMasterBlService } from '../../shared/billing-master.bl.service';
 import { BillingTransactionItem } from '../../shared/billing-transaction-item.model';
 import { BillingBLService } from '../../shared/billing.bl.service';
@@ -66,6 +66,7 @@ export class EditBillItemComponent {
     if (this.itemToEdit_Input) {
 
       this.itemToEdit = Object.assign({}, this.itemToEdit_Input);
+      this.itemToEdit.PreviousQuantity = this.itemToEdit.Quantity;
       if (this.doctorList) {
         this.docDDLSource = this.doctorList;
         this.selectedPerformer = null;
@@ -95,8 +96,13 @@ export class EditBillItemComponent {
     });
     //console.log("from edit item component.");
     //console.log(this.docDDLSource);
+    this.selPatInfo.AgeSex = this.SetAgeAndGender(this.selPatInfo.DateOfBirth, this.selPatInfo.Gender);
   }
-
+  SetAgeAndGender(dateOfBirth: string, gender: string): string {
+    const age = this.coreService.CalculateAge(dateOfBirth);
+    const Agesex = this.coreService.FormateAgeSex(age, gender);
+    return Agesex;
+  }
 
   ngOnDestroy() {
     // remove listener
@@ -118,6 +124,10 @@ export class EditBillItemComponent {
       if (this.itemToEdit.IsAutoBillingItem) {
         this.itemToEdit.IsAutoCalculationStop = true;
       }
+      if (this.itemToEdit.ItemIntegrationName === ENUM_IntegrationNames.BedCharges && this.itemToEdit.Quantity !== this.itemToEdit.PreviousQuantity) {
+        this.itemToEdit.IsBedChargeQuantityEdited = true;
+      }
+
       this.billingBlService.UpdateBillItem_PriceQtyDiscNDoctor(this.itemToEdit)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status == "OK") {
@@ -160,7 +170,12 @@ export class EditBillItemComponent {
               this.showCancelPrintPopup = true;
               //alert("Item Cancelled Successfully.");
               //this.onClose.emit({ CloseWindow: true, EventName: "cancelled" });
+            } else {
+              this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, [`Cannot Cancel the Item!`]);
             }
+          }, err => {
+            console.log(err);
+            this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, [err]);
           });
       }
     }

@@ -5,6 +5,7 @@ import { VisitService } from '../../appointments/shared/visit.service';
 import { BillingMasterBlService } from '../../billing/shared/billing-master.bl.service';
 import { BillingTransactionItem } from '../../billing/shared/billing-transaction-item.model';
 import { BillingBLService } from '../../billing/shared/billing.bl.service';
+import { SchemePriceCategory_DTO } from '../../billing/shared/dto/scheme-pricecategory.dto';
 import { CoreService } from '../../core/shared/core.service';
 import { InPatientLabTest } from '../../labs/shared/InpatientLabTest';
 import { Patient } from '../../patients/shared/patient.model';
@@ -54,7 +55,8 @@ export class ERWardBillingComponent {
   public NepaliDateInGridSettings = new NepaliDateInGridParams();
   public SelectedSchemePriceCategory = { SchemeId: 0, PriceCategoryId: 0 }
   public showSchemePriceCategory: boolean = true;
-
+  public serviceBillingContext: string = ENUM_ServiceBillingContext.OpBilling;
+  public SchemePriceCategory = new SchemePriceCategory_DTO();
   constructor(
     private _changeDetector: ChangeDetectorRef,
     private _messageBoxService: MessageboxService,
@@ -389,4 +391,10 @@ export class ERWardBillingComponent {
     }
   }
 
+
+  OnSchemePriceCategoryChanged(schemePriceObj: SchemePriceCategory_DTO): void {
+    if (schemePriceObj) {
+      this.SchemePriceCategory = schemePriceObj;
+    }
+  }
 }

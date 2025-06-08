@@ -5,10 +5,9 @@ import { CoreService } from "../../../core/shared/core.service";
 import { PatientService } from '../../../patients/shared/patient.service';
 import { SecurityService } from '../../../security/shared/security.service';
 import { DanpheHTTPResponse } from '../../../shared/common-models';
-import { CommonFunctions } from '../../../shared/common.functions';
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_LabVerificationStatus, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import LabGridColumnSettings from '../../shared/lab-gridcol-settings';
 import { LabSticker } from '../../shared/lab-sticker.model';
 import { LabService } from '../../shared/lab.service';
@@ -21,6 +20,7 @@ import { LabsBLService } from '../../shared/labs.bl.service';
 })
 export class LabTestsPendingReports {
   public reportList: Array<any>;
+  public FilteredReportList: any[] = [];
   gridColumns: Array<any> = null;
   public showAddEditResult: boolean = false;
   public showlabsticker: boolean = false;
@@ -41,7 +41,33 @@ export class LabTestsPendingReports {
   public routeAfterVerification: string;
 
   public loading: boolean = false;
-
+  public VerificationStatus: string = "";
+  public ShowUndoOption: boolean = false;
+  public IsSelectedRowPreVerified: boolean = false;
+  public IsPreVerificationEnabled: boolean = false;
+  public VerificationStatusOptions = [
+    {
+      id: "labPendingReport_verificationStatus_all",
+      value: "All",
+      label: {
+        value: "All",
+      }
+    },
+    {
+      id: "labPendingReport_verificationStatus_pending",
+      value: "Pending",
+      label: {
+        value: "Pending",
+      }
+    },
+    {
+      id: "labPendingReport_verificationStatus_preVerified",
+      value: "Pre-Verified",
+      label: {
+        value: "Pre-Verified",
+      }
+    }
+  ];
   constructor(public labBLService: LabsBLService, public coreService: CoreService,
     public changeDetector: ChangeDetectorRef, public labService: LabService,
     public msgBoxService: MessageboxService, public router: Router,
@@ -59,7 +85,7 @@ export class LabTestsPendingReports {
       }
 
     }
-    //this.GetPendingReportList();
+    this.ProcessPreVerification();
   }
 
   ngOnInit() {
@@ -79,6 +105,7 @@ export class LabTestsPendingReports {
 
   BackToGrid() {
     this.showGrid = true;
+    this.FilteredReportList = [];
     //reset patient on header;
     this.requisitionIdList = [];
     this.patientService.CreateNewGlobal();
@@ -87,37 +114,21 @@ export class LabTestsPendingReports {
   GetPendingReportList(frmdate, todate, categoryList) {
     this.reportList = [];
     this.labBLService.GetLabTestPendingReports(frmdate, todate, categoryList)
-      .finally(() => { this.loading = false })//re-enable button after response comes back.
+      .finally(() => {
+        this.loading = false;
+        this.ShowUndoOption = false;
+      })//re-enable button after response comes back.
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
           this.reportList = res.Results;
-          this.reportList.forEach(result => {
-            let testNameCSV: string;
-            let templateNameCSV: string;
-            let IsVerificationEnabled = this.coreService.EnableVerificationStep();
-            result["verificationEnabled"] = IsVerificationEnabled;
-            result["signatureUpdated"] = true;
-            result.Tests.forEach(test => {
-              if (!test.LabReportId) { result["signatureUpdated"] = false; }
-              if (!testNameCSV)
-                testNameCSV = test.TestName;
-              else
-                testNameCSV = testNameCSV + "," + test.TestName;
-              //this is removed because it didnt show the same TestName of single patient Twice
-              //testNameCSV += testNameCSV.includes(test.TestName) ? "" : "," + test.TestName;
-
-              if (!templateNameCSV)
-                templateNameCSV = test.ReportTemplateShortName;
-              else
-                templateNameCSV += templateNameCSV.includes(test.ReportTemplateShortName) ? "" : "," + test.ReportTemplateShortName;
-            });
-            result.LabTestCSV = testNameCSV;
-            result.TemplateName = templateNameCSV;
-          });
           this.reportList = this.reportList.slice();
+          this.FilteredReportList = this.reportList;
+          if (this.IsPreVerificationEnabled) {
+            this.FilterByVerificationStatus();
+          }
         }
         else {
-          this.msgBoxService.showMessage('failed', ['Unable to get Final Report List']);
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Unable to get Final Report List']);
           console.log(res.ErrorMessage);
         }
       });
@@ -136,14 +147,16 @@ export class LabTestsPendingReports {
           this.requisitionIdList = [];
 
           if ($event.Data.signatureUpdated) {
-            $event.Data.Tests.forEach(reqId => {
+
+            let reqs = $event.Data.RequisitionIdsCSV.split(',');
+            reqs.forEach(reqId => {
               if (this.requisitionIdList && this.requisitionIdList.length) {
-                if (!this.requisitionIdList.includes(reqId.RequisitionId)) {
-                  this.requisitionIdList.push(reqId.RequisitionId);
+                if (!this.requisitionIdList.includes(+reqId)) {
+                  this.requisitionIdList.push(+reqId);
                 }
               }
               else {
-                this.requisitionIdList.push(reqId.RequisitionId);
+                this.requisitionIdList.push(+reqId);
               }
             });
 
@@ -166,8 +179,10 @@ export class LabTestsPendingReports {
           this.PatientLabInfo.HospitalNumber = $event.Data.PatientCode;
           let dob = $event.Data.DateOfBirth;
           let gender: string = $event.Data.Gender;
-          this.PatientLabInfo.AgeSex = CommonFunctions.GetFormattedAgeSex(dob, gender);
-          this.PatientLabInfo.Age = CommonFunctions.GetFormattedAge(dob);
+          this.PatientLabInfo.Age = this.coreService.CalculateAge(dob);
+          if (this.PatientLabInfo.Age) {
+            this.PatientLabInfo.AgeSex = this.coreService.FormateAgeSex(this.PatientLabInfo.Age, gender);
+          }
           this.PatientLabInfo.Sex = gender;
           this.PatientLabInfo.PatientName = $event.Data.PatientName;
           this.PatientLabInfo.RunNumber = $event.Data.SampleCode;
@@ -176,14 +191,15 @@ export class LabTestsPendingReports {
           this.PatientLabInfo.BarCodeNumber = $event.Data.BarCodeNumber;
           this.PatientLabInfo.TestName = $event.Data.LabTestCSV;
 
-          $event.Data.Tests.forEach(reqId => {
+          let reqs = $event.Data.RequisitionIdsCSV.split(',');
+          reqs.forEach(reqId => {
             if (this.requisitionIdList && this.requisitionIdList.length) {
-              if (!this.requisitionIdList.includes(reqId.RequisitionId)) {
-                this.requisitionIdList.push(reqId.RequisitionId);
+              if (!this.requisitionIdList.includes(+reqId)) {
+                this.requisitionIdList.push(+reqId);
               }
             }
             else {
-              this.requisitionIdList.push(reqId.RequisitionId);
+              this.requisitionIdList.push(+reqId);
             }
           });
 
@@ -203,6 +219,27 @@ export class LabTestsPendingReports {
 
 
         }
+        break;
+      case "undo":
+        {
+          this.IsSelectedRowPreVerified = false;
+          this.requisitionIdList = [];
+          this.ShowUndoOption = true;
+          let reqs = $event.Data.RequisitionIdsCSV.split(',');
+          reqs.forEach(reqId => {
+            if (this.requisitionIdList && this.requisitionIdList.length) {
+              if (!this.requisitionIdList.includes(+reqId)) {
+                this.requisitionIdList.push(+reqId);
+              }
+            }
+            else {
+              this.requisitionIdList.push(+reqId);
+            }
+          });
+          this.IsSelectedRowPreVerified = ($event.Data.VerificationStatus === ENUM_LabVerificationStatus.PreVerified);
+        }
+
+        break;
       default:
         break;
     }
@@ -217,17 +254,17 @@ export class LabTestsPendingReports {
     this.patientService.getGlobal().Gender = $event.Data.Gender;
     this.patientService.getGlobal().Ins_HasInsurance = $event.Data.HasInsurance;
 
-
     //this is removed because it didnt show the two diff. RequisitionID of same TestName of single patient Twice
     //this.requisitionIdList = $event.Data.Tests.map(test => { return test.RequisitionId });
-    $event.Data.Tests.forEach(reqId => {
+    let reqs = $event.Data.RequisitionIdsCSV.split(',');
+    reqs.forEach(reqId => {
       if (this.requisitionIdList && this.requisitionIdList.length) {
-        if (!this.requisitionIdList.includes(reqId.RequisitionId)) {
-          this.requisitionIdList.push(reqId.RequisitionId);
+        if (!this.requisitionIdList.includes(+reqId)) {
+          this.requisitionIdList.push(+reqId);
         }
       }
       else {
-        this.requisitionIdList.push(reqId.RequisitionId);
+        this.requisitionIdList.push(+reqId);
       }
     });
 
@@ -307,18 +344,92 @@ export class LabTestsPendingReports {
     }, 500);
   }
 
+  public FilterByVerificationStatus() {
+    if (this.VerificationStatus === ENUM_LabVerificationStatus.Pending) {
+      this.FilteredReportList = this.reportList.filter(a => a.VerificationStatus === ENUM_LabVerificationStatus.Pending);
+    }
+    else if (this.VerificationStatus === ENUM_LabVerificationStatus.PreVerified) {
+      this.FilteredReportList = this.reportList.filter(a => a.VerificationStatus === ENUM_LabVerificationStatus.PreVerified);
+    }
+    else if (this.VerificationStatus === ENUM_LabVerificationStatus.All) {
+      this.FilteredReportList = this.reportList;
+    }
+    else {
+      this.FilteredReportList = [];
+    }
+  }
+
+  CloseUndoConfirmationBox() {
+    this.requisitionIdList = [];
+    this.ShowUndoOption = false;
+  }
+
+  UndoPendingReport() {
+    this.loading = true;
+    this.labBLService.UndoPendingReport(this.requisitionIdList)
+      .finally(() => {
+        this.loading = false;
+      })
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Success, [`Undo operation for this report is successfully completed.`]);
+          this.GetPendingReportList(this.fromDate, this.toDate, this.catIdList);
+        } else {
+          this.ShowUndoOption = false;
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Unable to undo selected report.']);
+        }
+      }, (err: DanpheHTTPResponse) => {
+        this.ShowUndoOption = false;
+        this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Exception: ${err.ErrorMessage}`]);
+      });
+  }
+
+  public ProcessPreVerification() {
+    const maxVerificationPermissionCount = 3;
+    let param = this.coreService.Parameters.find(val => val.ParameterName === "LabReportVerificationNeededB4Print" && val.ParameterGroupName === "LAB");
+    if (param) {
+      let paramValue = JSON.parse(param.ParameterValue);
+      if (paramValue) {
+        this.IsPreVerificationEnabled = JSON.parse(paramValue.EnablePreVerification);
+      }
+    }
+    if (!this.securityService.HasPermission('radio-filter-lab-verification-status-pending')) {
+      let index = this.VerificationStatusOptions.findIndex(a => a.id === "labPendingReport_verificationStatus_pending");
+      if (index >= 0) {
+        this.VerificationStatusOptions.splice(index, 1);
+      }
+    }
+    if (!this.securityService.HasPermission('radio-filter-lab-verification-status-pre-verified')) {
+      let index = this.VerificationStatusOptions.findIndex(a => a.id === "labPendingReport_verificationStatus_preVerified");
+      if (index >= 0) {
+        this.VerificationStatusOptions.splice(index, 1);
+      }
+    }
+    if (this.VerificationStatusOptions.length !== maxVerificationPermissionCount) {
+      let index = this.VerificationStatusOptions.findIndex(a => a.id === "labPendingReport_verificationStatus_all");
+      if (index >= 0) {
+        this.VerificationStatusOptions.splice(index, 1);
+      }
+    }
+    this.VerificationStatus = this.VerificationStatusOptions.length === maxVerificationPermissionCount ? ENUM_LabVerificationStatus.PreVerified : this.VerificationStatusOptions.length > 0 ? this.VerificationStatusOptions[0].value : "";
+  }
+
+  ngOnDestroy(): void {
+    this.patientService.CreateNewGlobal();
+  }
 }
 
 
 export class LabPendingReportColumnSettings {
-  public IsVerificatioStepEnabled: boolean = true;
-  public HasVerificationStepEnabled: boolean = false;
+  static IsVerificatioStepEnabled: boolean = true;
+  static HasVerificationStepEnabled: boolean = false;
   static securityServ: any;
 
   constructor(public securityService: SecurityService, public coreService: CoreService) {
-    this.IsVerificatioStepEnabled = this.coreService.EnableVerificationStep();
-    this.HasVerificationStepEnabled = this.securityService.HasPermission('lab-verifier');
+    LabPendingReportColumnSettings.IsVerificatioStepEnabled = this.coreService.EnableVerificationStep();
+    LabPendingReportColumnSettings.HasVerificationStepEnabled = this.securityService.HasPermission('lab-verifier');
     LabPendingReportColumnSettings.securityServ = this.securityService;
+    new LabGridColumnSettings(this.securityService);
   }
 
 
@@ -327,17 +438,18 @@ export class LabPendingReportColumnSettings {
     let LabTestPendingReportList: Array<any> = [
       { headerName: "Hospital No.", field: "PatientCode", width: 80 },
       { headerName: "Patient Name", field: "PatientName", width: 130 },
-      { headerName: "Age/Sex", field: "", width: 90, cellRenderer: LabGridColumnSettings.AgeSexRendererPatient },
+      { headerName: "Age/Sex", field: "", width: 90, cellRenderer: LabGridColumnSettings.NewAgeSexRendererPatient },
       { headerName: "Phone Number", field: "PhoneNumber", width: 100 },
       { headerName: "Test Name", field: "LabTestCSV", width: 170 },
       { headerName: "Requesting Dept.", field: "WardName", width: 70 },
       { headerName: "Run No.", field: "SampleCodeFormatted", width: 60 },
       { headerName: "Bar Code", field: "BarCodeNumber", width: 70 },
+      { headerName: "Status", field: "VerificationStatus", width: 70 },
       {
         headerName: "Action",
         field: "",
         width: 200,
-        template: this.VerifyRenderer()
+        cellRenderer: LabPendingReportColumnSettings.VerifyRenderer,
       }
     ];
     var filteredColumns = [];
@@ -363,7 +475,7 @@ export class LabPendingReportColumnSettings {
 
   }
 
-  public VerifyRenderer() {
+  static VerifyRenderer(params) {
     let template = "";
     if (LabPendingReportColumnSettings.securityServ.HasPermission("btn-pending-reports-view")) {
       template += `<a danphe-grid-action="ViewDetails" class="grid-action">
@@ -376,10 +488,27 @@ export class LabPendingReportColumnSettings {
         `
     }
 
-    if (this.IsVerificatioStepEnabled && this.HasVerificationStepEnabled) {
-      template = template + `<a danphe-grid-action="verify" class="grid-action">Verify</a>`;
+    // if (LabPendingReportColumnSettings.IsPreVerificationEnabled && LabPendingReportColumnSettings.HasPermissionOfPreVerification && params.data.Tests.some(a => a.IsPreVerified === false)) {
+    //   template += `<a danphe-grid-action="pre-verify" class="grid-action">Pre-Verify</a>`
+    // }
+    // else {
+    //   if (LabPendingReportColumnSettings.IsVerificatioStepEnabled && LabPendingReportColumnSettings.HasVerificationStepEnabled) {
+    //     template = template + `<a danphe-grid-action="verify" class="grid-action">Verify</a>`;
+    //   }
+    // }
+
+
+
+    template += `<div class="dropdown" style="display:inline-block;">
+    <button class="dropdown-toggle grid-btnCstm" type="button" data-toggle="dropdown">...
+      <span class="caret"></span></button>
+      <ul class="dropdown-menu grid-ddlCstm">`;
+
+    if (LabGridColumnSettings.securityServ.HasPermission("btn-pending-report-undo")) {
+      template += `<li><a danphe-grid-action="undo">Undo</a></li>`;
     }
 
+    template += `</ul></div>`;
     return template;
   }
 

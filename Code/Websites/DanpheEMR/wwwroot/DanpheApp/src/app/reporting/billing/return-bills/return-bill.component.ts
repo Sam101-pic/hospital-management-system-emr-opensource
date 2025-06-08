@@ -1,17 +1,17 @@
-import { Component, Directive, ViewChild } from '@angular/core';
+import { Component } from '@angular/core';
 import * as moment from 'moment/moment';
 
 import { ReportingService } from "../../../reporting/shared/reporting-service";
 import { RPT_BIL_ReturnBillModel } from './return-bill.model';
 
-import { DLService } from "../../../shared/dl.service"
+import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 
 import { CommonFunctions } from '../../../shared/common.functions';
 
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { CoreService } from '../../../core/shared/core.service';
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 
 @Component({
   templateUrl: "./return-bill.html"
@@ -33,21 +33,22 @@ export class RPT_BIL_ReturnBillReportComponent {
   public dateRange: string = "";
 
   public SummaryData = {
-    "TotalReturnAmount":0,
-    "TotalDiscountAmount":0,
-    "NetReturnAmount":0
+    "TotalReturnAmount": 0,
+    "TotalDiscountAmount": 0,
+    "NetReturnAmount": 0
   };
-  public ShowReturnBillsDetail:boolean = false;
-  public IsReturnBillDetailsLoaded:boolean = false;
-  public ReturnBillDetail:any;
-  public ReturnBillRowData:any;
-  public footerContent:any;
+  public ShowReturnBillsDetail: boolean = false;
+  public IsReturnBillDetailsLoaded: boolean = false;
+  public ReturnBillDetail: any;
+  public ReturnBillRowData: any;
+  public footerContent: any;
 
   constructor(_dlService: DLService, public msgBoxServ: MessageboxService,
     public reportServ: ReportingService, public coreService: CoreService) {
     this.dlService = _dlService;
     this.currentReturnBill.fromDate = moment().format('YYYY-MM-DD');
     this.currentReturnBill.toDate = moment().format('YYYY-MM-DD');
+    this.ReturnBillColumns = this.reportServ.reportGridCols.ReturnBillGridColumn;
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("Date", false));
   }
   gridExportOptions = {
@@ -86,7 +87,6 @@ export class RPT_BIL_ReturnBillReportComponent {
         this.coreService.GetReportHeaderTextForProperty('CreditNoteReportHeader')
       );
 
-      this.ReturnBillColumns = this.reportServ.reportGridCols.ReturnBillGridColumn;
 
       if (res.Results && res.Results.length) {
         res.Results.forEach(bil => {
@@ -100,13 +100,12 @@ export class RPT_BIL_ReturnBillReportComponent {
       }
 
       this.ReturnBillData = res.Results;
-      if(this.ReturnBillData.length>0){
+      if (this.ReturnBillData.length > 0) {
         this.CalculateReturnBillSummary(this.ReturnBillData);
       }
     }
     else if (res.Status == "OK" && res.Results.length == 0) {
       this.msgBoxServ.showMessage("notice-message", ['No Data is Available Between Selected Parameters....Try Different Dates'])
-      this.ReturnBillColumns = this.reportServ.reportGridCols.ReturnBillGridColumn;
       this.ReturnBillData = res.Results;
     }
     else {
@@ -114,12 +113,12 @@ export class RPT_BIL_ReturnBillReportComponent {
     }
   }
 
-  CalculateReturnBillSummary(returnBillData){
-    if(returnBillData){
+  CalculateReturnBillSummary(returnBillData) {
+    if (returnBillData) {
       let netReturnAmount = 0;
 
-      let totalReturnAmount = returnBillData.reduce(function(acc,itm) { return acc + itm.SubTotal; }, 0)
-      let totalDiscountAmount = returnBillData.reduce(function(acc,itm) { return acc + itm.DiscountAmount; }, 0)
+      let totalReturnAmount = returnBillData.reduce(function (acc, itm) { return acc + itm.SubTotal; }, 0)
+      let totalDiscountAmount = returnBillData.reduce(function (acc, itm) { return acc + itm.DiscountAmount; }, 0)
       netReturnAmount = (totalReturnAmount - totalDiscountAmount);
 
       this.SummaryData.TotalReturnAmount = CommonFunctions.parseAmount(totalReturnAmount);
@@ -159,14 +158,14 @@ export class RPT_BIL_ReturnBillReportComponent {
     this.dateRange = "<b>Date:</b>&nbsp;" + this.fromDate + "&nbsp;<b>To</b>&nbsp;" + this.toDate;
   }
 
-  public ReturnBillGridActions($event:GridEmitModel){
-    switch($event.Action){
-      case 'view':{
+  public ReturnBillGridActions($event: GridEmitModel) {
+    switch ($event.Action) {
+      case 'view': {
         this.ShowReturnBillsDetail = true;
         var data = $event.Data;
-        if(data){
+        if (data) {
           this.IsReturnBillDetailsLoaded = true;
-           this.ReturnBillRowData = data;
+          this.ReturnBillRowData = data;
           this.LoadReturnBillDetail(data.BillReturnId);
 
         }
@@ -175,13 +174,13 @@ export class RPT_BIL_ReturnBillReportComponent {
     }
   }
 
- public CloseDetailsPopup(){
-  this.ShowReturnBillsDetail = false;
+  public CloseDetailsPopup() {
+    this.ShowReturnBillsDetail = false;
   }
 
-  public LoadReturnBillDetail(billReturnId:number){
+  public LoadReturnBillDetail(billReturnId: number) {
     if (billReturnId) {
-      this.dlService.Read("/BillingReports/ReturnBillReportViewDetail?BillReturnId="+billReturnId)
+      this.dlService.Read("/BillingReports/ReturnBillReportViewDetail?BillReturnId=" + billReturnId)
         .map(res => res)
         .finally(() => { this.loading = false; })
         .subscribe(res => this.GotReturnBillData(res),
@@ -191,10 +190,10 @@ export class RPT_BIL_ReturnBillReportComponent {
       this.msgBoxServ.showMessage("error", ['Bill Return Is not Available']);
     }
   }
-  GotReturnBillData(res){
+  GotReturnBillData(res) {
     if (res.Status == "OK" && res.Results.length > 0) {
-      this.ReturnBillDetail = res.Results; 
-      }
+      this.ReturnBillDetail = res.Results;
+    }
   }
 
 }

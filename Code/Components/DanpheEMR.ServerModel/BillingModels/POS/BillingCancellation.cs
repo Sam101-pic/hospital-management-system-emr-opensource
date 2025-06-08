@@ -16,7 +16,7 @@ namespace DanpheEMR.ServerModel
         public int CancellationReceiptNo { get; set; }
         public int CancellationFiscalYearId { get; set; }
         public int PatientId { get; set; }
-        public int PatientVisitId { get; set; }
+        public int? PatientVisitId { get; set; }
         public string BillingType { get; set; }
         public string VisitType { get; set; }
         public int ServiceItemId { get; set; }

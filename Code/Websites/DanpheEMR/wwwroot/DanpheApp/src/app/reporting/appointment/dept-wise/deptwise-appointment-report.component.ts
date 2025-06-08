@@ -1,13 +1,16 @@
-import { Component } from '@angular/core';
-import { ReportingService } from "../../../reporting/shared/reporting-service";
-import { DynamicReport } from "../../shared/dynamic-report.model"
-import { DLService } from "../../../shared/dl.service"
 import { HttpClient } from '@angular/common/http';
+import { Component } from '@angular/core';
 import * as moment from 'moment/moment';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
-import { CommonFunctions } from '../../../shared/common.functions';
+import { ReportingService } from "../../../reporting/shared/reporting-service";
 import { Department } from '../../../settings-new/shared/department.model';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { CommonFunctions } from '../../../shared/common.functions';
+import { DLService } from "../../../shared/dl.service";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { DepartmentWiseAppointmentReportSummary_DTO } from '../../shared/dto/dept-wise-appt-rpt-summary.dto';
+import { RPT_SchemeDTO } from '../../shared/dto/scheme.dto';
+import { DynamicReport } from '../../shared/dynamic-report.model';
 
 @Component({
   templateUrl: "./deptwise-appointment-report.html"
@@ -21,11 +24,11 @@ export class RPT_APPT_DeptWiseAppointmentReportComponent {
   DepartmentWiseAppointmentReportColumns: Array<any> = null;
   DepartmentWiseAppointmentReportData: Array<any> = new Array<DynamicReport>();
   dynamicColumns: Array<string> = new Array<string>();
-  public currentdepartmentappointment: DynamicReport = new DynamicReport();
+  public CurrentDepartmentAppointment: DynamicReport = new DynamicReport();
   dlService: DLService = null;
   http: HttpClient = null;
   public departmentList: Array<Department>;
-  public summary = { tot_new: 0, tot_followup: 0, tot_referral: 0, tot_all: 0 };
+  DepartmentWiseAppointmentReportSummary = new DepartmentWiseAppointmentReportSummary_DTO();
   public selGenderName: string = "all";
   // public summaryHtml: string = null;
 
@@ -34,63 +37,64 @@ export class RPT_APPT_DeptWiseAppointmentReportComponent {
     //displayColumns: ['PatientCode', 'ShortName', 'Gender', 'MiddleName', 'DateOfBirth', 'PhoneNumber']
 
   };
+  Schemes = new Array<RPT_SchemeDTO>();
+  SelectedScheme = new RPT_SchemeDTO();
+
   constructor(
     _http: HttpClient,
     _dlService: DLService,
-    public msgBoxServ: MessageboxService,
-    public reportServ: ReportingService) {
+    private _messageBoxService: MessageboxService,
+    private _reportingService: ReportingService) {
     this.http = _http;
     this.dlService = _dlService;
-    this.currentdepartmentappointment.fromDate = moment().format('YYYY-MM-DD');
-    this.currentdepartmentappointment.toDate = moment().format('YYYY-MM-DD');
+    this.CurrentDepartmentAppointment.fromDate = moment().format('YYYY-MM-DD');
+    this.CurrentDepartmentAppointment.toDate = moment().format('YYYY-MM-DD');
     this.GetDepartments();
-    this.DepartmentWiseAppointmentReportColumns = this.reportServ.reportGridCols.RPT_APPT_DepartmentWiseAppointmentCounts;
+    this.DepartmentWiseAppointmentReportColumns = this._reportingService.reportGridCols.RPT_APPT_DepartmentWiseAppointmentCounts;
+    this.Schemes = this._reportingService.SchemeList;
   }
 
 
   Load() {
-    if (this.currentdepartmentappointment.fromDate != null && this.currentdepartmentappointment.toDate != null) {
+    if (this.CurrentDepartmentAppointment.fromDate != null && this.CurrentDepartmentAppointment.toDate != null) {
       //reset all values to zero on button click.
-      this.summary.tot_all = this.summary.tot_new = this.summary.tot_followup = this.summary.tot_referral = 0;
+      this.DepartmentWiseAppointmentReportSummary = new DepartmentWiseAppointmentReportSummary_DTO();
       this.DepartmentWiseAppointmentReportData = [];
       let deptId = 0;
-      if (this.currentdepartmentappointment && this.currentdepartmentappointment.departmentName && this.currentdepartmentappointment.departmentName.DepartmentId) {
-        deptId = this.currentdepartmentappointment.departmentName.DepartmentId;
+      if (this.CurrentDepartmentAppointment && this.CurrentDepartmentAppointment.departmentName && this.CurrentDepartmentAppointment.departmentName.DepartmentId) {
+        deptId = this.CurrentDepartmentAppointment.departmentName.DepartmentId;
       }
 
 
       this.dlService.Read("/Reporting/DepartmentWiseAppointmentReport?FromDate="
-        + this.currentdepartmentappointment.fromDate + "&ToDate=" + this.currentdepartmentappointment.toDate + "&DepartmentId=" + deptId + "&gender=" + this.selGenderName)
-        .map(res => res)
+        + this.CurrentDepartmentAppointment.fromDate + "&ToDate=" + this.CurrentDepartmentAppointment.toDate + "&DepartmentId=" + deptId + "&gender=" + this.selGenderName
+        + "&SchemeId=" + this.CurrentDepartmentAppointment.SchemeId + "&IsFreeVisit=" + this.CurrentDepartmentAppointment.IsFreeVisit)
+        .map((res: DanpheHTTPResponse) => res)
         .subscribe(res => this.Success(res),
           res => this.Error(res));
     } else {
-      this.msgBoxServ.showMessage("error", ['Dates Provided is not Proper']);
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Dates Provided is not Proper']);
     }
 
   }
 
   Error(err) {
-    this.msgBoxServ.showMessage("error", [err]);
+    this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [err]);
   }
   Success(res) {
-    if (res.Status == "OK") {
-    
-      this.DepartmentWiseAppointmentReportData = res.Results;
-      if (this.DepartmentWiseAppointmentReportData && this.DepartmentWiseAppointmentReportData.length > 0) {
-        this.DepartmentWiseAppointmentReportData.forEach(appt => {
-          this.summary.tot_new += appt.NewAppointment;
-          this.summary.tot_followup += appt.Followup;
-          this.summary.tot_referral += appt.Referral;
-          this.summary.tot_all += appt.TotalAppointments;
-        });
+    if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+
+
+      if (res.Results) {
+        this.DepartmentWiseAppointmentReportData = res.Results.DepartmentWiseAppointmentReport;
+        this.DepartmentWiseAppointmentReportSummary = res.Results.DepartmentWiseAppointmentReportSummary[0];
       }
       else {
-        this.msgBoxServ.showMessage("notice-message", ['Data is Not Available Between Selected dates...Try Different Dates']);
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['Data is Not Available Between Selected dates...Try Different Dates']);
       }
     }
     else {
-      this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+      this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
     }
   }
 
@@ -99,8 +103,8 @@ export class RPT_APPT_DeptWiseAppointmentReportComponent {
     this.fromDate = $event ? $event.fromDate : this.fromDate;
     this.toDate = $event ? $event.toDate : this.toDate;
 
-    this.currentdepartmentappointment.fromDate = this.fromDate;
-    this.currentdepartmentappointment.toDate = this.toDate;
+    this.CurrentDepartmentAppointment.fromDate = this.fromDate;
+    this.CurrentDepartmentAppointment.toDate = this.toDate;
   }
 
   public LoadDeptList() {
@@ -122,7 +126,7 @@ export class RPT_APPT_DeptWiseAppointmentReportComponent {
   }
 
   departmentChanged() {
-    this.currentdepartmentappointment.departmentName = this.currentdepartmentappointment.departmentName ? this.currentdepartmentappointment.departmentName : "";
+    this.CurrentDepartmentAppointment.departmentName = this.CurrentDepartmentAppointment.departmentName ? this.CurrentDepartmentAppointment.departmentName : "";
   }
 
   GetDepartments() {
@@ -134,6 +138,20 @@ export class RPT_APPT_DeptWiseAppointmentReportComponent {
       });
   }
 
+  SchemeFormatter(data: any): string {
+    let html = data["SchemeName"];
+    return html;
+  }
+
+  OnSchemeChange(): void {
+    if (this.SelectedScheme && typeof (this.SelectedScheme) === "object" && this.SelectedScheme.SchemeId) {
+      this.CurrentDepartmentAppointment.SchemeId = this.SelectedScheme.SchemeId;
+    }
+    else {
+      this.SelectedScheme = new RPT_SchemeDTO();
+      this.CurrentDepartmentAppointment.SchemeId = null;
+    }
+  }
 }
 
 

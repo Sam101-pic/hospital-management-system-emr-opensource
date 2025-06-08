@@ -40,6 +40,9 @@
     <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\..\Solutions\packages\Newtonsoft.Json.11.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="Serilog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\..\Solutions\packages\Serilog.3.0.0\lib\netstandard2.0\Serilog.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.configuration" />
@@ -79,6 +82,7 @@
     <Compile Include="IRDNepal\APIs.cs" />
     <Compile Include="IRDNepal\DanpheDateConverter.cs" />
     <Compile Include="IRDNepal\IRDBillingViewModels.cs" />
+    <Compile Include="IRDNepal\IrdConfigsDTO.cs" />
     <Compile Include="IRDNepal\IRDNepalDbContext.cs" />
     <Compile Include="IRDNepal\IRD_PHRMBillSaleViewModel.cs" />
     <Compile Include="IRDNepal\PostToIRD.cs" />

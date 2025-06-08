@@ -130,8 +130,7 @@
                   <p class="c_paragraphs" style="margin-bottom: 0px;">Patient's Name: <strong>{{PatientInfo.PatientName}}</strong></p>
                 </td>
                 <td colspan="5" style="text-align: right;">
-                  <p class="c_paragraphs" style="margin-bottom: 0px;">Age/Sex : <strong>{{PatientInfo.DateOfBirth | DanpheDateTime:'age'
-                      }}/{{PatientInfo.Gender}}</strong></p>
+                  <p class="c_paragraphs" style="margin-bottom: 0px;">Age/Sex : <strong>{{PatientInfo.Age}}/{{PatientInfo.Gender}}</strong></p>
                 </td>
               </tr>
               <tr>
@@ -146,10 +145,7 @@
               </tr>
               <tr>
                 <td colspan="5" style="text-align: left;" *ngIf="PatientInfo.CountryName === CountryNepal">
-                  <p class="c_paragraphs" style="margin-bottom: 0px;">Address : <strong><span
-                            *ngIf="showMunicipality && PatientInfo.MunicipalityName">{{PatientInfo.MunicipalityName}}<span
-                              *ngIf="PatientInfo.WardNumber">-{{PatientInfo.WardNumber}}</span>,
-                      </span>{{PatientInfo.CountrySubDivisionName}}</strong></p>
+                  <p class="c_paragraphs" style="margin-bottom: 0px;">Address : <strong>{{coreService.SortPatientAddress(PatientInfo)}}</strong></p>
 
                 </td>
                 <td colspan="5" style="text-align: right;">

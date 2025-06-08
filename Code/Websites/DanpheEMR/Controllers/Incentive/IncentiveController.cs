@@ -13,6 +13,8 @@ using System.Data;
 using DanpheEMR.Security;
 using DanpheEMR.Enums;
 using AutoMapper;
+using DanpheEMR.Controllers.Incentive.DTOs;
+using DanpheEMR.Services.BillSettings.DTOs;
 
 namespace DanpheEMR.Controllers
 {
@@ -98,6 +100,7 @@ namespace DanpheEMR.Controllers
                                            empInctvinfo.EmployeeIncentiveInfoId,
                                            emp.EmployeeId,
                                            emp.FullName,
+                                           IsEmployeeActive= emp.IsActive,
                                            empInctvinfo.TDSPercent,
                                            EmpTDSPercent = emp.TDSPercent,
                                            empInctvinfo.IsActive,
@@ -133,10 +136,11 @@ namespace DanpheEMR.Controllers
                                   select new
                                   {
                                       itm.ServiceItemId,
-                                      itm.ItemName,
+                                      ItemName = priceCatServItem.ItemLegalName,
                                       priceCatServItem.Price,
                                       itm.ItemCode,
                                       srv.ServiceDepartmentName,
+                                      srv.ServiceDepartmentId,
                                       srv.ServiceDepartmentShortName,
                                       priceCat.PriceCategoryName,
                                       Doctor = (from doc in _billingDbContext.Employee.DefaultIfEmpty()
@@ -166,6 +170,7 @@ namespace DanpheEMR.Controllers
                                            empInctvinfo.EmployeeIncentiveInfoId,
                                            emp.EmployeeId,
                                            emp.FullName,
+                                           IsEmployeeActive = emp.IsActive,
                                            empInctvinfo.TDSPercent,
                                            EmpTDSPercent = emp.TDSPercent,
                                            empInctvinfo.IsActive,
@@ -174,6 +179,9 @@ namespace DanpheEMR.Controllers
                                                                    join bilItm in _incentiveDbContext.ServiceItems on empBillItmMap.ServiceItemId equals bilItm.ServiceItemId
                                                                    join servDep in _incentiveDbContext.ServiceDepartments on bilItm.ServiceDepartmentId equals servDep.ServiceDepartmentId
                                                                    join priceCat in _incentiveDbContext.PriceCategories on empBillItmMap.PriceCategoryId equals priceCat.PriceCategoryId
+                                                                   join priceCatServItem in _incentiveDbContext.BillItemsPriceCategoryMaps
+                                                                         on new { empBillItmMap.ServiceItemId, empBillItmMap.PriceCategoryId }
+                                                                         equals new { priceCatServItem.ServiceItemId, priceCatServItem.PriceCategoryId }
                                                                    where empBillItmMap.IsActive && bilItm.IsActive == true
                                                                    //&& bilItm.IsFractionApplicable == true
                                                                    select new
@@ -189,13 +197,15 @@ namespace DanpheEMR.Controllers
                                                                        empBillItmMap.IsActive,
                                                                        empBillItmMap.HasGroupDistribution,
                                                                        empBillItmMap.BillingTypesApplicable,
+                                                                       priceCatServItem.Price,
                                                                        empBillItmMap.CreatedBy,
                                                                        empBillItmMap.CreatedOn,
-                                                                       bilItm.ItemName,
+                                                                       ItemName = priceCatServItem.ItemLegalName,
                                                                        ServiceDepartmentId = servDep.ServiceDepartmentId,
                                                                        DepartmentName = servDep.ServiceDepartmentName,
                                                                        GroupDistribution = _incentiveDbContext.ItemGroupDistribution.Where(a => a.EmployeeBillItemsMapId == empBillItmMap.EmployeeBillItemsMapId).ToList(),
                                                                        GroupDistributionCount = _incentiveDbContext.ItemGroupDistribution.Where(a => a.EmployeeBillItemsMapId == empBillItmMap.EmployeeBillItemsMapId).ToList().Count()
+                                                                       
                                                                    }).ToList()
                                        }).FirstOrDefault();
             return InvokeHttpGetFunction(func);
@@ -203,10 +213,10 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("TransactionItems")]
-        public IActionResult TransactionItems(DateTime fromDate, DateTime toDate)
+        public IActionResult TransactionItems(DateTime fromDate, DateTime toDate,string searchText, string itemName)
         {
             //else if (reqType == "view-txn-items-list")
-            Func<object> func = () => DALFunctions.GetDataTableFromStoredProc("SP_INCTV_GetBillingTxnItems_BetweenDate", new List<SqlParameter>() { new SqlParameter("@FromDate", fromDate), new SqlParameter("@ToDate", toDate) }, _incentiveDbContext);
+            Func<object> func = () => DALFunctions.GetDataTableFromStoredProc("SP_INCTV_GetBillingTxnItems_BetweenDate", new List<SqlParameter>() { new SqlParameter("@FromDate", fromDate), new SqlParameter("@ToDate", toDate), new SqlParameter("@SearchText", searchText), new SqlParameter("@ItemName", itemName) }, _incentiveDbContext);
             return InvokeHttpGetFunction(func);
         }
 
@@ -460,6 +470,9 @@ namespace DanpheEMR.Controllers
                                              join priceCategory in _incentiveDbContext.PriceCategories on profileItems.PriceCategoryId equals priceCategory.PriceCategoryId
                                              join servItm in _incentiveDbContext.ServiceItems on profileItems.ServiceItemId equals servItm.ServiceItemId
                                              join servDep in _incentiveDbContext.ServiceDepartments on servItm.ServiceDepartmentId equals servDep.ServiceDepartmentId
+                                             join priceCatServItem in _incentiveDbContext.BillItemsPriceCategoryMaps
+                                             on new {profileItems.ServiceItemId,profileItems.PriceCategoryId}
+                                             equals new { priceCatServItem.ServiceItemId,priceCatServItem.PriceCategoryId}
                                              select new
                                              {
                                                  BillItemProfileMapId = profileItems.BillItemProfileMapId,
@@ -474,7 +487,9 @@ namespace DanpheEMR.Controllers
                                                  IsActive = profileItems.IsActive,
                                                  ItemName = servItm.ItemName,
                                                  ServiceDepartmentId = servDep.ServiceDepartmentId,
-                                                 DepartmentName = servDep.ServiceDepartmentName
+                                                 DepartmentName = servDep.ServiceDepartmentName,
+                                                 Price = priceCatServItem.Price
+                                                
                                              }).ToList()
                           }).FirstOrDefault();
             return result;
@@ -593,7 +608,6 @@ namespace DanpheEMR.Controllers
                     {
                         a.IsActive = EmployeeIncentiveInfo.IsActive;
                         _incentiveDbContext.Entry(a).Property(x => x.IsActive).IsModified = true;
-                        _incentiveDbContext.SaveChanges();
 
                         if (a.HasGroupDistribution == true)
                         {
@@ -602,12 +616,11 @@ namespace DanpheEMR.Controllers
                             {
                                 grp.IsActive = a.IsActive;
                                 _incentiveDbContext.Entry(grp).Property(x => x.IsActive).IsModified = true;
-                                _incentiveDbContext.SaveChanges();
                             });
                         }
 
                     });
-                    //IncentiveBL.EmployeeItemMapping(EmployeeBillItemsMap, incentiveDb, currentUser.EmployeeId);
+                    _incentiveDbContext.SaveChanges();
 
                     dbContextTxn.Commit();
                     return EmployeeIncentiveInfo;
@@ -876,6 +889,67 @@ namespace DanpheEMR.Controllers
         }
 
 
+        [HttpGet]
+        [Route("IncentiveServiceItems")]
+
+        public IActionResult IncentiveServiceItems([FromQuery] FilterIncentiveServiceitem_Dto filter)
+        {
+            Func<object> func = () => GetIncentiveServiceItems(
+                                                 filter.PriceCategoryId,
+                                                 filter.ServiceDepartmentIds
+                                                 );
+            return InvokeHttpGetFunction(func);
+        }
+
+        private object GetIncentiveServiceItems( int? priceCategoryId,string serviceDepartmentIds)
+        {
+
+            List<int> serviceDeptIdList = serviceDepartmentIds?.Split(',')
+                                        .Select(id => int.TryParse(id.Trim(), out int parsedId) ? parsedId : (int?)null) 
+                                        .Where(id => id.HasValue) 
+                                        .Select(id => id.Value) 
+                                        .ToList();
+
+            var defaultPriceCategory = _billingDbContext.PriceCategoryModels.FirstOrDefault(a => a.IsDefault == true);
+            if (priceCategoryId == 0 || priceCategoryId == null && defaultPriceCategory != null)
+            {
+                priceCategoryId = defaultPriceCategory.PriceCategoryId;
+            }
+
+            var incentiveItems = (from itm in _billingDbContext.BillServiceItems
+                                  join srv in _billingDbContext.ServiceDepartment on itm.ServiceDepartmentId equals srv.ServiceDepartmentId
+                                  join priceCatServItem in _billingDbContext.BillItemsPriceCategoryMaps on itm.ServiceItemId equals priceCatServItem.ServiceItemId
+                                  join priceCat in _billingDbContext.PriceCategoryModels on priceCatServItem.PriceCategoryId equals priceCat.PriceCategoryId
+                                  where itm.IsActive == true
+                                        && itm.IsIncentiveApplicable == true
+                                        && (priceCatServItem.PriceCategoryId == priceCategoryId)
+                                
+                                  select new IncentiveServiceItem_Dto
+                                  {
+                                      ServiceItemId = itm.ServiceItemId,
+                                      ItemName = priceCatServItem.ItemLegalName,
+                                      Price = priceCatServItem.Price,
+                                      ItemCode = itm.ItemCode,
+                                      ServiceDepartmentName = srv.ServiceDepartmentName,
+                                      ServiceDepartmentId = srv.ServiceDepartmentId,
+                                      ServiceDepartmentShortName = srv.ServiceDepartmentShortName,
+                                      PriceCategoryName = priceCat.PriceCategoryName,
+                                      Doctor = (from doc in _billingDbContext.Employee.DefaultIfEmpty()
+                                                where doc.IsAppointmentApplicable == true && srv.IntegrationName == "OPD"
+                                                      && srv.ServiceDepartmentId == itm.ServiceDepartmentId
+                                                select new DoctorDto
+                                                {
+                                                    DoctorId = doc != null ? doc.EmployeeId : 0,
+                                                    DoctorName = doc != null ? doc.FullName : "",
+                                                }).FirstOrDefault(),
+                                  });
+            if (serviceDeptIdList != null && serviceDeptIdList.Any())
+            {
+                incentiveItems = incentiveItems.Where(a => serviceDeptIdList.Contains(a.ServiceDepartmentId));
+            }
+            return incentiveItems.ToList().OrderBy(b => b.ServiceDepartmentName);
+
+        }
 
         /*#region reqType(Get)
         [HttpGet]

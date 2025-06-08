@@ -31,8 +31,7 @@ export class NursingOpdFreeReferralComponent implements OnInit {
   @Input("visit")
   public visit: Visit = new Visit();
   @Output() discardInput: EventEmitter<boolean> = new EventEmitter<boolean>();
-  @Output('nursing-opd-refer-callback)')
-  NursingOpdReferCallback = new EventEmitter<object>();
+  @Output('nursing-opd-refer-callback') NursingOpdReferCallback = new EventEmitter<object>();
   public selectedDiagnosis: ICD10[] = [];
   public chiefComplaints: Array<PatientClinicalInfoModel> = [];
   public FinalDiagnosisList: FinalDiagnosisModel[] = [];
@@ -146,16 +145,22 @@ export class NursingOpdFreeReferralComponent implements OnInit {
   // }
 
   FilterDoctorList() {
-    if (this.selectedDoctor != null) {
-      if (typeof (this.selectedDoctor) == 'object') {
-        this.selectedDoctor.PerformerName = "";
-        this.selectedDoctor.PerformerId = 0;
-      }
-    }
-    // if (this.departmentId && Number(this.departmentId) != 0) {
-    //   this.filteredDocList = this.doctorList.filter(doc => doc.DepartmentId == this.departmentId);
-
+    // if (this.selectedDoctor != null) {
+    //   if (typeof (this.selectedDoctor) == 'object') {
+    //     this.selectedDoctor.PerformerName = "";
+    //     this.selectedDoctor.PerformerId = 0;
+    //   }
     // }
+    // // if (this.departmentId && Number(this.departmentId) != 0) {
+    // //   this.filteredDocList = this.doctorList.filter(doc => doc.DepartmentId == this.departmentId);
+
+    // // }
+    // else {
+    //   this.filteredDocList = this.doctorList;
+    // }
+    if (this.visit.DepartmentId) {
+      this.filteredDocList = this.doctorList.filter(a => a.DepartmentId === this.visit.DepartmentId);
+    }
     else {
       this.filteredDocList = this.doctorList;
     }
@@ -275,6 +280,7 @@ export class NursingOpdFreeReferralComponent implements OnInit {
       this.filteredDocList = this.doctorList;
       this.visitService.TriggerBillChangedEvent({ ChangeType: "Department", SelectedDepartment: this.selectedDepartment }); //Removes paticulars from 'Additional Bill Item?' when Department is kept empty
     }
+    this.FilterDoctorList();
   }
 
 
@@ -337,11 +343,11 @@ export class NursingOpdFreeReferralComponent implements OnInit {
     this.referDoctorDepartment = new NursingOPDFreeReferral_DTO();
     this.selectedDepartment = null;
     this.selectedDoctor = null;
-    this.NursingOpdReferCallback.emit({ action: 'close' });
     this.showChangeDoctor = false;
     this.freeReferValidator.reset();
     this.freeReferValidator.updateValueAndValidity();
     this.showValidationMessage = false;
+    this.NursingOpdReferCallback.emit({ action: 'close' });
 
   }
 
@@ -377,7 +383,7 @@ export class NursingOpdFreeReferralComponent implements OnInit {
             this.freeReferValidator.reset();
             this.showValidationMessage = false;
             this.referDoctorDepartment = new NursingOPDFreeReferral_DTO();
-            this.LoadVisitList();
+            // this.LoadVisitList();
             this.Close();
           } else {
             this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Patient already has same visit"']);
@@ -401,34 +407,34 @@ export class NursingOpdFreeReferralComponent implements OnInit {
       return !this.freeReferValidator.hasError(validator, fieldName);
     }
   }
-  LoadVisitList() {
-    //today's all visit or all visits with IsVisitContinued status as false
-    this.fromDate = moment().format('YYYY-MM-DD');
-    this.toDate = moment().format('YYYY-MM-DD');
-    this.nursingBLService.GetOPDList(this.fromDate, this.toDate)  //this.fromDate, this.toDate
-      .subscribe(res => {
-        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-          this.opdList = res.Results;
-          let opdTriaged = [];
-          let opdNotTriaged = [];
-          for (let i = 0; i < res.Results.length; i++) {
-            if (res.Results[i].IsTriaged == 0) {
-              opdNotTriaged.push(res.Results[i]);
-            } else if (res.Results[i].IsTriaged == 1) {
-              opdTriaged.push(res.Results[i]);
-            }
-          }
-          this.opdListZero = opdNotTriaged;
+  // LoadVisitList() {
+  //   //today's all visit or all visits with IsVisitContinued status as false
+  //   this.fromDate = moment().format('YYYY-MM-DD');
+  //   this.toDate = moment().format('YYYY-MM-DD');
+  //   this.nursingBLService.GetOPDList(this.fromDate, this.toDate)  //this.fromDate, this.toDate
+  //     .subscribe(res => {
+  //       if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+  //         this.opdList = res.Results;
+  //         let opdTriaged = [];
+  //         let opdNotTriaged = [];
+  //         for (let i = 0; i < res.Results.length; i++) {
+  //           if (res.Results[i].IsTriaged == 0) {
+  //             opdNotTriaged.push(res.Results[i]);
+  //           } else if (res.Results[i].IsTriaged == 1) {
+  //             opdTriaged.push(res.Results[i]);
+  //           }
+  //         }
+  //         this.opdListZero = opdNotTriaged;
 
-          this.opdListOne = opdTriaged;
-          // this.onChangeDepartment();
-          this.opdFilteredList = this.opdList;
-          //this.opdFilteredList.forEach(a => a.IsSelected = false);
-        }
-        else {
-          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Failed To Load Data']);
-        }
+  //         this.opdListOne = opdTriaged;
+  //         // this.onChangeDepartment();
+  //         this.opdFilteredList = this.opdList;
+  //         //this.opdFilteredList.forEach(a => a.IsSelected = false);
+  //       }
+  //       else {
+  //         this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Failed To Load Data']);
+  //       }
 
-      });
-  }
+  //     });
+  // }
 }

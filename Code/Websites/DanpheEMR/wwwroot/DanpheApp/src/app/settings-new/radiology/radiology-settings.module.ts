@@ -1,20 +1,19 @@
-import { NgModule } from '@angular/core';
-import { Routes, RouterModule } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { CommonModule, HashLocationStrategy, LocationStrategy } from '@angular/common';
 import { HttpClientModule } from '@angular/common/http';
-import { HashLocationStrategy, LocationStrategy } from "@angular/common";
-import { AgGridModule } from 'ag-grid-angular/main';
-import { RadiologySettingsMainComponent } from './radiology-settings.main.component';
+import { NgModule } from '@angular/core';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
+import { AuthGuardService } from '../../security/shared/auth-guard.service';
+import { DanpheAutoCompleteModule } from '../../shared/danphe-autocomplete';
+import { SharedModule } from '../../shared/shared.module';
+import { RadDefSignatoriesComponent } from './def-signatories/rad-def-signatories.component';
 import { ImagingTypeAddComponent } from './imaging-types/imaging-type-add.component';
 import { ImagingTypeListComponent } from './imaging-types/imaging-type-list.component';
 import { ImagingItemAddComponent } from './items/imaging-item-add.component';
 import { ImagingItemListComponent } from './items/imaging-item-list.component';
+import { RadiologySettingsMainComponent } from './radiology-settings.main.component';
 import { RadiologyReportTemplateComponent } from './report-templates/radiology-report-template.component';
-import { SharedModule } from '../../shared/shared.module';
-import { DanpheAutoCompleteModule } from '../../shared/danphe-autocomplete';
-import { RadDefSignatoriesComponent } from './def-signatories/rad-def-signatories.component';
-import { AuthGuardService } from '../../security/shared/auth-guard.service';
+import { TemplateStyleSettingsComponent } from './template-style-settings/template-style-settings.component';
 
 
 export const radSettingsRoutes =
@@ -27,6 +26,8 @@ export const radSettingsRoutes =
         { path: 'ManageImagingItem', component: ImagingItemListComponent, canActivate: [AuthGuardService] },
         { path: 'ManageRadiologyTemplate', component: RadiologyReportTemplateComponent, canActivate: [AuthGuardService] },
         { path: 'DefaultSignatories', component: RadDefSignatoriesComponent, canActivate: [AuthGuardService] },
+        { path: 'TemplateStyle', component: TemplateStyleSettingsComponent, canActivate: [AuthGuardService] },
+
       ]
     }
   ]
@@ -42,7 +43,7 @@ export const radSettingsRoutes =
     FormsModule,
     HttpClientModule,
     SharedModule,
-    DanpheAutoCompleteModule, 
+    DanpheAutoCompleteModule,
     RouterModule.forChild(radSettingsRoutes),
 
   ],
@@ -53,7 +54,8 @@ export const radSettingsRoutes =
     ImagingItemAddComponent,
     ImagingItemListComponent,
     RadiologyReportTemplateComponent,
-    RadDefSignatoriesComponent
+    RadDefSignatoriesComponent,
+    TemplateStyleSettingsComponent
   ],
   bootstrap: []
 })

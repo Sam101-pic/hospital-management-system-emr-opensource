@@ -31,7 +31,7 @@ namespace DanpheEMR.ServerModel.AccountingModels
  
         [NotMapped]
         public bool IsPaymentDone { get; set; }
-        [NotMapped]
         public int SectionId { get; set; }
+        public int HospitalId { get; set; }
     }
 }

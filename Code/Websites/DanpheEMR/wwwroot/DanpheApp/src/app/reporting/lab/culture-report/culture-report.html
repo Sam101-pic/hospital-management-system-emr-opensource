@@ -5,7 +5,8 @@
   </div>
   <div class="row" style="padding-bottom: 5px">
     <div class="col-md-8 col-xs-12">
-      <from-to-date-select (on-change)="OnFromToDateChange($event)">
+      <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                           [date-settings-name]="'common-range-with-today'">
       </from-to-date-select>
     </div>
     <div class="col-md-2 col-xs-12">
@@ -20,15 +21,14 @@
   <div class="row" *ngIf="showGrid">
     <div class="col-lg-12 col-sm-12">
       <danphe-grid
-        *ngIf="showGrid"
-        [grid-colDefaults]="cultureTestReportColumns"
-        [grid-data]="cultureTestReportData"
-        [grid-exportOptions]="gridExportOptions"
-        [grid-showExport]="true"
-        [NepaliDateInGridParams]="NepaliDateInGridSettings"
-        [report-for]="'lab'"
-        [grid-date-range]="dateRange"
-      >
+                   *ngIf="showGrid"
+                   [grid-colDefaults]="cultureTestReportColumns"
+                   [grid-data]="cultureTestReportData"
+                   [grid-exportOptions]="gridExportOptions"
+                   [grid-showExport]="true"
+                   [NepaliDateInGridParams]="NepaliDateInGridSettings"
+                   [report-for]="'lab'"
+                   [grid-date-range]="dateRange">
       </danphe-grid>
     </div>
   </div>

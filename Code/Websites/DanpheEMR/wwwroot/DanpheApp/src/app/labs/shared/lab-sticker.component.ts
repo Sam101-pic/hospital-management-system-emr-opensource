@@ -87,6 +87,7 @@ export class LabStickerComponent {
     if (document.getElementById('numberOfPrint')) {
       this.coreService.FocusInputById("numberOfPrint");
     }
+    console.log(this.patientinfos);
   }
 
   public GetAllRequisitionsFromIdList(reqIdList: Array<number>) {

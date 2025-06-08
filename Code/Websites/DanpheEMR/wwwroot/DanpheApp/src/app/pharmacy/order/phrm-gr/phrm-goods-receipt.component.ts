@@ -22,7 +22,7 @@ import { PHRMGoodsReceiptModel } from "../../shared/phrm-goods-receipt.model";
 import { PHRMPurchaseOrderItems } from "../../shared/phrm-purchase-order-items.model";
 import { PHRMStoreModel } from '../../shared/phrm-store.model';
 import { PHRMSupplierModel } from "../../shared/phrm-supplier.model";
-import { PHRMGoodsReceiptItemComponent, updateCalculationsForGrItem } from "../phrm-gr-item/phrm-gr-item.component";
+import { PHRMGoodsReceiptItemComponent } from "../phrm-gr-item/phrm-gr-item.component";
 
 @Component({
   selector: "phrm-goods-receipt",
@@ -34,93 +34,77 @@ import { PHRMGoodsReceiptItemComponent, updateCalculationsForGrItem } from "../p
 export class PHRMGoodsReceiptComponent {
   @ViewChild('grItemPop')
   phrmGoodReceiptItemComponent: PHRMGoodsReceiptItemComponent;
-
-  ///view model for binding
   goodsReceiptVM: PHRMGoodsReceiptViewModel = new PHRMGoodsReceiptViewModel();
-  tempgoodsReceiptVM: PHRMGoodsReceiptViewModel = new PHRMGoodsReceiptViewModel();
+  tempGoodsReceiptVM: PHRMGoodsReceiptViewModel = new PHRMGoodsReceiptViewModel();
   goodReceiptItems: PHRMGoodsReceiptItemsModel = new PHRMGoodsReceiptItemsModel();
-  ///local list variable to get list of PO data and Push into GRList
   grItemList: Array<PHRMGoodsReceiptItemsModel> = new Array<PHRMGoodsReceiptItemsModel>();
-  ///local varible to bind supplier data
   currentSupplier: PHRMSupplierModel = new PHRMSupplierModel();
   supplierList: Array<PHRMSupplierModel> = new Array<PHRMSupplierModel>();
-
-  ///local varible to bind company data
   currentCompany: Array<PHRMCompanyModel> = new Array<PHRMCompanyModel>();
   PurchaseOrderNo: number = 0;
   SupplierName: string = null;
-  //declare boolean loading variable for disable the double click event of button
   loading: boolean = false;
-  //for Item Popup purpose
   index: number = 0;
   showAddItemPopUp: boolean = false;
-  //for Supplier Popup purpose
   showAddSupplierPopUp: boolean;
-  //flag for disable or enable some text boxes order
   IsPOorder: boolean = false;
   IsGRedit: boolean = false;
   showAddGRPage: boolean = false;
   showUpdateGRPage: boolean = false;
   update: boolean = false;
   goodreceipt: PHRMGoodsReceiptModel;
-  //for editing gr and checking duplication
   oldSupplierId: any;
   oldInvoiceNo: any;
   duplicateInvoice: boolean = false;
-  //get all is active item list for create new gr
   itemList: Array<PharmacyItem_DTO> = new Array<PharmacyItem_DTO>();
   taxList: Array<any>;
   taxData: Array<any> = [];
   currentCounter: number = null;
   itemLst: Array<any> = [];
   goodsReceiptList: Array<PHRMGoodsReceiptModel> = new Array<PHRMGoodsReceiptModel>();
-  //@ViewChild('addItems')
-  //addItems: phrmitemaddComponent;
   storeList: PHRMStoreModel;
   currentStore: any;
   tempStore: any;
   //for show and hide packing features
-  IsPkgitem: boolean = false;
-  //for show and hide item level discount features
+  IsPackageItem: boolean = false;
   isItemLevelDiscountApplicable: boolean = false;
-  //Show and hide Dispensary Option
-  ShowDispensary: boolean = false;
-  pcktypeList: any;
-  packingtypeList: Array<PHRMPackingTypeModel> = new Array<PHRMPackingTypeModel>();
-  idList: Array<any> = [];
+  PackingTypeList: Array<PHRMPackingTypeModel> = new Array<PHRMPackingTypeModel>();
   IsGReditAfterModification: boolean = false;
   dispensaryList: Array<any> = [];
-  selectedDispensary: any = null;
   goodReceiptHistory: Array<any> = [];
   CheckIsValid: boolean = true;
   isExpiryNotApplicable: boolean = false;
-  ExpiryAfter: number = 0;
-  //for keep/change cccharge value at edite gritem.
-  itemid: number = 0;
+  ItemId: number = 0;
   IsStripRateEdit: boolean = false;
   fiscalYearList: Array<any> = new Array<any>();
   showFreeQty: boolean = false;
   showCCCharge: boolean = false;
   showNepaliReceipt: boolean;
   goodsReceiptIdForPrint: number;
-  showGRReceipt: boolean;
-  isMainDiscountApplicable: boolean;
+  showGRReceipt: boolean = false;
+  isMainDiscountApplicable: boolean = false;
   checkCreditPeriod: boolean = false;
   genericList: PHRMGenericModel[] = [];
+  AllowPreviousFiscalYear: boolean = false;
   @Output('call-back-popup-close') callBackPopupClose: EventEmitter<Object> = new EventEmitter<Object>();
+  EnableAdjustmentEdit: boolean = false;
+  GRTotalAmount: number = 0;
+  IsDuplicateItemsFound: boolean = false;
+  DuplicateItemNames: Set<string> = new Set<string>();
+  throwError: boolean = false;
+
   constructor(public dispensaryService: DispensaryService,
     public pharmacyService: PharmacyService,
     public coreService: CoreService,
     public pharmacyBLService: PharmacyBLService,
     public securityService: SecurityService,
-    public msgserv: MessageboxService,
+    public messageBoxService: MessageboxService,
     public router: Router,
     public callBackService: CallbackService,
     public changeDetectorRef: ChangeDetectorRef
   ) {
-    //this.currentCounter = this.securityService.getPHRMLoggedInCounter().CounterId;
     this.GetAllFiscalYears();
-    this.supplierList = new Array<PHRMSupplierModel>(); //make empty supllier
+    this.supplierList = new Array<PHRMSupplierModel>();
     this.currentSupplier = new PHRMSupplierModel();
     this.itemList = new Array<PharmacyItem_DTO>();
     this.GetAllItemData();
@@ -134,23 +118,23 @@ export class PHRMGoodsReceiptComponent {
     this.GetDispensaryList();
     this.LoadGoodReceiptHistory();
     this.GetPackingTypeList();
-    this.showitemlvldiscount();
-    this.showpacking();
+    this.ShowItemLevelDiscount();
+    this.ShowPacking();
     this.checkGRCustomization();
+    this.GetEnablePharmacyGoodReceiptAdjustment();
   }
 
 
   ngOnInit() {
   }
   // for show and hide packing feature
-  showpacking() {
-    this.IsPkgitem = true;
+  ShowPacking() {
+    this.IsPackageItem = true;
     let pkg = this.coreService.Parameters.find((p) => p.ParameterName == "PharmacyGRpacking" && p.ParameterGroupName == "Pharmacy").ParameterValue;
     if (pkg == "true") {
-      this.IsPkgitem = true;
+      this.IsPackageItem = true;
     } else {
-      this.IsPkgitem = false;
-      //this.goodReceiptItem.GoodReceiptItemValidator.controls["PackingQuantity"].disable();
+      this.IsPackageItem = false;
     }
   }
   // for Free Qty and CC Charge Paramaters.
@@ -193,9 +177,9 @@ export class PHRMGoodsReceiptComponent {
   //this function load all packing type  list
   public GetPackingTypeList() {
     this.pharmacyBLService.GetPackingTypeList()
-      .subscribe(res => {
-        if (res.Status == "OK") {
-          this.packingtypeList = res.Results;
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.PackingTypeList = res.Results;
 
         }
         else {
@@ -218,17 +202,17 @@ export class PHRMGoodsReceiptComponent {
               this.itemLst = this.itemList;
             } else {
               console.log(res.ErrorMessage);
-              this.msgserv.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to get item list, see detail in console log"]);
+              this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to get item list, see detail in console log"]);
             }
           },
           (err) => {
             console.log(err.ErrorMessage);
-            this.msgserv.showMessage(ENUM_MessageBox_Status.Error, ["Failed to get item list., see detail in console log"]);
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Failed to get item list., see detail in console log"]);
           }
         );
     } catch (exception) {
       console.log(exception);
-      this.msgserv.showMessage(ENUM_MessageBox_Status.Error, ["error details see in console log"]);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["error details see in console log"]);
     }
   }
 
@@ -243,7 +227,7 @@ export class PHRMGoodsReceiptComponent {
     if ($event == true) {
       this.showUpdateGRPage = false;
       this.showAddGRPage = false;
-      let newIndex = this.phrmGoodReceiptItemComponent.goodReceiptItem.IndexOnEdit + 1;
+      let newIndex = this.phrmGoodReceiptItemComponent.GoodReceiptItem.IndexOnEdit + 1;
       if (this.IsPOorder && newIndex < this.grItemList.length)
         this.SetFocusById("editButton" + newIndex);
       else
@@ -260,7 +244,7 @@ export class PHRMGoodsReceiptComponent {
     if (this.goodsReceiptVM.goodReceipt.IsTransferredToACC == true || this.grItemList[i].IsItemAltered == true) {
       this.update = false;
       this.showUpdateGRPage = false;
-      this.msgserv.showMessage("notice-message", ["Can not edit the record as this Stock is already altered or post to accounting."])
+      this.messageBoxService.showMessage("notice-message", ["Can not edit the record as this Stock is already altered or post to accounting."])
     }
     else {
       this.update = true;
@@ -268,40 +252,38 @@ export class PHRMGoodsReceiptComponent {
       this.changeDetectorRef.detectChanges();
       this.phrmGoodReceiptItemComponent.IsPOorder = this.IsPOorder;
       if (this.IsPOorder || (this.IsGRedit && this.goodsReceiptVM.goodReceipt.PurchaseOrderId != null)) {
-        this.phrmGoodReceiptItemComponent.showPendingQty = true;
+        this.phrmGoodReceiptItemComponent.ShowPendingQty = true;
       }
-      this.phrmGoodReceiptItemComponent.goodReceiptItem = _.cloneDeep(this.grItemList[i]);
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.IndexOnEdit = i;
-      this.phrmGoodReceiptItemComponent.selectedGeneneric = this.genericList.find(a => a.GenericId === this.grItemList[i].GenericId);
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem = _.cloneDeep(this.grItemList[i]);
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.IndexOnEdit = i;
+      this.phrmGoodReceiptItemComponent.SelectedGeneric = this.genericList.find(a => a.GenericId === this.grItemList[i].GenericId);
       this.phrmGoodReceiptItemComponent.GRItemPrice = this.grItemList[i].GRItemPrice;
       this.phrmGoodReceiptItemComponent.VATPercentage = this.grItemList[i].VATPercentage;
       this.phrmGoodReceiptItemComponent.ItemQty = this.grItemList[i].ItemQTy;
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.ItemQTy = this.grItemList[i].ItemQTy;
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.FreeQuantity = this.grItemList[i].FreeQuantity;
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.Packing = this.grItemList[i].Packing;
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.CCCharge = this.grItemList[i].CCCharge;
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.CCAmount = this.grItemList[i].CCAmount;
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.SalePrice = this.grItemList[i].SalePrice;
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.PendingQuantity = this.grItemList[i].PendingQuantity;
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.ItemQTy = this.grItemList[i].ItemQTy;
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.FreeQuantity = this.grItemList[i].FreeQuantity;
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.Packing = this.grItemList[i].Packing;
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.CCCharge = this.grItemList[i].CCCharge;
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.CCAmount = this.grItemList[i].CCAmount;
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.SalePrice = this.grItemList[i].SalePrice;
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.PendingQuantity = this.grItemList[i].PendingQuantity;
 
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.MRP = this.grItemList[i].MRP;
-      if (!this.IsPOorder) {
-        this.phrmGoodReceiptItemComponent.goodReceiptItem.SelectedItem = this.itemList.find(a => a.ItemId === this.grItemList[i].ItemId).ItemName;
+      let selectedItem = this.itemList.find(a => a.ItemId === this.grItemList[i].ItemId)
+      if (selectedItem) {
+        this.phrmGoodReceiptItemComponent.SelectedItem = selectedItem.ItemName;
+        this.phrmGoodReceiptItemComponent.GoodReceiptItem.GoodReceiptItemValidator.get("ItemName").setValue(selectedItem);
+        this.phrmGoodReceiptItemComponent.GoodReceiptItem.SelectedItem = selectedItem;
       }
-      else {
-        this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("ItemName").setErrors(null);
-        this.phrmGoodReceiptItemComponent.goodReceiptItem.SelectedItem = this.itemList.find(a => a.ItemId === this.grItemList[i].ItemId).ItemName;
-      }
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("ItemName").setValue(this.grItemList[i].ItemName);
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("ExpiryDate").setValue((moment().add(1, 'years')).format("YYYY-MM")); //By default expiry date will be 1 year from now.
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("ItemQTy").setValue(this.grItemList[i].ItemQTy);
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("AdjustedMargin").setValue(this.grItemList[i].AdjustedMargin);
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("FreeQuantity").setValue(this.grItemList[i].FreeQuantity);
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("CCCharge").setValue(this.grItemList[i].CCCharge);
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("CCCharge").setValue(this.grItemList[i].CCCharge);
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("DiscountPercentage").setValue(this.grItemList[i].DiscountPercentage);
-      this.phrmGoodReceiptItemComponent.goodReceiptItem.GoodReceiptItemValidator.get("VATPercentage").setValue(this.grItemList[i].VATPercentage);
-      this.phrmGoodReceiptItemComponent.update = true;
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.MRP = this.grItemList[i].MRP;
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.GoodReceiptItemValidator.get("ExpiryDate").setValue((moment().add(1, 'years')).format("YYYY-MM")); //By default expiry date will be 1 year from now.
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.GoodReceiptItemValidator.get("ItemQTy").setValue(this.grItemList[i].ItemQTy);
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.GoodReceiptItemValidator.get("AdjustedMargin").setValue(this.grItemList[i].AdjustedMargin);
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.GoodReceiptItemValidator.get("FreeQuantity").setValue(this.grItemList[i].FreeQuantity);
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.GoodReceiptItemValidator.get("CCCharge").setValue(this.grItemList[i].CCCharge);
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.GoodReceiptItemValidator.get("CCCharge").setValue(this.grItemList[i].CCCharge);
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.GoodReceiptItemValidator.get("DiscountPercentage").setValue(this.grItemList[i].DiscountPercentage);
+      this.phrmGoodReceiptItemComponent.GoodReceiptItem.GoodReceiptItemValidator.get("VATPercentage").setValue(this.grItemList[i].VATPercentage);
+      this.phrmGoodReceiptItemComponent.IsUpdate = true;
       this.changeDetectorRef.detectChanges();
       this.phrmGoodReceiptItemComponent.ngOnInit();
     }
@@ -316,13 +298,13 @@ export class PHRMGoodsReceiptComponent {
             this.supplierList = res.Results;
             this.SetFocusById("SupplierName");
           } else {
-            this.msgserv.showMessage("failed", [
+            this.messageBoxService.showMessage("failed", [
               "Failed to get supplier list." + res.ErrorMessage,
             ]);
           }
         },
         (err) => {
-          this.msgserv.showMessage("error", [
+          this.messageBoxService.showMessage("error", [
             "Failed to get supplier list." + err.ErrorMessage,
           ]);
         }
@@ -330,7 +312,7 @@ export class PHRMGoodsReceiptComponent {
     } catch (exception) {
       this.loading = false;
       console.log(exception);
-      this.msgserv.showMessage("error", ["error details see in console log"]);
+      this.messageBoxService.showMessage("error", ["error details see in console log"]);
     }
   }
 
@@ -366,22 +348,31 @@ export class PHRMGoodsReceiptComponent {
               orderItem.SalePrice = item.SalePrice;
               orderItem.GRItemPrice = item.SalePrice;
               orderItem.ExpiryDate = (moment().add(1, 'years')).format("YYYY-MM") //By default expiry date will be 1 year from now.
-              orderItem.MRP = item.SalePrice;
+              orderItem.MRP = item.MRP > 0 ? item.MRP : item.SalePrice;
               orderItem.AdjustedMargin = 0;
               orderItem.SellingPrice = 0;
               orderItem.ReceivedQuantity = item.ReceivedQuantity;
-              orderItem.PendingQuantity = orderItem.ReceivedQuantity > 0 ? orderItem.Quantity - orderItem.ReceivedQuantity : orderItem.PendingQuantity;
+              orderItem.PendingQuantity = orderItem.ReceivedQuantity > 0 ? orderItem.IsPacking ? orderItem.PackingQty : orderItem.Quantity - orderItem.ReceivedQuantity : orderItem.PendingQuantity;
               orderItem.ItemQTy = item.PendingQuantity;
               orderItem.FreeQuantity = item.PendingFreeQuantity;
               orderItem.CCCharge = item.CCChargePercentage;
               orderItem.FreeGoodsAmount = CommonFunctions.parseAmount(orderItem.FreeQuantity * item.SalePrice, 4);
-              orderItem.SubTotal = CommonFunctions.parseAmount(orderItem.PendingQuantity * item.SalePrice, 4);
+              orderItem.SubTotal = CommonFunctions.parseAmount(orderItem.PendingQuantity * (orderItem.IsPacking ? orderItem.StripRate : item.SalePrice), 4);
               orderItem.DiscountPercentage = item.DiscountPercentage;
               orderItem.DiscountAmount = CommonFunctions.parseAmount(orderItem.SubTotal * orderItem.DiscountPercentage / 100, 4);
               orderItem.VATPercentage = item.VATPercentage;
               orderItem.VATAmount = CommonFunctions.parseAmount((orderItem.SubTotal - orderItem.DiscountAmount) * orderItem.VATPercentage / 100, 4);
               orderItem.CCAmount = CommonFunctions.parseAmount(orderItem.FreeGoodsAmount * orderItem.CCCharge / 100, 4);
               orderItem.TotalAmount = CommonFunctions.parseAmount(orderItem.SubTotal - orderItem.DiscountAmount + orderItem.VATAmount + orderItem.CCAmount, 4);
+              if (orderItem.IsPacking && this.PackingTypeList) {
+                orderItem.PackingQty = item.PackingQty;
+                orderItem.StripQty = item.PackingQty;
+                orderItem.PackingName = item.PackingName;
+                orderItem.StripRate = item.StripRate;
+                orderItem.StripMRP = item.StripRate;
+                orderItem.FreeStripQuantity = item.FreeQuantity;
+                orderItem.Packing = this.PackingTypeList.find(p => p.PackingTypeId === item.PackingTypeId);
+              }
               return orderItem;
             });
             this.goodsReceiptVM.goodReceipt.TransactionType = ENUM_BillPaymentMode.credit;
@@ -390,19 +381,19 @@ export class PHRMGoodsReceiptComponent {
             this.goodsReceiptVM.goodReceipt.DiscountAmount = CommonFunctions.parseAmount(this.grItemList.reduce((a, b) => a + b.DiscountAmount, 0), 4);
             this.goodsReceiptVM.goodReceipt.DiscountPercentage = CommonFunctions.parseAmount((this.goodsReceiptVM.goodReceipt.DiscountAmount / this.goodsReceiptVM.goodReceipt.SubTotal) * 100, 4);
             this.goodsReceiptVM.goodReceipt.VATAmount = CommonFunctions.parseAmount(this.grItemList.reduce((a, b) => a + b.VATAmount, 0), 4);
-            this.goodsReceiptVM.goodReceipt.VATPercentage = CommonFunctions.parseAmount(this.goodsReceiptVM.goodReceipt.VATAmount / (this.goodsReceiptVM.goodReceipt.SubTotal - this.goodsReceiptVM.goodReceipt.DiscountAmount), 4);
+            this.goodsReceiptVM.goodReceipt.VATPercentage = CommonFunctions.parseAmount(this.goodsReceiptVM.goodReceipt.VATAmount / (this.goodsReceiptVM.goodReceipt.TaxableSubTotal - this.goodsReceiptVM.goodReceipt.DiscountAmount), 4);
             this.goodsReceiptVM.goodReceipt.CCAmount = CommonFunctions.parseAmount(this.grItemList.reduce((a, b) => a + b.CCAmount, 0), 4);
             this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parseAmount(this.goodsReceiptVM.goodReceipt.SubTotal - this.goodsReceiptVM.goodReceipt.DiscountAmount + this.goodsReceiptVM.goodReceipt.VATAmount + this.goodsReceiptVM.goodReceipt.CCAmount, 4);
 
 
           } else {
-            this.msgserv.showMessage("failed", [
+            this.messageBoxService.showMessage("failed", [
               "Failed to get OrderList." + res.ErrorMessage,
             ]);
           }
         },
         (err) => {
-          this.msgserv.showMessage("error", [
+          this.messageBoxService.showMessage("error", [
             "Failed to get OrderList." + err.ErrorMessage,
           ]);
         }
@@ -410,8 +401,8 @@ export class PHRMGoodsReceiptComponent {
     }
   }
   private UpdatePackingSettingForItem(grItemToUpdate: PHRMGoodsReceiptItemsModel) {
-    if (this.packingtypeList != null && this.packingtypeList.length > 0 && grItemToUpdate.SelectedItem.PackingTypeId != null) {
-      var selectedItemPackingType = this.packingtypeList.find(a => a.PackingTypeId == grItemToUpdate.SelectedItem.PackingTypeId);
+    if (this.PackingTypeList != null && this.PackingTypeList.length > 0 && grItemToUpdate.SelectedItem.PackingTypeId != null) {
+      let selectedItemPackingType = this.PackingTypeList.find(a => a.PackingTypeId == grItemToUpdate.SelectedItem.PackingTypeId);
       if (selectedItemPackingType != null) {
         grItemToUpdate.PackingName = selectedItemPackingType.PackingName + "\n" + "(" + selectedItemPackingType.PackingQuantity + ")";
         grItemToUpdate.PackingQty = selectedItemPackingType.PackingQuantity;
@@ -448,10 +439,11 @@ export class PHRMGoodsReceiptComponent {
             this.goodsReceiptVM.goodReceipt.DiscountPercentage = res.Results.DiscountPercentage;
             this.goodsReceiptVM.goodReceipt.DiscountAmount = res.Results.DiscountAmount;
             this.goodsReceiptVM.goodReceipt.TotalAmount = res.Results.TotalAmount;
-            this.goodsReceiptVM.goodReceipt.TaxableSubTotal = this.goodsReceiptVM.goodReceipt.SubTotal - this.goodsReceiptVM.goodReceipt.DiscountAmount;
-            this.goodsReceiptVM.goodReceipt.NonTaxableSubTotal = this.goodsReceiptVM.goodReceipt.DiscountAmount;
+            //this.goodsReceiptVM.goodReceipt.TaxableSubTotal = this.goodsReceiptVM.goodReceipt.SubTotal - this.goodsReceiptVM.goodReceipt.DiscountAmount;
+            //this.goodsReceiptVM.goodReceipt.NonTaxableSubTotal = this.goodsReceiptVM.goodReceipt.DiscountAmount;
             this.goodsReceiptVM.goodReceipt.Remarks = res.Results.Remarks;
-            //this.goodsReceiptVM.goodReceipt.Adjustment = res.Results.Adjustment;
+            this.goodsReceiptVM.goodReceipt.Adjustment = res.Results.Adjustment;
+            this.GRTotalAmount = this.goodsReceiptVM.goodReceipt.TotalAmount - this.goodsReceiptVM.goodReceipt.Adjustment;
             this.goodsReceiptVM.goodReceipt.CreatedBy = res.Results.CreatedBy;
             this.goodsReceiptVM.goodReceipt.CreatedOn = res.Results.CreatedOn;
             this.goodsReceiptVM.goodReceipt.VATAmount = res.Results.VATAmount;
@@ -467,11 +459,11 @@ export class PHRMGoodsReceiptComponent {
             this.goodsReceiptVM.goodReceipt.IsItemDiscountApplicable = res.Results.IsItemDiscountApplicable;
             this.tempStore = this.storeList;
             this.AssignStore();
-            var goodsReceiptItems: Array<any> = res.Results.GoodReceiptItem;
+            let goodsReceiptItems: Array<any> = res.Results.GoodReceiptItem;
             //this.changeDetectorRef.detectChanges();
             for (let i = 0; i < goodsReceiptItems.length; i++) {
               //this.changeDetectorRef.detectChanges();
-              var currGRItem: PHRMGoodsReceiptItemsModel = new PHRMGoodsReceiptItemsModel();
+              let currGRItem: PHRMGoodsReceiptItemsModel = new PHRMGoodsReceiptItemsModel();
               currGRItem.GoodReceiptItemId = goodsReceiptItems[i].GoodReceiptItemId;
               currGRItem.GoodReceiptId = goodsReceiptItems[i].GoodReceiptId;
               currGRItem.CompanyName = goodsReceiptItems[i].CompanyName;
@@ -479,7 +471,7 @@ export class PHRMGoodsReceiptComponent {
               currGRItem.ItemName = goodsReceiptItems[i].ItemName;
               currGRItem.ItemId = goodsReceiptItems[i].ItemId;
               currGRItem.ItemName = goodsReceiptItems[i].ItemName;
-              this.itemid = currGRItem.ItemId;                                ///set itemid for if item change then chabge cccharge value else keep old value.
+              this.ItemId = currGRItem.ItemId;
               currGRItem.SelectedItem = this.itemList.find((a) => a.ItemId == currGRItem.ItemId);
               currGRItem.StockId = goodsReceiptItems[i].StockId;
               currGRItem.StoreStockId = goodsReceiptItems[i].StoreStockId;
@@ -490,7 +482,7 @@ export class PHRMGoodsReceiptComponent {
               }
               currGRItem.ReceivedQuantity = goodsReceiptItems[i].ReceivedQuantity;
               if (goodsReceiptItems[i].PackingTypeId != null) {
-                var packing = this.packingtypeList.find(x => x.PackingTypeId == goodsReceiptItems[i].PackingTypeId);
+                let packing = this.PackingTypeList.find(x => x.PackingTypeId == goodsReceiptItems[i].PackingTypeId);
                 currGRItem.PackingQty = goodsReceiptItems[i].PackingQty;
                 currGRItem.ItemQTy = goodsReceiptItems[i].ReceivedQuantity / currGRItem.PackingQty;
                 currGRItem.PackingName = packing.PackingName + "\n" + "(" + packing.PackingQuantity + ")";
@@ -502,7 +494,7 @@ export class PHRMGoodsReceiptComponent {
               currGRItem.GenericName = goodsReceiptItems[i].GenericName;
               currGRItem.GenericId = goodsReceiptItems[i].GenericId;
               currGRItem.StripRate = goodsReceiptItems[i].StripRate;
-              currGRItem.StripMRP = goodsReceiptItems[i].StripMRP;
+              currGRItem.StripSalePrice = goodsReceiptItems[i].StripSalePrice;
               currGRItem.StripQty = goodsReceiptItems[i].PackingQty;
               currGRItem.PackingTypeId = goodsReceiptItems[i].PackingTypeId;
               currGRItem.FreeQuantity = goodsReceiptItems[i].FreeQuantity;
@@ -514,6 +506,7 @@ export class PHRMGoodsReceiptComponent {
               currGRItem.VATPercentage = goodsReceiptItems[i].VATPercentage;
               currGRItem.IsPacking = goodsReceiptItems[i].IsPacking;
               currGRItem.MRP = goodsReceiptItems[i].MRP;
+              currGRItem.StripMRP = goodsReceiptItems[i].StripMRP;
               currGRItem.IsItemDiscountApplicable = goodsReceiptItems[i].IsItemDiscountApplicable;
               if (goodsReceiptItems[i].CCCharge == null) {
                 currGRItem.CCCharge = 0;
@@ -526,25 +519,30 @@ export class PHRMGoodsReceiptComponent {
               currGRItem.DiscountPercentage = goodsReceiptItems[i].DiscountPercentage;
               currGRItem.DiscountAmount = goodsReceiptItems[i].GrPerItemDisAmt;
               currGRItem.VATAmount = goodsReceiptItems[i].GrPerItemVATAmt;
+              // this.goodsReceiptVM.goodReceipt.TaxableSubTotal += goodsReceiptItems[i].SubTotal - goodsReceiptItems[i].DiscountAmount;
+              // this.goodsReceiptVM.goodReceipt.NonTaxableSubTotal += goodsReceiptItems[i].DiscountAmount;
               if (currGRItem.VATAmount) {
-                this.goodsReceiptVM.goodReceipt.TaxableSubTotal += goodsReceiptItems[i].SubTotal - goodsReceiptItems[i].DiscountAmount;
+                this.goodsReceiptVM.goodReceipt.TaxableSubTotal += goodsReceiptItems[i].SubTotal;
               }
               else {
-                this.goodsReceiptVM.goodReceipt.NonTaxableSubTotal += goodsReceiptItems[i].DiscountAmount;
+                this.goodsReceiptVM.goodReceipt.NonTaxableSubTotal += goodsReceiptItems[i].SubTotal;
               }
               currGRItem.TotalAmount = goodsReceiptItems[i].TotalAmount;
               currGRItem.CreatedBy = goodsReceiptItems[i].CreatedBy;
               currGRItem.CreatedOn = goodsReceiptItems[i].CreatedOn;
               currGRItem.SalePrice = goodsReceiptItems[i].SalePrice;
               currGRItem.AvailableQuantity = goodsReceiptItems[i].AvailableQuantity;
+              currGRItem.CostPrice = goodsReceiptItems[i].CostPrice;
               currGRItem.QtyDiffCount = goodsReceiptItems[i].QtyDiffCount;
               currGRItem.StkManageInOut = goodsReceiptItems[i].StkManageInOut;
               currGRItem.IsItemAltered = goodsReceiptItems[i].IsItemAltered;
               if (currGRItem.PackingTypeId != null) {
-                currGRItem.Margin = CommonFunctions.parseAmount(((currGRItem.StripMRP - currGRItem.StripRate) / currGRItem.StripRate) * 100)
+                currGRItem.Margin = CommonFunctions.parseAmount(((currGRItem.StripSalePrice - currGRItem.StripRate) / currGRItem.StripRate) * 100, 4);
+                currGRItem.AdjustedMargin = currGRItem.Margin;
               }
               else {
-                currGRItem.Margin = CommonFunctions.parseAmount(((currGRItem.SalePrice - currGRItem.GRItemPrice) / currGRItem.GRItemPrice) * 100)
+                currGRItem.Margin = CommonFunctions.parseAmount(((currGRItem.SalePrice - currGRItem.GRItemPrice) / currGRItem.GRItemPrice) * 100, 4);
+                currGRItem.AdjustedMargin = currGRItem.Margin;
               }
               this.grItemList.push(currGRItem);
               //this.UpdatePackingSettingForItem(currGRItem); //ramesh: this is updating the item wise packing; need discussion
@@ -559,12 +557,12 @@ export class PHRMGoodsReceiptComponent {
           } else {
             //this.msgserv.showMessage("Error", ["Failed to load GR.", res.Results + " has been modified or transfered"]);
             //this.logError(res.ErrorMessage);
-            this.msgserv.showMessage("Error", ["Failed to load GR."]);
+            this.messageBoxService.showMessage("Error", ["Failed to load GR."]);
             this.logError(res.ErrorMessage);
           }
         }),
         (err) => {
-          this.msgserv.showMessage("Error", [
+          this.messageBoxService.showMessage("Error", [
             "Failed to load GR.",
             err.ErrorMessage,
           ]);
@@ -577,17 +575,21 @@ export class PHRMGoodsReceiptComponent {
     if (this.grItemList != null) {
       let CheckIsValid = true;
       if (this.currentSupplier.SupplierId <= 0) {
-        //this.msgserv.showMessage("error", ['Please select supplier']);
         alert("Please select supplier");
         CheckIsValid = false;
       }
-      if (this.goodsReceiptVM.goodReceipt.InvoiceNo == null) {
+      if (this.goodsReceiptVM.goodReceipt.InvoiceNo == null || !this.goodsReceiptVM.goodReceipt.InvoiceNo.trim()) {
         alert("Please enter Invoice no.");
         CheckIsValid = false;
       }
       if (this.currentStore == null || this.currentStore.StoreId == 0) {
         alert("Please select store");
         CheckIsValid = false;
+      }
+      this.OnInvoiceChange();
+      if (this.duplicateInvoice) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['Duplicate Supplier Name and InvoiceNo is not allowed']);
+        return;
       }
       let invoiceNo = this.goodsReceiptVM.goodReceipt.InvoiceNo;
       let SupplierId = this.currentSupplier.SupplierId;
@@ -602,22 +604,25 @@ export class PHRMGoodsReceiptComponent {
 
         }
       }
+      if (this.EnableAdjustmentEdit) {
+        const integerPart = this.getIntegerPart(this.goodsReceiptVM.goodReceipt.Adjustment);
+        if (integerPart >= 1) {
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['Adjustment must be in decimal and range must between -1 and 1.']);
+          CheckIsValid = false;
+        }
+      }
+      this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls['GoodReceiptDate'].setValue(this.goodsReceiptVM.goodReceipt.GoodReceiptDate);
       // for loop is used to show GoodsReceiptValidator message ..if required  field is not filled
-      for (var a in this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls) {
+      for (let a in this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls) {
         this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls[a].markAsDirty();
         this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls[a].updateValueAndValidity();
         if (this.goodsReceiptVM.goodReceipt.IsValidCheck(undefined, undefined) == false) {
           CheckIsValid = false;
         }
       }
-      //If Below 'X' one Validaiton checking working then remove It
-      // for loop 'N'
-      for (var b in this.goodReceiptItems.GoodReceiptItemValidator.controls) {
-        this.goodReceiptItems.GoodReceiptItemValidator.controls[b].markAsDirty();
-        this.goodReceiptItems.GoodReceiptItemValidator.controls[b].updateValueAndValidity();
-      }
-      for (var c = 0; c < this.grItemList.length; c++) {
-        for (var ctrl in this.grItemList[c].GoodReceiptItemValidator.controls) {
+
+      for (let c = 0; c < this.grItemList.length; c++) {
+        for (let ctrl in this.grItemList[c].GoodReceiptItemValidator.controls) {
           this.grItemList[c].GoodReceiptItemValidator.controls[ctrl].markAsDirty();
           this.grItemList[c].GoodReceiptItemValidator.controls[ctrl].updateValueAndValidity();
           //this.grItemList[c].CounterId = this.currentCounter;
@@ -633,22 +638,19 @@ export class PHRMGoodsReceiptComponent {
         // }
       }
       if (CheckIsValid) {
-        /////assigning GRList To GoodsReceipt View Model
+        this.goodsReceiptVM.goodReceipt.GoodReceiptItem = [];
+        this.tempGoodsReceiptVM.goodReceipt.GoodReceiptItem = [];
         for (let k = 0; k < this.grItemList.length; k++) {
           this.goodsReceiptVM.goodReceipt.GoodReceiptItem[k] = this.grItemList[k];
         }
-        //////this function checking GrItems whose received quantity is not equal to zero we can pass those item to server call
         for (let c = 0; c < this.goodsReceiptVM.goodReceipt.GoodReceiptItem.length; c++) {
           if (this.goodsReceiptVM.goodReceipt.GoodReceiptItem[c].ReceivedQuantity != 0 || this.goodsReceiptVM.goodReceipt.GoodReceiptItem[c].FreeQuantity != 0) {
-            /////assign GrItem whose received qty is not equal to zero then push to Temp local varible of view model
-            this.tempgoodsReceiptVM.goodReceipt.GoodReceiptItem.push(this.goodsReceiptVM.goodReceipt.GoodReceiptItem[c]);
+            this.tempGoodsReceiptVM.goodReceipt.GoodReceiptItem.push(this.goodsReceiptVM.goodReceipt.GoodReceiptItem[c]);
           }
         }
-        //////null all original GrItems because and assign those item to this view model whose received qty is greater then zero
         this.goodsReceiptVM.goodReceipt.GoodReceiptItem = [];
-        for (let e = 0; e < this.tempgoodsReceiptVM.goodReceipt.GoodReceiptItem.length; e++) {
-          /////push temporary stored GrItems to Original GrItems Array
-          this.goodsReceiptVM.goodReceipt.GoodReceiptItem.push(this.tempgoodsReceiptVM.goodReceipt.GoodReceiptItem[e]);
+        for (let e = 0; e < this.tempGoodsReceiptVM.goodReceipt.GoodReceiptItem.length; e++) {
+          this.goodsReceiptVM.goodReceipt.GoodReceiptItem.push(this.tempGoodsReceiptVM.goodReceipt.GoodReceiptItem[e]);
         }
 
         if (this.goodsReceiptVM.goodReceipt.GoodReceiptItem.length > 0) {
@@ -671,19 +673,17 @@ export class PHRMGoodsReceiptComponent {
           } else {
             this.ChangePOAndPOItemsStatus();
           }
-          this.pharmacyBLService.UpdateGoodsReceipt(this.goodsReceiptVM.goodReceipt).subscribe(
+          this.pharmacyBLService.UpdateGoodsReceipt(this.goodsReceiptVM.goodReceipt).finally(() => this.loading = false).subscribe(
             (res) => {
               if (res.Status == "OK") {
-                this.msgserv.showMessage("success", ["Goods Receipt is Updated and Saved.",]);
+                this.messageBoxService.showMessage("success", ["Goods Receipt is Updated and Saved.",]);
                 this.pharmacyService.CreateNew();
                 this.IsPOorder = false;
                 this.IsGRedit = false;
-                this.itemid = 0;
-                //navigate to GRLIST Page
+                this.ItemId = 0;
                 this.router.navigate(["/Pharmacy/Order/GoodsReceiptList"]);
               } else {
-                this.msgserv.showMessage("failed", [res.Results, " has been transfered or modified",]);
-                this.logError(res.ErrorMessage);
+                this.messageBoxService.showMessage("failed", ["Failed to Update", res.ErrorMessage,]);
               }
               this.loading = false;
             },
@@ -692,19 +692,19 @@ export class PHRMGoodsReceiptComponent {
             }
           );
         } else {
-          this.msgserv.showMessage("notice-message", ["Received Qty of All Items is Zero",]);
+          this.messageBoxService.showMessage("notice-message", ["Received Qty of All Items is Zero",]);
         }
       } else {
-        this.msgserv.showMessage("notice-message", ["missing value, please fill it",]);
+        this.messageBoxService.showMessage("notice-message", ["missing value, please fill it",]);
       }
     }
-
+    this.loading = false;
   }
   //Method for transforming POItems to GRItems
   GetGrItemsFromPoItems() {
-    for (var i = 0; i < this.goodsReceiptVM.purchaseOrder.PHRMPurchaseOrderItems.length; i++
+    for (let i = 0; i < this.goodsReceiptVM.purchaseOrder.PHRMPurchaseOrderItems.length; i++
     ) {
-      var currGRItem: PHRMGoodsReceiptItemsModel = new PHRMGoodsReceiptItemsModel();
+      let currGRItem: PHRMGoodsReceiptItemsModel = new PHRMGoodsReceiptItemsModel();
       currGRItem.ItemId = this.goodsReceiptVM.purchaseOrder.PHRMPurchaseOrderItems[i].ItemId;
       currGRItem.ItemName = this.goodsReceiptVM.purchaseOrder.PHRMPurchaseOrderItems[i].ItemName;
       currGRItem.SellingPrice = 0;
@@ -755,7 +755,6 @@ export class PHRMGoodsReceiptComponent {
       }
     });
   }
-  //get Store List
   public getMainStore() {
     this.pharmacyBLService.GetMainStore().subscribe((res) => {
       if (res.Status == "OK") {
@@ -769,43 +768,53 @@ export class PHRMGoodsReceiptComponent {
     });
   }
 
-  //Save data to database
   SaveGoodsReceipt() {
-    if (this.grItemList != null) {
-      var isValid = this.CheckGoodReceiptValidity();
+    if (this.grItemList && this.grItemList.length) {
+      if (this.duplicateInvoice) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Duplicate Supplier Name and InvoiceNo is not allowed']);
+        return;
+      }
+      if (this.goodsReceiptVM && this.goodsReceiptVM.goodReceipt && this.goodsReceiptVM.goodReceipt.InvoiceNo && !this.goodsReceiptVM.goodReceipt.InvoiceNo.trim()) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Please enter Invoice no.']);
+        return;
+      }
+      this.goodsReceiptVM.goodReceipt.GoodReceiptItem = [...this.grItemList];
+      this.goodsReceiptVM.goodReceipt.GoodReceiptItem.forEach((item, index) => {
+        item.FreeQuantity = item.FreeQuantity != null ? item.FreeQuantity : 0;
+        item.ReceivedQuantity = item.ItemQTy;
+        this.goodsReceiptVM.goodReceipt.IsPacking = this.grItemList[index].IsPacking == true ? true : false
+        this.goodsReceiptVM.goodReceipt.IsItemDiscountApplicable = item.DiscountAmount ? true : false;
+      });
 
-      var goSigal: boolean = false;
-      if (this.CheckIsValid && isValid && this.grItemList.length > 0)
-        goSigal = this.CheckGRItemHistory();
+      this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls['GoodReceiptDate'].setValue(this.goodsReceiptVM.goodReceipt.GoodReceiptDate);
 
-      if (goSigal) {
-        let gr = this.goodsReceiptVM.goodReceipt;
+      let isValid = this.CheckGoodReceiptValidity();
+      if (!isValid) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Missing or Invalid value ! !",]);
+        return;
+      }
+      let goSignal: boolean = false;
+      if (this.CheckIsValid) {
+        goSignal = this.CheckGRItemHistory();
+      }
+      if (goSignal) {
+        let goodReceipt = this.goodsReceiptVM.goodReceipt;
         if (this.CheckIsValid && isValid) {
-          for (let k = 0; k < this.grItemList.length; k++) {
-            this.goodsReceiptVM.goodReceipt.GoodReceiptItem[k] = this.grItemList[k];
-            this.goodsReceiptVM.goodReceipt.GoodReceiptItem[k].FreeQuantity = this.grItemList[k].FreeQuantity != null ? this.grItemList[k].FreeQuantity : 0;
-            this.goodsReceiptVM.goodReceipt.IsPacking = this.grItemList[k].IsPacking == true ? true : false
-            this.goodsReceiptVM.goodReceipt.IsItemDiscountApplicable = this.grItemList[k].DiscountAmount ? true : false;
-            this.goodsReceiptVM.goodReceipt.GoodReceiptItem[k].ReceivedQuantity = this.grItemList[k].ItemQTy;
-          }
-          gr.GoodReceiptDate = moment(gr.GoodReceiptDate).format("YYYY-MM-DD") + ' ' + moment().format('HH:mm:ss.SSS');
-          //////this function checking GrItems whose received quantity is not equal to zero we can pass those item to server call
-          gr.GoodReceiptItem = gr.GoodReceiptItem.filter(a => a.ReceivedQuantity > 0 || a.FreeQuantity > 0);
+          goodReceipt.GoodReceiptItem = goodReceipt.GoodReceiptItem.filter(a => a.ReceivedQuantity > 0 || a.FreeQuantity > 0);
 
-          if (gr.GoodReceiptItem.length > 0) {
-            this.loading = true;
-            gr.GoodReceiptItem.forEach(
-              r => {
-                r.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
-                r.CreatedOn = moment().format("YYYY-MM-DD");
+          if (goodReceipt.GoodReceiptItem.length > 0) {
+            goodReceipt.GoodReceiptItem.forEach(
+              gri => {
+                gri.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
+                gri.CreatedOn = moment().format("YYYY-MM-DD");
               }
             );
-            gr.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
-            gr.SupplierId = this.currentSupplier.SupplierId;
-            gr.CreatedOn = moment().format("YYYY-MM-DD");
-            gr.StoreId = this.currentStore.StoreId;
-            gr.StoreName = this.currentStore.Name;
-            gr.PaymentStatus = "pending";
+            goodReceipt.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
+            goodReceipt.SupplierId = this.currentSupplier.SupplierId;
+            goodReceipt.CreatedOn = moment().format("YYYY-MM-DD");
+            goodReceipt.StoreId = this.currentStore.StoreId;
+            goodReceipt.StoreName = this.currentStore.Name;
+            goodReceipt.PaymentStatus = "pending";
             this.goodsReceiptVM.purchaseOrder.SubTotal = this.goodsReceiptVM.goodReceipt.SubTotal;
             this.goodsReceiptVM.purchaseOrder.TotalAmount = this.goodsReceiptVM.goodReceipt.TotalAmount;
             this.goodsReceiptVM.purchaseOrder.DiscountAmount = this.goodsReceiptVM.goodReceipt.DiscountAmount;
@@ -815,37 +824,40 @@ export class PHRMGoodsReceiptComponent {
             this.goodsReceiptVM.purchaseOrder.SupplierName = this.currentSupplier.SupplierName;
             this.goodsReceiptVM.goodReceipt.CreditPeriod = this.goodsReceiptVM.goodReceipt.CreditPeriod == null ? 0 : this.goodsReceiptVM.goodReceipt.CreditPeriod;
             this.goodsReceiptVM.purchaseOrder.CCChargeAmount = this.goodsReceiptVM.goodReceipt.CCAmount;
-            if (this.checkCreditPeriod) {
-              this.msgserv.showMessage('Notice', ['Credit Period should be positive and whole number']);
-              return;
-            }
+
 
             if (!this.IsPOorder) {
               // this.MakePoWithPOItemsForPost(goodReceiptVM);
             } else {
               this.ChangePOAndPOItemsStatus();
             }
-
-            this.pharmacyBLService.PostGoodReceipt(this.goodsReceiptVM, this.IsPOorder).subscribe(
+            this.loading = true;
+            this.pharmacyBLService.PostGoodReceipt(this.goodsReceiptVM, this.IsPOorder).finally(() => {
+              this.loading = false;
+            }).subscribe(
               (res) => {
-                this.goodsReceiptVM = new PHRMGoodsReceiptViewModel();
-                this.CallBackAddGoodsReceipt(res);
-                this.loading = false;
+                if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+                  this.goodsReceiptVM = new PHRMGoodsReceiptViewModel();
+                  this.CallBackAddGoodsReceipt(res);
+                }
+                else {
+                  this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to save. " + res.ErrorMessage]);
+                }
               },
               (err) => {
-                this.loading = false;
                 this.logError(err);
               }
             );
-          } else {
-            this.msgserv.showMessage("notice-message", ["Received Qty of All Items is Zero",]);
+          }
+          else {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Received Qty of All Items is Zero",]);
           }
         } else {
-          this.msgserv.showMessage("notice-message", ["Missing or Invalid value ! !",]);
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Missing or Invalid value ! !",]);
         }
       }
       else {
-        this.msgserv.showMessage(ENUM_MessageBox_Status.Notice, ["Please, Insert Valid Data",]);
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Please, Insert Valid Data",]);
       }
     }
   }
@@ -855,7 +867,7 @@ export class PHRMGoodsReceiptComponent {
   invalidVATPercentage: boolean = false;
   invalidVATAmount: boolean = false;
   public CheckGoodReceiptValidity(): boolean {
-    var CheckIsValid = true;
+    let CheckIsValid = true;
     if (!this.currentSupplier || this.currentSupplier.SupplierId == undefined || this.currentSupplier.SupplierId <= 0) {
       //this.msgserv.showMessage("error", ['Please select supplier']);
       alert("Please select supplier");
@@ -872,6 +884,26 @@ export class PHRMGoodsReceiptComponent {
     if (this.currentStore == null || this.currentStore.StoreId == 0) {
       alert("Please select store");
       CheckIsValid = false;
+    }
+
+    if (this.EnableAdjustmentEdit) {
+      const integerPart = this.getIntegerPart(this.goodsReceiptVM.goodReceipt.Adjustment);
+      if (integerPart >= 1) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Adjustment should be a decimal value and cannot be greater than or equals to 1']);
+        return;
+      }
+    }
+    if (this.checkCreditPeriod) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Credit Period should be positive and whole number']);
+      return;
+    }
+
+    this.IsDuplicateItemsFound = this.CheckForDuplicateItems();
+
+    if (this.IsDuplicateItemsFound && this.DuplicateItemNames && this.DuplicateItemNames.size) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Duplicate items found' + Array.from(this.DuplicateItemNames).join(", ") + 'with the identical Batch, Expiry and Price']);
+      CheckIsValid = false;
+      return;
     }
 
     if ((this.goodsReceiptVM.goodReceipt.DiscountPercentage < 0 || this.goodsReceiptVM.goodReceipt.DiscountPercentage > 100) || this.goodsReceiptVM.goodReceipt.DiscountAmount < 0) {
@@ -896,32 +928,24 @@ export class PHRMGoodsReceiptComponent {
 
 
     // for loop is used to show GoodsReceiptValidator message ..if required  field is not filled
-    for (var a in this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls) {
+    if (this.goodsReceiptVM.goodReceipt.GoodReceiptValidator) {
+      for (let a in this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls) {
 
-      this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls[a].markAsDirty();
-      this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls[a].updateValueAndValidity();
+        this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls[a].markAsDirty();
+        this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls[a].updateValueAndValidity();
 
-      if (this.goodsReceiptVM.goodReceipt.IsValidCheck(undefined, undefined) == false) {
-        CheckIsValid = false;
+        if (this.goodsReceiptVM.goodReceipt.IsValidCheck(undefined, undefined) == false) {
+          CheckIsValid = false;
+        }
       }
     }
+    for (let grItem of this.goodsReceiptVM.goodReceipt.GoodReceiptItem) {
 
-    if (this.IsPOorder) {
-      this.goodReceiptItems.GoodReceiptItemValidator.controls['ItemName'].setErrors(null);
-    }
-    for (var b in this.goodReceiptItems.GoodReceiptItemValidator.controls) {
-      this.goodReceiptItems.GoodReceiptItemValidator.controls[b].markAsDirty();
-      this.goodReceiptItems.GoodReceiptItemValidator.controls[b].updateValueAndValidity();
-    }
-
-    for (let grItem of this.grItemList) {
-
-      for (var ctrl in grItem.GoodReceiptItemValidator.controls) {
+      for (let ctrl in grItem.GoodReceiptItemValidator.controls) {
 
         if ((grItem.FreeQuantity != 0) && (grItem.ItemQTy == 0 || grItem.ReceivedQuantity == 0)) {
           if (grItem.GoodReceiptItemValidator.status != "VALID") {
             grItem.GoodReceiptItemValidator.controls["ItemQTy"].disable();
-            //grItem.GoodReceiptItemValidator.controls["ReceivedQuantity"].disable();
           }
         }
         if (this.isExpiryNotApplicable && grItem.GoodReceiptItemValidator.controls["ExpiryDate"] == grItem.GoodReceiptItemValidator.controls[ctrl]) {
@@ -949,7 +973,7 @@ export class PHRMGoodsReceiptComponent {
   //call after Goods Receipt saved
   CallBackAddGoodsReceipt(res) {
     if (res.Status == "OK") {
-      this.msgserv.showMessage("success", ["Goods Receipt is Generated and Saved.",]);
+      this.messageBoxService.showMessage("success", ["Goods Receipt is Generated and Saved.",]);
       this.pharmacyService.CreateNew();
       this.loadItemRateHistory();
       this.loadMRPHistory();
@@ -960,7 +984,7 @@ export class PHRMGoodsReceiptComponent {
       this.ClearAllFields();
       this.getGoodsReceiptList();
     } else {
-      this.msgserv.showMessage("failed", ["failed to add result.. please check log for details.",]);
+      this.messageBoxService.showMessage("failed", ["failed to add result.. please check log for details.",]);
       this.logError(res.ErrorMessage);
 
     }
@@ -999,10 +1023,11 @@ export class PHRMGoodsReceiptComponent {
   ClearAllFields() {
     this.goodsReceiptVM = new PHRMGoodsReceiptViewModel();
     this.grItemList = new Array<PHRMGoodsReceiptItemsModel>();
-    this.tempgoodsReceiptVM = new PHRMGoodsReceiptViewModel();
+    this.tempGoodsReceiptVM = new PHRMGoodsReceiptViewModel();
     this.goodReceiptItems = new PHRMGoodsReceiptItemsModel();
     this.goodsReceiptList = new Array<PHRMGoodsReceiptModel>();
     this.goodsReceiptVM.goodReceipt.GoodReceiptDate = moment().format("YYYY-MM-DD");
+    this.goodsReceiptVM.goodReceipt.GoodReceiptValidator.controls['GoodReceiptDate'].setValue(this.goodsReceiptVM.goodReceipt.GoodReceiptDate);
     this.PurchaseOrderNo = null;
     this.currentSupplier = null;
   }
@@ -1011,7 +1036,9 @@ export class PHRMGoodsReceiptComponent {
     this.showGRReceipt = false;
     this.SetFocusById("SupplierName");
   }
-
+  OnSupplierViewPopUpClose() {
+    this.showAddSupplierPopUp = false;
+  }
   logError(err: any) {
     this.PurchaseOrderNo = 0;
     this.pharmacyService.CreateNew();
@@ -1030,107 +1057,19 @@ export class PHRMGoodsReceiptComponent {
   // Calculation for Goods Receipt Item
 
   OnNewGRItemAdded(grItemToAdded: PHRMGoodsReceiptItemsModel) {
-    var Gritem = grItemToAdded;
+    let grItem = grItemToAdded;
 
     if (!this.grItemList || this.grItemList.length == 0) {
       this.grItemList = [];
     }
-    this.grItemList.push(Gritem);
-
-    // if (this.grItemList[0].ItemId === 0) {
-    //   // remove the default item
-    //   this.grItemList.splice(0, 1);
-    // }
-    // this.grItemList.unshift(Gritem);
+    this.grItemList.push(grItem);
     this.CalculationForPHRMGoodsReceipt();
     this.changeDetectorRef.detectChanges();
     this.goodReceiptItems = new PHRMGoodsReceiptItemsModel();
     this.SetFocusById("btn_AddNew");
   }
 
-  public throwError: boolean = false;
-  // CalculationForPHRMGoodsReceipt(changeType: string = null) {
 
-  //   if (changeType == "disc-amount") {
-  //     let discAmt = this.goodsReceiptVM.goodReceipt.DiscountAmount;
-  //     if (!discAmt) {
-  //       discAmt = 0;
-  //     }
-  //     let totalCCAmt = this.grItemList.reduce((a, b) => {
-  //       let ccAmount = b.FreeQuantity * b.GRItemPrice * b.CCCharge / 100;
-  //       return a + ccAmount;
-  //     }, 0)
-  //     let subTotalwithoutCC = this.goodsReceiptVM.goodReceipt.SubTotal - totalCCAmt;
-
-  //     let discPercent = discAmt * 100 / subTotalwithoutCC;
-
-  //     this.goodsReceiptVM.goodReceipt.DiscountAmount = discAmt;
-  //     this.goodsReceiptVM.goodReceipt.DiscountPercentage = (discPercent);
-  //   }
-
-  //   else if (changeType == "disc-percent") {
-  //     let discPercent = this.goodsReceiptVM.goodReceipt.DiscountPercentage;
-  //     if (!discPercent) {
-  //       discPercent = 0;
-  //     }
-  //     let totalCCAmt = this.grItemList.reduce((a, b) => {
-  //       let ccAmount = b.FreeQuantity * b.GRItemPrice * b.CCCharge / 100;
-  //       return a + ccAmount;
-  //     }, 0);
-  //     let subTotalwithoutCC = this.goodsReceiptVM.goodReceipt.SubTotal - totalCCAmt;
-
-  //     let discAmt = subTotalwithoutCC * discPercent / 100;
-  //     this.goodsReceiptVM.goodReceipt.DiscountAmount = discAmt;
-
-  //   }
-  //   if (["disc-amount", "disc-percent"].includes(changeType)) {
-  //     this.grItemList.forEach(a => {
-  //       a.DiscountPercentage = this.goodsReceiptVM.goodReceipt.DiscountPercentage;
-  //       updateCalculationsForGrItem(a);
-  //     });
-  //   }
-  //   //To validate the discount percentage: Rohit
-  //   if (this.goodsReceiptVM.goodReceipt.DiscountAmount > this.goodsReceiptVM.goodReceipt.SubTotal) {
-  //     this.throwError = true;
-  //     this.loading = true;
-  //   }
-  //   else {
-  //     this.loading = false;
-  //     this.throwError = false;
-  //   }
-  //   let aggregateResult = this.grItemList.reduce((aggregatedObject, currentItem) => {
-  //     if (currentItem.VATAmount) {
-  //       aggregatedObject.taxableSubTotal += currentItem.SubTotal;
-  //     }
-  //     else {
-  //       aggregatedObject.nontaxableSubtotal += currentItem.SubTotal;
-  //     }
-  //     aggregatedObject.discountTotal += currentItem.DiscountAmount;
-  //     aggregatedObject.vatTotal += currentItem.VATAmount;
-  //     aggregatedObject.totalAmount += currentItem.TotalAmount;
-  //     aggregatedObject.ccTotal += currentItem.FreeQuantity * currentItem.GRItemPrice * currentItem.CCCharge / 100
-  //     return aggregatedObject;
-  //   }, { taxableSubTotal: 0, nontaxableSubtotal: 0, discountTotal: 0, vatTotal: 0, ccTotal: 0, totalAmount: 0 });
-
-
-
-  //   this.goodsReceiptVM.goodReceipt.TaxableSubTotal = CommonFunctions.parsePhrmAmount(aggregateResult.taxableSubTotal);
-  //   this.goodsReceiptVM.goodReceipt.NonTaxableSubTotal = CommonFunctions.parsePhrmAmount(aggregateResult.nontaxableSubtotal);
-  //   this.goodsReceiptVM.goodReceipt.SubTotal = CommonFunctions.parsePhrmAmount(this.goodsReceiptVM.goodReceipt.TaxableSubTotal + this.goodsReceiptVM.goodReceipt.NonTaxableSubTotal);
-  //   this.goodsReceiptVM.goodReceipt.TotalAmount = aggregateResult.totalAmount;
-  //   this.goodsReceiptVM.goodReceipt.DiscountAmount = CommonFunctions.parsePhrmAmount(aggregateResult.discountTotal);
-  //   if (this.goodsReceiptVM.goodReceipt.SubTotal - aggregateResult.ccTotal > 0)
-  //     this.goodsReceiptVM.goodReceipt.DiscountPercentage = CommonFunctions.parsePhrmAmount(this.goodsReceiptVM.goodReceipt.DiscountAmount * 100 / (this.goodsReceiptVM.goodReceipt.SubTotal - aggregateResult.ccTotal));
-  //   this.goodsReceiptVM.goodReceipt.VATAmount = aggregateResult.vatTotal;
-  //   this.goodsReceiptVM.goodReceipt.CCAmount = aggregateResult.ccTotal;
-  //   // if (this.goodsReceiptVM.goodReceipt.DiscountAmount == 0) {
-  //   //   this.goodsReceiptVM.goodReceipt.VATAmount = CommonFunctions.parsePhrmAmount(this.goodsReceiptVM.goodReceipt.TotalAmount - this.goodsReceiptVM.goodReceipt.SubTotal);
-  //   // }
-  //   // this.goodsReceiptVM.goodReceipt.Adjustment = CommonFunctions.parseFinalAmount(this.goodsReceiptVM.goodReceipt.TotalAmount) - this.goodsReceiptVM.goodReceipt.TotalAmount;
-  //   // this.goodsReceiptVM.goodReceipt.Adjustment = CommonFunctions.parsePhrmAmount(this.goodsReceiptVM.goodReceipt.Adjustment);
-  //   this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parsePhrmAmount(this.goodsReceiptVM.goodReceipt.TotalAmount);
-
-  // }
 
   CalculationForPHRMGoodsReceipt(discPer?: number, discAmt?: number) {
     let SubTotal = 0;
@@ -1140,11 +1079,13 @@ export class PHRMGoodsReceiptComponent {
     let VATPercentage = 0;
     let TotalAmount = 0;
     let CCAmount = 0;
+    let TaxableSubTotal = 0;
+    let NonTaxableSubTotal = 0;
 
     if ((discPer < 0 || discPer > 100) || discAmt < 0) {
       this.invalidDiscountPercentage = true;
       this.invalidDiscountAmount = true;
-      this.msgserv.showMessage(ENUM_MessageBox_Status.Warning, ['Enter a valid discount']);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ['Enter a valid discount']);
       return;
     }
     else {
@@ -1169,8 +1110,17 @@ export class PHRMGoodsReceiptComponent {
         itm.GrTotalDisAmt = 0;
         itm.DiscountAmount = 0;
       }
-      itm.VATAmount = (itm.SubTotal - itm.DiscountAmount) * itm.VATPercentage / 100;
-      itm.TotalAmount = itm.SubTotal - itm.DiscountAmount + itm.VATAmount + itm.CCAmount;
+      if (itm.VATPercentage) {
+        itm.TaxableSubTotal = itm.SubTotal
+      }
+      else {
+        itm.NonTaxableSubTotal = itm.SubTotal
+      }
+
+      itm.VATAmount = CommonFunctions.parseAmount((itm.SubTotal - itm.DiscountAmount) * itm.VATPercentage / 100, 4);
+      itm.TotalAmount = CommonFunctions.parseAmount(itm.SubTotal - itm.DiscountAmount + itm.VATAmount + itm.CCAmount, 4);
+      itm.CostPrice = CommonFunctions.parseAmount(itm.TotalAmount / (itm.FreeQuantity + itm.ReceivedQuantity), 4);
+
     });
 
     SubTotal = this.grItemList.reduce((a, b) => a + b.SubTotal, 0);
@@ -1178,7 +1128,9 @@ export class PHRMGoodsReceiptComponent {
     DiscountPercentage = (DiscountAmount / SubTotal) * 100;
     VATAmount = this.grItemList.reduce((a, b) => a + b.VATAmount, 0);
     CCAmount = this.grItemList.reduce((a, b) => a + b.CCAmount, 0);
-    VATPercentage = ((VATAmount / (SubTotal - DiscountAmount)) * 100);
+    TaxableSubTotal = this.grItemList.reduce((a, b) => a + b.TaxableSubTotal, 0);
+    VATPercentage = ((VATAmount / (TaxableSubTotal - DiscountAmount)) * 100);
+    NonTaxableSubTotal = this.grItemList.reduce((a, b) => a + b.NonTaxableSubTotal, 0);
 
     if (this.isMainDiscountApplicable) {
       discAmt = discAmt ? discAmt : 0;
@@ -1198,9 +1150,17 @@ export class PHRMGoodsReceiptComponent {
 
 
     TotalAmount = SubTotal - DiscountAmount + VATAmount + CCAmount;
+    this.GRTotalAmount = TotalAmount;
 
-    this.goodsReceiptVM.goodReceipt.TaxableSubTotal = CommonFunctions.parseAmount(SubTotal - DiscountAmount, 4);
-    this.goodsReceiptVM.goodReceipt.NonTaxableSubTotal = CommonFunctions.parseAmount(DiscountAmount, 4);
+
+    if (this.EnableAdjustmentEdit && this.goodsReceiptVM.goodReceipt.Adjustment) {
+      const integerPart = this.getIntegerPart(this.goodsReceiptVM.goodReceipt.Adjustment);
+      if (integerPart < 1) {
+        TotalAmount = TotalAmount + this.goodsReceiptVM.goodReceipt.Adjustment;
+      }
+    }
+    this.goodsReceiptVM.goodReceipt.TaxableSubTotal = CommonFunctions.parseAmount(TaxableSubTotal, 4);
+    this.goodsReceiptVM.goodReceipt.NonTaxableSubTotal = CommonFunctions.parseAmount(NonTaxableSubTotal, 4);
     this.goodsReceiptVM.goodReceipt.SubTotal = CommonFunctions.parseAmount(SubTotal, 4);
     this.goodsReceiptVM.goodReceipt.DiscountAmount = CommonFunctions.parseAmount(DiscountAmount, 4);
     this.goodsReceiptVM.goodReceipt.DiscountPercentage = CommonFunctions.parseAmount(DiscountPercentage, 4);
@@ -1208,7 +1168,6 @@ export class PHRMGoodsReceiptComponent {
     this.goodsReceiptVM.goodReceipt.VATPercentage = CommonFunctions.parseAmount(VATPercentage, 4);
     this.goodsReceiptVM.goodReceipt.CCAmount = CommonFunctions.parseAmount(CCAmount, 4);
     this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parseAmount(TotalAmount, 4);
-
 
     if (this.goodsReceiptVM.goodReceipt.DiscountAmount > this.goodsReceiptVM.goodReceipt.SubTotal) {
       this.throwError = true;
@@ -1244,16 +1203,20 @@ export class PHRMGoodsReceiptComponent {
 
   OnVATChange(vatPer?: number, vatAmt?: number) {
 
+
     if ((vatPer < 0 || vatPer > 100) || vatAmt < 0) {
       this.invalidVATPercentage = true;
       this.invalidVATAmount = true;
-      this.msgserv.showMessage(ENUM_MessageBox_Status.Warning, ['Enter a valid VAT']);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ['Enter a valid VAT']);
       return;
     }
     else {
       this.invalidVATPercentage = false;
       this.invalidVATAmount = false;
     }
+    let vatAmount = 0;
+    let vatPercentage = 0;
+
 
     this.grItemList.forEach(itm => {
       if (vatPer > 0 && vatAmt === 0) {
@@ -1262,8 +1225,9 @@ export class PHRMGoodsReceiptComponent {
       }
 
       if (vatPer === 0 && vatAmt > 0) {
+
         let VATPercentage = 0;
-        VATPercentage = (vatAmt / (itm.SubTotal - itm.DiscountAmount) * 100);
+        VATPercentage = vatAmt / (this.goodsReceiptVM.goodReceipt.TaxableSubTotal - this.goodsReceiptVM.goodReceipt.DiscountAmount) * 100;
         itm.VATPercentage = VATPercentage;
         itm.VATAmount = (itm.SubTotal - itm.DiscountAmount) * itm.VATPercentage / 100;
       }
@@ -1283,9 +1247,8 @@ export class PHRMGoodsReceiptComponent {
     let TAmount: number = 0;
     let VAmount: number = 0;
     let DAmount: number = 0;
-    let TotalitemlevDisPer: number = 0;
-    let TotalitemlevDisAmt: number = 0;
-    let Subtotalofitm: number = 0;
+    let TotalItemLevelDiscount: number = 0;
+    let SubTotalOfItem: number = 0;
 
     let aggregateResult = this.grItemList.reduce((aggregatedObject, currentItem) => {
       aggregatedObject.subTotal += currentItem.SubTotal;
@@ -1297,35 +1260,35 @@ export class PHRMGoodsReceiptComponent {
 
     TAmount = aggregateResult.totalAmount;
     VAmount = aggregateResult.vatTotal;
-    TotalitemlevDisAmt = aggregateResult.discountTotal;
-    Subtotalofitm = aggregateResult.subTotal;
+    TotalItemLevelDiscount = aggregateResult.discountTotal;
+    SubTotalOfItem = aggregateResult.subTotal;
 
 
     //for bulk discount calculation and conversion of percentage into amount and vice versa
     if (this.isItemLevelDiscountApplicable == false) {
       if (discPer == 0 && discAmt > 0) {
         this.goodsReceiptVM.goodReceipt.TotalAmount =
-          CommonFunctions.parsePhrmAmount(STotal) - discAmt;
+          CommonFunctions.parseAmount(STotal, 4) - discAmt;
         this.goodsReceiptVM.goodReceipt.DiscountAmount = discAmt;
-        discPer = (discAmt / CommonFunctions.parsePhrmAmount(STotal)) * 100;
-        this.goodsReceiptVM.goodReceipt.DiscountPercentage = CommonFunctions.parsePhrmAmount(
+        discPer = (discAmt / CommonFunctions.parseAmount(STotal)) * 100;
+        this.goodsReceiptVM.goodReceipt.DiscountPercentage = CommonFunctions.parseAmount(
           discPer
-        );
+          , 4);
       }
       if (discPer > 0 && discAmt == 0) {
-        discAmt = CommonFunctions.parsePhrmAmount((TAmount * discPer) / 100);
+        discAmt = CommonFunctions.parseAmount((TAmount * discPer) / 100, 4);
         this.goodsReceiptVM.goodReceipt.TotalAmount =
-          CommonFunctions.parsePhrmAmount(STotal) - discAmt;
+          CommonFunctions.parseAmount(STotal, 4) - discAmt;
         this.goodsReceiptVM.goodReceipt.DiscountAmount = discAmt;
         this.goodsReceiptVM.goodReceipt.DiscountPercentage = discPer;
       }
       if (discPer == 0 && discAmt == 0 && vatAmt == 0) {
-        this.goodsReceiptVM.goodReceipt.SubTotal = CommonFunctions.parsePhrmAmount(STotal);
-        this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parsePhrmAmount(TAmount
+        this.goodsReceiptVM.goodReceipt.SubTotal = CommonFunctions.parseAmount(STotal, 4);
+        this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parseAmount(TAmount, 4
         );
-        //this.goodsReceiptVM.goodReceipt.DiscountAmount = CommonFunctions.parsePhrmAmount(DAmount);
-        this.goodsReceiptVM.goodReceipt.VATAmount = CommonFunctions.parsePhrmAmount(
-          VAmount
+        //this.goodsReceiptVM.goodReceipt.DiscountAmount = CommonFunctions.parseAmount(DAmount);
+        this.goodsReceiptVM.goodReceipt.VATAmount = CommonFunctions.parseAmount(
+          VAmount, 4
         );
         this.goodsReceiptVM.goodReceipt.DiscountAmount = 0;
         this.goodsReceiptVM.goodReceipt.DiscountPercentage = 0;
@@ -1335,45 +1298,31 @@ export class PHRMGoodsReceiptComponent {
         this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parseAmount(
           this.goodsReceiptVM.goodReceipt.SubTotal -
           this.goodsReceiptVM.goodReceipt.DiscountAmount +
-          vatAmt
+          vatAmt, 4
         );
       } else {
-        this.goodsReceiptVM.goodReceipt.SubTotal = CommonFunctions.parsePhrmAmount(
-          STotal
+        this.goodsReceiptVM.goodReceipt.SubTotal = CommonFunctions.parseAmount(
+          STotal, 4
         );
         this.goodsReceiptVM.goodReceipt.TotalAmount =
-          CommonFunctions.parsePhrmAmount(TAmount) -
+          CommonFunctions.parseAmount(TAmount, 4) -
           this.goodsReceiptVM.goodReceipt.DiscountAmount;
-        //this.goodsReceiptVM.goodReceipt.DiscountAmount = CommonFunctions.parsePhrmAmount(DAmount);
-        this.goodsReceiptVM.goodReceipt.VATAmount = CommonFunctions.parsePhrmAmount(
-          VAmount
+        //this.goodsReceiptVM.goodReceipt.DiscountAmount = CommonFunctions.parseAmount(DAmount);
+        this.goodsReceiptVM.goodReceipt.VATAmount = CommonFunctions.parseAmount(
+          VAmount, 4
         );
       }
     }
     else {                                                                             //this cal for total item level discount
-      this.goodsReceiptVM.goodReceipt.SubTotal = CommonFunctions.parsePhrmAmount(
-        Subtotalofitm
-      );
-      this.goodsReceiptVM.goodReceipt.DiscountAmount = CommonFunctions.parsePhrmAmount(
-        TotalitemlevDisAmt
-      );
-      let totaldisper = (this.goodsReceiptVM.goodReceipt.DiscountAmount / this.goodsReceiptVM.goodReceipt.SubTotal) * 100;
-      this.goodsReceiptVM.goodReceipt.DiscountPercentage = CommonFunctions.parsePhrmAmount(
-        totaldisper
-      );
-      this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parsePhrmAmount(
-        TAmount
-      );
-      this.goodsReceiptVM.goodReceipt.VATAmount = CommonFunctions.parsePhrmAmount(
-        VAmount
-      );
+      this.goodsReceiptVM.goodReceipt.SubTotal = CommonFunctions.parseAmount(SubTotalOfItem, 4);
+      this.goodsReceiptVM.goodReceipt.DiscountAmount = CommonFunctions.parseAmount(TotalItemLevelDiscount, 4);
+      let TotalDiscountPercentage = (this.goodsReceiptVM.goodReceipt.DiscountAmount / this.goodsReceiptVM.goodReceipt.SubTotal) * 100;
+      this.goodsReceiptVM.goodReceipt.DiscountPercentage = CommonFunctions.parseAmount(TotalDiscountPercentage, 4);
+      this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parseAmount(TAmount, 4);
+      this.goodsReceiptVM.goodReceipt.VATAmount = CommonFunctions.parseAmount(VAmount, 4);
       if (vatAmt > 0) {
         this.goodsReceiptVM.goodReceipt.VATAmount = vatAmt;
-        this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parsePhrmAmount(
-          this.goodsReceiptVM.goodReceipt.SubTotal -
-          this.goodsReceiptVM.goodReceipt.DiscountAmount +
-          vatAmt
-        );
+        this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parseAmount(this.goodsReceiptVM.goodReceipt.SubTotal - this.goodsReceiptVM.goodReceipt.DiscountAmount + vatAmt, 4);
       }
     }
 
@@ -1386,16 +1335,14 @@ export class PHRMGoodsReceiptComponent {
     //   this.goodsReceiptVM.goodReceipt.Adjustment
     // );
 
-    this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parseAmount(
-      this.goodsReceiptVM.goodReceipt.TotalAmount
-    );
+    this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parseAmount(this.goodsReceiptVM.goodReceipt.TotalAmount, 4);
   }
 
   //to delete the row
   DeleteGrItemRow(index) {
     //Don't allow to remove the item if the stock is already dispatched to dispensary. //sud:8July'2022
     if (this.goodsReceiptVM.goodReceipt.IsTransferredToACC == true || this.grItemList[index].IsItemAltered == true) {
-      this.msgserv.showMessage("notice-message", ["Can not remove this item since this Stock is already altered or post to accounting."]);
+      this.messageBoxService.showMessage("notice-message", ["Can not remove this item since this Stock is already altered or post to accounting."]);
       return;
     }
 
@@ -1410,8 +1357,6 @@ export class PHRMGoodsReceiptComponent {
       //this will remove the data from the array
 
       this.grItemList.splice(index, 1);
-
-
     }
 
     if (index == 0 && this.grItemList.length == 0) {
@@ -1427,10 +1372,10 @@ export class PHRMGoodsReceiptComponent {
 
   //After Goods Receipt Generation Updating The Pending and Received Qty of PO Item and also PO
   ChangePOAndPOItemsStatus() {
-    var poItemList = this.goodsReceiptVM.purchaseOrder.PHRMPurchaseOrderItems;
+    let poItemList = this.goodsReceiptVM.purchaseOrder.PHRMPurchaseOrderItems;
     //Set the Received and Pending Quantity for Each Purchaser Order Item
-    for (var i = 0; i < poItemList.length; i++) {
-      var grItemEquivalentOfPoItem = this.grItemList.find(a => a.ItemId == poItemList[i].ItemId)
+    for (let i = 0; i < poItemList.length; i++) {
+      let grItemEquivalentOfPoItem = this.grItemList.find(a => a.ItemId == poItemList[i].ItemId)
       if (grItemEquivalentOfPoItem != null) {
         poItemList[i].ReceivedQuantity = poItemList[i].ReceivedQuantity + grItemEquivalentOfPoItem.ItemQTy; //- poItemList[i].ReceivedQuantity;
         let pending = poItemList[i].Quantity - poItemList[i].ReceivedQuantity;
@@ -1452,7 +1397,7 @@ export class PHRMGoodsReceiptComponent {
     goodsReceiptVM.purchaseOrder.VATAmount = goodsReceiptVM.goodReceipt.VATAmount;
     goodsReceiptVM.purchaseOrder.TotalAmount = goodsReceiptVM.goodReceipt.TotalAmount;
     goodsReceiptVM.purchaseOrder.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
-    for (var x = 0; x < goodsReceiptVM.goodReceipt.GoodReceiptItem.length; x++) {
+    for (let x = 0; x < goodsReceiptVM.goodReceipt.GoodReceiptItem.length; x++) {
       let tempPOItem = new PHRMPurchaseOrderItems();
       tempPOItem.PurchaseOrderId = 0;
       tempPOItem.PurchaseOrderItemId = 0;
@@ -1462,7 +1407,7 @@ export class PHRMGoodsReceiptComponent {
       tempPOItem.ReceivedQuantity = tempPOItem.Quantity;
       tempPOItem.PendingQuantity = 0;
       tempPOItem.SubTotal = goodsReceiptVM.goodReceipt.GoodReceiptItem[x].SubTotal;
-      tempPOItem.VATAmount = CommonFunctions.parsePhrmAmount(goodsReceiptVM.goodReceipt.GoodReceiptItem[x].TotalAmount - tempPOItem.SubTotal);
+      tempPOItem.VATAmount = CommonFunctions.parseAmount(goodsReceiptVM.goodReceipt.GoodReceiptItem[x].TotalAmount - tempPOItem.SubTotal, 4);
       tempPOItem.TotalAmount = goodsReceiptVM.goodReceipt.GoodReceiptItem[x].TotalAmount;
       tempPOItem.DeliveryDays = 1;
       tempPOItem.POItemStatus = "complete";
@@ -1491,7 +1436,7 @@ export class PHRMGoodsReceiptComponent {
         this.currentStore = null;
       }
     } catch (ex) {
-      this.msgserv.showMessage("error", [
+      this.messageBoxService.showMessage("error", [
         "Failed to get Store." + ex.ErrorMessage,
       ]);
     }
@@ -1515,9 +1460,9 @@ export class PHRMGoodsReceiptComponent {
     this.pharmacyService.CreateNew();
     this.PurchaseOrderNo = 0;
     this.IsPOorder = false;
-    this.itemid = 0;
+    this.ItemId = 0;
     //navigate to GRLIST Page
-    this.router.navigate(["/Pharmacy/Order/GoodsReceiptList"]);
+    this.callBackPopupClose.emit();
   }
 
   //for item add popup page to turn on
@@ -1540,7 +1485,7 @@ export class PHRMGoodsReceiptComponent {
 
   OnNewSupplierAdded($event) {
     this.showAddSupplierPopUp = false;
-    var supplier = $event.supplier;
+    let supplier = $event.supplier;
     this.supplierList.unshift(supplier);
     this.supplierList = this.supplierList.slice();
     this.currentSupplier = supplier;
@@ -1550,7 +1495,7 @@ export class PHRMGoodsReceiptComponent {
 
 
   //show or hide GR item level discount
-  showitemlvldiscount() {
+  ShowItemLevelDiscount() {
     this.isItemLevelDiscountApplicable = true;
     this.isMainDiscountApplicable = true;
     let discountParameter = this.coreService.Parameters.find((p) => p.ParameterName == "PharmacyDiscountCustomization" && p.ParameterGroupName == "Pharmacy").ParameterValue;
@@ -1565,7 +1510,7 @@ export class PHRMGoodsReceiptComponent {
         if (res.Status == "OK" && res.Results && res.Results.length > 0) {
           this.dispensaryList = res.Results;
         } else {
-          this.msgserv.showMessage("failed", ["Failed to get Dispensary List"]);
+          this.messageBoxService.showMessage("failed", ["Failed to get Dispensary List"]);
         }
       },
       (err) => {
@@ -1589,94 +1534,87 @@ export class PHRMGoodsReceiptComponent {
 
 
   public CheckGRItemHistory(): boolean {
-    var NoOfcurrentGRItems = this.grItemList.length;
+    const noOfCurrentGRItems = this.grItemList.length;
 
     if (this.goodReceiptHistory && this.goodReceiptHistory.length > 0) {
 
-      var filteredGRHistory: Array<any> = [];
-      // filtering GR-history by supplier Id and no of GR-items that matches with current GR
-      filteredGRHistory = this.goodReceiptHistory.filter(a => {
-        if (a.SupplierId == this.currentSupplier.SupplierId && NoOfcurrentGRItems == a.items.length) {
-          return a;
+      const filteredGRHistory = this.goodReceiptHistory.filter(gr =>
+        gr.SupplierId === this.currentSupplier.SupplierId && gr.items.length === noOfCurrentGRItems
+      );
+
+      let duplicateInvoices: string[] = [];
+
+      for (let historyGR of filteredGRHistory) {
+        const matchingItems = historyGR.items.filter(grItem =>
+          this.grItemList.some(currentItem =>
+            currentItem.ItemId === grItem.ItemId &&
+            currentItem.ReceivedQuantity === grItem.ReceivedQuantity &&
+            currentItem.GRItemPrice === grItem.GRItemPrice &&
+            currentItem.SubTotal === grItem.SubTotal
+          )
+        );
+
+        if (matchingItems.length === noOfCurrentGRItems) {
+          duplicateInvoices.push(historyGR.InvoiceNo);
         }
-      });
+      }
 
-      var duplicatePastGR: Array<any> = [];
-      var invoiceString: string = "";
-      if (filteredGRHistory && filteredGRHistory.length) {
-        //One block of GR history
-        filteredGRHistory.forEach(b => {  // b is One GR history block
-
-          var duplicatePastGRItems: Array<any> = [];
-          this.grItemList.forEach(a => {
-
-            var di = b.items.filter(i => i.ItemId == a.ItemId && i.ReceivedQuantity == a.ReceivedQuantity
-              && i.GRItemPrice == a.GRItemPrice && i.SubTotal == a.SubTotal);
-
-            if (di && di.length > 0) {
-              di.forEach(c => {
-                duplicatePastGRItems.push(c); // storing duplicate item
-              });
-            }
-
-          });
-          if (duplicatePastGRItems && duplicatePastGRItems.length == NoOfcurrentGRItems) {
-            duplicatePastGR.push(b);
-            invoiceString = invoiceString + "\n Invoice No.: " + b.InvoiceNo;
-          }
-        });
-
-
+      if (duplicateInvoices.length > 0) {
+        const invoiceString = duplicateInvoices.join(', ');
+        // const confirmIt = confirm(`Similar GR found with these Invoices: ${invoiceString}\n Want to continue?`);
+        // if (!confirmIt) {
+        //     return false;
+        // }
       }
     }
-    // if (duplicatePastGR && duplicatePastGR.length > 0) {
-    //   var confirmIt = confirm(`Similar GR found with these Invoices: ${invoiceString}\n Want to continue?`);
-    //   if (!confirmIt) {
-    //     return false;
-    //   }
-    // }
     return true;
   }
+
 
   OnInvoiceChange() {
     this.duplicateInvoice = false;
     this.CheckIsValid = true;
+    this.goodsReceiptVM.goodReceipt.InvoiceNo = this.goodsReceiptVM.goodReceipt.InvoiceNo.trim();
     let invoiceNo = this.goodsReceiptVM.goodReceipt.InvoiceNo;
     let SupplierId = this.currentSupplier.SupplierId;
     let selectedDate = this.goodsReceiptVM.goodReceipt.GoodReceiptDate;
     let isGRCancelled = true;
-    let fiscalyearName = (this.fiscalYearList.length > 0) ? this.fiscalYearList.filter(f => moment(f.StartYear).format('YYYY-MM-DD') <= moment(selectedDate).format('YYYY-MM-DD') && moment(f.EndYear).format('YYYY-MM-DD') >= moment(selectedDate).format('YYYY-MM-DD'))[0].FiscalYearName : "";
+    let fiscalYearName = (this.fiscalYearList.length > 0) ? this.fiscalYearList.filter(f => moment(f.StartYear).format('YYYY-MM-DD') <= moment(selectedDate).format('YYYY-MM-DD') && moment(f.EndYear).format('YYYY-MM-DD') >= moment(selectedDate).format('YYYY-MM-DD'))[0].FiscalYearName : "";
+    let grId = this.goodsReceiptVM.goodReceipt.GoodReceiptId;
 
-
-    if (invoiceNo && SupplierId > 0 && fiscalyearName != "") {
-      for (let row of this.goodsReceiptList) {
-        if (invoiceNo == row.InvoiceNo && SupplierId == row.SupplierId && fiscalyearName == row.CurrentFiscalYear && isGRCancelled != row.IsCancel) {
-          this.duplicateInvoice = true;
-          this.CheckIsValid = false;
-        }
+    if (invoiceNo && SupplierId > 0 && fiscalYearName != "") {
+      let goodReceipt = new PHRMGoodsReceiptModel();
+      if (!this.IsGRedit) {
+        goodReceipt = this.goodsReceiptList && this.goodsReceiptList.find(a => a.InvoiceNo == invoiceNo && a.SupplierId == SupplierId && a.CurrentFiscalYear == fiscalYearName && a.IsCancel != isGRCancelled);
+      }
+      else {
+        goodReceipt = this.goodsReceiptList && this.goodsReceiptList.find(a => a.GoodReceiptId !== grId && a.InvoiceNo == invoiceNo && a.SupplierId == SupplierId && a.CurrentFiscalYear == fiscalYearName && a.IsCancel != isGRCancelled);
+      }
+      if (goodReceipt) {
+        this.duplicateInvoice = true;
+        this.CheckIsValid = false;
       }
     }
   }
 
-  HasDuplicateItems(ItemId, i) {
+  HasDuplicateItems(ItemId, i): boolean {
 
     let seen = new Set();
-    var hasDuplicates = this.grItemList.some(obj => {
-      return seen.size == seen
-        .add(obj.ItemId).size && obj.ItemId != 0 && (obj.ItemId == ItemId || ItemId == null);
-    });
+    let hasDuplicates = this.grItemList.some(obj => { return seen.size == seen.add(obj.ItemId).size && obj.ItemId != 0 && (obj.ItemId == ItemId || ItemId == null); });
     if (hasDuplicates) {
       if (this.grItemList[i].BatchNo && this.grItemList[i].ExpiryDate && this.grItemList[i].GRItemPrice) {
 
-        var hasDuplicates = this.grItemList.some(obj => {
+        let hasDuplicates = this.grItemList.some(obj => {
 
-          var myBool1 = seen.size == seen.add(obj.BatchNo).size && obj.BatchNo != "" && (obj.BatchNo == this.grItemList[i].BatchNo);
-          var myBool2 = seen.size == seen.add(obj.ExpiryDate).size && obj.ExpiryDate != null && (obj.ExpiryDate == this.grItemList[i].ExpiryDate);
-          var myBool3 = seen.size == seen.add(obj.GRItemPrice).size && obj.GRItemPrice != 0 && (obj.GRItemPrice == this.grItemList[i].GRItemPrice);
+          let myBool1 = seen.size == seen.add(obj.BatchNo).size && obj.BatchNo != "" && (obj.BatchNo == this.grItemList[i].BatchNo);
+          let myBool2 = seen.size == seen.add(obj.ExpiryDate).size && obj.ExpiryDate != null && (obj.ExpiryDate == this.grItemList[i].ExpiryDate);
+          let myBool3 = seen.size == seen.add(obj.GRItemPrice).size && obj.GRItemPrice != 0 && (obj.GRItemPrice == this.grItemList[i].GRItemPrice);
           if (myBool1 && myBool2 && myBool3) {
-            this.CheckIsValid = false;
+            this.DuplicateItemNames.add(obj.ItemName);
             return true;
           } else {
+            this.CheckIsValid = true;
+            this.DuplicateItemNames.add(obj.ItemName);
             return false;
           }
         });
@@ -1685,11 +1623,14 @@ export class PHRMGoodsReceiptComponent {
       } else {
         hasDuplicates = true;
       }
-
     }
-
+    else {
+      this.CheckIsValid = true;
+      hasDuplicates = false;
+    }
     return hasDuplicates;
   }
+
   public hotkeys(event) {
     if (event.altKey) {
       console.log(event.keyCode);
@@ -1705,7 +1646,7 @@ export class PHRMGoodsReceiptComponent {
     }
   }
   setFocusById(id: string, waitingTimeInms = 0) {
-    var Timer = setTimeout(() => {
+    let Timer = setTimeout(() => {
       if (document.getElementById(id)) {
         let nextEl = <HTMLInputElement>document.getElementById(id);
         nextEl.focus();
@@ -1715,7 +1656,7 @@ export class PHRMGoodsReceiptComponent {
     }, waitingTimeInms)
   }
   setFocusToBtnById(id: string, waitingTimeInms = 0) {
-    var Timer = setTimeout(() => {
+    let Timer = setTimeout(() => {
       if (document.getElementById(id)) {
         let nextEl = <HTMLInputElement>document.getElementById(id);
         nextEl.focus();
@@ -1723,11 +1664,68 @@ export class PHRMGoodsReceiptComponent {
       }
     }, waitingTimeInms)
   }
-  //Credit Period Validation
+
   OnCreditPeriodChange() {
     this.checkCreditPeriod = false;
     if (this.goodsReceiptVM.goodReceipt.CreditPeriod < 0 || !Number.isInteger(this.goodsReceiptVM.goodReceipt.CreditPeriod)) {
       this.checkCreditPeriod = true;
     }
+  }
+
+  GetEnablePharmacyGoodReceiptAdjustment() {
+    let adjust = this.coreService.Parameters.find((p) => p.ParameterName == "EnableEditPHRMGRAdjustment" && p.ParameterGroupName == "Pharmacy");
+    if (adjust && adjust.ParameterValue) {
+      if (adjust.ParameterValue == "true") {
+        this.EnableAdjustmentEdit = true;
+      } else {
+        this.EnableAdjustmentEdit = false;
+      }
+
+    }
+  }
+  OnAdjustmentChange($event) {
+    if ($event && this.goodsReceiptVM.goodReceipt.Adjustment) {
+      const integerPart = this.getIntegerPart(this.goodsReceiptVM.goodReceipt.Adjustment);
+      if (this.EnableAdjustmentEdit && integerPart >= 1) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Adjustment must be in decimal and range must between -1 and 1."]);
+        return;
+      }
+      if (this.EnableAdjustmentEdit && integerPart < 1) {
+        if (this.goodsReceiptVM.goodReceipt.TotalAmount > 0) {
+          this.goodsReceiptVM.goodReceipt.TotalAmount = CommonFunctions.parseAmount(this.GRTotalAmount + this.goodsReceiptVM.goodReceipt.Adjustment, 4);
+        }
+      }
+    }
+    else {
+      this.goodsReceiptVM.goodReceipt.TotalAmount = this.GRTotalAmount;
+    }
+  }
+  getIntegerPart(value: number): number {
+    return Math.trunc(Math.abs(value));
+
+  }
+  OnNewMasterItemAdded($event) {
+    if ($event) {
+      this.itemList.push($event);
+    }
+  }
+
+  CheckForDuplicateItems(): boolean {
+    let seenItems = new Set<string>();
+    let hasDuplicates = false;
+
+    const uniqueFields = ['BatchNo', 'ExpiryDate', 'GRItemPrice'];
+
+    for (let item of this.grItemList) {
+      let uniqueKey = uniqueFields.map(field => item[field]).join('|');
+
+      if (seenItems.has(uniqueKey)) {
+        hasDuplicates = true;
+        break;
+      } else {
+        seenItems.add(uniqueKey);
+      }
+    }
+    return hasDuplicates;
   }
 }

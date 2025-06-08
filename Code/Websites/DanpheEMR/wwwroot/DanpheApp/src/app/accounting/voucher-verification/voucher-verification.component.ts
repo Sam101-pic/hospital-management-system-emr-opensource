@@ -42,6 +42,7 @@ export class VoucherVerificationComponent {
     public fiscalYearId: number = 0;
     public validDate: boolean = true;
     public showVoucherVerification: boolean = false;
+    public ActiveHospitalId: number = 1;
 
     constructor(public accReportBLService: AccountingReportsBLService, public msgBoxServ: MessageboxService,
         public accountingService: AccountingService,
@@ -54,6 +55,7 @@ export class VoucherVerificationComponent {
 
         this.GetConfigurationData();
         this.GetSection();
+        this.ActiveHospitalId = this.securityService.AccHospitalInfo.ActiveHospitalId > 0 ? this.securityService.AccHospitalInfo.ActiveHospitalId : this.ActiveHospitalId;
     }
 
     public GetConfigurationData() {
@@ -94,6 +96,8 @@ export class VoucherVerificationComponent {
         if (this.checkDateValidation()) {
 
             if (this.sectionId > 0) {
+                this.txnListAll = [];
+                this.txnList = [];
                 this.accReportBLService.GetVoucherForVerification(this.fromDate, this.toDate, this.sectionId)
                     .finally(() => { this.btndisabled = false; })
                     .subscribe((res: DanpheHTTPResponse) => {
@@ -205,7 +209,7 @@ export class VoucherVerificationComponent {
             });
     }
     gridExportOptions = {
-        fileName: 'VoucherVerificationList_' + moment().format('YYYY-MM-DD') + '.xls',
+        fileName: 'VoucherVerificationList_' + moment().format(ENUM_DateTimeFormat.Year_Month_Day) + '.xls',
     };
 
     public GetChangedSection() {
@@ -244,6 +248,7 @@ export class VoucherVerificationComponent {
     public CloseTransaction() {
         this.accountingService.voucherTxnData.VoucherNumber = null;
         this.accountingService.voucherTxnData.FiscalyearId = 0;
+        this.showVoucherVerification = true;
         this.changeDetector.detectChanges();
         this.GetTxnList();
     }

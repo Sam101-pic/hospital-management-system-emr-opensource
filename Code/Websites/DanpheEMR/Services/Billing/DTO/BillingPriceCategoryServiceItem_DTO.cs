@@ -9,6 +9,8 @@
         public int? IntegrationItemId { get; set; }
         public string ItemCode { get; set; }
         public int PriceCategoryId { get; set; }
+        public bool IsDoctorMandatory { get; set; }
+
 
     }
 }

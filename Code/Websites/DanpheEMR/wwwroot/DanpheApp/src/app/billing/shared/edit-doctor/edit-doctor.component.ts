@@ -1,12 +1,13 @@
-import { Component, Directive, ViewChild, ChangeDetectorRef } from '@angular/core';
-import { Input, Output, EventEmitter, OnInit } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { EditDoctorFeatureViewModel } from "../../shared/edit-doctor-feature-view.model";
 
 
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { BillingBLService } from '../billing.bl.service';
+import { EditDoctorRequest } from '../dto/edit-doctor.request';
 
 @Component({
   selector: "danphe-edit-doctor",
@@ -30,7 +31,9 @@ export class EditDoctorComponent {
   public showmsgbox: boolean = false;
   public status: string = null;
   public message: string = null;
-
+  SelectedRefId: number = null;
+  SelectedReferrerName: string = null;
+  public NewRefeerer = { EmployeeId: null, EmployeeName: null };
   constructor(public msgBoxServ: MessageboxService, public changeDetector: ChangeDetectorRef,
     public billingBlService: BillingBLService, public router: Router) {
 
@@ -44,21 +47,13 @@ export class EditDoctorComponent {
     if (this.SelectedItem.PrescriberId) {
       this.newPrescriber = { EmployeeId: this.SelectedItem.PrescriberId, EmployeeName: this.SelectedItem.PrescriberName };
     }
-
+    if (this.SelectedItem.ReferredById && this.SelectedItem.ReferrerName) {
+      this.SelectedRefId = this.SelectedItem.ReferredById;
+      this.SelectedReferrerName = this.SelectedItem.ReferrerName;
+    }
   }
 
-
-  //@Input("showEditDoctorPage")
-  //public set value(val: boolean) {
-  //  if (val) {
-
-  //    //get the  provider list
-  //    this.GetProviderList();
-  //  }
-  //  this.showEditDoctorPage = val;
-  //}
-
-  //load doctor  
+  //load doctor
   GetDoctorList(): void {
     this.newPerformer = null;
     this.newPrescriber = null;
@@ -66,7 +61,6 @@ export class EditDoctorComponent {
       .subscribe(res => this.CallBackGenerateDoctor(res));
   }
 
-  ////this is a success callback of GenerateDoctorList function.
   CallBackGenerateDoctor(res) {
     if (res.Status == "OK") {
       this.doctorList = [];
@@ -89,78 +83,44 @@ export class EditDoctorComponent {
     this.updateDoctor.emit({ SelectedItem: null });
   }
 
-
-  //// for updating the provider
-  //UpdateProvider() {
-  //  if (this.newProvider != undefined && this.newProvider.EmployeeId) {
-  //    let billTxnItemId = this.SelectedItem.BillingTransactionItemId;
-  //    let ProviderId = this.newProvider.EmployeeId;
-  //    let ProviderName = this.newProvider.EmployeeName;
-  //    this.billingBlService.UpdateDoctorafterDoctorEdit(billTxnItemId, ProviderName, ProviderId)
-  //      .subscribe(res => {
-  //        if (res.Status == "OK") {
-  //          this.Close();
-  //          if (this.newProvider) {
-  //            ///emiting the event to the parent page 
-  //            this.updateprovider.emit({ SelectedItem: this.SelectedItem });
-  //          }
-  //          else {
-  //            this.updateprovider.emit({ SelectedItem: null });
-  //          }
-  //          this.changeDetector.detectChanges();
-  //          this.router.navigate(['/Billing/EditDoctor']);
-  //        }
-  //        else {
-  //          this.msgBoxServ.showMessage("error", ["Sorry!!! Not able to update the Doctor"]);
-  //          console.log(res.ErrorMessage)
-  //        }
-
-  //      });
-
-  //  }
-  //  else {
-  //    this.msgBoxServ.showMessage("notice", ["Please!!! select proper Doctor before updating"]);
-  //  }
-
-  //}
-
   // for updating the provider
   UpdatePerformerAndPrescriber() {
     let billTxnItemId = this.SelectedItem.BillingTransactionItemId;
     let performer;
     let prescriber;
-
+    const editDoctorRequest = new EditDoctorRequest();
+    editDoctorRequest.BillingTransactionItemId = billTxnItemId;
     if (this.newPerformer) {
       performer = this.newPerformer.EmployeeName.replace(/&/g, '%26');
       this.newPerformer.EmployeeName = performer;
+      editDoctorRequest.PerformerId = this.newPerformer.EmployeeId;
     }
     if (this.newPrescriber) {
       prescriber = this.newPrescriber.EmployeeName.replace(/&/g, '%26');
       this.newPrescriber.EmployeeName = prescriber;
+      editDoctorRequest.PrescriberId = this.newPrescriber.EmployeeId;
     }
-    //let provider = this.newProvider.EmployeeName.replace(/&/g, '%26');//this is URL-Encoded value for character  '&'    --see: URL Encoding in Google for details.
-    //let referrer = this.newReferrer.EmployeeName.replace(/&/g, '%26');//this is URL-Encoded value for character  '&'    --see: URL Encoding in Google for details.
-    //this.newProvider.EmployeeName = provider;
-    //this.newReferrer.EmployeeName = referrer;
-    this.billingBlService.UpdateDoctorafterDoctorEdit(billTxnItemId, this.newPerformer, this.newPrescriber)
+    if (this.SelectedReferrerName && this.SelectedRefId) {
+      editDoctorRequest.ReferrerId = this.SelectedRefId
+    }
+
+    this.billingBlService.ChangeDoctor(editDoctorRequest)
       .subscribe(res => {
-        if (res.Status == "OK") {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.Close();
           if (this.newPerformer || this.newPrescriber) {
-            ///emiting the event to the parent page 
+            ///emiting the event to the parent page
             this.updateDoctor.emit({ SelectedItem: this.SelectedItem });
           }
           else {
             this.updateDoctor.emit({ SelectedItem: null });
           }
-          //this.changeDetector.detectChanges();
           this.router.navigate(['/Billing/EditDoctor']);
         }
         else {
-          this.msgBoxServ.showMessage("error", ["Sorry!!! Not able to update the Doctor"]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Sorry!!! Not able to update the Doctor"]);
           console.log(res.ErrorMessage)
         }
-
       });
 
   }
@@ -175,5 +135,11 @@ export class EditDoctorComponent {
     if (event.keyCode == 27) {//key->ESC
       this.Close();
     }
+  }
+
+  OnReferrerChanged($event) {
+    this.SelectedRefId = $event.ReferrerId;
+    this.SelectedReferrerName = $event.ReferrerName;
+
   }
 }

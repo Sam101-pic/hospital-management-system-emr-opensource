@@ -11,6 +11,7 @@
         public decimal PercentageOfBedCharges { get; set; }
         public bool UsePercentageOfBedCharges { get; set; }
         public bool IsRepeatable { get; set; }
+        public bool AllowAutoCancellation { get; set; }
         public int PriceCategoryId { get; set; }
         public string ItemCode { get; set; }
         public string ItemName { get; set; }
@@ -26,7 +27,7 @@
         public bool IsCoPayment { get; set; }
         public decimal CoPayCashPercent { get; set; }
         public decimal CoPayCreditPercent { get; set; }
-        public int IntegrationItemId { get; set; }
+        public int? IntegrationItemId { get; set; }
         public string IntegrationName { get; set; }
         public bool IsActive { get; set; }
     }

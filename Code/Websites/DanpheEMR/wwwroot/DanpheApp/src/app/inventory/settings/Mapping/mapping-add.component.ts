@@ -1,12 +1,12 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 
 import { CurrencyModel } from '../shared/currency.model';
 import { InventorySettingBLService } from "../shared/inventory-settings.bl.service";
 
 import { SecurityService } from '../../../security/shared/security.service';
 //Parse, validate, manipulate, and display dates and times in JS.
-import * as moment from 'moment/moment';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 
 
 @Component({
@@ -19,6 +19,9 @@ export class MappingAddComponent {
     public showAddPage: boolean = false;
     @Input("selectedCurrency")
     public selectedCurrency: CurrencyModel;
+
+    @Input("currencyList")
+    public CurrencyList = new Array<CurrencyModel>();
     @Output("callback-add")
     callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
     public update: boolean = false;
@@ -30,12 +33,12 @@ export class MappingAddComponent {
     //public message: string = null;
     public completecurrencylist: Array<CurrencyModel> = new Array<CurrencyModel>();
     public currencylist: Array<CurrencyModel> = new Array<CurrencyModel>();
-   
+
 
     constructor(public invSettingBL: InventorySettingBLService,
         public securityService: SecurityService,
         public changeDetector: ChangeDetectorRef, public msgBoxServ: MessageboxService) {
-        
+
     }
     @Input("showAddPage")
     public set value(val: boolean) {
@@ -52,7 +55,7 @@ export class MappingAddComponent {
             this.update = false;
         }
     }
-  
+
 
 
 
@@ -64,18 +67,24 @@ export class MappingAddComponent {
             this.CurrentCurrency.CurrencyValidator.controls[i].updateValueAndValidity();
         }
 
-
+        if (this.CurrencyList && this.CurrencyList.length) {
+            const isCurrencyCodeAlreadyExists = this.CurrencyList.some(a => a.CurrencyCode.toLowerCase() === this.CurrentCurrency.CurrencyCode.toLowerCase());
+            if (isCurrencyCodeAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Mapping as the Currency Code "${this.CurrentCurrency.CurrencyCode}" already exists.`]);
+                return;
+            }
+        }
         if (this.CurrentCurrency.IsValidCheck(undefined, undefined)) {
             this.invSettingBL.AddCurrency(this.CurrentCurrency)
                 .subscribe(
-                res => {
-                    this.showMessageBox("success", "Currency Added");
-                    this.CurrentCurrency = new CurrencyModel();
-                    this.CallBackAddCurrency(res)
-                },
-                err => {
-                    this.logError(err);
-                });
+                    res => {
+                        this.showMessageBox("success", "Currency Added");
+                        this.CurrentCurrency = new CurrencyModel();
+                        this.CallBackAddCurrency(res)
+                    },
+                    err => {
+                        this.logError(err);
+                    });
         }
     }
     //adding new department
@@ -86,18 +95,27 @@ export class MappingAddComponent {
             this.CurrentCurrency.CurrencyValidator.controls[i].updateValueAndValidity();
         }
 
+
+        if (this.CurrencyList && this.CurrencyList.length) {
+            const isCurrencyCodeAlreadyExists = this.CurrencyList.some(a => a.CurrencyCode.toLowerCase() === this.CurrentCurrency.CurrencyCode.toLowerCase() && a.CurrencyID !== this.CurrentCurrency.CurrencyID);
+            if (isCurrencyCodeAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Mapping as the Currency Code "${this.CurrentCurrency.CurrencyCode}" already exists.`]);
+                return;
+            }
+        }
+
         if (this.CurrentCurrency.IsValidCheck(undefined, undefined)) {
             this.invSettingBL.UpdateCurrency(this.CurrentCurrency)
                 .subscribe(
-                res => {
-                    this.showMessageBox("success", "Currency Updated");
-                    this.CurrentCurrency = new CurrencyModel();
-                    this.CallBackAddCurrency(res)
+                    res => {
+                        this.showMessageBox("success", "Currency Updated");
+                        this.CurrentCurrency = new CurrencyModel();
+                        this.CallBackAddCurrency(res)
 
-                },
-                err => {
-                    this.logError(err);
-                });
+                    },
+                    err => {
+                        this.logError(err);
+                    });
         }
     }
 

@@ -33,6 +33,8 @@ import { TaxManageComponent } from "./tax/tax-manage.component";
           { path: 'PrintExportConfiguration', loadChildren: "./print-export-configuration/print-export-configuration.module#PrintExportConfigurationModule", canActivate: [AuthGuardService] },
           { path: 'PaymentModeSettings', loadChildren: "./payment-mode-settings/payment-mode.module#PaymentModeSettingsModule", canActivate: [AuthGuardService] },
           { path: 'PriceCategory', loadChildren: "./price-cateogory/pricecategory.module#PriceCategoryModule", canActivate: [AuthGuardService] },
+          { path: 'PrintTemplates', loadChildren: "./printers-new/print-template-settings.module#PrintTemplateSettingsModule", canActivate: [AuthGuardService] },
+          { path: 'FiscalYear', loadChildren: './fiscal-year/fiscal-year-settings.module#FiscalYearSettingsModule', canActivate: [AuthGuardService] },
         ]
       },
       { path: "**", component: PageNotFound }

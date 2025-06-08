@@ -32,7 +32,7 @@ export class PHRMUpdateMRPComponent implements OnInit {
                             if (res.Status == "OK" && res.Results != null) {
                                 this.msgBoxServ.showMessage("success", ['Item SalePrice Updated.']);
                                 this.changeDetector.detectChanges();
-                                this.callBackUpdate.emit({ event: 'update', stock: res.Results })
+                                this.callBackUpdate.emit({ event: 'update', stock: res.Results.Result })
                             }
                             else {
                                 this.msgBoxServ.showMessage("failed", ["Something Wrong " + res.ErrorMessage]);

@@ -1,18 +1,14 @@
-import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-
-import { AccountHeadModel } from "./account-head.model";
-import { CurrencyModel } from "./currency.model";
-import { ItemCategoryModel } from "./item-category.model";
-import { ItemModel } from "./item.model";
-import { PackagingTypeModel } from "./packaging-type.model";
-import { UnitOfMeasurementModel } from "./unit-of-measurement.model";
-import { VendorsModel } from "./vendors.model";
+import { Injectable } from '@angular/core';
+import { ConsumptionType } from '../consumption-type/consumption-type.model';
 
 @Injectable()
 export class InventorySettingDLService {
   public options = {
     headers: new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' })
+  };
+  public jsonOptions = {
+    headers: new HttpHeaders({ 'Content-Type': 'application/json' })
   };
   constructor(public http: HttpClient) { }
 
@@ -145,6 +141,25 @@ export class InventorySettingDLService {
   }
 
   public PutTerms(currentData) {
- return this.http.put<any>("/api/InventorySettings/InventoryTerm", currentData, this.options);
+    return this.http.put<any>("/api/InventorySettings/InventoryTerm", currentData, this.options);
+  }
+  SaveConsumptionType(ConsumptionType: ConsumptionType) {
+    return this.http.post(`/api/InventorySettings/ConsumptionType`, ConsumptionType, this.jsonOptions);
+  }
+
+  UpdateConsumptionType(ConsumptionType: ConsumptionType) {
+    return this.http.put(`/api/InventorySettings/ConsumptionType`, ConsumptionType, this.jsonOptions);
+  }
+
+  GetConsumptionTypes() {
+    return this.http.get(`/api/InventorySettings/ConsumptionTypes`, this.options);
+  }
+
+  GetActiveConsumptionTypes() {
+    return this.http.get(`/api/InventorySettings/ActiveConsumptionTypes`, this.options);
+  }
+
+  ActivateDeActiveConsumptionType(consumptionTypeId: number, activate: boolean) {
+    return this.http.put(`/api/InventorySettings/ActiveDeactivateConsumptionType?consumptionTypeId=${consumptionTypeId}&activate=${activate}`, this.jsonOptions)
   }
 }

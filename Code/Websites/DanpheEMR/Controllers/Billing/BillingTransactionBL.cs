@@ -12,6 +12,8 @@ using DanpheEMR.ServerModel.MasterModels;
 using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.PatientModels;
 using DanpheEMR.ServerModel.MedicareModels;
+using Serilog;
+using DanpheEMR.ServerModel.ReportingModels;
 
 namespace DanpheEMR.Controllers.Billing
 {
@@ -27,362 +29,402 @@ namespace DanpheEMR.Controllers.Billing
             RbacUser currentUser,
             DateTime currentDate, int? dischargeStatementId = null)
         {
-            List<BillingTransactionItemModel> newTxnItems = new List<BillingTransactionItemModel>();
-            dbContext.AuditDisabled = false;
-            if (billingTransaction.BillingTransactionItems != null && billingTransaction.BillingTransactionItems.Count > 0)
+            try
             {
-                foreach (var txnItem in billingTransaction.BillingTransactionItems)
+                List<BillingTransactionItemModel> newTxnItems = new List<BillingTransactionItemModel>();
+                dbContext.AuditDisabled = false;
+                if (billingTransaction.BillingTransactionItems != null && billingTransaction.BillingTransactionItems.Count > 0)
                 {
+                    foreach (var txnItem in billingTransaction.BillingTransactionItems)
+                    {
 
-                    BillingTransactionItemModel clonedItem = BillingTransactionItemModel.GetClone(txnItem);
-                    clonedItem.BillingTransaction = null;
-                    newTxnItems.Add(clonedItem);
+                        BillingTransactionItemModel clonedItem = BillingTransactionItemModel.GetClone(txnItem);
+                        clonedItem.BillingTransaction = null;
+                        newTxnItems.Add(clonedItem);
+                    }
+                    billingTransaction.BillingTransactionItems = null;
                 }
-                billingTransaction.BillingTransactionItems = null;
-            }
-            //if paymentmode is credit, paiddate and paidamount should be null
-            //handle this in client side as well. 
-            billingTransaction.CreatedBy = currentUser.EmployeeId;
-            if (billingTransaction.PatientVisitId == null)
-            {
-                billingTransaction.PatientVisitId = newTxnItems[0].PatientVisitId;
-            }
-            if (billingTransaction.BillStatus == ENUM_BillingStatus.unpaid)// "unpaid")
-            {
-                billingTransaction.PaidDate = null;
-                billingTransaction.PaidAmount = 0;
-                billingTransaction.PaymentReceivedBy = null;
-                billingTransaction.PaidCounterId = null;
-
-            }
-            else if (billingTransaction.BillStatus == ENUM_BillingStatus.paid)// "paid")
-            {
-                billingTransaction.PaidDate = currentDate;
-                billingTransaction.PaidCounterId = billingTransaction.CounterId;
-                billingTransaction.PaymentReceivedBy = billingTransaction.CreatedBy;
-
-            }
-
-            BillingFiscalYear fiscYear = BillingBL.GetFiscalYear(connString);
-
-            //ashim: 26Aug2018: Moved from client side to server side.
-            billingTransaction.CreatedOn = currentDate;
-            billingTransaction.CreatedBy = currentUser.EmployeeId;
-            billingTransaction.FiscalYearId = fiscYear.FiscalYearId;
-            billingTransaction.InvoiceCode = billingTransaction.IsInsuranceBilling == true ? "INS" : BillingBL.InvoiceCode;
-
-
-            dbContext.BillingTransactions.Add(billingTransaction);
-
-            dbContext.AddAuditCustomField("ChangedByUserId", currentUser.EmployeeId);
-            dbContext.AddAuditCustomField("ChangedByUserName", currentUser.UserName);
-
-            GenerateInvoiceNoAndSaveInvoice(billingTransaction, dbContext, connString); //To avoid the duplicate the invoiceNo..
-
-            dbContext.AuditDisabled = true;
-            //Krishna, 22,Jul'22, This will map PatientVisitId to the Provisional Items of inpatient only
-            #region This will map PatientVisitId to the Provisional Items of inpatient 
-            for (int i = 0; i < newTxnItems.Count; i++)
-            {
-                if (newTxnItems[i].BillStatus == ENUM_BillingStatus.provisional && billingTransaction.TransactionType == ENUM_BillingType.inpatient)
+                //if paymentmode is credit, paiddate and paidamount should be null
+                //handle this in client side as well. 
+                billingTransaction.CreatedBy = currentUser.EmployeeId;
+                if (billingTransaction.PatientVisitId == null)
                 {
-                    newTxnItems[i].PatientVisitId = billingTransaction.PatientVisitId;
+                    billingTransaction.PatientVisitId = newTxnItems[0].PatientVisitId;
                 }
-            }
-            #endregion
-
-            PostUpdateBillingTransactionItems(dbContext,
-                   connString,
-                   newTxnItems,
-                   currentUser, currentDate,
-                   billingTransaction.BillStatus,
-                   billingTransaction.CounterId,
-                   billingTransaction.BillingTransactionId,
-                   dischargeStatementId);
-
-            dbContext.SaveChanges();
-
-            //Krishna, 23rdMarch'23 Below Method will add requisition to its respective Departments
-            if (billingTransaction.BillingTransactionItems[0].BillStatus != ENUM_BillingStatus.provisional)
-            {
-                AddRequisitions(dbContext, connString, billingTransactionPostVM, billingTransaction.BillingTransactionId, billingTransaction.BillStatus, currentUser);
-            }
-
-
-
-
-            if (billingTransaction.BillStatus == ENUM_BillingStatus.paid || billingTransaction.IsCoPayment == true)
-            { //If transaction is done with Depositor paymentmode is credit we don't have to add in EmpCashTransaction table
-                List<EmpCashTransactionModel> empCashTransaction = new List<EmpCashTransactionModel>();
-                for (int i = 0; i < billingTransaction.EmployeeCashTransaction.Count; i++)
+                if (billingTransaction.BillStatus == ENUM_BillingStatus.unpaid)// "unpaid")
                 {
-                    EmpCashTransactionModel empCashTransactionModel = new EmpCashTransactionModel();
-                    empCashTransactionModel.TransactionType = "CashSales";
-                    empCashTransactionModel.ReferenceNo = billingTransaction.BillingTransactionId;
-                    //empCashTransactionModel.InAmount = billingTransaction.TotalAmount;
-                    empCashTransactionModel.InAmount = billingTransaction.EmployeeCashTransaction[i].InAmount;
-                    empCashTransactionModel.OutAmount = 0;
-                    empCashTransactionModel.EmployeeId = currentUser.EmployeeId;
+                    billingTransaction.PaidDate = null;
+                    billingTransaction.PaidAmount = 0;
+                    billingTransaction.PaymentReceivedBy = null;
+                    billingTransaction.PaidCounterId = null;
+
+                }
+                else if (billingTransaction.BillStatus == ENUM_BillingStatus.paid)// "paid")
+                {
+                    billingTransaction.PaidDate = currentDate;
+                    billingTransaction.PaidCounterId = billingTransaction.CounterId;
+                    billingTransaction.PaymentReceivedBy = billingTransaction.CreatedBy;
+
+                }
+
+                BillingFiscalYear fiscYear = BillingBL.GetFiscalYear(connString);
+
+                //ashim: 26Aug2018: Moved from client side to server side.
+                billingTransaction.CreatedOn = currentDate;
+                billingTransaction.CreatedBy = currentUser.EmployeeId;
+                billingTransaction.FiscalYearId = fiscYear.FiscalYearId;
+                billingTransaction.InvoiceCode = billingTransaction.IsInsuranceBilling == true ? "INS" : BillingBL.InvoiceCode;
+
+
+                dbContext.BillingTransactions.Add(billingTransaction);
+
+                dbContext.AddAuditCustomField("ChangedByUserId", currentUser.EmployeeId);
+                dbContext.AddAuditCustomField("ChangedByUserName", currentUser.UserName);
+
+                GenerateInvoiceNoAndSaveInvoice(billingTransaction, dbContext, connString); //To avoid the duplicate the invoiceNo..
+
+                dbContext.AuditDisabled = true;
+                //Krishna, 22,Jul'22, This will map PatientVisitId to the Provisional Items of inpatient only
+                #region This will map PatientVisitId to the Provisional Items of inpatient 
+                for (int i = 0; i < newTxnItems.Count; i++)
+                {
+                    if (newTxnItems[i].BillStatus == ENUM_BillingStatus.provisional && billingTransaction.TransactionType == ENUM_BillingType.inpatient)
+                    {
+                        newTxnItems[i].PatientVisitId = billingTransaction.PatientVisitId;
+                    }
+                }
+                #endregion
+
+                PostUpdateBillingTransactionItems(dbContext,
+                       connString,
+                       newTxnItems,
+                       currentUser, currentDate,
+                       billingTransaction.BillStatus,
+                       billingTransaction.CounterId,
+                       billingTransaction.BillingTransactionId,
+                       dischargeStatementId);
+
+                dbContext.SaveChanges();
+                Log.ForContext("UserId", currentUser.EmployeeId).Information($"BillingTransactionItems for the Invoice BL{billingTransaction.InvoiceNo} of patient {billingTransaction.PatientId} is saved successfully!");
+
+                //Krishna, 23rdMarch'23 Below Method will add requisition to its respective Departments
+                if (billingTransaction.BillingTransactionItems[0].BillStatus != ENUM_BillingStatus.provisional)
+                {
+                    Log.Information("Add Requisition is being triggered inside PostBillingTransaction method.");
+                    AddRequisitions(dbContext, connString, billingTransactionPostVM, billingTransaction.BillingTransactionId, billingTransaction.BillStatus, currentUser);
+                }
+
+
+
+
+                if (billingTransaction.BillStatus == ENUM_BillingStatus.paid || billingTransaction.IsCoPayment == true)
+                { //If transaction is done with Depositor paymentmode is credit we don't have to add in EmpCashTransaction table
+                    List<EmpCashTransactionModel> empCashTransaction = new List<EmpCashTransactionModel>();
+                    for (int i = 0; i < billingTransaction.EmployeeCashTransaction.Count; i++)
+                    {
+                        EmpCashTransactionModel empCashTransactionModel = new EmpCashTransactionModel();
+                        empCashTransactionModel.TransactionType = "CashSales";
+                        empCashTransactionModel.ReferenceNo = billingTransaction.BillingTransactionId;
+                        //empCashTransactionModel.InAmount = billingTransaction.TotalAmount;
+                        empCashTransactionModel.InAmount = billingTransaction.EmployeeCashTransaction[i].InAmount;
+                        empCashTransactionModel.OutAmount = 0;
+                        empCashTransactionModel.EmployeeId = currentUser.EmployeeId;
+                        //empCashTransaction.Description = billingTransaction.de;
+                        empCashTransactionModel.TransactionDate = DateTime.Now;
+                        empCashTransactionModel.CounterID = billingTransaction.CounterId;
+                        empCashTransactionModel.PaymentModeSubCategoryId = billingTransaction.EmployeeCashTransaction[i].PaymentModeSubCategoryId;
+                        empCashTransactionModel.PatientId = billingTransaction.PatientId;
+                        empCashTransactionModel.ModuleName = billingTransaction.EmployeeCashTransaction[i].ModuleName;
+                        empCashTransactionModel.Remarks = billingTransaction.EmployeeCashTransaction[i].Remarks;
+                        empCashTransaction.Add(empCashTransactionModel);
+                    }
+
+                    BillingBL.AddEmpCashtransactionForBilling(dbContext, empCashTransaction);
+                }
+
+                //step:3-- if there's deposit deduction, then add to deposit table. 
+                if ((billingTransaction.IsCoPayment == true &&
+                    billingTransaction.PaymentMode.ToLower() == ENUM_BillPaymentMode.credit.ToLower() &&  //case of Copayment
+                    billingTransaction.DepositUsed != null && billingTransaction.DepositUsed > 0) ||
+                    (billingTransaction.PaymentMode != ENUM_BillPaymentMode.credit // "credit" 
+                    && billingTransaction.DepositUsed != null && billingTransaction.DepositUsed > 0))
+                {
+                    decimal depBalance = 0;
+                    if (billingTransaction.InvoiceType == ENUM_InvoiceType.inpatientDischarge)
+                    {
+                        //in case of discharge bill, we clear all remaining deposits of a patient.
+                        //but from client side, we're already making deposit balance=0.
+                        //so only for DepositTable, we have to re-calcaultate the balance amount again.
+                        depBalance = (decimal)billingTransaction.DepositReturnAmount;
+                    }
+                    else
+                    {
+                        depBalance = (decimal)billingTransaction.DepositBalance;
+                    }
+
+
+                    BillingDepositModel dep = new BillingDepositModel()
+                    {
+                        TransactionType = ENUM_DepositTransactionType.DepositDeduct, //"depositdeduct",
+                        Remarks = "Deposit used in InvoiceNo. " + billingTransaction.InvoiceCode + billingTransaction.InvoiceNo,
+                        //Remarks = "depositdeduct" + " for transactionid:" + billingTransaction.BillingTransactionId,
+                        IsActive = true,
+                        //Amount = billingTransaction.DepositUsed,
+                        OutAmount = (decimal)billingTransaction.DepositUsed,
+                        ModuleName = ENUM_ModuleNames.Billing,
+                        DepositHeadId = 1,
+                        BillingTransactionId = billingTransaction.BillingTransactionId,
+                        DepositBalance = depBalance,
+                        FiscalYearId = billingTransaction.FiscalYearId,
+                        CounterId = billingTransaction.CounterId,
+                        CreatedBy = billingTransaction.CreatedBy,
+                        CreatedOn = currentDate,
+                        PatientId = billingTransaction.PatientId,
+                        PatientVisitId = billingTransaction.PatientVisitId,
+                        PaymentMode = billingTransaction.PaymentMode,
+                        PaymentDetails = billingTransaction.PaymentDetails,
+                        ReceiptNo = BillingBL.GetDepositReceiptNo(connString),
+                        VisitType = billingTransaction.TransactionType
+                    };
+                    billingTransaction.ReceiptNo = dep.ReceiptNo + 1;
+                    dbContext.BillingDeposits.Add(dep);
+                    dbContext.SaveChanges();
+
+                    MasterDbContext masterDbContext = new MasterDbContext(connString);
+                    PaymentModes MstPaymentModes = masterDbContext.PaymentModes.Where(a => a.PaymentSubCategoryName.ToLower() == "deposit").FirstOrDefault();
+                    EmpCashTransactionModel empCashTransaction = new EmpCashTransactionModel();
+                    empCashTransaction.TransactionType = ENUM_DepositTransactionType.DepositDeduct;
+                    empCashTransaction.ReferenceNo = dep.DepositId;
+                    empCashTransaction.InAmount = 0;
+                    //empCashTransaction.OutAmount = dep.Amount;
+                    empCashTransaction.OutAmount = (double)dep.OutAmount;
+                    empCashTransaction.EmployeeId = currentUser.EmployeeId;
                     //empCashTransaction.Description = billingTransaction.de;
-                    empCashTransactionModel.TransactionDate = DateTime.Now;
-                    empCashTransactionModel.CounterID = billingTransaction.CounterId;
-                    empCashTransactionModel.PaymentModeSubCategoryId = billingTransaction.EmployeeCashTransaction[i].PaymentModeSubCategoryId;
-                    empCashTransactionModel.PatientId = billingTransaction.PatientId;
-                    empCashTransactionModel.ModuleName = billingTransaction.EmployeeCashTransaction[i].ModuleName;
-                    empCashTransactionModel.Remarks = billingTransaction.EmployeeCashTransaction[i].Remarks;
-                    empCashTransaction.Add(empCashTransactionModel);
+                    empCashTransaction.TransactionDate = DateTime.Now;
+                    empCashTransaction.CounterID = dep.CounterId;
+                    empCashTransaction.ModuleName = "Billing";
+                    empCashTransaction.PatientId = dep.PatientId;
+                    empCashTransaction.PaymentModeSubCategoryId = MstPaymentModes.PaymentSubCategoryId;
+
+                    BillingBL.AddEmpCashTransaction(dbContext, empCashTransaction);
+                }
+                billingTransaction.FiscalYear = fiscYear.FiscalYearFormatted;
+
+                //create BillingTxnCreditBillStatus when IsCoPayment is true, Krishna,23,Aug'22
+
+                if (billingTransaction.PaymentMode == ENUM_BillPaymentMode.credit)
+                {
+                    BillingTransactionCreditBillStatusModel billingTransactionCreditBillStatus = new BillingTransactionCreditBillStatusModel();
+
+                    billingTransactionCreditBillStatus.BillingTransactionId = billingTransaction.BillingTransactionId;
+                    billingTransactionCreditBillStatus.FiscalYearId = billingTransaction.FiscalYearId;
+                    billingTransactionCreditBillStatus.InvoiceNoFormatted = $"{billingTransaction.FiscalYear}-{billingTransaction.InvoiceCode}{billingTransaction.InvoiceNo}";
+                    billingTransactionCreditBillStatus.InvoiceDate = (DateTime)billingTransaction.CreatedOn;
+                    billingTransactionCreditBillStatus.PatientVisitId = (int)billingTransaction.PatientVisitId;
+                    billingTransactionCreditBillStatus.SchemeId = billingTransaction.SchemeId;
+                    billingTransactionCreditBillStatus.LiableParty = billingTransaction.OrganizationId is null ? "SELF" : "Organization";
+                    billingTransactionCreditBillStatus.PatientId = billingTransaction.PatientId;
+                    billingTransactionCreditBillStatus.CreditOrganizationId = (int)billingTransaction.OrganizationId;
+                    billingTransactionCreditBillStatus.MemberNo = billingTransaction.MemberNo;
+                    billingTransactionCreditBillStatus.SalesTotalBillAmount = (decimal)billingTransaction.TotalAmount;
+                    billingTransactionCreditBillStatus.SettlementStatus = ENUM_ClaimManagement_SettlementStatus.Pending;
+                    billingTransactionCreditBillStatus.ReturnTotalBillAmount = 0; //This will come if bill is returned
+                    billingTransactionCreditBillStatus.CoPayReceivedAmount = billingTransaction.ReceivedAmount;
+                    billingTransactionCreditBillStatus.CoPayReturnAmount = 0;
+                    billingTransactionCreditBillStatus.NetReceivableAmount = billingTransactionCreditBillStatus.SalesTotalBillAmount - billingTransactionCreditBillStatus.CoPayReceivedAmount - (billingTransactionCreditBillStatus.ReturnTotalBillAmount - billingTransactionCreditBillStatus.CoPayReturnAmount);
+                    billingTransactionCreditBillStatus.CreatedBy = currentUser.EmployeeId;
+                    billingTransactionCreditBillStatus.NonClaimableAmount = 0;
+                    billingTransactionCreditBillStatus.IsClaimable = true;
+                    billingTransactionCreditBillStatus.ClaimCode = billingTransaction.ClaimCode;
+                    billingTransactionCreditBillStatus.CreatedOn = currentDate;
+                    billingTransactionCreditBillStatus.IsActive = true;
+
+                    dbContext.BillingTransactionCreditBillStatuses.Add(billingTransactionCreditBillStatus);
+                    dbContext.SaveChanges();
                 }
 
-                BillingBL.AddEmpCashtransactionForBilling(dbContext, empCashTransaction);
-            }
+                //update PatientPriceCategoryMap table to update CreditLimits according to Visit Types ('inpatient', 'outpatient')
+                var patientVisit = dbContext.Visit.Where(a => a.PatientVisitId == billingTransaction.PatientVisitId).FirstOrDefault();
 
-            //step:3-- if there's deposit deduction, then add to deposit table. 
-            if ((billingTransaction.IsCoPayment == true &&
-                billingTransaction.PaymentMode.ToLower() == ENUM_BillPaymentMode.credit.ToLower() &&  //case of Copayment
-                billingTransaction.DepositUsed != null && billingTransaction.DepositUsed > 0) ||
-                (billingTransaction.PaymentMode != ENUM_BillPaymentMode.credit // "credit" 
-                && billingTransaction.DepositUsed != null && billingTransaction.DepositUsed > 0))
-            {
-                decimal depBalance = 0;
-                if (billingTransaction.InvoiceType == ENUM_InvoiceType.inpatientDischarge)
+                //Krishna, 8th-Jan'23 Below logic is responsible to update the MedicareMemberBalance When Medicare Patient Billing is done.
+                BillingSchemeModel scheme = new BillingSchemeModel();
+
+                if (patientVisit != null)
                 {
-                    //in case of discharge bill, we clear all remaining deposits of a patient.
-                    //but from client side, we're already making deposit balance=0.
-                    //so only for DepositTable, we have to re-calcaultate the balance amount again.
-                    depBalance = (decimal)billingTransaction.DepositReturnAmount;
+                    scheme = dbContext.BillingSchemes.FirstOrDefault(a => a.SchemeId == patientVisit.SchemeId);
                 }
-                else
+                if (scheme != null && (scheme.IsGeneralCreditLimited || scheme.IsOpCreditLimited || scheme.IsIpCreditLimited))
                 {
-                    depBalance = (decimal)billingTransaction.DepositBalance;
+                    UpdatePatientSchemeMap(billingTransaction, patientVisit, dbContext, currentDate, currentUser, scheme);
                 }
+                //UpdatePatientMapPriceCategoryForMedicarePatientBilling(billingTransaction, patientVisit, dbContext, currentDate, currentUser);
 
-                
-                BillingDepositModel dep = new BillingDepositModel()
+                if (scheme != null && scheme.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.Medicare)
                 {
-                    TransactionType = ENUM_DepositTransactionType.DepositDeduct, //"depositdeduct",
-                    Remarks = "Deposit used in InvoiceNo. " + billingTransaction.InvoiceCode + billingTransaction.InvoiceNo,
-                    //Remarks = "depositdeduct" + " for transactionid:" + billingTransaction.BillingTransactionId,
-                    IsActive = true,
-                    //Amount = billingTransaction.DepositUsed,
-                    OutAmount = (decimal)billingTransaction.DepositUsed,
-                    ModuleName = ENUM_ModuleNames.Billing,
-                    DepositHeadId = 1,
-                    BillingTransactionId = billingTransaction.BillingTransactionId,
-                    DepositBalance = depBalance,
-                    FiscalYearId = billingTransaction.FiscalYearId,
-                    CounterId = billingTransaction.CounterId,
-                    CreatedBy = billingTransaction.CreatedBy,
-                    CreatedOn = currentDate,
-                    PatientId = billingTransaction.PatientId,
-                    PatientVisitId = billingTransaction.PatientVisitId,
-                    PaymentMode = billingTransaction.PaymentMode,
-                    PaymentDetails = billingTransaction.PaymentDetails,
-                    ReceiptNo = BillingBL.GetDepositReceiptNo(connString),
-                    VisitType = billingTransaction.TransactionType
-                };
-                billingTransaction.ReceiptNo = dep.ReceiptNo + 1;
-                dbContext.BillingDeposits.Add(dep);
-                dbContext.SaveChanges();
-
-                MasterDbContext masterDbContext = new MasterDbContext(connString);
-                PaymentModes MstPaymentModes = masterDbContext.PaymentModes.Where(a => a.PaymentSubCategoryName.ToLower() == "deposit").FirstOrDefault();
-                EmpCashTransactionModel empCashTransaction = new EmpCashTransactionModel();
-                empCashTransaction.TransactionType = ENUM_DepositTransactionType.DepositDeduct;
-                empCashTransaction.ReferenceNo = dep.DepositId;
-                empCashTransaction.InAmount = 0;
-                //empCashTransaction.OutAmount = dep.Amount;
-                empCashTransaction.OutAmount = (double)dep.OutAmount;
-                empCashTransaction.EmployeeId = currentUser.EmployeeId;
-                //empCashTransaction.Description = billingTransaction.de;
-                empCashTransaction.TransactionDate = DateTime.Now;
-                empCashTransaction.CounterID = dep.CounterId;
-                empCashTransaction.ModuleName = "Billing";
-                empCashTransaction.PatientId = dep.PatientId;
-                empCashTransaction.PaymentModeSubCategoryId = MstPaymentModes.PaymentSubCategoryId;
-
-                BillingBL.AddEmpCashTransaction(dbContext, empCashTransaction);
+                    UpdateMedicareMemberBalance(billingTransaction, patientVisit, dbContext, currentDate, currentUser);
+                }
+                return billingTransaction;
             }
-            billingTransaction.FiscalYear = fiscYear.FiscalYearFormatted;
-
-            //create BillingTxnCreditBillStatus when IsCoPayment is true, Krishna,23,Aug'22
-
-            if (billingTransaction.PaymentMode == ENUM_BillPaymentMode.credit)
+            catch (Exception ex)
             {
-                BillingTransactionCreditBillStatusModel billingTransactionCreditBillStatus = new BillingTransactionCreditBillStatusModel();
-
-                billingTransactionCreditBillStatus.BillingTransactionId = billingTransaction.BillingTransactionId;
-                billingTransactionCreditBillStatus.FiscalYearId = billingTransaction.FiscalYearId;
-                billingTransactionCreditBillStatus.InvoiceNoFormatted = $"{billingTransaction.FiscalYear}-{billingTransaction.InvoiceCode}{billingTransaction.InvoiceNo}";
-                billingTransactionCreditBillStatus.InvoiceDate = (DateTime)billingTransaction.CreatedOn;
-                billingTransactionCreditBillStatus.PatientVisitId = (int)billingTransaction.PatientVisitId;
-                billingTransactionCreditBillStatus.SchemeId = billingTransaction.SchemeId;
-                billingTransactionCreditBillStatus.LiableParty = billingTransaction.OrganizationId is null ? "SELF" : "Organization";
-                billingTransactionCreditBillStatus.PatientId = billingTransaction.PatientId;
-                billingTransactionCreditBillStatus.CreditOrganizationId = (int)billingTransaction.OrganizationId;
-                billingTransactionCreditBillStatus.MemberNo = billingTransaction.MemberNo;
-                billingTransactionCreditBillStatus.SalesTotalBillAmount = (decimal)billingTransaction.TotalAmount;
-                billingTransactionCreditBillStatus.SettlementStatus = ENUM_ClaimManagement_SettlementStatus.Pending;
-                billingTransactionCreditBillStatus.ReturnTotalBillAmount = 0; //This will come if bill is returned
-                billingTransactionCreditBillStatus.CoPayReceivedAmount = billingTransaction.ReceivedAmount;
-                billingTransactionCreditBillStatus.CoPayReturnAmount = 0;
-                billingTransactionCreditBillStatus.NetReceivableAmount = billingTransactionCreditBillStatus.SalesTotalBillAmount - billingTransactionCreditBillStatus.CoPayReceivedAmount - (billingTransactionCreditBillStatus.ReturnTotalBillAmount - billingTransactionCreditBillStatus.CoPayReturnAmount);
-                billingTransactionCreditBillStatus.CreatedBy = currentUser.EmployeeId;
-                billingTransactionCreditBillStatus.NonClaimableAmount = 0;
-                billingTransactionCreditBillStatus.IsClaimable = true;
-                billingTransactionCreditBillStatus.ClaimCode = billingTransaction.ClaimCode;
-                billingTransactionCreditBillStatus.CreatedOn = currentDate;
-                billingTransactionCreditBillStatus.IsActive = true;
-
-                dbContext.BillingTransactionCreditBillStatuses.Add(billingTransactionCreditBillStatus);
-                dbContext.SaveChanges();
+                Log.Error($"Eception Caught at PostBillingTransaction method, Exception Details: {ex.ToString()}");
+                throw;
             }
-
-            //update PatientPriceCategoryMap table to update CreditLimits according to Visit Types ('inpatient', 'outpatient')
-            var patientVisit = dbContext.Visit.Where(a => a.PatientVisitId == billingTransaction.PatientVisitId).FirstOrDefault();
-
-            //Krishna, 8th-Jan'23 Below logic is responsible to update the MedicareMemberBalance When Medicare Patient Billing is done.
-            BillingSchemeModel scheme = new BillingSchemeModel();
-
-            if (patientVisit != null)
-            {
-                scheme = dbContext.BillingSchemes.FirstOrDefault(a => a.SchemeId == patientVisit.SchemeId);
-            }
-            if (scheme != null && (scheme.IsGeneralCreditLimited || scheme.IsOpCreditLimited || scheme.IsIpCreditLimited))
-            {
-                UpdatePatientSchemeMap(billingTransaction, patientVisit, dbContext, currentDate, currentUser, scheme);
-            }
-            //UpdatePatientMapPriceCategoryForMedicarePatientBilling(billingTransaction, patientVisit, dbContext, currentDate, currentUser);
-
-            if (scheme != null && scheme.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.Medicare)
-            {
-                UpdateMedicareMemberBalance(billingTransaction, patientVisit, dbContext, currentDate, currentUser);
-            }
-            return billingTransaction;
         }
 
         private static void UpdatePatientSchemeMap(BillingTransactionModel billingTransaction, VisitModel patientVisit, BillingDbContext dbContext, DateTime currentDate, RbacUser currentUser, BillingSchemeModel scheme)
         {
-            PatientSchemeMapModel patientSchemeMap = new PatientSchemeMapModel();
-            patientSchemeMap = dbContext.PatientSchemeMaps.Where(a => a.PatientId == billingTransaction.PatientId && a.SchemeId == patientVisit.SchemeId).FirstOrDefault();
-
-            if (scheme.IsGeneralCreditLimited && patientSchemeMap.GeneralCreditLimit > 0)
+            try
             {
-                if ((decimal)billingTransaction.TotalAmount <= patientSchemeMap.GeneralCreditLimit)
-                {
-                    patientSchemeMap.GeneralCreditLimit = patientSchemeMap.GeneralCreditLimit - (decimal)billingTransaction.TotalAmount;
-                    patientSchemeMap.ModifiedOn = currentDate;
-                    patientSchemeMap.ModifiedBy = currentUser.EmployeeId;
+                PatientSchemeMapModel patientSchemeMap = new PatientSchemeMapModel();
+                patientSchemeMap = dbContext.PatientSchemeMaps.Where(a => a.PatientId == billingTransaction.PatientId && a.SchemeId == patientVisit.SchemeId).FirstOrDefault();
 
-                    dbContext.Entry(patientSchemeMap).Property(p => p.GeneralCreditLimit).IsModified = true;
-                    dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedOn).IsModified = true;
-                    dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedBy).IsModified = true;
-                    dbContext.SaveChanges();
-                }
-                else
+                if (scheme.IsGeneralCreditLimited && patientSchemeMap.GeneralCreditLimit > 0)
                 {
-                    throw new Exception("General Credit Limit is less than total bill amount");
-                }
-            }
-
-            if (scheme.IsOpCreditLimited && (patientVisit != null && patientVisit.VisitType.ToLower() == ENUM_VisitType.outpatient.ToLower()))
-            {
-
-                if (patientSchemeMap != null && patientSchemeMap.OpCreditLimit > 0)
-                {
-                    patientSchemeMap.OpCreditLimit = patientSchemeMap.OpCreditLimit - (decimal)billingTransaction.TotalAmount;
-                    patientSchemeMap.ModifiedOn = currentDate;
-                    patientSchemeMap.ModifiedBy = currentUser.EmployeeId;
-
-                    dbContext.Entry(patientSchemeMap).Property(p => p.OpCreditLimit).IsModified = true;
-                    dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedOn).IsModified = true;
-                    dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedBy).IsModified = true;
-                    dbContext.SaveChanges();
-                }
-                else
-                {
-                    throw new Exception("OP Credit Limit is less than total bill amount");
-                }
-            }
-
-            if (scheme.IsIpCreditLimited && (patientVisit != null && patientVisit.VisitType.ToLower() == ENUM_VisitType.inpatient.ToLower() && scheme.ApiIntegrationName != ENUM_Scheme_ApiIntegrationNames.SSF))
-            {
-                if (patientSchemeMap != null && patientSchemeMap.IpCreditLimit > 0)
-                {
-                    patientSchemeMap.IpCreditLimit = patientSchemeMap.IpCreditLimit - (decimal)billingTransaction.TotalAmount;
-                    patientSchemeMap.ModifiedOn = currentDate;
-                    patientSchemeMap.ModifiedBy = currentUser.EmployeeId;
-
-                    dbContext.Entry(patientSchemeMap).Property(p => p.IpCreditLimit).IsModified = true;
-                    dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedOn).IsModified = true;
-                    dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedBy).IsModified = true;
-                    dbContext.SaveChanges();
-                }
-                else
-                {
-                    throw new Exception("IP Credit Limit is less than total bill amount");
-                }
-            }
-
-            //Below block is for inpatient i.e. either IPCreditlimit only is used or both IP and OP Credit limits are used.
-            if (scheme.IsIpCreditLimited && (patientVisit != null && patientVisit.VisitType.ToLower() == ENUM_VisitType.inpatient.ToLower() && scheme.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.SSF))
-            {
-                //Here when TotalBillAmount is less than the sum of (IPCreditLimit and OPCreditLimit) then only update Credit limits or allow to use Credit limits
-                decimal TotalBillAmount = (decimal)billingTransaction.TotalAmount;
-                if (patientSchemeMap != null && (TotalBillAmount <= (patientSchemeMap.IpCreditLimit + patientSchemeMap.OpCreditLimit)))
-                {
-                    //This checks which credit limit to use (if TotalBillAmount is less than IpCreditLimit itself use IpCreditLimit only and update its value as well)
-                    if (TotalBillAmount <= patientSchemeMap.IpCreditLimit)
+                    if ((decimal)billingTransaction.TotalAmount <= patientSchemeMap.GeneralCreditLimit)
                     {
-                        patientSchemeMap.IpCreditLimit = patientSchemeMap.IpCreditLimit - TotalBillAmount;
+                        if (billingTransaction.IsCoPayment == true)
+                        {
+                            Boolean isTotalAmountSubtracted = dbContext.AdminParameters.Where(ap => ap.ParameterGroupName == "Insurance" && ap.ParameterName == "SubtractTotalAmountFromGeneralCreditLimitForCoPayment").Select(param => param.ParameterValue == "true" ? true : false).FirstOrDefault();
+
+                            if (isTotalAmountSubtracted == true)
+                            {
+                                patientSchemeMap.GeneralCreditLimit = patientSchemeMap.GeneralCreditLimit - (decimal)billingTransaction.TotalAmount;
+                            }
+                            else
+                            {
+                                patientSchemeMap.GeneralCreditLimit = patientSchemeMap.GeneralCreditLimit - (decimal)billingTransaction.CoPaymentCreditAmount;
+                            }
+                        }
+                        else
+                        {
+                            patientSchemeMap.GeneralCreditLimit = patientSchemeMap.GeneralCreditLimit - (decimal)billingTransaction.TotalAmount;
+
+                        }
                         patientSchemeMap.ModifiedOn = currentDate;
                         patientSchemeMap.ModifiedBy = currentUser.EmployeeId;
 
-                        dbContext.Entry(patientSchemeMap).Property(p => p.IpCreditLimit).IsModified = true;
+                        dbContext.Entry(patientSchemeMap).Property(p => p.GeneralCreditLimit).IsModified = true;
                         dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedOn).IsModified = true;
                         dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedBy).IsModified = true;
                         dbContext.SaveChanges();
                     }
-                    //(if TotalBillAmount is more than IpCreditLimit and there is OPCreditlimit remaining then use both and update there value as well)
-                    else if (TotalBillAmount > patientSchemeMap.IpCreditLimit && patientSchemeMap.OpCreditLimit > 0)
+                    else
                     {
-                        TotalBillAmount = TotalBillAmount - patientSchemeMap.IpCreditLimit;
-                        patientSchemeMap.IpCreditLimit = 0;
-                        patientSchemeMap.OpCreditLimit = (decimal)(patientSchemeMap.OpCreditLimit - TotalBillAmount);
+                        throw new Exception("General Credit Limit is less than total bill amount");
+                    }
+                }
+
+                if (scheme.IsOpCreditLimited && (patientVisit != null && patientVisit.VisitType.ToLower() == ENUM_VisitType.outpatient.ToLower()))
+                {
+
+                    if (patientSchemeMap != null && patientSchemeMap.OpCreditLimit > 0)
+                    {
+                        patientSchemeMap.OpCreditLimit = patientSchemeMap.OpCreditLimit - (decimal)billingTransaction.TotalAmount;
                         patientSchemeMap.ModifiedOn = currentDate;
                         patientSchemeMap.ModifiedBy = currentUser.EmployeeId;
 
-                        dbContext.Entry(patientSchemeMap).Property(p => p.IpCreditLimit).IsModified = true;
                         dbContext.Entry(patientSchemeMap).Property(p => p.OpCreditLimit).IsModified = true;
                         dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedOn).IsModified = true;
                         dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedBy).IsModified = true;
                         dbContext.SaveChanges();
                     }
+                    else
+                    {
+                        throw new Exception("OP Credit Limit is less than total bill amount");
+                    }
                 }
-                else
+
+                if (scheme.IsIpCreditLimited && (patientVisit != null && patientVisit.VisitType.ToLower() == ENUM_VisitType.inpatient.ToLower() && scheme.ApiIntegrationName != ENUM_Scheme_ApiIntegrationNames.SSF))
                 {
-                    throw new Exception("Credit Limit is less than total bill amount");
+                    if (patientSchemeMap != null && patientSchemeMap.IpCreditLimit > 0)
+                    {
+                        patientSchemeMap.IpCreditLimit = patientSchemeMap.IpCreditLimit - (decimal)billingTransaction.TotalAmount;
+                        patientSchemeMap.ModifiedOn = currentDate;
+                        patientSchemeMap.ModifiedBy = currentUser.EmployeeId;
+
+                        dbContext.Entry(patientSchemeMap).Property(p => p.IpCreditLimit).IsModified = true;
+                        dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedOn).IsModified = true;
+                        dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedBy).IsModified = true;
+                        dbContext.SaveChanges();
+                    }
+                    else
+                    {
+                        throw new Exception("IP Credit Limit is less than total bill amount");
+                    }
                 }
+
+                //Below block is for inpatient i.e. either IPCreditlimit only is used or both IP and OP Credit limits are used.
+                if (scheme.IsIpCreditLimited && (patientVisit != null && patientVisit.VisitType.ToLower() == ENUM_VisitType.inpatient.ToLower() && scheme.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.SSF))
+                {
+                    //Here when TotalBillAmount is less than the sum of (IPCreditLimit and OPCreditLimit) then only update Credit limits or allow to use Credit limits
+                    decimal TotalBillAmount = (decimal)billingTransaction.TotalAmount;
+                    if (patientSchemeMap != null && (TotalBillAmount <= (patientSchemeMap.IpCreditLimit + patientSchemeMap.OpCreditLimit)))
+                    {
+                        //This checks which credit limit to use (if TotalBillAmount is less than IpCreditLimit itself use IpCreditLimit only and update its value as well)
+                        if (TotalBillAmount <= patientSchemeMap.IpCreditLimit)
+                        {
+                            patientSchemeMap.IpCreditLimit = patientSchemeMap.IpCreditLimit - TotalBillAmount;
+                            patientSchemeMap.ModifiedOn = currentDate;
+                            patientSchemeMap.ModifiedBy = currentUser.EmployeeId;
+
+                            dbContext.Entry(patientSchemeMap).Property(p => p.IpCreditLimit).IsModified = true;
+                            dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedOn).IsModified = true;
+                            dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedBy).IsModified = true;
+                            dbContext.SaveChanges();
+                        }
+                        //(if TotalBillAmount is more than IpCreditLimit and there is OPCreditlimit remaining then use both and update there value as well)
+                        else if (TotalBillAmount > patientSchemeMap.IpCreditLimit && patientSchemeMap.OpCreditLimit > 0)
+                        {
+                            TotalBillAmount = TotalBillAmount - patientSchemeMap.IpCreditLimit;
+                            patientSchemeMap.IpCreditLimit = 0;
+                            patientSchemeMap.OpCreditLimit = (decimal)(patientSchemeMap.OpCreditLimit - TotalBillAmount);
+                            patientSchemeMap.ModifiedOn = currentDate;
+                            patientSchemeMap.ModifiedBy = currentUser.EmployeeId;
+
+                            dbContext.Entry(patientSchemeMap).Property(p => p.IpCreditLimit).IsModified = true;
+                            dbContext.Entry(patientSchemeMap).Property(p => p.OpCreditLimit).IsModified = true;
+                            dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedOn).IsModified = true;
+                            dbContext.Entry(patientSchemeMap).Property(p => p.ModifiedBy).IsModified = true;
+                            dbContext.SaveChanges();
+                        }
+                    }
+                    else
+                    {
+                        throw new Exception("Credit Limit is less than total bill amount");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Exception Caught in UpdatePatientSchemeMap method for Patient: {billingTransaction.PatientId}, Exception Details: {ex.ToString()}");
+                throw;
             }
         }
 
         private static void AddRequisitions(BillingDbContext dbContext, string connString, BillingTransactionPostVM billingTransactionPostVM, int billingTransactionId, string billStatus, RbacUser currentUser)
         {
-            if (billingTransactionPostVM != null)//sud:29Mar'23--Added NullCheck since this object was coming NULL from IpBilling.
+            try
             {
-                if (billingTransactionPostVM.LabRequisition != null && billingTransactionPostVM.LabRequisition.Count > 0)
+                if (billingTransactionPostVM != null)//sud:29Mar'23--Added NullCheck since this object was coming NULL from IpBilling.
                 {
-                    AddLabRequisition(dbContext, billingTransactionId, billStatus, billingTransactionPostVM.LabRequisition, currentUser.EmployeeId, connString);
-                }
-                if (billingTransactionPostVM.ImagingItemRequisition != null && billingTransactionPostVM.ImagingItemRequisition.Count > 0)
-                {
-                    AddImagingRequisition(dbContext, billingTransactionId, billStatus, billingTransactionPostVM.ImagingItemRequisition, currentUser.EmployeeId);
+                    if (billingTransactionPostVM.LabRequisition != null && billingTransactionPostVM.LabRequisition.Count > 0)
+                    {
+                        Log.Information($"AddLabRequisition method is being triggered inside AddRequisitions method for Patient: {billingTransactionPostVM.Txn.PatientId}");
+                        AddLabRequisition(dbContext, billingTransactionId, billStatus, billingTransactionPostVM.LabRequisition, currentUser.EmployeeId, connString);
+                    }
+                    if (billingTransactionPostVM.ImagingItemRequisition != null && billingTransactionPostVM.ImagingItemRequisition.Count > 0)
+                    {
+                        Log.Information($"AddImagingRequisition method is being triggered inside AddRequisitions method for Patient: {billingTransactionPostVM.Txn.PatientId}");
+                        AddImagingRequisition(dbContext, billingTransactionId, billStatus, billingTransactionPostVM.ImagingItemRequisition, currentUser.EmployeeId);
+                    }
                 }
             }
-
-            //if (billingTransactionPostVM.VisitItems != null && billingTransactionPostVM.VisitItems.Count > 0)
-            //{
-            //    billingTransactionPostVM.VisitItems = AddVisitItems(_billingDbContext, billingTransactionPostVM.VisitItems, currentUser.EmployeeId);
-            //}
+            catch (Exception ex)
+            {
+                Log.Error($"Exception Caught inside AddRequisition Method for Patient: {billingTransactionPostVM.Txn.PatientId}, Exception Details: {ex.ToString()}");
+                throw;
+            }
         }
 
         private static List<ImagingRequisitionModel> AddImagingRequisition(BillingDbContext billingDbContext, int billingTransactionId, string billStatus, List<ImagingRequisitionModel> imagingItemRequisition, int employeeId)
@@ -429,6 +471,9 @@ namespace DanpheEMR.Controllers.Billing
                         }
                     }
                     billingDbContext.SaveChanges();
+
+                    Log.Information($"Imaging Requisition is saved for Patient, {imagingItemRequisition[0].PatientId} with BillingTransactionItemId {imagingItemRequisition[0].BillingTransactionItemId}");
+
                     return imagingItemRequisition;
                 }
                 else
@@ -438,7 +483,8 @@ namespace DanpheEMR.Controllers.Billing
             }
             catch (Exception ex)
             {
-                throw ex;
+                Log.Error($"Exception Caught while adding Imaging Requisitions for Patient: {imagingItemRequisition[0].PatientId}, Exception Details: {ex.ToString()}");
+                throw;
             }
         }
 
@@ -448,6 +494,11 @@ namespace DanpheEMR.Controllers.Billing
             {
                 List<LabRequisitionModel> labReqListFromClient = labRequisition;
                 LabVendorsModel defaultVendor = billingDbContext.LabVendors.Where(val => val.IsDefault == true).FirstOrDefault();
+                if(defaultVendor is null)
+                {
+                    Log.Error($"No Default Vendor found in LabVendors while adding requisition for {labRequisition[0].PatientId}, Please add Default Vendor and proceed!");
+                    throw new InvalidOperationException($"No Default Vendor found in LabVendors while adding requisition for {labRequisition[0].PatientId}, Please add Default Vendor and proceed!");
+                }
 
                 if (labReqListFromClient != null && labReqListFromClient.Count > 0)
                 {
@@ -466,7 +517,10 @@ namespace DanpheEMR.Controllers.Billing
                             req.ResultingVendorId = defaultVendor.LabVendorId;
                             LabTestModel labTestdb = allLabTests.Where(a => a.LabTestId == req.LabTestId).FirstOrDefault<LabTestModel>();
                             if (labTestdb == null)
-                                throw new Exception("Billing Item Not Mapped With Lab Test (Key:IntegrationItemId)");
+                            {
+                                Log.Error($"Billing Item Not Mapped With Lab Test (Key:IntegrationItemId)");
+                                throw new InvalidOperationException($"Billing Item Not Mapped With Lab Test (Key:IntegrationItemId)");
+                            }
                             //get PatientId from clientSide
                             if (labTestdb.IsValidForReporting == true)
                             {
@@ -503,8 +557,11 @@ namespace DanpheEMR.Controllers.Billing
                                 req.IsFileUploaded = false;
                                 req.IsFileUploadedToTeleMedicine = false;
                                 req.IsUploadedToIMU = false;
+                                req.LabTypeName = String.IsNullOrEmpty(req.LabTypeName) ? "op-lab" : req.LabTypeName;
                                 billingDbContext.LabRequisitions.Add(req);
                                 billingDbContext.SaveChanges();
+
+                                Log.Information($"Lab Requisition is saved for Patient {billingTransactionItem.PatientId} with billingTransactionItem, {billingTransactionItem.BillingTransactionItemId}");
                             }
                         });
 
@@ -518,7 +575,8 @@ namespace DanpheEMR.Controllers.Billing
             }
             catch (Exception ex)
             {
-                throw ex;
+                Log.Error($"Exception Caught while adding Lab Requisitions for Patient: {labRequisition[0].PatientId}, Exception Details: {ex.ToString()}");
+                throw;
             }
         }
 
@@ -592,6 +650,7 @@ namespace DanpheEMR.Controllers.Billing
                 billingTransaction.InvoiceNo = BillingBL.GetInvoiceNumber(connString);
                 //if(invoiceNoTest == 1) { billingTransaction.InvoiceNo = 258017; invoiceNoTest++; }//logic to test the duplicate invoice no and retry to get the latest invoiceNo
                 dbContext.SaveChanges();
+                Log.Information($"InvoiceNo BL{billingTransaction.InvoiceNo} is created and Invoice Generation process succeeded for the patient, {billingTransaction.PatientId}!");
             }
             catch (Exception ex)
             {
@@ -602,6 +661,8 @@ namespace DanpheEMR.Controllers.Billing
 
                         if (sqlException.Number == 2627)// unique constraint error in BillingTranscation table..
                         {
+                            Log.Information($"Duplicate InvoiceNo exception occurred and Retry logic to generate InvoiceNo is being executed for the patient, {billingTransaction.PatientId}");
+
                             GenerateInvoiceNoAndSaveInvoice(billingTransaction, dbContext, connString);
                         }
                         else
@@ -644,10 +705,10 @@ namespace DanpheEMR.Controllers.Billing
                     var txnItem = billingTransactionItems[i];
                     if (txnItem.BillingTransactionItemId == 0)
                     {
-                        //if (string.IsNullOrEmpty(txnItem.LabTypeName))
-                        //{
-                        //    txnItem.LabTypeName = "op-lab";
-                        //}
+                        if (string.IsNullOrEmpty(txnItem.LabTypeName))
+                        {
+                            txnItem.LabTypeName = "op-lab";
+                        }
                         txnItem.CreatedOn = currentDate;
                         txnItem.CreatedBy = currentUser.EmployeeId;
                         txnItem.RequisitionDate = currentDate;
@@ -709,9 +770,9 @@ namespace DanpheEMR.Controllers.Billing
             int? dischargeStatementId = null)
         {
             modifiedDate = modifiedDate != null ? modifiedDate : DateTime.Now;
-               int fiscalYearId =
-                      billingDbContext.BillingFiscalYears.Where(f => f.StartYear <= DateTime.Today && f.EndYear >= DateTime.Today)
-                 .Select(f => f.FiscalYearId).FirstOrDefault();
+            int fiscalYearId =
+                   billingDbContext.BillingFiscalYears.Where(f => f.StartYear <= DateTime.Today && f.EndYear >= DateTime.Today)
+              .Select(f => f.FiscalYearId).FirstOrDefault();
             int receiptNo = GetCancellationReceiptNo(billingDbContext, fiscalYearId);
             if (billStatus == ENUM_BillingStatus.cancel)
             {
@@ -760,9 +821,9 @@ namespace DanpheEMR.Controllers.Billing
                     cancelledItem.BillingTransactionItemId = billItem.BillingTransactionItemId;
                     cancelledItem.ReferenceProvisionalReceiptNo = (int)billItem.ProvisionalReceiptNo;
                     cancelledItem.CancellationReceiptNo = receiptNo;
-                    cancelledItem.CancellationFiscalYearId = (int)billItem.ProvisionalFiscalYearId;
+                    cancelledItem.CancellationFiscalYearId = (int)fiscalYearId;
                     cancelledItem.PatientId = billItem.PatientId;
-                    cancelledItem.PatientVisitId = (int)billItem.PatientVisitId;
+                    cancelledItem.PatientVisitId = billItem.PatientVisitId;
                     cancelledItem.BillingType = billItem.BillingType;
                     cancelledItem.VisitType = billItem.VisitType;
                     cancelledItem.ServiceItemId = billItem.ServiceItemId;
@@ -1005,6 +1066,11 @@ namespace DanpheEMR.Controllers.Billing
                         txnItmFromDb.ModifiedBy = txnItmFromClient.ModifiedBy;
                         txnItmFromDb.ModifiedOn = DateTime.Now;
                         txnItmFromDb.IsAutoCalculationStop = txnItmFromClient.IsAutoCalculationStop;
+                        txnItmFromDb.IsBedChargeQuantityEdited = txnItmFromClient.IsBedChargeQuantityEdited != null ? txnItmFromClient.IsBedChargeQuantityEdited : false;
+                        if(txnItmFromDb.IsBedChargeQuantityEdited == true)
+                        {
+                            txnItmFromDb.BedChargeQuantityEditedDate = DateTime.Now;
+                        }
 
                         billingDbContext.Entry(txnItmFromDb).Property(a => a.Price).IsModified = true;
                         billingDbContext.Entry(txnItmFromDb).Property(a => a.Quantity).IsModified = true;
@@ -1021,6 +1087,8 @@ namespace DanpheEMR.Controllers.Billing
                         billingDbContext.Entry(txnItmFromDb).Property(a => a.ModifiedBy).IsModified = true;
                         billingDbContext.Entry(txnItmFromDb).Property(a => a.ModifiedOn).IsModified = true;
                         billingDbContext.Entry(txnItmFromDb).Property(a => a.IsAutoCalculationStop).IsModified = true;
+                        billingDbContext.Entry(txnItmFromDb).Property(a => a.IsBedChargeQuantityEdited).IsModified = true;
+                        billingDbContext.Entry(txnItmFromDb).Property(a => a.BedChargeQuantityEditedDate).IsModified = true;
                         //var billingTransact = billingDbContext.BillingTransactionItems;
                         //billingTransact.Add(txnItmFromDb);
                         //billingDbContext.BillingTransactionItems.Add(txnItmFromDb);
@@ -1140,14 +1208,18 @@ namespace DanpheEMR.Controllers.Billing
 
         public static bool IsDepositAvailable(BillingDbContext contex, int patientId, double? depositUsed)
         {
+            var usePharmacyDepositsIndependently = false;
+            usePharmacyDepositsIndependently = ReadDepositConfigureationParam(contex);
+
             var patientAllDepositTxns = (from bill in contex.BillingDeposits
                                          where bill.PatientId == patientId && bill.IsActive == true
+                                         && ((usePharmacyDepositsIndependently && bill.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && bill.ModuleName == bill.ModuleName))
                                          group bill by new { bill.PatientId, bill.TransactionType } into p
                                          select new
                                          {
                                              TransactionType = p.Key.TransactionType,
-                                             SumInAmount = p.Sum(a => a.InAmount),
-                                             SumOutAmount = p.Sum(a => a.OutAmount)
+                                                                          SumInAmount = p.Sum(a => a.InAmount),
+                                                                          SumOutAmount = p.Sum(a => a.OutAmount)
                                          }).ToList();
             decimal totalDepositAmt, totalDepositDeductAmt, totalDepositReturnAmt, currentDepositBalance;
             currentDepositBalance = totalDepositAmt = totalDepositDeductAmt = totalDepositReturnAmt = 0;
@@ -1315,6 +1387,19 @@ namespace DanpheEMR.Controllers.Billing
             {
                 throw ex;
             }
+        }
+
+        private static bool ReadDepositConfigureationParam(BillingDbContext _billingDbContext)
+        {
+            var usePharmacyDepositsIndependently = false;
+            var param = _billingDbContext.AdminParameters.FirstOrDefault(p => p.ParameterGroupName == "Pharmacy" && p.ParameterName == "UsePharmacyDeposit");
+            if (param != null)
+            {
+                var paramValue = param.ParameterValue;
+                usePharmacyDepositsIndependently = paramValue == "true" ? true : false;
+            }
+
+            return usePharmacyDepositsIndependently;
         }
     }
 

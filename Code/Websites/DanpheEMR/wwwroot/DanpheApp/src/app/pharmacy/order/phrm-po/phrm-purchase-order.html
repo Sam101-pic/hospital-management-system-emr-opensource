@@ -123,8 +123,13 @@
                     <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 5px;" class="row">
                         <label class="control-label col-md-5 col-sm-5">Supplier:<sup style="color:red">*</sup></label>
                         <div class="col-md-7 col-sm-7">
-                            <input danphe-auto-complete class="form-control left" id="SupplierName" formControlName="SupplierId" [(ngModel)]="SelectedSupplier" [source]="supplierList" [list-formatter]="SupplierListFormatter" placeholder="Select Supplier" display-property-name="SupplierName" value-property-name=null min-chars="1" max-num-list="20" onClick="this.select();" (keyup.enter)="SetFocusById('PODate')" match-formatted="true" [grid-sort]="'SupplierName'" (valueChanged)="OnSupplierChanged()" />
-                            <span style="color:red" *ngIf="currentPO.IsDirty('SupplierId')" [hidden]="currentPO.IsValidCheck('SupplierId','required')">
+                            <input danphe-auto-complete class="form-control left" id="SupplierName" formControlName="SupplierId"
+                                   [(ngModel)]="SelectedSupplier" [source]="supplierList" [list-formatter]="SupplierListFormatter"
+                                   placeholder="Select Supplier" display-property-name="SupplierName" value-property-name=null min-chars="1"
+                                   max-num-list="20" onClick="this.select();" (keyup.enter)="SetFocusById('PODate')" match-formatted="true"
+                                   [grid-sort]="'SupplierName'" (valueChanged)="OnSupplierChanged()" />
+                            <span style="color:red" *ngIf="currentPO.IsDirty('SupplierId')"
+                                  [hidden]="currentPO.IsValidCheck('SupplierId','required')">
                                 Supplier is required
                             </span>
                         </div>
@@ -134,7 +139,10 @@
                     <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 5px;" class="row">
                         <label class="control-label col-md-5 col-sm-5 left">PO Date:<sup style="color:red">*</sup></label>
                         <div class="col-md-7 col-sm-7 ">
-                            <input type="date" class="from-control" [(ngModel)]="currentPO.PODate" [ngModelOptions]="{standalone:true}" id="PODate" (ngModelChange)="OnPODateChange($event)" (keyup.enter)="SetFocusById('deliveryDays')">
+                            <danphe-date-picker [(ngModel)]="currentPO.PODate" formControlName="PODate" ngDefaultControl
+                                                (keyup.enter)="SetFocusById('deliveryDays')" id="PODate" (ngModelChange)="OnPODateChange($event)"
+                                                [previous-fiscal-year]="AllowPreviousFiscalYear">
+                            </danphe-date-picker>
                         </div>
                     </div>
                 </div>
@@ -142,11 +150,15 @@
                     <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 5px;" class="row">
                         <label class="control-label col-md-5 col-sm-5">Delivery Days:</label>
                         <div class="col-md-7 col-sm-7 ">
-                            <input type="number" [(ngModel)]="currentPO.DeliveryDays" (focusout)="OnDeliveryDaysChange()" formControlName="DeliveryDays" class="form-control" (keyup.enter)="coreService.FocusInputById('DeliveryDate')" id="deliveryDays">
-                            <span style="color:red" *ngIf="currentPO.IsDirty('DeliveryDays')" [hidden]="currentPO.IsValidCheck('DeliveryDays','required')">
+                            <input type="number" [(ngModel)]="currentPO.DeliveryDays" (focusout)="OnDeliveryDaysChange()"
+                                   formControlName="DeliveryDays" class="form-control" (keyup.enter)="coreService.FocusInputById('DeliveryDate')"
+                                   id="deliveryDays">
+                            <span style="color:red" *ngIf="currentPO.IsDirty('DeliveryDays')"
+                                  [hidden]="currentPO.IsValidCheck('DeliveryDays','required')">
                                 Delivery Days is required
                             </span>
-                            <span style="color:red" *ngIf="currentPO.IsDirty('DeliveryDays')" [hidden]="currentPO.IsValidCheck('DeliveryDays','invalidNumber')">
+                            <span style="color:red" *ngIf="currentPO.IsDirty('DeliveryDays')"
+                                  [hidden]="currentPO.IsValidCheck('DeliveryDays','invalidNumber')">
                                 Invalid number
                             </span>
                         </div>
@@ -157,7 +169,10 @@
                     <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 5px;" class="row">
                         <label class="control-label col-md-5 col-sm-5">Delivery Date:</label>
                         <div class="col-md-7 col-sm-7">
-                            <input type="date" class="from-control" [(ngModel)]="currentPO.DeliveryDate" [ngModelOptions]="{standalone:true}" id="DeliveryDate" (ngModelChange)="OnDeliveryDateChange($event)" (keyup.enter)="coreService.FocusInputById('referenceNo')">
+                            <danphe-date-picker [allow-future-date]="true" [(ngModel)]="currentPO.DeliveryDate" [ngModelOptions]="{standalone:true}"
+                                                ngDefaultControl (keyup.enter)="SetFocusById('referenceNo')" id="DeliveryDate"
+                                                (ngModelChange)="OnDeliveryDateChange($event)">
+                            </danphe-date-picker>
                         </div>
                     </div>
                 </div>
@@ -165,7 +180,8 @@
                     <div style="display: flex; justify-content: flex-start; margin-bottom: 5px" class="row">
                         <label class="control-label col-md-5 col-sm-5">Reference No.:</label>
                         <div class="col-md-7 col-sm-7">
-                            <input type="number" [(ngModel)]="currentPO.ReferenceNo" [ngModelOptions]="{standalone:true}" (keyup.enter)="SetFocusById('InvoicingAddress')" style="width: 100%;" id="referenceNo">
+                            <input type="number" [(ngModel)]="currentPO.ReferenceNo" [ngModelOptions]="{standalone:true}"
+                                   (keyup.enter)="SetFocusById('InvoicingAddress')" style="width: 100%;" id="referenceNo">
                         </div>
                     </div>
                 </div>
@@ -173,7 +189,8 @@
                     <div style="display: flex; justify-content: flex-start; margin-bottom: 5px" class="row">
                         <label class="control-label col-md-5 col-sm-5">Invoicing Address:</label>
                         <div class="col-md-7 col-sm-7">
-                            <textarea [(ngModel)]="currentPO.InvoicingAddress" [ngModelOptions]="{standalone:true}" id="InvoicingAddress" (keyup.enter)="SetFocusById('DeliveryAddress')" style="width: 100%;">
+                            <textarea [(ngModel)]="currentPO.InvoicingAddress" [ngModelOptions]="{standalone:true}" id="InvoicingAddress"
+                                      (keyup.enter)="SetFocusById('DeliveryAddress')" style="width: 100%;">
                             </textarea>
                         </div>
                     </div>
@@ -182,7 +199,8 @@
                     <div style="display: flex; justify-content: flex-start; margin-bottom: 5px" class="row">
                         <label class="control-label col-md-5 col-sm-5">Delivery Address:</label>
                         <div class="col-md-7 col-sm-7">
-                            <textarea [(ngModel)]="currentPO.DeliveryAddress" [ngModelOptions]="{standalone:true}" id="DeliveryAddress" (keyup.enter)="SetFocusById('ContactDetails')" style="width: 100%;">
+                            <textarea [(ngModel)]="currentPO.DeliveryAddress" [ngModelOptions]="{standalone:true}" id="DeliveryAddress"
+                                      (keyup.enter)="SetFocusById('ContactDetails')" style="width: 100%;">
                             </textarea>
                         </div>
                     </div>
@@ -191,7 +209,8 @@
                     <div style="display: flex; justify-content: flex-start; margin-bottom: 5px" class="row">
                         <label class="control-label col-md-5 col-sm-5">Contact:</label>
                         <div class="col-md-7 col-sm-7">
-                            <textarea [(ngModel)]="currentPO.Contact" [ngModelOptions]="{standalone:true}" id="ContactDetails" (keyup.enter)="SetFocusById('ItemName')" style="width: 100%;">
+                            <textarea [(ngModel)]="currentPO.Contact" [ngModelOptions]="{standalone:true}" id="ContactDetails"
+                                      (keyup.enter)="SetFocusById('ItemName')" style="width: 100%;">
                                     </textarea>
                         </div>
                     </div>
@@ -209,7 +228,9 @@
                     <tr>
                         <th><b>Generic Name</b></th>
                         <th><b>Item Name</b></th>
-                        <th><b>Quantity</b></th>
+                        <th *ngIf="IsPackageItem"><b>Packing</b></th>
+                        <th *ngIf="!IsPackageItem"><b>Quantity</b></th>
+                        <th *ngIf="IsPackageItem"><b>Packing Qty</b></th>
                         <th><b>Free Qty</b></th>
                         <th><b>Total Qty</b></th>
                         <th><b>Standard Rate</b></th>
@@ -225,23 +246,57 @@
                     <tr>
                         <td>
                             <div>
-                                <input danphe-auto-complete id="GenericName" class="form-control" [(ngModel)]="SelectedGeneric" [source]="FilteredGenericList" [list-formatter]="GenericListFormatter" placeholder="GenericName" display-property-name="GenericName" value-property-name=null min-chars="1" max-num-list="20" (valueChanged)="OnGenericNameChange()" onClick="this.select();" (keyup.enter)="coreService.FocusInputById('ItemName')" match-formatted="true" [grid-sort]="'GenericName'" />
+                                <input danphe-auto-complete id="GenericName" class="form-control" [(ngModel)]="SelectedGeneric"
+                                       [source]="FilteredGenericList" [list-formatter]="GenericListFormatter" placeholder="GenericName"
+                                       display-property-name="GenericName" value-property-name=null min-chars="1" max-num-list="20"
+                                       (valueChanged)="OnGenericNameChange()" onClick="this.select();"
+                                       (keyup.enter)="coreService.FocusInputById('ItemName')" match-formatted="true" [grid-sort]="'GenericName'" />
                             </div>
                         </td>
                         <td>
                             <form [formGroup]="purchaseOrderItem.PurchaseOrderItemValidator">
-                                <input danphe-auto-complete id="ItemName" class="form-control" [(ngModel)]="SelectedItem" [source]="FilteredItemList" [list-formatter]="ItemListFormatter" placeholder="Item Name" display-property-name="ItemName" value-property-name=null min-chars="1" max-num-list="20" (valueChanged)="OnItemSelected()" [ngModelOptions]="{standalone: true}" onClick="this.select();" (keyup.enter)="SelectedItem? coreService.FocusInputById('QuantityAt'): coreService.FocusInputById('main-remark')" match-formatted="true" [grid-sort]="'ItemName'" [ngClass]="{'border-red': purchaseOrderItem.IsDirty('ItemId')}" />
+                                <input danphe-auto-complete id="ItemName" class="form-control" [(ngModel)]="SelectedItem" [source]="FilteredItemList"
+                                       [list-formatter]="ItemListFormatter" placeholder="Item Name" display-property-name="ItemName"
+                                       value-property-name=null min-chars="1" max-num-list="20" (valueChanged)="OnItemSelected()"
+                                       [ngModelOptions]="{standalone: true}" onClick="this.select();"
+                                       (keyup.enter)="SelectedItem? IsPackageItem ? coreService.FocusInputById('Id_Packing') : coreService.FocusInputById('QuantityAt'): coreService.FocusInputById('main-remark')"
+                                       match-formatted="true" [grid-sort]="'ItemName'"
+                                       [ngClass]="{'border-red': purchaseOrderItem.IsDirty('ItemId')}" />
                             </form>
-
                         </td>
-                        <td style="width: 80px">
+                        <td *ngIf="IsPackageItem">
+                            <input danphe-auto-complete class="" [(ngModel)]="SelectedPacking" [source]="PackingTypeList"
+                                   [list-formatter]="PackingListsFormatter" display-property-name="PackingName" value-property-name=null
+                                   min-chars="0"
+                                   max-num-list="30" (valueChanged)="AssignPackingQty()" onClick="this.select();" match-formatted="true"
+                                   [ngModelOptions]="{standalone:true}" id="Id_Packing" (keyup.enter)="SetFocusById('QuantityAt')"
+                                   style="width: 100%;" />
+                        </td>
+                        <td style="width: 80px" *ngIf="!IsPackageItem">
                             <form [formGroup]="purchaseOrderItem.PurchaseOrderItemValidator">
-                                <input [(ngModel)]="purchaseOrderItem.Quantity" (ngModelChange)="CalculationForPOItem()" class="form-control" id="QuantityAt" min="1" formControlName="Quantity" type="number" onClick="this.select();" onfocus="this.select();" (keyup.enter)="coreService.FocusInputById('freequantity')" (wheel)="coreService.PreventNumberChangeOnScroll($event)" [ngClass]="{'border-red': purchaseOrderItem.IsDirty('Quantity')}">
+                                <input [(ngModel)]="purchaseOrderItem.Quantity" (ngModelChange)="CalculationForPOItem()" class="form-control"
+                                       id="QuantityAt" min="1" formControlName="Quantity" type="number" onClick="this.select();"
+                                       onfocus="this.select();" (keyup.enter)="coreService.FocusInputById('freequantity')"
+                                       (wheel)="coreService.PreventNumberChangeOnScroll($event)"
+                                       [ngClass]="{'border-red': purchaseOrderItem.IsDirty('Quantity')}">
+                            </form>
+                        </td>
+                        <td style="width: 80px" *ngIf="IsPackageItem">
+                            <form [formGroup]="purchaseOrderItem.PurchaseOrderItemValidator">
+                                <input [(ngModel)]="purchaseOrderItem.PackingQty" (ngModelChange)="CalculationForPOItem()" class="form-control"
+                                       id="QuantityAt" min="1" formControlName="Quantity" type="number" onClick="this.select();"
+                                       onfocus="this.select();" (keyup.enter)="coreService.FocusInputById('freequantity')"
+                                       (wheel)="coreService.PreventNumberChangeOnScroll($event)">
                             </form>
                         </td>
                         <td style="width:80px">
                             <form [formGroup]="purchaseOrderItem.PurchaseOrderItemValidator">
-                                <input [(ngModel)]="purchaseOrderItem.FreeQuantity" (ngModelChange)="CalculationForPOItem()" class="form-control" id="freequantity" min="1" formControlName="FreeQuantity" type="number" onClick="this.select();" onfocus="this.select();" (keyup.enter)="coreService.FocusInputById('PriceAt')" (wheel)="coreService.PreventNumberChangeOnScroll($event)" [ngClass]="{'border-red': purchaseOrderItem.IsDirty('FreeQuantity')}">
+                                <input [(ngModel)]="purchaseOrderItem.FreeQuantity" (ngModelChange)="CalculationForPOItem()" class="form-control"
+                                       id="freequantity" min="1" formControlName="FreeQuantity" type="number" onClick="this.select();"
+                                       onfocus="this.select();"
+                                       (keyup.enter)="IsPackageItem ? coreService.FocusInputById('stripRate') : coreService.FocusInputById('PriceAt')"
+                                       (wheel)="coreService.PreventNumberChangeOnScroll($event)"
+                                       [ngClass]="{'border-red': purchaseOrderItem.IsDirty('FreeQuantity')}">
                             </form>
                         </td>
                         <td style="width:80px">
@@ -249,12 +304,26 @@
                         </td>
                         <td style="width:80px;display: flex; flex-direction: row;align-items: center;">
                             <form [formGroup]="purchaseOrderItem.PurchaseOrderItemValidator">
-                                <input [(ngModel)]="purchaseOrderItem.StandardRate" (ngModelChange)="CalculationForPOItem()" class="form-control" id="PriceAt" name="price" type="number" onfocus="this.select();" (keyup.enter)="coreService.FocusInputById('ccchargepercentage')" formControlName="StandardRate" (wheel)="coreService.PreventNumberChangeOnScroll($event)" [ngClass]="{'border-red': purchaseOrderItem.IsDirty('StandardRate')}">
+                                <input *ngIf="!IsPackageItem" [(ngModel)]="purchaseOrderItem.StandardRate" (ngModelChange)="CalculationForPOItem()"
+                                       class="form-control"
+                                       id="PriceAt" name="price" type="number" onfocus="this.select();"
+                                       (keyup.enter)="coreService.FocusInputById('ccchargepercentage')" formControlName="StandardRate"
+                                       (wheel)="coreService.PreventNumberChangeOnScroll($event)"
+                                       [ngClass]="{'border-red': purchaseOrderItem.IsDirty('StandardRate')}">
+
+                                <input *ngIf="IsPackageItem" [(ngModel)]="purchaseOrderItem.StripRate" (ngModelChange)="CalculationForPOItem()"
+                                       class="form-control"
+                                       id="stripRate" name="striprate" type="number" onfocus="this.select();"
+                                       (keyup.enter)="coreService.FocusInputById('ccchargepercentage')" formControlName="StandardRate"
+                                       (wheel)="coreService.PreventNumberChangeOnScroll($event)"
+                                       [ngClass]="{'border-red': purchaseOrderItem.IsDirty('StandardRate')}">
                             </form>
                             <a *ngIf="purchaseOrderItem.SelectedItem!=null" id="itemPriceHistoryTooltip" class="tooltip list-tooltip ">
-                                <span class="fa fa-info" style="margin-left:5px;padding: 3px 6px 3px 6px;background-color: #c8c8d2;border-radius: 9px;">
+                                <span class="fa fa-info"
+                                      style="margin-left:5px;padding: 3px 6px 3px 6px;background-color: #c8c8d2;border-radius: 9px;">
                                 </span>
-                                <p class="tooltiptext tooltip-list-type ttptextdown no-print" *ngIf="ItemRateHistory.length;else noPriceHistoryMessage">
+                                <p class="tooltiptext tooltip-list-type ttptextdown no-print"
+                                   *ngIf="ItemRateHistory.length;else noPriceHistoryMessage">
                                     <span class="tooltip-header">Rate History</span>
                                     <span *ngFor="let itemRate of ItemRateHistory">
                                         Rs.{{itemRate.GRItemPrice}}-{{itemRate.SupplierName}}-{{itemRate.GoodReceiptDate | date: 'yyyy-M-d'}}
@@ -272,26 +341,39 @@
                         </td>
                         <td style="width:50px;">
                             <form [formGroup]="purchaseOrderItem.PurchaseOrderItemValidator">
-                                <input [(ngModel)]="purchaseOrderItem.CCChargePercentage" (focusout)="CalculationForPOItem()" max="100" class="form-control" id="ccchargepercentage" type="number" (keyup.enter)="coreService.FocusInputById('discountpercentage')" formControlName="CCChargePercentage" (wheel)="coreService.PreventNumberChangeOnScroll($event)" onfocus="this.select()" [ngClass]="{'border-red': purchaseOrderItem.IsDirty('CCChargePercentage')}">
+                                <input [(ngModel)]="purchaseOrderItem.CCChargePercentage" (focusout)="CalculationForPOItem()" max="100"
+                                       class="form-control" id="ccchargepercentage" type="number"
+                                       (keyup.enter)="coreService.FocusInputById('discountpercentage')" formControlName="CCChargePercentage"
+                                       (wheel)="coreService.PreventNumberChangeOnScroll($event)" onfocus="this.select()"
+                                       [ngClass]="{'border-red': purchaseOrderItem.IsDirty('CCChargePercentage')}">
                             </form>
                         </td>
                         <td style="width:70px;">
                             <form [formGroup]="purchaseOrderItem.PurchaseOrderItemValidator">
-                                <input [(ngModel)]="purchaseOrderItem.DiscountPercentage" (focusout)="CalculationForPOItem()" max="100" id="discountpercentage" type="number" (keyup.enter)="coreService.FocusInputById('vatpercentage')" formControlName="DiscountPercentage" (wheel)="coreService.PreventNumberChangeOnScroll($event)" onfocus="this.select()" class="form-control" [ngClass]="{'border-red': purchaseOrderItem.IsDirty('DiscountPercentage')}">
+                                <input [(ngModel)]="purchaseOrderItem.DiscountPercentage" (focusout)="CalculationForPOItem()" max="100"
+                                       id="discountpercentage" type="number" (keyup.enter)="coreService.FocusInputById('vatpercentage')"
+                                       formControlName="DiscountPercentage" (wheel)="coreService.PreventNumberChangeOnScroll($event)"
+                                       onfocus="this.select()" class="form-control"
+                                       [ngClass]="{'border-red': purchaseOrderItem.IsDirty('DiscountPercentage')}">
                             </form>
                         </td>
                         <td style="width:70px;">
                             <form [formGroup]="purchaseOrderItem.PurchaseOrderItemValidator">
-                                <input [(ngModel)]="purchaseOrderItem.VATPercentage" (focusout)="CalculationForPOItem()" max="100" id="vatpercentage" type="number" (keyup.enter)="coreService.FocusInputById('remarks')" formControlName="VATPercentage" (wheel)="coreService.PreventNumberChangeOnScroll($event)" onfocus="this.select()" class="form-control" [ngClass]="{'border-red': purchaseOrderItem.IsDirty('VATPercentage')}">
+                                <input [(ngModel)]="purchaseOrderItem.VATPercentage" (focusout)="CalculationForPOItem()" max="100" id="vatpercentage"
+                                       type="number" (keyup.enter)="coreService.FocusInputById('remarks')" formControlName="VATPercentage"
+                                       (wheel)="coreService.PreventNumberChangeOnScroll($event)" onfocus="this.select()" class="form-control"
+                                       [ngClass]="{'border-red': purchaseOrderItem.IsDirty('VATPercentage')}">
                             </form>
                         </td>
                         <td style="width:80px;">
                             <span id="total">{{purchaseOrderItem.TotalAmount}}</span>
                         </td>
-                        <td><input [(ngModel)]="purchaseOrderItem.Remarks" class="form-control" id="remarks" (keyup.enter)="coreService.FocusButtonById('btn-add-po')" type="text"></td>
+                        <td><input [(ngModel)]="purchaseOrderItem.Remarks" class="form-control" id="remarks"
+                                   (keyup.enter)="coreService.FocusButtonById('btn-add-po')" type="text"></td>
                         <td>
 
-                            <button type="button" #btnadd id="btn-add-po" class="btn green btn-success" (click)="AddPO()" (keyup.enter)="coreService.FocusInputById('ItemName')">
+                            <button type="button" #btnadd id="btn-add-po" class="btn green btn-success" (click)="AddPO()"
+                                    (keyup.enter)="coreService.FocusInputById('ItemName')">
                                 <i class="fa fa-plus"></i>
                             </button>
                         </td>
@@ -300,7 +382,9 @@
             </table>
             <div *ngIf="purchaseOrderItem.PurchaseOrderItemValidator.invalid && purchaseOrderItem.PurchaseOrderItemValidator.dirty">
                 <div class="error-message alert alert-danger error-message-alert">
-                    <span style="color:red" *ngIf="!purchaseOrderItem.IsValidCheck('ItemId','required') ||!purchaseOrderItem.IsValidCheck('ItemId','invalidNumber')">Invalid Item.</span>
+                    <span style="color:red"
+                          *ngIf="!purchaseOrderItem.IsValidCheck('ItemId','required') ||!purchaseOrderItem.IsValidCheck('ItemId','invalidNumber')">Invalid
+                        Item.</span>
 
                     <span style="color:red" *ngIf="!purchaseOrderItem.IsValidCheck('Quantity','required')"> Qty(required).</span>
                     <span style="color:red" *ngIf="!purchaseOrderItem.IsValidCheck('Quantity','wrongDecimalValue')"> Qty(required whole
@@ -317,13 +401,16 @@
                     <span style="color:red" *ngIf="!purchaseOrderItem.IsValidCheck('StandardRate','wrongDecimalValue')"> StandardRate(required whole
                         number)</span>
 
-                    <span class="color-red font-sm" *ngIf="!purchaseOrderItem.IsValidCheck('CCChargePercentage','required') || !purchaseOrderItem.IsValidCheck('CCChargePercentage','min') || !purchaseOrderItem.IsValidCheck('CCChargePercentage','max')">
+                    <span class="color-red font-sm"
+                          *ngIf="!purchaseOrderItem.IsValidCheck('CCChargePercentage','required') || !purchaseOrderItem.IsValidCheck('CCChargePercentage','min') || !purchaseOrderItem.IsValidCheck('CCChargePercentage','max')">
                         CC Charge% Range: 0-100%</span>
 
-                    <span class="color-red font-sm" *ngIf="!purchaseOrderItem.IsValidCheck('DiscountPercentage','required') || !purchaseOrderItem.IsValidCheck('DiscountPercentage','min') || !purchaseOrderItem.IsValidCheck('DiscountPercentage','max')">
+                    <span class="color-red font-sm"
+                          *ngIf="!purchaseOrderItem.IsValidCheck('DiscountPercentage','required') || !purchaseOrderItem.IsValidCheck('DiscountPercentage','min') || !purchaseOrderItem.IsValidCheck('DiscountPercentage','max')">
                         Discount% Range: 0-100%</span>
 
-                    <span class="color-red font-sm" *ngIf="!purchaseOrderItem.IsValidCheck('VATPercentage','required') || !purchaseOrderItem.IsValidCheck('VATPercentage','min') || !purchaseOrderItem.IsValidCheck('VATPercentage','max')">
+                    <span class="color-red font-sm"
+                          *ngIf="!purchaseOrderItem.IsValidCheck('VATPercentage','required') || !purchaseOrderItem.IsValidCheck('VATPercentage','min') || !purchaseOrderItem.IsValidCheck('VATPercentage','max')">
                         VAT% Range: 0-100%</span>
                 </div>
             </div>
@@ -337,10 +424,13 @@
                         <th>#</th>
                         <th><b>Generic Name</b></th>
                         <th><b>Item Name</b></th>
-                        <th><b>Quantity</b></th>
+                        <th *ngIf="IsPackageItem"><b>Packing</b></th>
+                        <th *ngIf="IsPackageItem"><b>Packing Qty</b></th>
+                        <th *ngIf="!IsPackageItem"><b>Quantity</b></th>
                         <th><b>Free Qty</b></th>
                         <th><b>Total Qty</b></th>
-                        <th><b>Rate</b></th>
+                        <th *ngIf="IsPackageItem"><b>Strip Rate</b></th>
+                        <th *ngIf="!IsPackageItem"><b>Rate</b></th>
                         <th><b>CCCharge %</b></th>
                         <th><b>CCCharge Amt</b></th>
                         <th><b>Dis %</b></th>
@@ -354,22 +444,27 @@
                 <tbody>
                     <tr *ngFor="let item of currentPO.PHRMPurchaseOrderItems; let i = index">
                         <td>
-                            <a *ngIf="!item.IsCancel" class="btn btn-danger" (click)="!editPO ? RemovePOItem(i) : CancelItem(i)" title=" Click to remove this item">
+                            <a *ngIf="!item.IsCancel" class="btn btn-danger" (click)="!editPO ? RemovePOItem(i) : CancelItem(i)"
+                               title=" Click to remove this item">
                                 <i class="fa fa-times"></i></a>
                             <a *ngIf="item.IsCancel" class="btn btn-green" (click)="UndoCancelItem(i)" title=" Click to remove this item">
                                 <i class="fa fa-times"></i></a>
                         </td>
                         <td *ngIf="editPO">
-                            <a [attr.disabled]="item.PurchaseOrderItemId> 0? null: true" class="btn btn-success" (click)="EditPOItem(i)" title="Click to edit this item">
+                            <a [attr.disabled]="item.PurchaseOrderItemId> 0 &&  ['active','pending'].includes(item.POItemStatus)? null: true"
+                               class="btn btn-success" (click)="EditPOItem(i)" title="Click to edit this item">
                                 <i class="fa fa-pencil"></i></a>
                         </td>
                         <td>{{i + 1}}</td>
                         <td>{{item.GenericName}}</td>
                         <td>{{item.ItemName}}</td>
-                        <td>{{item.Quantity}}</td>
+                        <td *ngIf="IsPackageItem">{{item.PackingName}}</td>
+                        <td *ngIf="IsPackageItem">{{item.PackingQty}}</td>
+                        <td *ngIf="!IsPackageItem">{{item.Quantity}}</td>
                         <td>{{item.FreeQuantity}}</td>
                         <td>{{item.TotalQuantity}}</td>
-                        <td>{{item.StandardRate | number: "1.2-4"}}</td>
+                        <td *ngIf="!IsPackageItem">{{item.StandardRate | number: "1.2-4"}}</td>
+                        <td *ngIf="IsPackageItem">{{item.StripRate | number: "1.2-4"}}</td>
                         <td>{{item.CCChargePercentage | number: "1.2-4"}}</td>
                         <td>{{item.CCChargeAmount | number: "1.2-4"}}</td>
                         <td>{{item.DiscountPercentage | number: "1.2-4"}}</td>
@@ -395,13 +490,15 @@
                                     <option *ngFor="let terms of termsList" title="{{ terms.Text }}" value="{{ terms.Text }}">
                                         {{ terms.ShortName }}</option>
                                 </select>
-                                <a class="fa fa-question" (click)="AddTermsPopUp()" title="Unable to find Terms? Click to add to Terms and Conditions">
+                                <a class="fa fa-question" (click)="AddTermsPopUp()"
+                                   title="Unable to find Terms? Click to add to Terms and Conditions">
                                 </a>
                             </div>
                         </div>
                     </div>
                     <div>
-                        <danphe-ckeditor [readonly]="false" (get-html-content)="onChangeEditorData($event)" [set-html-content]="currentPO.TermsConditions" panel-height="240px"></danphe-ckeditor>
+                        <danphe-ckeditor [readonly]="false" (get-html-content)="onChangeEditorData($event)"
+                                         [set-html-content]="currentPO.TermsConditions" panel-height="240px"></danphe-ckeditor>
                     </div>
                 </div>
                 <div class="col-md-6 text-center" style="padding: 0;">
@@ -409,7 +506,9 @@
                         <div class="verification-card" *ngIf="IsVerificationActivated">
                             <div>
                                 <div class="custom-control  custom-checkbox verification-check">
-                                    <input type="checkbox" class="custom-control-input" id="defaultUnchecked" [(ngModel)]="currentPO.IsVerificationEnabled" (ngModelChange)="ShowVerifiers()">
+                                    <input type="checkbox" class="custom-control-input" id="defaultUnchecked"
+                                           [(ngModel)]="currentPO.IsVerificationEnabled" (ngModelChange)="ShowVerifiers()"
+                                           [disabled]="!HasPermission">
                                     <label title="Check If Verification Needed" class="custom-control-label" for="defaultUnchecked">Need
                                         Verification</label>
                                 </div>
@@ -417,17 +516,24 @@
                                     <div class="left t-wrap col-md-12" *ngFor="let verifier of currentPO.VerifierList; let i = index;let c= count;">
                                         <div class="row">
                                             <div class="col-md-5">
-                                                <button title="Delete this Verifier" class="btn btn-sm btn-danger" (click)="DeleteVerifier(i)" [disabled]="CheckIfDeleteVerifierAllowed()"><i class="glyphicon glyphicon-minus"></i>
+                                                <button title="Delete this Verifier" class="btn btn-sm btn-danger" (click)="DeleteVerifier(i)"
+                                                        [disabled]="!HasPermission || CheckIfDeleteVerifierAllowed()"><i
+                                                       class="glyphicon glyphicon-minus"></i>
                                                 </button>
                                                 <label class="verifier" for="inputIconEx{{i}}">
                                                     <i class="fa fa-user"></i>{{GetSignatoryName(i)}}
                                                 </label>
                                             </div>
                                             <div class="col-md-6">
-                                                <input danphe-auto-complete class="form-control " autocomplete="off" [source]="VerifierList" [(ngModel)]="verifier" [list-formatter]="VerifierListFormatter" placeholder="Select Verifier" display-property-name="Name" max-num-list="10" (valueChanged)="AssignVerifier($event,i)" />
+                                                <input danphe-auto-complete class="form-control " autocomplete="off" [source]="VerifierList"
+                                                       [(ngModel)]="verifier" [list-formatter]="VerifierListFormatter" placeholder="Select Verifier"
+                                                       display-property-name="Name" max-num-list="10" (focusout)="AssignVerifier(verifier,i)"
+                                                       [disabled]="!HasPermission" />
                                             </div>
                                             <div class="col-md-1">
-                                                <button title="Add Verifier" class="btn btn-sm btn-primary" (click)="AddVerifier()" [disabled]="CheckIfAddVerifierAllowed()"><i class="glyphicon glyphicon-plus"></i></button>
+                                                <button title="Add Verifier" class="btn btn-sm btn-primary" (click)="AddVerifier()"
+                                                        [disabled]="!HasPermission || CheckIfAddVerifierAllowed()"><i
+                                                       class="glyphicon glyphicon-plus"></i></button>
                                             </div>
                                         </div>
                                     </div>
@@ -455,7 +561,10 @@
                     <td class="text-right"><b>Discount %:</b></td>
                     <td>
                         <div class="form-group">
-                            <input class="form-control" (focusout)="OnDiscountChange(currentPO.DiscountPercentage,0)" [(ngModel)]="currentPO.DiscountPercentage" id="main-discoutpercentage" name="discoutpercentage" type="number" (wheel)="coreService.PreventNumberChangeOnScroll($event)" onfocus="this.select()" (keyup.enter)="coreService.FocusInputById('main-remark')">
+                            <input class="form-control" (focusout)="OnDiscountChange(currentPO.DiscountPercentage,0)"
+                                   [(ngModel)]="currentPO.DiscountPercentage" id="main-discoutpercentage" name="discoutpercentage" type="number"
+                                   (wheel)="coreService.PreventNumberChangeOnScroll($event)" onfocus="this.select()"
+                                   (keyup.enter)="coreService.FocusInputById('main-remark')">
                         </div>
                     </td>
                 </tr>
@@ -463,7 +572,10 @@
                     <td class="text-right"><b>Discount:</b></td>
                     <td>
                         <div class="form-group">
-                            <input class="form-control" (focusout)="OnDiscountChange(0,currentPO.DiscountAmount)" [(ngModel)]="currentPO.DiscountAmount" name="main-discountamount" id="main-discountamount" type="number" (wheel)="coreService.PreventNumberChangeOnScroll($event)" onfocus="this.select()" (keyup.enter)="coreService.FocusInputById('main-remark')">
+                            <input class="form-control" (focusout)="OnDiscountChange(0,currentPO.DiscountAmount)"
+                                   [(ngModel)]="currentPO.DiscountAmount" name="main-discountamount" id="main-discountamount" type="number"
+                                   (wheel)="coreService.PreventNumberChangeOnScroll($event)" onfocus="this.select()"
+                                   (keyup.enter)="coreService.FocusInputById('main-remark')">
                         </div>
                     </td>
                 </tr>
@@ -519,7 +631,8 @@
                     <td class="text-right"><b>Remarks:</b></td>
                     <td>
                         <div class="form-group">
-                            <input [(ngModel)]="currentPO.Remarks" id="main-remark" class="form-control" name="Remarks" type="text" (keyup.enter)="!editPO?coreService.FocusButtonById('btn-print'):coreService.FocusButtonById('btn-update')">
+                            <input [(ngModel)]="currentPO.Remarks" id="main-remark" class="form-control" name="Remarks" type="text"
+                                   (keyup.enter)="!editPO?coreService.FocusButtonById('btn-print'):coreService.FocusButtonById('btn-update')">
                         </div>
                     </td>
                 </tr>
@@ -531,13 +644,18 @@
         </div>
         <div class="text-right mt20 mb20">
             <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
-                <input *ngIf="!editPO" DanpheConfirmationDialog type="submit" [title]="confirmationTitle" [message]="confirmationMessage" (confirm)="handleConfirm()" (cancel)="handleCancel()" #printInvoice class="btn green btn-success tooltip" title="ALT + P" [disabled]="loading" value="Print Order" id="btn-print">
-                <input *ngIf="editPO" DanpheConfirmationDialog type="submit" [title]="confirmationTitle" [message]="confirmationMessage" (confirm)="handleConfirm()" (cancel)="handleCancel()" #printInvoice class="btn green btn-success tooltip" title="ALT + P" [disabled]="loading" value="Update Order" id="btn-update">
+                <input *ngIf="!editPO" DanpheConfirmationDialog type="submit" [title]="confirmationTitle" [message]="confirmationMessage"
+                       (confirm)="handleConfirm()" (cancel)="handleCancel()" #printInvoice class="btn green btn-success tooltip" title="ALT + P"
+                       [disabled]="loading" value="Print Order" id="btn-print">
+                <input *ngIf="editPO" DanpheConfirmationDialog type="submit" [title]="confirmationTitle" [message]="confirmationMessage"
+                       (confirm)="handleConfirm()" (cancel)="handleCancel()" #printInvoice class="btn green btn-success tooltip" title="ALT + P"
+                       [disabled]="loading" value="Update Order" id="btn-update">
                 <span></span>
                 <button type="button" class="btn btn-danger" (click)="DiscardPurchaseOrder()" id="btn-discard">Discard</button>
                 <span></span>
             </div>
         </div>
     </div>
-    <terms-add *ngIf="showAddTermsPopUp" [TermsApplicationId]="2" [showAddPage]="showAddTermsPopUp" (callback-add)="OnNewTermsAdded($event)">
+    <terms-add *ngIf="showAddTermsPopUp" [TermsApplicationId]="TermsApplicationId" [showAddPage]="showAddTermsPopUp"
+               (callback-add)="OnNewTermsAdded($event)">
     </terms-add>

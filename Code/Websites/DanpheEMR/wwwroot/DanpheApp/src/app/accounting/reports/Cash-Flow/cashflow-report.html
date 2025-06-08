@@ -39,12 +39,12 @@
     </div>
     <div class="col-md-12 col-xs-12 col-sm-12">
         <div class="row" style="background: #bcbcbc; padding-top: 0px;">
-            <div class="col-md-7 col-xs-12" style="margin-right: -45px;">
+            <div class="col-md-7 col-xs-12" style="margin-right: -45px;margin-top: 10px;">
                 <div class="form-group">
-                    <label class="control-label mt10">Select Fiscal Year<b class="color-red">
+                    <label class="control-label col-md-3">Select Fiscal Year<b class="color-red">
                             *</b><b style="float:right;">:</b></label>
 
-                    <div>
+                    <div class="col-md-9 ">
                         <fiscal-year-calendar [showSingleDatePicker]="false" [showAllFiscalYear]="true" (fiscalYearDate)="selectDate($event)">
                         </fiscal-year-calendar>
                     </div>
@@ -59,8 +59,15 @@
                     </div>
                 </div>
             </div> -->
-
-            <div class="col-md-1 col-xs-12" style="margin-top: 33px;">
+            <div class="col-md-4">
+                <label class=" col-md-5" style="margin-top: 20px;">Account Section <b class="color-red"> *</b>:</label><br>
+                <div class="col-md-7">
+                    <select [(ngModel)]="SelectedHospital" class="form-control">
+                        <option *ngFor="let h of HospitalList" value="{{h.HospitalId}}">{{ h.HospitalLongName }}</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-1 col-xs-12" style="margin-top:15px;">
                 <div class="form-group">
                     <button class="btn green btn-success" type="button" (click)="LoadData()" [disabled]="btndisabled">
                         <i class="fa fa-refresh"></i>

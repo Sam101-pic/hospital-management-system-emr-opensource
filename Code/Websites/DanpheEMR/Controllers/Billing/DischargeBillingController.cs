@@ -1,5 +1,6 @@
 ﻿
 using DanpheEMR.CommonTypes;
+using DanpheEMR.Controllers.Billing.DTOs;
 using DanpheEMR.Core.Configuration;
 using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
@@ -12,19 +13,32 @@ using DanpheEMR.ServerModel.MasterModels;
 using DanpheEMR.ServerModel.MedicareModels;
 using DanpheEMR.ServerModel.PatientModels;
 using DanpheEMR.Services.Billing.DTO;
+using DanpheEMR.Services.Billing.Invoice;
+using DanpheEMR.Services.Discharge;
+using DanpheEMR.Services.OnlinePayment.DTO.FonePay;
+using DanpheEMR.Services.OnlinePayment.FonePay;
 using DanpheEMR.Services.SSF.DTO;
+using DanpheEMR.Sync.IRDNepal;
 using DanpheEMR.Sync.IRDNepal.Models;
 using DanpheEMR.Utilities;
+using DanpheEMR.Utilities.SignalRHubs;
+using DocumentFormat.OpenXml.Validation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Data;
 using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DanpheEMR.Controllers.Billing
@@ -34,17 +48,76 @@ namespace DanpheEMR.Controllers.Billing
         private readonly DischargeDbContext _dischargeDbContext;
         bool realTimeRemoteSyncEnabled = false;
         bool RealTimeSSFClaimBooking = false;
+        bool EnableDirectFonePay = false;
+        bool EnableFewaPay = false;
+        private readonly IFonePayService _fonePayService;
+        private IHubContext<FonePayHub> _hubContext;
+        private IHttpContextAccessor _contextAccessor;
 
-        public DischargeBillingController(IOptions<MyConfiguration> _config) : base(_config)
+        public DischargeBillingController(IOptions<MyConfiguration> _config, IFonePayService fonePayService, IHubContext<FonePayHub> hubContext, IHttpContextAccessor contextAccessor) : base(_config)
         {
             realTimeRemoteSyncEnabled = _config.Value.RealTimeRemoteSyncEnabled;
             RealTimeSSFClaimBooking = _config.Value.RealTimeSSFClaimBooking;
+            EnableDirectFonePay = _config.Value.EnableDirectFonePay;
+            EnableFewaPay = _config.Value.EnableFewaPay;
             _dischargeDbContext = new DischargeDbContext(connString);
+            _fonePayService = fonePayService;
+            _hubContext = hubContext;
+            _contextAccessor = contextAccessor;
         }
 
 
         [HttpPost]
         [Route("PostBillingAndPharmacyTransactionAndDischarge")]
+        public async Task<object> PostBillAndPharmacyTransactionAndDischarge_New()
+        {
+            string strBillingTransactionData = this.ReadPostData();
+            PendingBill pendingBills = DanpheJSONConvert.DeserializeObject<PendingBill>(strBillingTransactionData);
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<Task<object>> func = async () => await New_PostBillAndPharmacyTransactionAndDischarge(pendingBills, currentUser);
+            return await InvokeHttpPostFunctionAsync_New(func);
+        }
+
+        private async Task<object> New_PostBillAndPharmacyTransactionAndDischarge(PendingBill pendingBills, RbacUser currentUser)
+        {
+            Log.Information($"Discahrge Process for Patient, {pendingBills.BillingPendingItems.billingTransactionModel.PatientId} with PatientVisist, {pendingBills.BillingPendingItems.billingTransactionModel.PatientVisitId} is started!");
+            //Read SettlePharamcyCreditFromBilling parameter and see if Pharmacy Credits are allowed to settle from Billing?
+            var param = _dischargeDbContext.CFGParameters.FirstOrDefault(p => p.ParameterGroupName == "Billing" && p.ParameterName == "SettlePharamcyCreditFromBilling");
+            bool settlePharamcyCredits = false;
+            if (param != null && param.ParameterValue == "true")
+            {
+                settlePharamcyCredits = true;
+            }
+            if (pendingBills != null && pendingBills.BillingPendingItems != null && pendingBills.BillingPendingItems.billingTransactionModel != null)
+            {
+                var paymentDetails = pendingBills.BillingPendingItems.billingTransactionModel.PaymentDetails;
+                if (paymentDetails != null && paymentDetails.ToLower().Contains(ENUM_OnlinePaymentMode.FonePay) && EnableDirectFonePay && EnableFewaPay == false)
+                {
+                    decimal totalAmount = (settlePharamcyCredits == true ? pendingBills.PharmacyTotalAmount : 0) + (decimal)pendingBills.BillingPendingItems.billingTransactionModel.TotalAmount;
+                    FonepayDynamicQrRequest_DTO fonepayDynamicQrRequest = new FonepayDynamicQrRequest_DTO
+                    {
+
+                        amount = (long)totalAmount,
+                        prn = new Random().Next().ToString()
+                    };
+                    FonePayTransactionEssentials_DTO obj = new FonePayTransactionEssentials_DTO(fonepayDynamicQrRequest, pendingBills, currentUser, connString, realTimeRemoteSyncEnabled, RealTimeSSFClaimBooking, totalAmount, ENUM_FonePayTransactionRequestFrom.InPatientDischarge, pendingBills.BillingPendingItems.billingTransactionModel.PatientId);
+                    var qrResponse = await _fonePayService.GenerateQR(obj, _dischargeDbContext, _hubContext, _contextAccessor);
+                    return qrResponse;
+                }
+                else
+                {
+                    var result = await DischargeBillingService.SaveBillingAndPharmacyTransactionAndDischarge(_dischargeDbContext, pendingBills, currentUser, connString, realTimeRemoteSyncEnabled, RealTimeSSFClaimBooking, _hubContext, _contextAccessor);
+                    return result;
+                }
+            }
+            else
+            {
+                throw new Exception("Transaction is not valid");
+            }
+        }
+
+        [HttpPost]
+        [Route("PostBillingAndPharmacyTransactionAndDischarge_Old")]
         public IActionResult PostBillAndPharmacyTransactionAndDischarge()
         {
             string strBillingTransactionData = this.ReadPostData();
@@ -53,6 +126,29 @@ namespace DanpheEMR.Controllers.Billing
             return InvokeHttpPostFunction(func);
         }
 
+        [HttpPut]
+        [Route("DischargeStatementPrintCount")]
+        public IActionResult UpdatePrintCount(int dischargeStatementId)
+        {
+            Func<object> func = () => UpdateDischargeStatementPrintCount(dischargeStatementId);
+            return InvokeHttpPostFunction(func);
+        }
+
+        private object UpdateDischargeStatementPrintCount(int dischargeStatementId)
+        {
+            var dischargeStatement = _dischargeDbContext.DischargeStatements.FirstOrDefault(d => d.DischargeStatementId == dischargeStatementId);
+            if (dischargeStatement != null)
+            {
+                dischargeStatement.PrintCount++;
+                _dischargeDbContext.Entry(dischargeStatement).State = EntityState.Modified;
+                _dischargeDbContext.SaveChanges();
+                return dischargeStatement.PrintCount;
+            }
+            else
+            {
+                return null;
+            }
+        }
 
         [HttpGet]
         [Route("Statements")]
@@ -62,7 +158,7 @@ namespace DanpheEMR.Controllers.Billing
             Func<object> func = () => (from ds in _dischargeDbContext.DischargeStatements
                                        join pat in _dischargeDbContext.Patient on ds.PatientId equals pat.PatientId
                                        where DbFunctions.TruncateTime(ds.StatementDate) >= fromDate && DbFunctions.TruncateTime(ds.StatementDate) <= toDate
-                                       select new
+                                       select new DischargeStatementsDTO
                                        {
                                            PatientId = ds.PatientId,
                                            DischargeStatementId = ds.DischargeStatementId,
@@ -71,6 +167,8 @@ namespace DanpheEMR.Controllers.Billing
                                            PatientCode = pat.PatientCode,
                                            StatementDate = ds.StatementDate,
                                            StatemntTime = ds.StatementTime,
+                                           DateOfBirth = pat.DateOfBirth,
+                                           Gender = pat.Gender,
                                            AgeSex = pat.Age + "/" + pat.Gender,
                                            PhoneNo = pat.PhoneNumber,
                                            PatientVisitId = ds.PatientVisitId
@@ -83,9 +181,273 @@ namespace DanpheEMR.Controllers.Billing
         [Route("StatementInfo")]
         public IActionResult StatementInfo(int patientId, int dischargeStatementId, int patientVisitId)
         {
-            Func<object> func = () => DischargeDbContext.GetDischargeStatementInfo(patientId, dischargeStatementId, patientVisitId, _dischargeDbContext);
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+
+            Func<object> func = () => GetDischargeStatementInfo(patientId, dischargeStatementId, patientVisitId, _dischargeDbContext, currentUser);
             return InvokeHttpGetFunction(func);
         }
+
+        private object GetDischargeStatementInfo(int patientId, int dischargeStatementId, int patientVisitId, DischargeDbContext dischargeDbContext, RbacUser currentUser)
+        {
+            List<SqlParameter> paramList = new List<SqlParameter>() {
+                            new SqlParameter("@PatientId", patientId),
+                            new SqlParameter("@DischargeStatementId",dischargeStatementId),
+                            new SqlParameter("@PatientVisitId",patientVisitId),
+            };
+            DataSet dischargeStatementDetail = DALFunctions.GetDatasetFromStoredProc("SP_BIL_DischargeStatement", paramList, dischargeDbContext);
+
+            DataTable dtPatientInfo = dischargeStatementDetail.Tables[0];
+            DataTable dtBillingInvoiceInfo = dischargeStatementDetail.Tables[1];
+            DataTable dtBillingInvoiceItemInfo = dischargeStatementDetail.Tables[2];
+            DataTable dtVisitInfo = dischargeStatementDetail.Tables[3];
+            DataTable dtDepositInfo = dischargeStatementDetail.Tables[4];
+            DataTable dtPharmacyItemInfo = dischargeStatementDetail.Tables[5];
+            DataTable dtDischargeInfo = dischargeStatementDetail.Tables[6];
+            DataTable dtBillingInvoiceSummary = dischargeStatementDetail.Tables[7];
+            DataTable dtPharmacySummary = dischargeStatementDetail.Tables[8];
+
+
+            var PatientInfo = BilPrint_PatientInfoVM.MapDataTableToSingleObject(dtPatientInfo);
+            var InvoiceInfo = BilPrint_InvoiceInfoVM.MapDataTableToSingleObject(dtBillingInvoiceInfo);
+            var InvoiceItems = BilPrint_InvoiceItemVM.MapDataTableToObjectList(dtBillingInvoiceItemInfo);
+            var VisitInfo = BilPrint_VisitInfoVM.MapDataTableToSingleObject(dtVisitInfo);
+            var DepositList = BilPrint_DepositListVM.MapDataTableToObjectList(dtDepositInfo);
+            var PharmacyInvoiceItems = BilPrint_PharmacyItemVM.MapDataTableToObjectList(dtPharmacyItemInfo);
+            var DischargeInfo = BilPrint_DischargeStatementVM.MapDataTableToSingleObject(dtDischargeInfo);
+            var BillingInvoiceSummary = BilPrint_BillingInvoiceSummary.MapDataTableToObjectList(dtBillingInvoiceSummary);
+            var PharmacySummary = BilPrint_PharmacyInvoiceSummary.MapDataTableToObjectList(dtPharmacySummary);
+            var IsInvoiceFound = dtBillingInvoiceInfo.Rows.Count > 0 ? true : false;
+
+            var invoicePrintTemplate = GetPrintTempleteAndFormat(PatientInfo, InvoiceInfo, InvoiceItems, VisitInfo, DepositList, BillingInvoiceSummary, dischargeDbContext, "ip-discharge-summary", currentUser);
+            var invoicePrintTemplatesSummary = GetPrintTempleteAndFormat(PatientInfo, InvoiceInfo, InvoiceItems, VisitInfo, DepositList, BillingInvoiceSummary, dischargeDbContext, "ip-discharge-detail", currentUser);
+
+            var param = _dischargeDbContext.CFGParameters.FirstOrDefault(p => p.ParameterGroupName == "Common" && p.ParameterName == "UseDynamicInvoicePrint");
+            /*
+             [{"PrintType":"op-billing","Enable":true},{"PrintType":"ip-billing","Enable":true},{"PrintType":"ip-discharge","Enable":true},{"PrintType":"ip-discharge-summary","Enable":true},{"PrintType":"ip-discharge-detailed","Enable":false},{"PrintType":"provisional-invoice","Enable":true},{"PrintType":"return-invoice","Enable":true},{"PrintType":"ip-estimation-discharge-summary","Enable":false},{"PrintType":"ip-estimation-discharge-Details","Enable":false}]
+             */
+            var summaryViewEnabled = false;
+            var detailedViewEnabled = false;
+            if (param != null)
+            {
+                var parsedParameterValue = JsonConvert.DeserializeObject<List<PrintTemplateType>>(param.ParameterValue);
+                if (parsedParameterValue != null)
+                {
+                    if (parsedParameterValue.FirstOrDefault(p => p.PrintType == "ip-discharge-summary") != null && parsedParameterValue.FirstOrDefault(p => p.PrintType == "ip-discharge-summary").Enable)
+                    {
+                        summaryViewEnabled = parsedParameterValue.FirstOrDefault(p => p.PrintType == "ip-discharge-summary").Enable;
+
+                    }
+                    else if (parsedParameterValue.FirstOrDefault(p => p.PrintType == "ip-discharge-detailed") != null && parsedParameterValue.FirstOrDefault(p => p.PrintType == "ip-discharge-detailed").Enable)
+                    {
+                        detailedViewEnabled = parsedParameterValue.FirstOrDefault(p => p.PrintType == "ip-discharge-detailed").Enable;
+                    }
+                }
+            }
+
+
+            string[] receiptArray = { };
+            List<string> receiptList = new List<string>();
+            if (summaryViewEnabled)
+            {
+                receiptList.Add("ip-discharge-summary");
+
+            }
+            if (detailedViewEnabled)
+            {
+                receiptList.Add("ip-discharge-detailed");
+            }
+            if (summaryViewEnabled || detailedViewEnabled)
+            {
+                receiptArray = receiptList.ToArray();
+            }
+            InvoiceInfo.PrintTemplateType = JsonConvert.SerializeObject(receiptArray);
+
+            //group them in a new anonymous object and send to client.
+            var printInfoToReturn = new
+            {
+                PatientInfo = PatientInfo,
+                InvoiceInfo = InvoiceInfo,
+                InvoiceItems = InvoiceItems,
+                VisitInfo = VisitInfo,
+                DepositList = DepositList,
+                BillingInvoiceSummary = BillingInvoiceSummary,
+                IsInvoiceFound = IsInvoiceFound,//this flag decides whether or not to display in client side.
+                PharmacyInvoiceItems = PharmacyInvoiceItems,
+                PharmacySummary = PharmacySummary,
+                DischargeInfo = DischargeInfo,
+                InvoicePrintTemplate = invoicePrintTemplate,
+                InvoicePrintTemplateSummary = invoicePrintTemplatesSummary
+
+            };
+
+            printInfoToReturn.VisitInfo.ItemsRequestingDoctorsId = printInfoToReturn.InvoiceItems.Select(s => s.RequestedBy).Distinct().ToList();
+            printInfoToReturn.VisitInfo.ItemsRequestingDoctors = String.Join(",", printInfoToReturn.InvoiceItems.Where(d => (d.RequestedBy > 0)).Select(s => s.RequestedByName).Distinct());
+
+            return printInfoToReturn;
+        }
+
+        private static string GetPrintTempleteAndFormat(BilPrint_PatientInfoVM PatientInfo, BilPrint_InvoiceInfoVM InvoiceInfo, List<BilPrint_InvoiceItemVM> InvoiceItems, BilPrint_VisitInfoVM VisitInfo, List<BilPrint_DepositListVM> DepositList, List<BilPrint_BillingInvoiceSummary> BillingInvoiceSummary, DischargeDbContext dischargeDbContext, string PrintType, RbacUser currentUser)
+        {
+            var transactionType = InvoiceInfo.TransactionType;
+            var invoiceTypeDetail = InvoiceInfo.InvoiceType;
+            var invoicePrintTemplate = dischargeDbContext.PrintTemplateSettings
+                                                   .FirstOrDefault(p => p.PrintType == PrintType
+                                                                   && p.FieldSettingsName == (InvoiceInfo.FieldSettingParamName !=null? InvoiceInfo.FieldSettingParamName : "General")
+                                                                   && p.VisitType == "IPD");
+            if (invoicePrintTemplate == null)
+            {
+                invoicePrintTemplate = dischargeDbContext.PrintTemplateSettings
+                                                       .FirstOrDefault(p => p.PrintType == PrintType
+                                                                       && p.FieldSettingsName == "General"
+                                                                       && p.VisitType == "IPD");
+            }
+
+            // StringBuilder detailsTemplate = new StringBuilder();
+            StringBuilder tempDetailsTemplate = new StringBuilder();
+            StringBuilder printDetailsTemplate = new StringBuilder();
+            int InvoiceItemSn = 0;
+            //  detailsTemplate = detailsTemplate.Append(invoicePrintTemplate.PrintTemplateDetailsFormat);
+
+            StringBuilder template = new StringBuilder();
+
+            if (invoicePrintTemplate != null)
+            {
+
+                template.Append(invoicePrintTemplate.PrintTemplateMainFormat);
+                //template.Replace("{image}",)
+
+                //current logged in user
+                template.Replace("{CurrentUser}", currentUser.UserName);
+
+                //PatientInfo Details
+                template.Replace("{PatientCode}", PatientInfo.PatientCode.ToString());
+                template.Replace("{ShortName}", PatientInfo.ShortName.ToString());
+                template.Replace("{PhoneNumber}", PatientInfo.PhoneNumber != null ? PatientInfo.PhoneNumber.ToString() : "");
+                template.Replace("{FullAddress}", PatientInfo.CountrySubDivisionName != null ? PatientInfo.CountrySubDivisionName.ToString() : "");
+                template.Replace("{District}", PatientInfo.CountrySubDivisionName != null ? PatientInfo.CountrySubDivisionName.ToString() : "");
+                template.Replace("{Country}", PatientInfo.CountryName != null ? PatientInfo.CountryName.ToString() : "");
+                template.Replace("{Municipality}", PatientInfo.MunicipalityName != null ? PatientInfo.MunicipalityName.ToString() : "");
+                template.Replace("{Address}", PatientInfo.Address != null ? PatientInfo.Address.ToString() : "");
+                template.Replace("{Ward}", PatientInfo.WardNumber != null ? PatientInfo.WardNumber.ToString() : "");
+                template.Replace("{CountrySubDivisionName}", PatientInfo.CountrySubDivisionName != null ? PatientInfo.CountrySubDivisionName.ToString() : "");
+                template.Replace("{PolicyNo}", PatientInfo.PolicyNo != null ? PatientInfo.PolicyNo.ToString() : "");
+                template.Replace("{finalAge}", PatientInfo.AgeFormatted != null ? PatientInfo.AgeFormatted.ToString() : "");
+                //template.Replace("{finalAge}", PatientInfo.Age != null ? PatientInfo.Age.ToString() : "");
+
+
+
+                //InvoiceInfo Details
+                template.Replace("{InvoiceNumFormatted}", InvoiceInfo.InvoiceNumFormatted != null ? InvoiceInfo.InvoiceNumFormatted.ToString() : "");
+                template.Replace("{SchemeName}", InvoiceInfo.SchemeName != null ? InvoiceInfo.SchemeName.ToString() : "");
+                template.Replace("{Change}", InvoiceInfo.Change != null ? InvoiceInfo.Change.ToString() : "");
+                template.Replace("{PackageName}", InvoiceInfo.PackageName != null ? InvoiceInfo.PackageName.ToString() : "");
+                template.Replace("{ClaimCode}", InvoiceInfo.ClaimCode != null ? InvoiceInfo.ClaimCode.ToString() : "");
+                template.Replace("{PaymentMode}", InvoiceInfo.PaymentMode != null ? InvoiceInfo.PaymentMode.ToString() : "");
+                template.Replace("{Tender}", InvoiceInfo.Tender != null ? InvoiceInfo.Tender.ToString() : "");
+                template.Replace("{ChangeAmount}", InvoiceInfo.Tender != null ? (InvoiceInfo.Tender - InvoiceInfo.TotalAmount).ToString() : "");
+                template.Replace("{Remarks}", InvoiceInfo.Remarks != null ? InvoiceInfo.Remarks.ToString() : "");
+                template.Replace("{UserName}", InvoiceInfo.UserName != null ? InvoiceInfo.UserName.ToString() : "");
+                template.Replace("{SubTotal}", InvoiceInfo.SubTotal != null ? InvoiceInfo.SubTotal.ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{DiscountAmount}", InvoiceInfo.DiscountAmount != null ? InvoiceInfo.DiscountAmount.ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{TotalAmount}", InvoiceInfo.TotalAmount != null ? InvoiceInfo.TotalAmount.ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{CreditOrganizationName}", InvoiceInfo.CreditOrganizationName != null ? InvoiceInfo.CreditOrganizationName.ToString() : "");
+                template.Replace("{Invoice_Label}", BillingInvoiceService.InvoiceLebelDetailGenerate(InvoiceInfo.IsInsuranceBilling, InvoiceInfo.PrintCount).ToString());
+                template.Replace("{TotalAmountInWords}", BillingInvoiceService.ConvertNumbersInWords((decimal)InvoiceInfo.TotalAmount).ToUpper());
+                template.Replace("{time}", BillingInvoiceService.Transform(InvoiceInfo.TransactionDate.Value.ToString("HH:mm:ss"), "format-time", ""));
+                template.Replace("{PaymentDetails}", InvoiceInfo.PaymentDetails != null ? InvoiceInfo.PaymentDetails.ToString() : "");
+                decimal totalAmount = (decimal)InvoiceInfo.TotalAmount;
+                decimal creditAmount = totalAmount - InvoiceInfo.ReceivedAmount;
+                template.Replace("{CreditAmount}", InvoiceInfo.TotalAmount != null ? creditAmount.ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{ReceivedAmount}", InvoiceInfo.ReceivedAmount != null ? InvoiceInfo.ReceivedAmount.ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{DepositAvailable}", InvoiceInfo.DepositAvailable != null ? InvoiceInfo.DepositAvailable.ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{PaidAmount}", InvoiceInfo.TotalAmount != null ? (InvoiceInfo.TotalAmount - InvoiceInfo.DepositAvailable).ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{ToBePaid}", InvoiceInfo.TotalAmount != null ? (InvoiceInfo.TotalAmount - InvoiceInfo.DepositAvailable).ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{ToBeReturned}", InvoiceInfo.DepositAvailable != null ? (InvoiceInfo.DepositAvailable - InvoiceInfo.TotalAmount).ToString("F2", CultureInfo.InvariantCulture) : "");
+                template.Replace("{DepositReturnAmount}", InvoiceInfo.DepositReturnAmount != null ? InvoiceInfo.DepositReturnAmount.ToString("F2", CultureInfo.InvariantCulture) : "");
+
+                var localDate = DanpheDateConvertor.ConvertEngToNepDate(DateTime.Now);
+                string localDateString = localDate != null ? localDate.Year + "-" + localDate.Month + "-" + localDate.Day : "";
+                template.Replace("{PrintTime}", DateTime.Now.ToString("HH:mm"));
+                template.Replace("{PrintDate}", DateTime.Now.ToString("yyyy-MM-dd"));
+                template.Replace("{PrintDateBs}", localDateString);
+
+
+
+                //VisitInfo  Details
+                if (VisitInfo.AdmissionDate != null)
+                {
+                    var localAdmissionDate = DanpheDateConvertor.ConvertEngToNepDate(VisitInfo.AdmissionDate.Value);
+                    string localAdmissionDateString = localAdmissionDate != null ? localAdmissionDate.Year + "-" + localAdmissionDate.Month + "-" + localAdmissionDate.Day : "";
+                    template.Replace("{AdmissionDate}", VisitInfo.AdmissionDate!=null?VisitInfo.AdmissionDate.Value.ToString("yyyy-MM-dd") : "");
+                    template.Replace("{AdmissionDateBs}", localAdmissionDateString);
+                    var localDischargeDate = DanpheDateConvertor.ConvertEngToNepDate(VisitInfo.DischargeDate.Value);
+                    string localDischargeDateString = localDischargeDate != null ? localAdmissionDate.Year + "-" + localAdmissionDate.Month + "-" + localAdmissionDate.Day : "";
+                    template.Replace("{DischargeDateBs}", localDischargeDateString);
+                    template.Replace("{DischargeDate}", VisitInfo.DischargeDate.Value!=null ? VisitInfo.DischargeDate.Value.ToString("yyyy-MM-dd"):"");
+                }
+
+                template.Replace("{WardName}", VisitInfo.WardName != null ? VisitInfo.WardName.ToString() : "");
+                template.Replace("{DepartmentName}", VisitInfo.DepartmentName != null ? VisitInfo.DepartmentName.ToString() : "");
+                template.Replace("{TransactionDate}", InvoiceInfo.TransactionDate != null ? InvoiceInfo.TransactionDate.Value.ToString("yyyy-MM-dd") : "");
+
+                var transactionDate = DanpheDateConvertor.ConvertEngToNepDate(InvoiceInfo.TransactionDate.Value);
+                string transactionDateString = transactionDate != null ? transactionDate.Year + "-" + transactionDate.Month + "-" + transactionDate.Day : "";
+                template.Replace("{TransactionDateBs}", transactionDateString);
+                template.Replace("{ConsultingDoctor}", VisitInfo.ConsultingDoctor != null ? VisitInfo.ConsultingDoctor.ToString() : "");
+                template.Replace("{ipdNumber}", VisitInfo.VisitCode != null ? VisitInfo.VisitCode.ToString() : "");
+
+
+                //InvoiceItems Details
+                template.Replace("{RequestedByName}}", InvoiceItems[0].RequestedByName != null ? InvoiceItems[0].RequestedByName.ToString() : "");
+
+
+                if (PrintType == "ip-discharge-summary")
+                {
+                    var rawHtmlDetails = invoicePrintTemplate.PrintTemplateDetailsFormat;
+                    var arrayOfHtmlDetails = rawHtmlDetails.Split('|');
+                    foreach (var invoiceSummary in BillingInvoiceSummary)
+                    {
+                        InvoiceItemSn = InvoiceItemSn + 1;
+                        tempDetailsTemplate = new StringBuilder(invoicePrintTemplate.PrintTemplateDetailsFormat);
+                        tempDetailsTemplate.Replace("{SN}", InvoiceItemSn.ToString());
+                        tempDetailsTemplate.Replace("{GroupName}", invoiceSummary.GroupName.ToString());
+                        tempDetailsTemplate.Replace("{SubTotal}", invoiceSummary.SubTotal.ToString());
+                        tempDetailsTemplate.Replace("{TotalAmount}", invoiceSummary.TotalAmount.ToString());
+                        printDetailsTemplate.Append(tempDetailsTemplate);
+                    }
+                }
+                else
+                {
+                    var rawHtmlDetails = invoicePrintTemplate.PrintTemplateDetailsFormat;
+                    var arrayOfHtmlDetails = rawHtmlDetails.Split('|');
+                    foreach (var invoiceItem in InvoiceItems)
+                    {
+                        InvoiceItemSn = InvoiceItemSn + 1;
+                        tempDetailsTemplate = new StringBuilder(invoicePrintTemplate.PrintTemplateDetailsFormat);
+
+                        tempDetailsTemplate.Replace("{SN}", InvoiceItemSn.ToString());
+                        tempDetailsTemplate.Replace("{BillDate}", invoiceItem.BillDate.ToString());
+                        var billDate= DanpheDateConvertor.ConvertEngToNepDate(invoiceItem.BillDate.Value);
+                        string billdateDateString = billDate != null ? billDate.Year + "-" + billDate.Month + "-" + billDate.Day : "";
+                        tempDetailsTemplate.Replace("{BillDateBs}", billdateDateString);
+                        tempDetailsTemplate.Replace("{ItemCode}", invoiceItem.ItemCode ?? "".ToString());
+                        tempDetailsTemplate.Replace("{ItemName}", invoiceItem.ItemName.ToString());
+                        tempDetailsTemplate.Replace("{Quantity}", invoiceItem.Quantity.ToString());
+                        tempDetailsTemplate.Replace("{Price}", invoiceItem.Price.ToString());
+                        tempDetailsTemplate.Replace("{SubTotal}", invoiceItem.SubTotal.ToString());
+                        tempDetailsTemplate.Replace("{DiscountAmount}", invoiceItem.DiscountAmount.ToString());
+                        tempDetailsTemplate.Replace("{TotalAmount}", invoiceItem.TotalAmount.ToString());
+                        printDetailsTemplate.Append(tempDetailsTemplate);
+                    }
+                }
+
+                template.Replace("{InvoiceDetails}", printDetailsTemplate.ToString());
+            }
+            return template.ToString();
+
+
+        }
+
 
         [HttpGet]
         [Route("SummaryInfo")]
@@ -132,10 +494,10 @@ namespace DanpheEMR.Controllers.Billing
 
                     dischargeTransactionScope.Commit();
 
-                    return new 
+                    return new
                     {
                         DischargeStatementId = dischargeStatement.DischargeStatementId,
-                        PatientId = ipBillingTxnVM.billingTransactionModel.PatientId, 
+                        PatientId = ipBillingTxnVM.billingTransactionModel.PatientId,
                         PatientVisitId = dischargeStatement.PatientVisitId
                     };
                 }
@@ -144,7 +506,7 @@ namespace DanpheEMR.Controllers.Billing
                     dischargeTransactionScope.Rollback();
                     throw new Exception(ex.Message + " exception details:" + ex.ToString());
                 }
-            }            
+            }
         }
 
         private void UpdatePharmacyInvoiceItemsWithDischargeStatementId(int patientId, int patientVisitId, int dischargeStatementId)
@@ -155,7 +517,7 @@ namespace DanpheEMR.Controllers.Billing
             {
                 pharmacyCreditInvoiceDetails.ForEach(a =>
                 {
-                   
+
                     var InvoiceDetails = _dischargeDbContext.PHRMInvoiceTransaction.Include(inv => inv.InvoiceItems).Where(inv => inv.InvoiceId == a.InvoiceId).FirstOrDefault();
                     if (InvoiceDetails != null)
                     {
@@ -172,7 +534,7 @@ namespace DanpheEMR.Controllers.Billing
             }
         }
 
-        
+
         private void SettlePharmacyCreditInvoices(int PatientId, int PatientVisitId, int DischargeStatementId, int FiscalYearId, RbacUser currentUser, int CounterId)
         {
             var pharmacyCreditInvoiceDetails = GetPharmacyCreditInvoiceDetails(PatientId, PatientVisitId);
@@ -532,7 +894,7 @@ namespace DanpheEMR.Controllers.Billing
                         });
                     }
 
-                    
+
 
                     var allPatientBedInfos = dischargeDbContext.PatientBedInfos.Where(a => a.PatientVisitId == billTransaction.PatientVisitId
                                                                                     && a.IsActive == true).OrderByDescending(b => b.PatientBedInfoId)
@@ -565,7 +927,9 @@ namespace DanpheEMR.Controllers.Billing
                     }
                     //Sud:23Dec'18--making parallel thread call (asynchronous) to post to IRD. so that it won't stop the normal execution of logic.
 
-                    Task.Run(() => SyncBillToRemoteServer(billTransaction, "sales", dischargeDbContext));
+                    //Task.Run(() => SyncBillToRemoteServer(billTransaction, "sales", dischargeDbContext));
+                    BillingDbContext billingDbContext = new BillingDbContext(connString);
+                    Task.Run(() => BillingBL.SyncBillToRemoteServer(billTransaction, "sales", billingDbContext));
 
                 }
 
@@ -573,9 +937,10 @@ namespace DanpheEMR.Controllers.Billing
                 var patientSchemes = dischargeDbContext.PatientSchemes.Where(a => a.SchemeId == billTransaction.SchemeId && a.PatientId == billTransaction.PatientId).FirstOrDefault();
                 if (patientSchemes != null)
                 {
-                    int priceCategoryId = billTransaction.BillingTransactionItems[0].PriceCategoryId;
-                    var priceCategory = dischargeDbContext.PriceCategories.Where(a => a.PriceCategoryId == priceCategoryId).FirstOrDefault();
-                    if (priceCategory != null && priceCategory.PriceCategoryName.ToLower() == "ssf" && RealTimeSSFClaimBooking)
+                    //int priceCategoryId = billTransaction.BillingTransactionItems[0].PriceCategoryId;
+                    //var priceCategory = dischargeDbContext.PriceCategories.Where(a => a.PriceCategoryId == priceCategoryId).FirstOrDefault();
+                    var scheme = dischargeDbContext.BillingSchemes.FirstOrDefault(s => s.SchemeId == patientSchemes.SchemeId);
+                    if (scheme != null && scheme.ApiIntegrationName != null && scheme.ApiIntegrationName.ToLower() == "ssf")
                     {
                         //making parallel thread call (asynchronous) to post to SSF Server. so that it won't stop the normal BillingFlow.
                         SSFDbContext ssfDbContext = new SSFDbContext(connString);
@@ -583,12 +948,13 @@ namespace DanpheEMR.Controllers.Billing
                         {
                             InvoiceNoFormatted = $"BL{billTransaction.InvoiceNo}",
                             TotalAmount = (decimal)billTransaction.TotalAmount,
-                            ClaimCode = (long)billTransaction.ClaimCode
+                            ClaimCode = (long)billTransaction.ClaimCode,
+                            VisitType = billTransaction.TransactionType
                         };
 
                         SSF_ClaimBookingService_DTO claimBooking = SSF_ClaimBookingService_DTO.GetMappedToBookClaim(billObj, patientSchemes);
 
-                        Task.Run(() => BillingBL.SyncToSSFServer(claimBooking, "billing", ssfDbContext, patientSchemes, currentUser));
+                        Task.Run(() => BillingBL.SyncToSSFServer(claimBooking, "billing", ssfDbContext, patientSchemes, currentUser, RealTimeSSFClaimBooking));
                     }
                 }
             }
@@ -719,9 +1085,9 @@ namespace DanpheEMR.Controllers.Billing
         private int GetFiscalYear(DischargeDbContext dischargeDbContext)
         {
             DateTime currentDate = DateTime.Now.Date;
-            var FiscalYear =  dischargeDbContext.BillingFiscalYears.Where(fsc => fsc.StartYear <= currentDate && fsc.EndYear >= currentDate).FirstOrDefault();
+            var FiscalYear = dischargeDbContext.BillingFiscalYears.Where(fsc => fsc.StartYear <= currentDate && fsc.EndYear >= currentDate).FirstOrDefault();
             int fiscalYearId = 0;
-            if(FiscalYear != null)
+            if (FiscalYear != null)
             {
                 fiscalYearId = FiscalYear.FiscalYearId;
             }
@@ -1431,12 +1797,12 @@ namespace DanpheEMR.Controllers.Billing
             //using (new TransactionScope(TransactionScopeOption.Required, new TransactionOptions { IsolationLevel = IsolationLevel.ReadUncommitted }))
             //{
             //}
-                int fiscalYearId = GetFiscalYear(dischargeDbContext);
-                int? receiptNo = (from depTxn in dischargeDbContext.BillingDeposits
-                                  where depTxn.FiscalYearId == fiscalYearId
-                                  select depTxn.ReceiptNo).DefaultIfEmpty(0).Max();
+            int fiscalYearId = GetFiscalYear(dischargeDbContext);
+            int? receiptNo = (from depTxn in dischargeDbContext.BillingDeposits
+                              where depTxn.FiscalYearId == fiscalYearId
+                              select depTxn.ReceiptNo).DefaultIfEmpty(0).Max();
 
-                return receiptNo + 1;
+            return receiptNo + 1;
         }
 
         private static void AddEmpCashTransaction(DischargeDbContext dbContext, EmpCashTransactionModel empCashTransaction)
@@ -1557,133 +1923,6 @@ namespace DanpheEMR.Controllers.Billing
             return billItem;
         }
 
-        private void SyncBillToRemoteServer(object billToPost, string billType, DischargeDbContext dbContext)
-        {
-            IRDLogModel irdLog = new IRDLogModel();
-            if (billType == "sales")
-            {
-
-                string responseMsg = null;
-                BillingTransactionModel billTxn = (BillingTransactionModel)billToPost;
-                try
-                {
-                    IRD_BillViewModel bill = IRD_BillViewModel.GetMappedSalesBillForIRD(billTxn, true);
-                    irdLog.JsonData = JsonConvert.SerializeObject(bill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesBillToIRD(bill);
-                }
-                catch (Exception ex)
-                {
-                    responseMsg = "0";
-                    irdLog.ErrorMessage = GetInnerMostException(ex);
-                    irdLog.Status = "failed";
-                }
-
-                dbContext.BillingTransactions.Attach(billTxn);
-                if (responseMsg == "200")
-                {
-                    billTxn.IsRealtime = true;
-                    billTxn.IsRemoteSynced = true;
-                    irdLog.Status = "success";
-                }
-                else
-                {
-                    billTxn.IsRealtime = false;
-                    billTxn.IsRemoteSynced = false;
-                    irdLog.Status = "failed";
-                }
-
-                dbContext.Entry(billTxn).Property(x => x.IsRealtime).IsModified = true;
-                dbContext.Entry(billTxn).Property(x => x.IsRemoteSynced).IsModified = true;
-                dbContext.SaveChanges();
-
-                irdLog.BillType = "billing-" + billType;
-                irdLog.ResponseMessage = responseMsg;
-                PostIRDLog(irdLog, dbContext);
-            }
-            else if (billType == "sales-return")
-            {
-                BillInvoiceReturnModel billRet = (BillInvoiceReturnModel)billToPost;
-
-                string responseMsg = null;
-                try
-                {
-                    IRD_BillReturnViewModel salesRetBill = IRD_BillReturnViewModel.GetMappedSalesReturnBillForIRD(billRet, true);
-                    irdLog.JsonData = JsonConvert.SerializeObject(salesRetBill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesReturnBillToIRD(salesRetBill);
-                }
-                catch (Exception ex)
-                {
-                    responseMsg = "0";
-                    irdLog.ErrorMessage = GetInnerMostException(ex);
-                    irdLog.Status = "failed";
-                }
-
-                dbContext.BillInvoiceReturns.Attach(billRet);
-                if (responseMsg == "200")
-                {
-                    billRet.IsRealtime = true;
-                    billRet.IsRemoteSynced = true;
-                    irdLog.Status = "success";
-                }
-                else
-                {
-                    billRet.IsRealtime = false;
-                    billRet.IsRemoteSynced = false;
-                    irdLog.Status = "failed";
-                }
-
-                dbContext.Entry(billRet).Property(x => x.IsRealtime).IsModified = true;
-                dbContext.Entry(billRet).Property(x => x.IsRemoteSynced).IsModified = true;
-                dbContext.SaveChanges();
-                irdLog.BillType = "billing-" + billType;
-                irdLog.ResponseMessage = responseMsg;
-                PostIRDLog(irdLog, dbContext);
-            }
-        }
-
-        //this function post IRD posting log details to Danphe IRD_Log table
-        private void PostIRDLog(IRDLogModel irdLogdata, DischargeDbContext dbContext)
-        {
-            try
-            {
-                irdLogdata.CreatedOn = DateTime.Now;
-
-                string url_IRDNepal = ConfigurationManager.AppSettings["url_IRDNepal"];
-                switch (irdLogdata.BillType)
-                {
-                    case "billing-sales":
-                        {
-                            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesIRDNepal"];
-                            irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesIRDNepal;
-                            break;
-                        }
-                    case "billing-sales-return":
-                        {
-                            string api_SalesReturnIRDNepal = ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
-                            irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesReturnIRDNepal;
-                            break;
-                        }
-                }
-                dbContext.IRDLog.Add(irdLogdata);
-                dbContext.SaveChanges();
-            }
-            catch (Exception ex)
-            {
-
-            }
-        }
-
-        //method to return inner most exception 
-        private string GetInnerMostException(Exception ex)
-        {
-            Exception currentEx = ex;
-            while (currentEx.InnerException != null)
-            {
-                currentEx = currentEx.InnerException;
-            }
-            return currentEx.Message;
-        }
-
         private int? GetProvisionalReceiptNo(DischargeDbContext dischargeDbContext)
         {
             int fiscalYearId = GetFiscalYear(dischargeDbContext);
@@ -1693,400 +1932,19 @@ namespace DanpheEMR.Controllers.Billing
 
             return receiptNo + 1;
         }
-
-
-        private object SaveFinalInvoiceOfPharmacyProvisionalAndDischarge(List<PharmacyPendingBillItem> phrmPendingInvoiceItems, RbacUser currentUser, int? DischargeStatementId, int SchemeId, DischargeDbContext dischargeDbContext)
-        {
-
-            PHRMInvoiceTransactionModel invoiceObjFromClient = new PHRMInvoiceTransactionModel();
-            List<PHRMInvoiceTransactionItemsModel> invoiceItems = new List<PHRMInvoiceTransactionItemsModel>();
-
-            try
-            {
-                var currFiscalYearId = GetFiscalYear(dischargeDbContext);
-                var currentDate = DateTime.Now;
-
-                var InvoiceItemIds = phrmPendingInvoiceItems.Select(a => a.InvoiceItemId).ToList();
-
-                invoiceObjFromClient.InvoiceItems = dischargeDbContext.PHRMInvoiceTransactionItems.Where(invtxn => InvoiceItemIds.Contains(invtxn.InvoiceItemId)).ToList();
-
-                invoiceObjFromClient.InvoiceItems.ForEach(itm => itm.DischargeStatementId = DischargeStatementId);
-
-                List<PHRMInvoiceTransactionItemsModel> invoiceItemsFromClient = invoiceObjFromClient.InvoiceItems;
-
-                SaveInvoice(phrmPendingInvoiceItems, currentUser, invoiceObjFromClient, currFiscalYearId, currentDate, invoiceItemsFromClient, SchemeId, dischargeDbContext);
-
-                SaveInvoiceItems(currentUser, dischargeDbContext, invoiceObjFromClient, currFiscalYearId, currentDate, invoiceItemsFromClient);
-
-                invoiceObjFromClient.InvoiceItems = invoiceItemsFromClient;
-
-                invoiceObjFromClient = PostToIRD(dischargeDbContext, invoiceObjFromClient);
-
-                return invoiceObjFromClient;
-
-            }
-
-            catch (Exception ex)
-            {
-                throw new Exception("Invoice details is null or failed to Save. Exception Detail: " + ex.Message.ToString());
-            }
-
-        }
-
-        private PHRMInvoiceTransactionModel PostToIRD(DischargeDbContext dischargeDbContext, PHRMInvoiceTransactionModel invoiceObjFromClient)
-        {
-            if (realTimeRemoteSyncEnabled)
-            {
-                if (invoiceObjFromClient.IsRealtime == null)
-                {
-                    PHRMInvoiceTransactionModel invoiceSale = dischargeDbContext.PHRMInvoiceTransaction.Where(p => p.InvoiceId == invoiceObjFromClient.InvoiceId).FirstOrDefault();
-                    invoiceObjFromClient = invoiceSale;
-                }
-                if (invoiceObjFromClient.IsReturn == null)
-                {
-                    //Sud:24Dec'18--making parallel thread call (asynchronous) to post to IRD. so that it won't stop the normal execution of logic.
-                    Task.Run(() => SyncPHRMBillInvoiceToRemoteServer(invoiceObjFromClient, "phrm-invoice", dischargeDbContext));
-                }
-            }
-
-            return invoiceObjFromClient;
-        }
-
-        private void SaveInvoiceItems(RbacUser currentUser, DischargeDbContext dischargeDbContext, PHRMInvoiceTransactionModel invoiceObjFromClient, int currFiscalYearId, DateTime currentDate, List<PHRMInvoiceTransactionItemsModel> invoiceItemsFromClient)
-        {
-            PHRMInvoiceTransactionItemsModel itemFromServer = new PHRMInvoiceTransactionItemsModel();
-            foreach (PHRMInvoiceTransactionItemsModel itmFromClient in invoiceItemsFromClient)
-            {
-                itemFromServer = dischargeDbContext.PHRMInvoiceTransactionItems.Where(itm => itm.InvoiceItemId == itmFromClient.InvoiceItemId).FirstOrDefault();
-                if (itemFromServer != null)
-                {
-                    itemFromServer.InvoiceId = invoiceObjFromClient.InvoiceId;
-
-                    if (invoiceObjFromClient.PaymentMode == ENUM_BillPaymentMode.cash)
-                    {
-                        itemFromServer.BilItemStatus = ENUM_PHRM_InvoiceItemBillStatus.Paid;
-                    }
-                    else
-                    {
-                        itemFromServer.BilItemStatus = ENUM_PHRM_InvoiceItemBillStatus.Unpaid;
-                    }
-
-                    //To update the Discount Percentage and totalDisAmount if changes comes from frontend
-                    itemFromServer.Quantity = itmFromClient.Quantity;
-                    itemFromServer.SubTotal = itmFromClient.SubTotal;
-                    itemFromServer.DiscountPercentage = itmFromClient.DiscountPercentage;
-                    itemFromServer.TotalDisAmt = itmFromClient.TotalDisAmt;
-                    itemFromServer.VATAmount = itmFromClient.VATAmount;
-                    itemFromServer.TotalAmount = itmFromClient.TotalAmount;
-                    itemFromServer.DischargeStatementId = itmFromClient.DischargeStatementId;
-                    dischargeDbContext.SaveChanges();
-
-
-                    //to update client side
-                    if (invoiceObjFromClient.PaymentMode == ENUM_BillPaymentMode.cash)
-                    {
-                        itmFromClient.BilItemStatus = ENUM_PHRM_InvoiceItemBillStatus.Paid;
-                    }
-                    else
-                    {
-                        itmFromClient.BilItemStatus = ENUM_PHRM_InvoiceItemBillStatus.Unpaid;
-                    }
-                    itmFromClient.InvoiceId = itemFromServer.InvoiceId;
-
-                }
-
-                UpdateStock(currentUser, currFiscalYearId, currentDate, itemFromServer, itmFromClient, dischargeDbContext);
-            }
-        }
-
-
-        private void UpdateStock(RbacUser currentUser, int currFiscalYearId, DateTime currentDate, PHRMInvoiceTransactionItemsModel itemFromServer, PHRMInvoiceTransactionItemsModel itmFromClient, DischargeDbContext dischargeDbContext)
-        {
-            var provisionalSaleTxn = ENUM_PHRM_StockTransactionType.ProvisionalSaleItem;
-            var provisionalCancelTxn = ENUM_PHRM_StockTransactionType.ProvisionalCancelItem;
-            // find the total sold stock, substract with total returned stock
-            var allStockTxnsForThisInvoiceItem = dischargeDbContext.StockTransactions
-                                                            .Where(s => (s.ReferenceNo == itemFromServer.InvoiceItemId && s.TransactionType == provisionalSaleTxn)
-                                                            || (s.ReferenceNo == itemFromServer.InvoiceItemId && s.TransactionType == provisionalCancelTxn)).ToList();
-
-            // if-guard
-            // the provToSale Qty must be equal to the (outQty-inQty) of the stock transactions, otherwise, there might be an issue
-            var provToSaleQtyForThisInvoice = allStockTxnsForThisInvoiceItem.Sum(s => s.OutQty - s.InQty);
-            if (itmFromClient.Quantity != provToSaleQtyForThisInvoice)
-                throw new InvalidOperationException($"Failed. Item: {itmFromClient.ItemName} with Batch: {itmFromClient.BatchNo} has quantity mismatch. ");
-            // Find the stock that was sold
-            var storeStockIdList = allStockTxnsForThisInvoiceItem.Select(s => s.StoreStockId).Distinct().ToList();
-            var soldByStoreId = allStockTxnsForThisInvoiceItem[0].StoreId;
-            var storeStockList = dischargeDbContext.StoreStocks.Include(s => s.StockMaster).Where(s => storeStockIdList.Contains((int)s.StoreStockId) && s.StoreId == soldByStoreId).ToList();
-
-            foreach (var storeStock in storeStockList)
-            {
-                // add a provisional-to-sale stock transaction with quantity = (sold qty - previously returned qty)
-                var provToSaleQty = allStockTxnsForThisInvoiceItem.Where(s => s.StoreStockId == storeStock.StoreStockId).Sum(s => s.OutQty - s.InQty);
-                if (provToSaleQty == 0) // by pass the same stock with same StockId with same batch and Expiry and SalePrice ie (that item is prov sale and return already);
-                {
-                    continue;
-                }
-
-                var provToSaleTxn = new PHRMStockTransactionModel(
-                                           storeStock: storeStock,
-                                           transactionType: ENUM_PHRM_StockTransactionType.ProvisionalToSale,
-                                           transactionDate: currentDate,
-                                           referenceNo: itemFromServer.InvoiceItemId,
-                                           createdBy: currentUser.EmployeeId,
-                                           createdOn: currentDate,
-                                           fiscalYearId: currFiscalYearId
-                                           );
-                provToSaleTxn.SetInOutQuantity(inQty: provToSaleQty, outQty: 0);
-
-                // add a sale-item stock transaction with quantity = (sold qty - previously returned qty)
-                var SaleTxn = new PHRMStockTransactionModel(
-                                           storeStock: storeStock,
-                                           transactionType: ENUM_PHRM_StockTransactionType.SaleItem,
-                                           transactionDate: currentDate,
-                                           referenceNo: itemFromServer.InvoiceItemId,
-                                           createdBy: currentUser.EmployeeId,
-                                           createdOn: currentDate,
-                                           fiscalYearId: currFiscalYearId
-                                           );
-                SaleTxn.SetInOutQuantity(inQty: 0, outQty: provToSaleQty);
-                // add to db
-                dischargeDbContext.StockTransactions.Add(provToSaleTxn);
-                dischargeDbContext.StockTransactions.Add(SaleTxn);
-            }
-            dischargeDbContext.SaveChanges();
-        }
-
-        private void SaveInvoice(List<PharmacyPendingBillItem> phrmPendingInvoiceItems, RbacUser currentUser, PHRMInvoiceTransactionModel invoiceObjFromClient, int currFiscalYearId, DateTime currentDate, List<PHRMInvoiceTransactionItemsModel> invoiceItemsFromClient, int SchemeId, DischargeDbContext dischargeDbContext)
-        {
-            try
-            {
-                invoiceObjFromClient.InvoiceItems = null;
-                invoiceObjFromClient.IsOutdoorPat = false;
-                invoiceObjFromClient.PatientId = dischargeDbContext.PHRMInvoiceTransactionItems.Find(invoiceItemsFromClient[0].InvoiceItemId).PatientId;
-                invoiceObjFromClient.CreateOn = currentDate;
-                invoiceObjFromClient.CreatedBy = currentUser.EmployeeId;
-                invoiceObjFromClient.InvoicePrintId = GetPharmacyInvoiceNumber(dischargeDbContext);
-                invoiceObjFromClient.FiscalYearId = currFiscalYearId;
-                invoiceObjFromClient.BilStatus = invoiceObjFromClient.PaymentMode == ENUM_BillPaymentMode.credit ? ENUM_BillingStatus.unpaid : ENUM_BillingStatus.paid;
-                invoiceObjFromClient.TotalAmount = (decimal)invoiceItemsFromClient.Sum(a => a.TotalAmount);
-                invoiceObjFromClient.SubTotal = (decimal)invoiceItemsFromClient.Sum(a => a.SubTotal);
-                invoiceObjFromClient.DiscountAmount = (decimal)invoiceItemsFromClient.Sum(a => a.TotalDisAmt);
-                invoiceObjFromClient.StoreId = invoiceItemsFromClient.FirstOrDefault().StoreId;
-                invoiceObjFromClient.CounterId = (int)invoiceItemsFromClient.FirstOrDefault().CounterId;
-                invoiceObjFromClient.PatientVisitId = phrmPendingInvoiceItems.FirstOrDefault().PatientVisitId;
-                invoiceObjFromClient.PrescriberId = phrmPendingInvoiceItems.FirstOrDefault().PrescriberId;
-                invoiceObjFromClient.VisitType = invoiceItemsFromClient.FirstOrDefault().VisitType;
-                invoiceObjFromClient.PaidDate = currentDate;
-                invoiceObjFromClient.PaymentMode = ENUM_BillPaymentMode.cash;
-                invoiceObjFromClient.PaidAmount = invoiceObjFromClient.TotalAmount;
-                invoiceObjFromClient.Tender = invoiceObjFromClient.TotalAmount;
-                invoiceObjFromClient.Change = 0;
-                invoiceObjFromClient.Adjustment = 0;
-                invoiceObjFromClient.PrintCount = 0;
-                //invoiceItemsFromClient
-
-                if (invoiceObjFromClient.PaymentMode == ENUM_BillPaymentMode.credit)
-                {
-                    invoiceObjFromClient.Creditdate = currentDate;
-                    invoiceObjFromClient.ReceivedAmount = 0;
-                }
-                else
-                {
-                    invoiceObjFromClient.Creditdate = null;
-                    invoiceObjFromClient.ReceivedAmount = (decimal)invoiceObjFromClient.TotalAmount;
-                }
-                dischargeDbContext.PHRMInvoiceTransaction.Add(invoiceObjFromClient);
-                dischargeDbContext.SaveChanges();
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
-        }
-
-        private void SyncPHRMBillInvoiceToRemoteServer(object billToPost, string billType, DischargeDbContext dbContext)
-        {
-            IRDLogModel irdLog = new IRDLogModel();
-            if (billType == "phrm-invoice")
-            {
-
-                string responseMsg = null;
-                PHRMInvoiceTransactionModel invoiceTxn = (PHRMInvoiceTransactionModel)billToPost;
-                try
-                {
-                    invoiceTxn.PANNumber = GetPANNumber(dbContext, invoiceTxn.PatientId);
-                    invoiceTxn.ShortName = GetShortName(dbContext, invoiceTxn.PatientId);
-                    invoiceTxn.FiscalYear = GetFiscalYearNameById(dbContext, invoiceTxn.FiscalYearId);
-                    IRD_PHRMBillSaleViewModel invoicebill = IRD_PHRMBillSaleViewModel.GetMappedInvoiceForIRD(invoiceTxn, true);
-                    irdLog.JsonData = JsonConvert.SerializeObject(invoicebill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceToIRD(invoicebill);
-                }
-                catch (Exception ex)
-                {
-                    responseMsg = "0";
-                    irdLog.ErrorMessage = GetInnerMostException(ex);
-                    irdLog.Status = "failed";
-                }
-
-                dbContext.PHRMInvoiceTransaction.Attach(invoiceTxn);
-                if (responseMsg == "200")
-                {
-                    invoiceTxn.IsRealtime = true;
-                    invoiceTxn.IsRemoteSynced = true;
-                    irdLog.Status = "success";
-                }
-                else
-                {
-                    invoiceTxn.IsRealtime = false;
-                    invoiceTxn.IsRemoteSynced = false;
-                    irdLog.Status = "failed";
-                }
-
-                dbContext.Entry(invoiceTxn).Property(x => x.IsRealtime).IsModified = true;
-                dbContext.Entry(invoiceTxn).Property(x => x.IsRemoteSynced).IsModified = true;
-                dbContext.SaveChanges();
-
-                irdLog.BillType = billType;
-                irdLog.ResponseMessage = responseMsg;
-                PHRMPostIRDLog(irdLog, dbContext);
-            }
-            else if (billType == "phrm-invoice-return")
-            {
-                PHRMInvoiceTransactionModel invoiceRet = (PHRMInvoiceTransactionModel)billToPost;
-
-                string responseMsg = null;
-                try
-                {
-                    invoiceRet.PANNumber = GetPANNumber(dbContext, invoiceRet.PatientId);
-                    invoiceRet.ShortName = GetShortName(dbContext, invoiceRet.PatientId);
-                    invoiceRet.FiscalYear = GetFiscalYearNameById(dbContext, invoiceRet.FiscalYearId);
-                    IRD_PHRMBillSaleReturnViewModel salesRetBill = IRD_PHRMBillSaleReturnViewModel.GetMappedPhrmSalesReturnBillForIRD(invoiceRet, true);
-                    salesRetBill.credit_note_number = GetCreditNoteNumberByInvoiceId(dbContext, invoiceRet.InvoiceId).ToString();
-                    irdLog.JsonData = JsonConvert.SerializeObject(salesRetBill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostPhrmInvoiceReturnToIRD(salesRetBill);
-                }
-                catch (Exception ex)
-                {
-                    responseMsg = "0";
-                    irdLog.ErrorMessage = GetInnerMostException(ex);
-                    irdLog.Status = "failed";
-                }
-
-                dbContext.PHRMInvoiceTransaction.Attach(invoiceRet);
-                if (responseMsg == "200")
-                {
-
-                    invoiceRet.IsRealtime = true;
-                    invoiceRet.IsRemoteSynced = true;
-                    irdLog.Status = "success";
-                }
-                else
-                {
-                    invoiceRet.IsRealtime = false;
-                    invoiceRet.IsRemoteSynced = false;
-                    irdLog.Status = "failed";
-                }
-
-                dbContext.Entry(invoiceRet).Property(x => x.IsRealtime).IsModified = true;
-                dbContext.Entry(invoiceRet).Property(x => x.IsRemoteSynced).IsModified = true;
-                dbContext.SaveChanges();
-                irdLog.BillType = billType;
-                irdLog.ResponseMessage = responseMsg;
-                PHRMPostIRDLog(irdLog, dbContext);
-            }
-        }
-
-        private static void PHRMPostIRDLog(IRDLogModel irdLogdata, DischargeDbContext dbContext)
-        {
-            try
-            {
-                irdLogdata.CreatedOn = DateTime.Now;
-
-                string url_IRDNepal = ConfigurationManager.AppSettings["url_IRDNepal"];
-                switch (irdLogdata.BillType)
-                {
-                    case "phrm-invoice":
-                        {
-                            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesIRDNepal"];
-                            irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesIRDNepal;
-                            break;
-                        }
-                    case "phrm-invoice-return":
-                        {
-                            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
-                            irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesIRDNepal;
-                            break;
-                        }
-
-                }
-                dbContext.IRDLog.Add(irdLogdata);
-                dbContext.SaveChanges();
-            }
-            catch (Exception ex)
-            {
-
-            }
-        }
-
-        private int GetPharmacyInvoiceNumber(DischargeDbContext dischargeDbContext)
-        {
-            int fiscalYearId = GetFiscalYear(dischargeDbContext);
-
-            int invoiceNumber = (from txn in dischargeDbContext.PHRMInvoiceTransaction
-                                 where txn.FiscalYearId == fiscalYearId
-                                 select txn.InvoicePrintId).DefaultIfEmpty(0).Max();
-            return invoiceNumber + 1;
-        }
-
-        private string GetFiscalYearNameById(DischargeDbContext dischargeDbContext, int? fiscalYearId)
-        {
-            return dischargeDbContext.PharmacyFiscalYears.Where(fsc => fsc.FiscalYearId == fiscalYearId).FirstOrDefault().FiscalYearName;
-        }
-
-        private string GetPANNumber(DischargeDbContext dbContext, int? PatientId)
-        {
-            try
-            {
-                return dbContext.PHRMPatient.Where(s => s.PatientId == PatientId).FirstOrDefault().PANNumber;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-        private string GetShortName(DischargeDbContext dbContext, int? PatientId)
-        {
-            try
-            {
-                var pat = dbContext.PHRMPatient.Where(s => s.PatientId == PatientId).FirstOrDefault();
-                return pat.FirstName + " " + (string.IsNullOrEmpty(pat.MiddleName) ? "" : pat.MiddleName + " ") + pat.LastName;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-        private int GetCreditNoteNumberByInvoiceId(DischargeDbContext dbContext, int? InvoiceId)
-        {
-            try
-            {
-                return (int)dbContext.PHRMInvoiceReturnItemsModel.Where(s => s.InvoiceId == InvoiceId).FirstOrDefault().CreditNoteNumber;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-
-
-
+        
         private object GetBillItemsEstimationSummary(int patientId, int patientVisitId, int? dischargeStatementId)
         {
             return _dischargeDbContext.GetItemsForBillingDischargeSummaryReceipt(patientId, patientVisitId, dischargeStatementId, "provisional");
         }
 
 
+    }
+
+    internal class PrintTemplateType
+    {
+        public string PrintType;
+        public bool Enable;
     }
 
 }

@@ -2,9 +2,11 @@ import { HttpClient, HttpHeaders } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import { DanpheHTTPResponse } from "../../shared/common-models";
+import { PatientVisitLevelReferralCommission_DTO } from "./DTOs/patient-referral-commission.dto";
 import { ReferralCommission_DTO } from "./DTOs/referral-commission.dto";
 import { ReferringOrganization_DTO } from "./DTOs/referral-organization.dto";
 import { ReferralParty_DTO } from "./DTOs/referral-party.dto";
+import { ReferralScheme_DTO } from "./DTOs/referral-scheme.dto";
 
 
 @Injectable()
@@ -19,8 +21,8 @@ export class MarketingReferralDLService {
     public GetInvoiceList(fromDate, toDate): Observable<DanpheHTTPResponse> {
         return this.http.get<DanpheHTTPResponse>(`/api/MarketingReferral/Invoices?FromDate=${fromDate}&ToDate=${toDate}`, this.optionsJson);
     }
-    public GetMarketingReferralDetailReport(fromDate, toDate, ReferringPartyId): Observable<DanpheHTTPResponse> {
-        return this.http.get<DanpheHTTPResponse>(`/api/MarketingReferral/MarketingreferralDetailReport?FromDate=${fromDate}&ToDate=${toDate}&ReferringPartyId=${ReferringPartyId}`, this.optionsJson);
+    public GetMarketingReferralDetailReport(fromDate, toDate, referringPartyId, referringGroupId, areaCode, referringOrganizationId): Observable<DanpheHTTPResponse> {
+        return this.http.get<DanpheHTTPResponse>(`/api/MarketingReferral/MarketingReferralReport?FromDate=${fromDate}&ToDate=${toDate}&referringPartyId=${referringPartyId}&referringPartyGroupId=${referringGroupId}&areaCode=${areaCode}&referringOrganizationId=${referringOrganizationId}`, this.optionsJson);
     }
     public GetBillDetails(billTransactionId): Observable<DanpheHTTPResponse> {
         return this.http.get<DanpheHTTPResponse>(`/api/MarketingReferral/BillDetails?billTransactionId=${billTransactionId}`, this.optionsJson);
@@ -63,5 +65,30 @@ export class MarketingReferralDLService {
     }
     public ActivateDeactivateParty(selectedItem): Observable<DanpheHTTPResponse> {
         return this.http.put<DanpheHTTPResponse>("/api/MarketingReferral/ActivateDeactivateParty", selectedItem, this.optionsJson);
+    }
+    public GetMasterDataForFilter(): Observable<DanpheHTTPResponse> {
+        return this.http.get<DanpheHTTPResponse>("/api/MarketingReferral/GetMasterDataForFilter", this.optionsJson);
+    }
+    public GetPatientVisitWiseReferralCommission(fromDate: string, toDate: string): Observable<DanpheHTTPResponse> {
+        return this.http.get<DanpheHTTPResponse>(`/api/MarketingReferral/GetPatientVisitWiseReferralCommission?fromDate=${fromDate}&toDate=${toDate}`, this.optionsJson);
+    }
+    public SaveReferralScheme(referralScheme: ReferralScheme_DTO): Observable<DanpheHTTPResponse> {
+        return this.http.post<DanpheHTTPResponse>(`/api/MarketingReferral/ReferralScheme`, referralScheme, this.optionsJson);
+    }
+    public UpdateReferralScheme(referralScheme: ReferralScheme_DTO): Observable<DanpheHTTPResponse> {
+        return this.http.put<DanpheHTTPResponse>(`/api/MarketingReferral/ReferralScheme`, referralScheme, this.optionsJson);
+    }
+    public ActivateDeactivateReferralScheme(referralScheme: ReferralScheme_DTO): Observable<DanpheHTTPResponse> {
+        return this.http.put<DanpheHTTPResponse>(`/api/MarketingReferral/ActivateDeactivateReferralScheme?referralSchemeId=${referralScheme.ReferralSchemeId}`, this.optionsJson);
+    }
+    public AddPatientReferralCommission(patientReferralCommission: PatientVisitLevelReferralCommission_DTO): Observable<DanpheHTTPResponse> {
+        return this.http.post<DanpheHTTPResponse>(`/api/MarketingReferral/PatientReferralCommission`, patientReferralCommission, this.optionsJson);
+    }
+    public GetReferralCommissionDetails(patientVisitId: number): Observable<DanpheHTTPResponse> {
+        return this.http.get<DanpheHTTPResponse>(`/api/MarketingReferral/GetPatientReferralCommissionDetails?patientVisitId=${patientVisitId}`, this.optionsJson);
+    }
+
+    public DeletePatientReferralCommission(ReferralCommissionId): Observable<DanpheHTTPResponse> {
+        return this.http.put<DanpheHTTPResponse>(`/api/MarketingReferral/PatientReferralCommission?patientReferralCommissionId=${ReferralCommissionId}`, this.optionsJson);
     }
 }

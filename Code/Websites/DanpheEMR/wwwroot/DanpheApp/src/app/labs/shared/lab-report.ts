@@ -20,4 +20,6 @@ export class LabReport {
     public ComponentIdList: Array<number> = new Array<number>();
 
     public VerificationEnabled: boolean = null;
+    public PreVerificationEnabled: boolean = false;
+    public CreatedDay: string = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
 }

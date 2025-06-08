@@ -90,7 +90,7 @@ export class VER_INV_RequisitionListComponent implements OnInit {
   LoadRequisitionListByStatus() {
     let temporaryFilteredList = new Array<Requisition>();
     if (this.VerificationStatus == ENUM_Requisition_VerificationStatus.pending) {
-      temporaryFilteredList = this.RequisitionGridData.filter(s => s.RequisitionStatus == "active" || s.RequisitionStatus == "pending" && s.CurrentVerificationLevelCount < s.MaxVerificationLevel && s.isVerificationAllowed == true);
+      temporaryFilteredList = this.RequisitionGridData.filter(s => (s.RequisitionStatus == "pending" || s.RequisitionStatus == "active") && s.CurrentVerificationLevelCount < s.MaxVerificationLevel && s.isVerificationAllowed == true);
     } else if (this.VerificationStatus == ENUM_Requisition_VerificationStatus.approved) {
       temporaryFilteredList = this.RequisitionGridData.filter(s => s.VerificationStatus == "approved");
     } else if (this.VerificationStatus == ENUM_Requisition_VerificationStatus.rejected) {
@@ -121,5 +121,6 @@ export class VER_INV_RequisitionListComponent implements OnInit {
         this.RequisitionGridDataFiltered = temporaryFilteredList
       }
     }
+
   }
 }

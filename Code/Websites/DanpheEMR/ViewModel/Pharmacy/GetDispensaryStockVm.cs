@@ -18,6 +18,7 @@ namespace DanpheEMR.ViewModel.Pharmacy
         public string RackNo { get; set; }
         public int StoreId { get; set; }
         public string  StoreName { get; set; }
-
+        public string UOMName { get; set; }
+        public double TotalValue { get; set; }
     }
 }

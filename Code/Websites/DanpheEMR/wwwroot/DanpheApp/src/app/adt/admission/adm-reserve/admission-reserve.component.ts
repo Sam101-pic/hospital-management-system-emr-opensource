@@ -7,7 +7,9 @@ import { SecurityService } from '../../../security/shared/security.service';
 import { NepaliCalendarService } from "../../../shared/calendar/np/nepali-calendar.service";
 import { NepaliDate } from "../../../shared/calendar/np/nepali-dates";
 import { CallbackService } from '../../../shared/callback.service';
+import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { ADT_BLService } from '../../shared/adt.bl.service';
 import { BedReservationInfo } from "../../shared/bed-reservation-info.model";
 import { Bed } from '../../shared/bed.model';
@@ -24,6 +26,7 @@ export class AdmissionReserveComponent {
   @Input("patientId") patientId: number = null;
   @Input("requestingDepartmentName") requestingDepartmentName: string = null;
   @Input("actionName") actionName: string = null;
+  @Input("admission-case") AdmissionCase: string = null;
   @Output("closePopUp") closePopUp: EventEmitter<object> = new EventEmitter<object>();
 
   public CurrentBedReservation: BedReservationInfo = new BedReservationInfo();
@@ -72,6 +75,7 @@ export class AdmissionReserveComponent {
   public InitializeData() {
     this.bufferDaysMinutes = this.coreService.ADTReservationBuffer(); //in the form of {days:xx,minutes:xx}
     this.CurrentBedReservation.PatientId = this.patientId;
+    this.CurrentBedReservation.AdmissionCase = this.AdmissionCase;
     this.patientVisitId ? (this.CurrentBedReservation.PatientVisitId = this.patientVisitId) : (this.CurrentBedReservation.PatientVisitId = null);
     this.CurrentBedReservation.AdmissionStartsOn = moment().add(50, 'minutes').format('YYYY-MM-DDTHH:mm');
     let nepDate = this.npCalendarService.ConvertEngToNepDate(this.CurrentBedReservation.AdmissionStartsOn);
@@ -172,7 +176,7 @@ export class AdmissionReserveComponent {
           if (res.Status == 'OK') {
             this.disableBed = false;
             if (res.Results.availableBeds.length) {
-              this.bedList = res.Results.availableBeds;
+              this.bedList = res.Results.availableBeds.filter(a => !a.IsReserved);
             }
             else {
               this.msgBoxServ.showMessage("failed", ["No beds are available for this type."]);
@@ -296,12 +300,16 @@ export class AdmissionReserveComponent {
       if (this.CurrentBedReservation.IsValidCheck(undefined, undefined) && this.CurrentBedReservation.IsValidCheck(undefined, undefined)) {
         this.loading = true;
         this.admissionBLService.PostADTBedReservation(this.CurrentBedReservation, this.actionName)
-          .subscribe(res => {
-            if (res.Status == "OK") {
-              this.msgBoxServ.showMessage('success', ["Bed Reservation is completed"]);
+          .subscribe((res: DanpheHTTPResponse) => {
+            if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Bed Reservation is completed"]);
               this.closePopUp.emit({ close: true, submit: true, PatientId: this.CurrentBedReservation.PatientId });
               this.loading = false;
-            } else { this.loading = false; }
+            }
+            else {
+              this.loading = false;
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+            }
           });
       }
       this.loading = false;

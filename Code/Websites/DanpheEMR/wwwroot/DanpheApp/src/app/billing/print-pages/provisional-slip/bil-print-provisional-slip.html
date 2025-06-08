@@ -59,7 +59,7 @@
   }
 </style>
 <!-- New Provisional Print Slip -->
-<div class="A5 portrait" *ngIf="isReceiptLoaded">
+<div class="A5 portrait" *ngIf="isReceiptLoaded && !PrintTemplateTypeSettings.Enable">
   <div class="sheet" id="divProvisionalSlipPrintPage">
     <div class="box-body invoice header">
       <table border="0" style="width: 100%; margin: 0 auto 5px auto; vertical-align: top !important" cellspacing="0" cellpadding="0"
@@ -119,10 +119,12 @@
               </tr>
               <tr>
                 <td colspan="5" style="text-align: left; padding: 0 !important;">
-                  <p class="c_paragraphs" style="margin: 0px;"><strong>Address: </strong>{{ProvisionalSlipDetails.Address}} <span
-                          *ngIf="ProvisionalSlipDetails.Address && ProvisionalSlipDetails.CountrySubdivisionName">,</span>
-                    {{ProvisionalSlipDetails.CountrySubdivisionName}} </p>
+                  <p class="c_paragraphs" style="margin: 0px;">
+                    <strong>Address:</strong>
+                    <span>{{coreService.SortPatientAddress(ProvisionalSlipDetails)}}</span>
+                  </p>
                 </td>
+
                 <td colspan="5" style="text-align: right; padding: 0 !important;" *ngIf="ProvisionalSlipDetails.PhoneNumber">
                   <p class="c_paragraphs" style="margin: 0px;"><strong>Contact: </strong>{{ProvisionalSlipDetails.PhoneNumber}}</p>
                 </td>
@@ -204,9 +206,19 @@
 
   </div>
 </div>
-<div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;">
+<div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;" *ngIf="!PrintTemplateTypeSettings.Enable">
   <button class="btn green btn-success" value="" (click)="print()" id="btnPrintProvisionalSlip">
     <span>Print</span>&nbsp;&nbsp;
+    &nbsp;&nbsp; <i class="glyphicon glyphicon-print"></i>
+  </button>
+</div>
+
+<div id="id_provisional_slip" *ngIf="PrintTemplateTypeSettings.Enable">
+  <!--Here Dynamically the provisional slip will be rendered-->
+</div>
+<div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;" *ngIf="PrintTemplateTypeSettings.Enable">
+  <button class="btn green btn-success" value="" (click)="printReceipt()" id="btnPrintProvisionalSlip">
+    <span>Print Receipt</span>&nbsp;&nbsp;
     &nbsp;&nbsp; <i class="glyphicon glyphicon-print"></i>
   </button>
 </div>

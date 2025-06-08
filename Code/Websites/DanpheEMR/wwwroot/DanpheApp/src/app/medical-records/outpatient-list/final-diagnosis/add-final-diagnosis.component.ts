@@ -1,10 +1,10 @@
-import { Component, Output, EventEmitter, Input, OnInit } from "@angular/core";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
 import { ICD10 } from "../../../clinical/shared/icd10.model";
+import { CoreService } from "../../../core/shared/core.service";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { MedicalRecordService } from "../../shared/medical-record.service";
 import { MR_BLService } from "../../shared/mr.bl.service";
 import { FinalDiagnosisModel } from "./final-diagnosis.model";
-import { MedicalRecordService } from "../../shared/medical-record.service";
-import { CoreService } from "../../../core/shared/core.service";
 
 @Component({
     selector: "add-final-diagnosis",
@@ -93,7 +93,8 @@ export class AddFinalDiagnosisComponent implements OnInit {
                     finalDiagnosis.PatientVisitId = this.SelectedPatient.PatientVisitId;
                     finalDiagnosis.ICD10ID = temp.ICD10ID;
                     finalDiagnosis.IsPatientReferred = this.IsPatientReferred;
-                    finalDiagnosis.ReferredBy = this.ReferredBy
+                    finalDiagnosis.ReferredBy = this.ReferredBy;
+                    finalDiagnosis.DiseaseGroupId = temp.DiseaseGroupId ? temp.DiseaseGroupId : a.DiseaseGroupId; // Here, temp is coming from MST_ICD10 where there is no DiseaseGroupId for ICD-11. Data in SelectedICD10List is assigned from data coming from MR_TXN_Outpatient_FinalDiagnosis so it will have DiseaseGroupId of new records onwards. Later, change to //   finalDiagnosis.DiseaseGroupId = temp.DiseaseGroupId;
                     this.FinalDiagnosisList.push(finalDiagnosis);
                 }
             });
@@ -144,7 +145,7 @@ export class AddFinalDiagnosisComponent implements OnInit {
             if (res.Status == "OK") {
                 this.ICD10DiseaseGroupList = res.Results;
                 this.ICD10DiseaseGroupList.forEach(a =>
-                    this.icd10List.push({ ICD10Code: a.ICDCode, ICD10Description: a.DiseaseGroupName }));
+                    this.icd10List.push({ ICD10Code: a.ICDCode, ICD10Description: a.DiseaseGroupName, DiseaseGroupId: a.DiseaseGroupId }));
             }
         })
     }

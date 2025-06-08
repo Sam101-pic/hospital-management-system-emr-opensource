@@ -50,7 +50,8 @@
                   <th></th>
                   <th>S.N</th>
                   <th>Field Name</th>
-                  <th>Display Label</th>
+                  <th>Display Label At Form</th>
+                  <th>Display Label At Print</th>
                   <th>Mandatory?</th>
                   <th>Sequence</th>
                 </tr>
@@ -67,7 +68,11 @@
                            disabled>
                   </td>
                   <td>
-                    <input type="text" id="{{'id_input_field_mapping_displayLabel'+i}}" class="table-input" [(ngModel)]="field.DisplayLabel"
+                    <input type="text" id="{{'id_input_field_mapping_displayLabel'+i}}" class="table-input" [(ngModel)]="field.DisplayLabelAtForm"
+                           [disabled]="!field.IsActive">
+                  </td>
+                  <td>
+                    <input type="text" id="{{'id_input_field_mapping_displayLabel'+i}}" class="table-input" [(ngModel)]="field.DisplayLabelAtPrint"
                            [disabled]="!field.IsActive">
                   </td>
                   <td>

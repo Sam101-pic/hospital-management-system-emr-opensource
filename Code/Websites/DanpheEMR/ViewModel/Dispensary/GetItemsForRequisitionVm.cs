@@ -18,6 +18,8 @@ namespace DanpheEMR.ViewModel.Dispensary
         public string GenericName { get; set; }
         public string UOMName { get; set; }
         public double AvailableQuantity { get; set; }
-        public bool IsActive { get; internal set; }
+        public bool IsActive { get; set; }
+        public int GenericId { get; set; }
+
     }
 }

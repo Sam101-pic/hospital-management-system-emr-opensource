@@ -7,6 +7,7 @@ import { AccountingReportsBLService } from '../../shared/accounting-reports.bl.s
 
 import { FiscalYearModel } from "../../../../accounting/settings/shared/fiscalyear.model";
 import { CoreService } from "../../../../core/shared/core.service";
+import { ENUM_DanpheHTTPResponses, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from "../../../../shared/shared-enums";
 @Component({
   selector: 'ledger-report-reusable',
   templateUrl: './ledger-report-reusable.html',
@@ -18,11 +19,9 @@ export class LedgerReportResuableComponent {
   public fiscalyearList: Array<FiscalYearModel> = new Array<FiscalYearModel>(); //mumbai-team-june2021-danphe-accounting-cache-change
   //public selLedger: { LedgerId, LedgerName } = null;
   public selFiscalYear: { FiscalYearId, FiscalYearName, StartDate, EndDate, IsActive } = null;
-  public txnGridColumns: Array<any> = null;
   public IsOpeningBalance: boolean = false;
   public transactionId: number = null;
   public selectedFiscalYear: any;
-  public IsActive: boolean = true;
   public IsDetailsView: boolean = true;
   public showLedgerDetail: boolean = false;
   public voucherNumber: string = null;
@@ -38,6 +37,7 @@ export class LedgerReportResuableComponent {
   public printDetaiils: any;
   public fiscalYearId: number;
   public showExportbtn: boolean = false;
+  public HospitalId: number = 1;
   @Input('ledgerId')
   public set setLedId(_ledId) {
     this.ledgerId = _ledId;
@@ -62,6 +62,12 @@ export class LedgerReportResuableComponent {
   public set fiscalyear(_fiscalyearid) {
     if (_fiscalyearid) {
       this.fiscalYearId = _fiscalyearid;
+    }
+  }
+  @Input("HospitalId")
+  public set HospitalIds(_hospitalId) {
+    if (_hospitalId) {
+      this.HospitalId = _hospitalId;
     }
   }
   @Input('showLedgerDetail')
@@ -126,9 +132,9 @@ export class LedgerReportResuableComponent {
   public GetTxnList() {
     if (this.ledgerId > 0 && this.fromDate && this.toDate) {
       this.ledgerResult = null;
-      this.accReportBLService.GetLedgerReport(this.ledgerId, this.fromDate, this.toDate, this.fiscalYearId)
+      this.accReportBLService.GetLedgerReport(this.ledgerId, this.fromDate, this.toDate, this.fiscalYearId, this.HospitalId)
         .subscribe(res => {
-          if (res.Status == "OK") {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
             if (res.Results.result.length) {
               let CrTotalAmt = 0;
               let DrTotalAmt = 0;
@@ -205,19 +211,19 @@ export class LedgerReportResuableComponent {
               this.ledgerResult.OpeningBalanceCrAmount = CommonFunctions.parseAmount(OpeningBalanceCrAmt);
             }
             else {
-              this.msgBoxServ.showMessage("failed", ["No Records for selected dates."]);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["No Records for selected dates."]);
               this.ledgerResult = null;
               this.CallBack();
             }
             this.BalanceCalculation();
           }
           else {
-            this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [res.ErrorMessage]);
           }
         });
     }
     else {
-      this.msgBoxServ.showMessage("failed", ["Something Wrong!!."]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Something Wrong!!."]);
       this.CallBack();
     }
   }
@@ -299,10 +305,10 @@ export class LedgerReportResuableComponent {
   //}
   checkValidFiscalYear() {
     let flag = true;
-    let fromDate = moment(this.fromDate, "YYYY-MM-DD");
-    let toDate = moment(this.toDate, "YYYY-MM-DD");
-    let startDate = moment(this.selFiscalYear.StartDate, "YYYY-MM-DD");
-    let endDate = moment(this.selFiscalYear.EndDate, "YYYY-MM-DD");
+    let fromDate = moment(this.fromDate, ENUM_DateTimeFormat.Year_Month_Day);
+    let toDate = moment(this.toDate, ENUM_DateTimeFormat.Year_Month_Day);
+    let startDate = moment(this.selFiscalYear.StartDate, ENUM_DateTimeFormat.Year_Month_Day);
+    let endDate = moment(this.selFiscalYear.EndDate, ENUM_DateTimeFormat.Year_Month_Day);
 
     if (!(fromDate.isSameOrAfter(startDate))) {
       flag = false;
@@ -311,7 +317,7 @@ export class LedgerReportResuableComponent {
       flag = false;
     }
     if (!flag) {
-      this.msgBoxServ.showMessage("error", ['From Date and To Date must be with in a fiscal year!']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['From Date and To Date must be with in a fiscal year!']);
     }
     return flag;
   }
@@ -326,11 +332,11 @@ export class LedgerReportResuableComponent {
   }
   checkDateValidation() {
     let flag = true;
-    flag = moment(this.fromDate, "YYYY-MM-DD").isValid() == true ? flag : false;
-    flag = moment(this.toDate, "YYYY-MM-DD").isValid() == true ? flag : false;
+    flag = moment(this.fromDate, ENUM_DateTimeFormat.Year_Month_Day).isValid() == true ? flag : false;
+    flag = moment(this.toDate, ENUM_DateTimeFormat.Year_Month_Day).isValid() == true ? flag : false;
     flag = (this.toDate >= this.fromDate) == true ? flag : false;
     if (!flag) {
-      this.msgBoxServ.showMessage("error", ['select proper date(FromDate <= ToDate)']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['select proper date(FromDate <= ToDate)']);
     }
     return flag;
   }

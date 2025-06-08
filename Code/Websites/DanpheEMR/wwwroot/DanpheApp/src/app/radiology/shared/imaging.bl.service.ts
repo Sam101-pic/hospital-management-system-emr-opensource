@@ -1,18 +1,18 @@
-import { Injectable, Directive } from '@angular/core';
-import { ImagingDLService } from './imaging.dl.service';
-import { SecurityService } from '../../security/shared/security.service';
-import { ImagingItemRequisition } from './imaging-item-requisition.model';
-import { ImagingItem } from './imaging-item.model';
-import { ImagingItemReport } from '../shared/imaging-item-report.model';
+import { Injectable } from '@angular/core';
 import { BillItemRequisition } from '../../billing/shared/bill-item-requisition.model';
 import { BillingDLService } from '../../billing/shared/billing.dl.service';
+import { SecurityService } from '../../security/shared/security.service';
+import { ImagingItemReport } from '../shared/imaging-item-report.model';
+import { ImagingItemRequisition } from './imaging-item-requisition.model';
+import { ImagingDLService } from './imaging.dl.service';
 
 
-import * as moment from 'moment/moment';
 import * as _ from 'lodash';
-import { InPatientLabTest } from '../../labs/shared/InpatientLabTest';
+import * as moment from 'moment/moment';
 import { BillingTransactionItem } from '../../billing/shared/billing-transaction-item.model';
-import { RadEmailModel } from './rad-email.model';
+import { InPatientLabTest } from '../../labs/shared/InpatientLabTest';
+import { CommonEmailModel } from '../../shared/DTOs/common-email_DTO';
+import { FileUpload_DTO } from './DTOs/file-upload.dto';
 //Note: mapping is done here by blservice, component will only do the .subscribe().
 @Injectable()
 export class ImagingBLService {
@@ -22,11 +22,11 @@ export class ImagingBLService {
   }
 
 
-  public GetFilmTypeData(){
+  public GetFilmTypeData() {
     return this.imagingDLService.GetFilmTypeData()
-    .map((responseData) => {
-      return responseData;
-    });
+      .map((responseData) => {
+        return responseData;
+      });
   }
 
   //this returns a promise, the calling component can subscribe and do the needful
@@ -55,9 +55,17 @@ export class ImagingBLService {
   //gets all the active requisitions and pending reports
   public GetImagingReqsAndReportsByStatus(fromDate: string, toDate: string, typeList: Array<number>) {
     var reqOrderStatus = "active";
-    var reportOrderStatus = "pending";
+    var reportOrderStatus = "active";
     let typeListStr = JSON.stringify(typeList);
     return this.imagingDLService.GetImagingReqsAndReportsByStatus(reqOrderStatus, reportOrderStatus, typeListStr, fromDate, toDate)
+      .map(res => { return res });
+  }
+  //get pending reports and requisition for Add report page 
+  public GetPendingReportsandRequisition(fromDate: string, toDate: string, typeList: Array<number>) {
+    var reqOrderStatus = "pending";
+    var reportOrderStatus = "pending";
+    let typeListStr = JSON.stringify(typeList);
+    return this.imagingDLService.GetPendingReportsandRequisition(reqOrderStatus, reportOrderStatus, typeListStr, fromDate, toDate)
       .map(res => { return res });
   }
 
@@ -206,67 +214,95 @@ export class ImagingBLService {
   }
   //imaging-report.component
   //post report 
-  public AddImgItemReport(filesToUpload, imgReport: ImagingItemReport, orderStatus: string, enableProviderUpdate: boolean) {
-    try {
-      let input = new FormData();
-      //localFolder storage address for the file ex. Radiology\X-Ray
-      var localFolder: string = "Radiology\\" + imgReport.ImagingTypeName;
-      var fileName: string;
-      imgReport.ImageName = "";//make it empty since we're replacing the existing images everytime.
-      //patient object was included to display it's details on client side
-      //it is not necessary during post
-      var omited = _.omit(imgReport, ['Patient']);
-
-      //we've to encode uri since we might have special characters like , / ? : @ & = + $ #  etc in our report value. 
-      var reportDetails = JSON.stringify(omited);//encodeURIComponent();
-
-
+  public AddImgItemReport(filesToUpload, imgReports: ImagingItemReport[], orderStatus: string, enableProviderUpdate: boolean) {
+    let input = new FormData();
+    let localFolder: string;
+    let fileNames: string[] = [];
+    let processedReports = imgReports.map((report, index) => {
+      localFolder = "Radiology\\" + report.ImagingTypeName;
+      report.ImageName = ""; // Make it empty since we're replacing the existing images every time.
       let uploadedImgCount = 0;
-      //ImageName can contain names of more than one image seperated by ;
-     
-      if (imgReport.ImageName) {
-        uploadedImgCount = imgReport.ImageName.split(";").length;
+
+      if (report.ImageName) {
+        uploadedImgCount = report.ImageName.split(";").length;
       }
 
-      if (filesToUpload) {
-        for (var i = 0; i < filesToUpload.length; i++) {
-          //to get the imagetype
-          let splitImagetype = filesToUpload[i].type.split("/");
+      if (filesToUpload && filesToUpload[index]) {
+        for (let i = 0; i < filesToUpload[index].length; i++) {
+          let splitImagetype = filesToUpload[index][i].type.split("/");
           let imageExtension = splitImagetype[1];
-          //fileName = PatientId_ImagingItemName_PatientVisitId_CurrentDateTime_Counter.imageExtension
-          fileName = imgReport.PatientId + "_" + imgReport.ImagingItemId + "_" + imgReport.PatientVisitId + "_" + moment().format('YYYY-MM-DD_HHmm') + "_" + (i + uploadedImgCount) + "." + imageExtension;
-          input.append("uploads", filesToUpload[i], fileName);
+          // FileName = PatientId_ImagingItemName_PatientVisitId_CurrentDateTime_Counter.imageExtension
+          let fileName = report.PatientId + "_" + report.ImagingItemId + "_" + report.PatientVisitId + "_" + moment().format('YYYY-MM-DD_HHmm') + "_" + (i + uploadedImgCount) + "." + imageExtension;
+          fileNames.push(fileName); // Store filenames
+          input.append("uploads", filesToUpload[index][i], fileName);
         }
       }
 
-      if (enableProviderUpdate) {
-        input.append("enableProviderEditInBillTxnItem", "true");
-      } else {
-        input.append("enableProviderEditInBillTxnItem", "false");
-      }
-      //pending reports has ImagingReportId
-      //new reports does not has ImagingReportId
-      //if ImagingReportId is present then update item.
-      input.append("reportDetails", reportDetails);
-      input.append("localFolder", localFolder);
-      input.append("orderStatus", orderStatus);
-      
-      if (imgReport.ImagingReportId)
-        return this.imagingDLService.PutImgItemReport(input)
-          .map(res => res);
-      //else post the item
-      else
-        return this.imagingDLService.PostImgItemReport(input)
-          .map(res => res);
-    } catch (exception) {
-      throw exception;
+      // Omit Patient and return the processed report
+      return _.omit(report, ['Patient']);
+    });
+
+    let reportDetails = JSON.stringify(processedReports);
+    input.append("reportDetails", reportDetails);
+    input.append("localFolder", localFolder);
+    input.append("orderStatus", orderStatus);
+    input.append("enableProviderEditInBillTxnItem", enableProviderUpdate ? "true" : "false");
+
+    // If any of the reports have an ImagingReportId, assume it's an update
+    if (imgReports.some(report => !!report.ImagingReportId)) {
+      return this.imagingDLService.PutImgItemReport(input)
+        .map(res => res);
+    } else {
+      return this.imagingDLService.PostImgItemReport(input)
+        .map(res => res);
     }
+
   }
 
-  public sendEmail(email: RadEmailModel) {
-    let data: RadEmailModel = new RadEmailModel();
+
+  //   public AddImgItemReport(filesToUpload, imgReports: ImagingItemReport[], orderStatus: string, enableProviderUpdate: boolean) {
+  //     const observables = imgReports.map(rep => {
+  //         let input = new FormData();
+  //         let localFolder: string = "Radiology\\" + rep.ImagingTypeName;
+  //         let fileName: string;
+  //         rep.ImageName = ""; // Make it empty since we're replacing the existing images every time.
+  //         let omitted = _.omit(rep, ['Patient']);
+  //         let reportDetails = JSON.stringify(omitted);
+  //         let uploadedImgCount = 0;
+
+  //         if (rep.ImageName) {
+  //             uploadedImgCount = rep.ImageName.split(";").length;
+  //         }
+
+  //         if (filesToUpload) {
+  //             for (let i = 0; i < filesToUpload.length; i++) {
+  //                 let splitImagetype = filesToUpload[i].type.split("/");
+  //                 let imageExtension = splitImagetype[1];
+  //                 fileName = `${rep.PatientId}_${rep.ImagingItemId}_${rep.PatientVisitId}_${moment().format('YYYY-MM-DD_HHmm')}_${i + uploadedImgCount}.${imageExtension}`;
+  //                 input.append("uploads", filesToUpload[i], fileName);
+  //             }
+  //         }
+
+  //         input.append("enableProviderEditInBillTxnItem", enableProviderUpdate ? "true" : "false");
+  //         input.append("reportDetails", reportDetails);
+  //         input.append("localFolder", localFolder);
+  //         input.append("orderStatus", orderStatus);
+
+  //         if (rep.ImagingReportId) {
+  //             return this.imagingDLService.PutImgItemReport(input);
+  //         } else {
+  //             return this.imagingDLService.PostImgItemReport(input);
+  //         }
+  //     });
+
+  //     return forkJoin(observables);
+  // }
+
+
+  public sendEmail(email: CommonEmailModel) {
+    let data: CommonEmailModel = new CommonEmailModel();
     data = Object.assign(data, email);
-    var omited = _.omit(data, ['RadEmailValidator']);
+    var omited = _.omit(data, ['EmailValidator']);
     return this.imagingDLService.SendEmail(omited)
       .map(res => res);
   }
@@ -347,6 +383,86 @@ export class ImagingBLService {
     return this.imagingDLService.PutScannedDetails(reqId)
       .map(res => { return res });
   }
+  GetPrintCount(requisitionId: number) {
+    return this.imagingDLService.GetPrintCount(requisitionId)
+      .map(res => { return res });
+  }
+  UpdateReferrer(referredById: number, referredByName: string, reqId: number) {
+    return this.imagingDLService.UpdateReferrer(referredById, referredByName, reqId)
+      .map(res => { return res });
+  }
+  // UploadRadiologyFile(patientDetail: Patient, fileToUpload: PatientFilesModel) {
+  //   try {
+  //     const fileDetails: FileUpload_DTO = {
+  //       PatientDetails: patientDetail,
+  //       FileDetails: fileToUpload
+  //     };
+  //     return this.imagingDLService.UploadRadiologyFile(fileDetails).map((res) => {
+  //       return res;
+  //     });
+  //   }
+  //   catch (exception) {
+  //     throw exception;
+  //   }
+  // }
+  UploadRadiologyFile(patientDetail: FileUpload_DTO[], fileToUpload: any) {
+    try {
+      const formToPost = new FormData();
+
+      formToPost.append("patientReportDetail", JSON.stringify(patientDetail));
+      formToPost.append("fileToUpload", JSON.stringify(fileToUpload));
+      if (fileToUpload.File) {
+        formToPost.append("file", fileToUpload.File);
+      }
+      console.log(formToPost)
+      return this.imagingDLService.UploadRadiologyFile(formToPost).map((res) => {
+        return res;
+      });
+    }
+    catch (exception) {
+      throw exception;
+    }
+  }
+  UpdateRadiologyFile(patientDetail: FileUpload_DTO[], fileToUpload: any) {
+    try {
+      const formToPost = new FormData();
+
+      formToPost.append("patientReportDetail", JSON.stringify(patientDetail));
+      formToPost.append("fileToUpload", JSON.stringify(fileToUpload));
+      if (fileToUpload.File) {
+        formToPost.append("file", fileToUpload.File);
+      }
+      console.log(formToPost)
+      return this.imagingDLService.UpdateRadiologyFile(formToPost).map((res) => {
+        return res;
+      });
+    }
+    catch (exception) {
+      throw exception;
+    }
+  }
+  GetPatientFileDetail(patientDetail: FileUpload_DTO[]) {
+    try {
+      return this.imagingDLService.GetPatientFileDetail(patientDetail).map((res) => {
+        return res;
+      });
+    }
+    catch (exception) {
+      throw exception;
+    }
+  }
+
+  GetTemplatesStyles() {
+    try {
+      return this.imagingDLService.GetTemplatesStyles().map((res) => {
+        return res;
+      });
+    }
+    catch (exception) {
+      throw exception;
+    }
+  }
+
 
 }
 

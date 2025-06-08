@@ -11,6 +11,8 @@ using DanpheEMR.ServerModel.AdmissionModels;
 using DanpheEMR.ServerModel.AdmissionModels.Config;
 using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.BillingModels.DischargeStatementModels;
+using DanpheEMR.ServerModel.CommonModels;
+using DanpheEMR.ServerModel.EmergencyModels;
 using DanpheEMR.ServerModel.MasterModels;
 using DanpheEMR.ServerModel.PatientModels;
 using DanpheEMR.ServerModel.Utilities;
@@ -37,6 +39,7 @@ namespace DanpheEMR.DalLayer
         public DbSet<VisitModel> Visits { get; set; }
         public DbSet<PatientModel> Patients { get; set; }
         public DbSet<DischargeSummaryModel> DischargeSummary { get; set; }
+        public DbSet<EmergencyDischargeSummaryModel> ERDischargeSummary { get; set; }
         public DbSet<DischargeTypeModel> DischargeType { get; set; }
         public DbSet<AddressModel> Address { get; set; }
         public DbSet<BillingDepositModel> BillDeposit { get; set; }
@@ -81,7 +84,8 @@ namespace DanpheEMR.DalLayer
 
 
         public DbSet<GuarantorModel> Guarantor { get; set; } //Bibek: 26thJune'23
-
+        public DbSet<PatientReferralModel> ReferralModels { get; set; }
+        public DbSet<PatientVisitConsultantsModel> PatientVisitConsultants { get; set; }
 
 
         public AdmissionDbContext(string conn) : base(conn)
@@ -95,6 +99,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<CountrySubDivisionModel>().ToTable("MST_CountrySubDivision");
             modelBuilder.Entity<MunicipalityModel>().ToTable("MST_Municipality");
             modelBuilder.Entity<DischargeSummaryModel>().ToTable("ADT_DischargeSummary");
+            modelBuilder.Entity<EmergencyDischargeSummaryModel>().ToTable("ER_DischargeSummary");
             modelBuilder.Entity<PatientBedInfo>().ToTable("ADT_TXN_PatientBedInfo");
             modelBuilder.Entity<VisitModel>().ToTable("PAT_PatientVisits");
             modelBuilder.Entity<PatientBedInfo>()
@@ -172,7 +177,8 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<BillInvoiceReturnItemsModel>().ToTable("BIL_TXN_InvoiceReturnItems");
             modelBuilder.Entity<DischargeStatementModel>().ToTable("BIL_TXN_DischargeStatement");
             modelBuilder.Entity<PaymentModes>().ToTable("MST_PaymentModes");
-
+            modelBuilder.Entity<PatientReferralModel>().ToTable("ADT_TXN_PatientReferral");
+            modelBuilder.Entity<PatientVisitConsultantsModel>().ToTable("PAT_PatientVisitConsultants");
         }
 
 
@@ -191,8 +197,8 @@ namespace DanpheEMR.DalLayer
                     parameter.Value = DBNull.Value;
                 }
             }
-            DataTable stockItems = DALFunctions.GetDataTableFromStoredProc("SP_ADT_GetAllAdmittedPatients", paramList, this);
-            return stockItems;
+            DataTable admittedPatientList = DALFunctions.GetDataTableFromStoredProc("SP_ADT_GetAllAdmittedPatients", paramList, this);
+            return admittedPatientList;
         }
         #endregion
     }

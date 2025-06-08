@@ -26,6 +26,9 @@ namespace DanpheEMR.ServerModel
         public bool IsActive { get; set; }
         public int CreditPeriod { get; set; }
         public bool IsLedgerRequired { get; set; }
+        public int? CountryId { get; set; }
+        public int? CountrySubDivisionId { get; set; }
+
 
         [NotMapped]
         public int LedgerId { get; set; }

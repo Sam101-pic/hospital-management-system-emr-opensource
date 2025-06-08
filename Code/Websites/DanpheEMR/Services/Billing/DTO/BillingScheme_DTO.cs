@@ -35,6 +35,9 @@ namespace DanpheEMR.Services.Billing.DTO
         public bool HasSubScheme { get; set; }
         public List<BillingSubScheme_DTO> SubSchemes { get; set; }
         public bool AllowProvisionalBilling { get; set; }
+        public bool IsPharmacyCappingApplicable { get; set; }
+        public bool IsBillingCappingApplicable { get; set; }
+        public bool UseCappingAPI { get; set; }
 
     }
 }

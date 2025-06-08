@@ -19,7 +19,9 @@
           <div class="col-md-12">
             <ul class="nav nav-tabs">
               <li class="active"><a data-toggle="tab" href="#allorders">Lab/Imaging Orders</a></li>
-              <li><a data-toggle="tab" href="#drugorders" (click)="ShowPharmacyOrder()">Pharmacy Orders</a></li>
+
+              <!-- Bikesh: 17th_Sep_2024 disabled the tab as per requirement in the story because of not in use -->
+              <!-- <li><a data-toggle="tab" href="#drugorders" (click)="ShowPharmacyOrder()">Pharmacy Orders</a></li> -->
             </ul>
           </div>
 
@@ -45,10 +47,12 @@
                 </div>
               </div>
 
-              <div class="col-md-6" style="margin-bottom: 10px;" *ngIf="showSchemePriceCategory">
+              <div class="col-md-8" style="margin-bottom: 10px; margin-right: 15px; margin-left: 15px;" *ngIf="showSchemePriceCategory">
                 <scheme-pricecategory-select
                                              [selected-scheme-priceCategory]="SelectedSchemePriceCategory"
-                                             [disable-selection]="true">
+                                             [disable-selection]="true"
+                                             [service-billing-context]="serviceBillingContext"
+                                             (on-change)="OnSchemePriceCategoryChanged($event)">
                 </scheme-pricecategory-select>
               </div>
 
@@ -58,6 +62,7 @@
                                          [patientId]="SelectedPatient.PatientId" [visitId]="SelectedPatient.PatientVisitId"
                                          [visitType]="'emergency'" [billingType]="'outpatient'" [showPriceCategory]="false"
                                          [past-tests]="ProvisionalItemsDetails"
+                                         [scheme-object]="SchemePriceCategory"
                                          (emit-billItemReq)="OrderRequested()"
                                          [scheme-priceCategory]="SelectedSchemePriceCategory"></ward-billitem-request>
                 </div>

@@ -1,17 +1,18 @@
 import { Component } from '@angular/core';
-import * as moment from 'moment/moment';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { WardSupplyBLService } from "../../shared/wardsupply.bl.service";
-import WARDGridColumns from "../../shared/ward-grid-cloumns";
-import { WARDReportsModel } from '../../shared/ward-report.model';
-import { SecurityService } from '../../../security/shared/security.service';
 import { Router } from '@angular/router';
+import * as moment from 'moment/moment';
+import { InventoryBLService } from '../../../inventory/shared/inventory.bl.service';
+import { SecurityService } from '../../../security/shared/security.service';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { IGridFilterParameter } from '../../../shared/danphe-grid/grid-filter-parameter.interface';
-import { InventoryBLService } from '../../../inventory/shared/inventory.bl.service';
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { ItemSubCategory } from '../../shared/SubCategory.model';
-import { DanpheHTTPResponse } from '../../../shared/common-models';
-import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { WardConsumptionType } from '../../shared/ward-consumption-types.model';
+import WARDGridColumns from "../../shared/ward-grid-cloumns";
+import { WARDReportsModel } from '../../shared/ward-report.model';
+import { WardSupplyBLService } from "../../shared/wardsupply.bl.service";
 
 
 @Component({
@@ -35,12 +36,16 @@ export class ConsumptionReportComponent {
   public toDate: string = null;
   public selectedSubCategoryId: number = null;
   public SubCategoryList: ItemSubCategory[] = [];
+  ConsumptionTypes: WardConsumptionType[] = [];
+  SelectedConsumptionType: WardConsumptionType = new WardConsumptionType();
+  ConsumptionTypeName: string;
 
   constructor(public wardBLService: WardSupplyBLService, public msgBoxServ: MessageboxService, public securityService: SecurityService, public router: Router, public inventoryBLService: InventoryBLService) {
     this.dateRange = 'last1Week';
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('Date', false));
     this.CheckForSubstoreActivation();
     this.getSubCategoryList();
+    this.GetConsumptionTypes();
   };
 
   CheckForSubstoreActivation() {
@@ -76,18 +81,22 @@ export class ConsumptionReportComponent {
   Load() {
     if (this.wardReports.FromDate != null && this.wardReports.ToDate != null) {
       this.FilterParameters = [
-        { DisplayName: "DateRange:", Value: this.dateRange }
+        { DisplayName: "DateRange:", Value: this.dateRange },
+        { DisplayName: "ConsumptionTypeName:", Value: this.ConsumptionTypeName != null ? this.ConsumptionTypeName : 'All' },
       ]
       this.isInternalConsumption = false;
       this.isPatientConsumption = false;
       this.wardBLService.GetConsumptionReport(this.wardReports)
-          .subscribe((res: DanpheHTTPResponse) => {
-              if (res.Status == ENUM_DanpheHTTPResponseText.OK) {
+        .subscribe((res: DanpheHTTPResponse) => {
+          if (res.Status == ENUM_DanpheHTTPResponseText.OK) {
             this.ConsumptionReportData = res.Results;
             this.NewWardConsumptionData = res.Results;
+            this.SelectedConsumptionType = null;
+            this.wardReports.ConsumptionTypeId = null;
+            this.ConsumptionTypeName = null;
           }
           else {
-                  this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage])
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage])
           }
         });
     }
@@ -151,5 +160,30 @@ export class ConsumptionReportComponent {
       err => {
         this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Failed to get SubCategoryList. " + err.ErrorMessage]);
       })
+  }
+  GetConsumptionTypes() {
+    this.wardBLService.GetActiveConsumptionTypes().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+        this.ConsumptionTypes = res.Results;
+      }
+    },
+      err => {
+        console.log(err.ErrorMessage);
+      })
+  }
+
+  OnConsumptionTypeChange() {
+    if (this.SelectedConsumptionType && this.SelectedConsumptionType.ConsumptionTypeId) {
+      this.wardReports.ConsumptionTypeId = this.SelectedConsumptionType.ConsumptionTypeId;
+      this.ConsumptionTypeName = this.SelectedConsumptionType.ConsumptionTypeName;
+    }
+    else {
+      this.wardReports.ConsumptionTypeId = null;
+      this.ConsumptionTypeName = null;
+    }
+  }
+
+  ConsumptionTypeFormatter(data): string {
+    return data["ConsumptionTypeName"];
   }
 }

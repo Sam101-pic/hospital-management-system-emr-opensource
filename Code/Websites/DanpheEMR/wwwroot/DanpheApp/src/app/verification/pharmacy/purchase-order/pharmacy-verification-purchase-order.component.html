@@ -242,7 +242,8 @@
                             <span class="col-md-10">{{PurchaseOrder.Remarks}}</span>
                         </div>
                         <div class="row hidden-in-print" style="margin:10px -15px" [hidden]="isVerificationAllowed==false">
-                            <label for="VerificationRemarks" class="col-md-2 text-left">Remarks <span class="right">:</span></label>
+                            <label for="VerificationRemarks" class="col-md-2 text-left">Remarks <span class="right"
+                                      style="color: red;">*:</span></label>
                             <textarea class="col-md-10" [(ngModel)]="PurchaseOrder.VerificationRemarks" name="VerificationRemarks"
                                       rows="3"></textarea>
                         </div>

@@ -20,6 +20,38 @@ namespace DanpheEMR.Controllers.Billing
 
             try
             {
+                //Step 0: Check whether the credit invoices are already settled.
+                var isAlreadySettled = false;
+                var serviceBillingInvoices = (from invFromClient in billNewSettlement_DTO.BillingTransactions
+                                join invFromServer in _settlementDbContext.BillingTransactions.AsNoTracking() on invFromClient.TransactionId equals invFromServer.BillingTransactionId
+                                where invFromServer.SettlementId is null
+                                select new 
+                                { 
+                                    TransactionId = invFromServer.SettlementId
+                                })
+                                .ToList();
+
+                var productBillingInvoices = (from invFromClient in billNewSettlement_DTO.PHRMInvoiceTransactionModels
+                                              join invFromServer in _settlementDbContext.PHRMInvoiceTransactionModels.AsNoTracking() on invFromClient.TransactionId equals invFromServer.InvoiceId
+                                              where invFromServer.SettlementId is null
+                                              select new
+                                              {
+                                                  TransactionId = invFromServer.SettlementId
+                                              })
+                                .ToList();
+                if ((serviceBillingInvoices != null && serviceBillingInvoices.Count > 0) || (productBillingInvoices != null && productBillingInvoices.Count() > 0))
+                {
+                    isAlreadySettled = false;
+                }
+                else
+                {
+                    isAlreadySettled = true;
+                }
+
+                if (isAlreadySettled)
+                {
+                    throw new InvalidOperationException($"The Invoice(s) are already settled!");
+                }
                 if (IsValidDeposit(_settlementDbContext, billNewSettlement_DTO.PatientId, billNewSettlement_DTO.DepositDeducted))
                 {
                     //step 1: Deserialize into BillSettlementModel
@@ -486,8 +518,12 @@ namespace DanpheEMR.Controllers.Billing
 
         private static bool IsValidDeposit(SettlementDbContext setttlementDbContext, int patientId, double? depositUsed)
         {
+            var usePharmacyDepositsIndependently = false;
+            usePharmacyDepositsIndependently = ReadDepositConfigureationParam(setttlementDbContext);
+
             var patientAllDepositTxns = (from bill in setttlementDbContext.BillingDeposits
                                          where bill.PatientId == patientId && bill.IsActive == true
+                                         && ((usePharmacyDepositsIndependently && bill.ModuleName == "Billing") || (!usePharmacyDepositsIndependently && bill.ModuleName == bill.ModuleName))
                                          group bill by new { bill.PatientId, bill.TransactionType } into p
                                          select new
                                          {
@@ -634,6 +670,18 @@ namespace DanpheEMR.Controllers.Billing
                                   select depTxn.ReceiptNo).DefaultIfEmpty(0).Max();
 
                 return receiptNo + 1;
+        }
+        private static bool ReadDepositConfigureationParam(SettlementDbContext dbContext)
+        {
+            var usePharmacyDepositsIndependently = false;
+            var param = dbContext.AdminParameters.FirstOrDefault(p => p.ParameterGroupName == "Pharmacy" && p.ParameterName == "UsePharmacyDeposit");
+            if (param != null)
+            {
+                var paramValue = param.ParameterValue;
+                usePharmacyDepositsIndependently = paramValue == "true" ? true : false;
+            }
+
+            return usePharmacyDepositsIndependently;
         }
     }
 }

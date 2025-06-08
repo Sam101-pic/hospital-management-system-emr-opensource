@@ -2,20 +2,20 @@
   <div class="col-md-12">
     <div class="row">
       <div class="col-md-12">
-        <div class="col-md-8">
+        <div class="col-md-8" style="margin-top:6px;">
           <div class="row">
-            <div class="col-md-12">
-              <div class="col-md-4">
+            <div class="col-md-12" style="padding-left:0px;">
+              <div class="col-md-4" style="padding-left:0px !important;">
                 <input type="button" class="btn primary-btn" (click)="CreatePurchaseOrder()" value="Create Purchase Order" />
               </div>
-              <div class="col-md-3">
+              <div class="col-md-3" style="margin-top:6px;">
                 <div class="pull-Right">
                   <a (click)="CreateNewDraft()" style="text-decoration: underline;">
                     <i class="fa fa-plus"></i> Start New Draft
                   </a>
                 </div>
               </div>
-              <div class="col-md-3">
+              <div class="col-md-3" style="margin-top:6px;">
                 <div class="pull-Right">
                   <a (click)="ViewDraftList()" style="text-decoration: underline;">
                     <i class="fa fa-folder-open"></i>View Draft List
@@ -59,7 +59,9 @@
                      [NepaliDateInGridParams]="NepaliDateInGridSettings"
                      [show-CustomDate]="true"
                      [grid-exportOptions]="getGridExportOptions()"
-                     [grid-showExport]="true"></danphe-grid>
+                     [grid-showExport]="true"
+                     [date-settings-name]="'common-range-with-today'">
+        </danphe-grid>
       </div>
     </div>
   </div>

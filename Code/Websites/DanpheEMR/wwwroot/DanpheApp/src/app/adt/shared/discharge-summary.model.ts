@@ -1,5 +1,6 @@
 import {
   FormBuilder,
+  FormControl,
   FormGroup,
   Validators,
 } from '@angular/forms';
@@ -15,12 +16,13 @@ export class DischargeSummary {
   public OperativeFindings: string = null;
   public AnaesthetistsId: number = null;
   public Anaesthetists: string = null;
+  public Anesthetists: string = null;
   public Diagnosis: string;
   public CaseSummary: string = null;
   public Condition: string = null;
   public Treatment: string = null;
   public HistologyReport: string = null;
-  public SpeicialNotes: string = null;
+  public SpecialNotes: string = null;
   public Medications: string = null;
   public Allergies: string = null;
   public Activities: string = null;
@@ -59,6 +61,7 @@ export class DischargeSummary {
   public ProcedureNts: string = null;
   public SelectedImagingItems: string = null;
   public DischargeType: string = null;
+  public DischargeOrder: string = null;
 
   public ProvisionalDiagnosis: string;
 
@@ -79,61 +82,87 @@ export class DischargeSummary {
   public DoctorIncharge: string;
   public Age: number;
   public SelectedDiagnosis: string;
-  public Anesthetists: string;
   public ResidenceDrName: string;
   public CheckedBy: string;
   public Consultants: string;
-  public Consultant: String;
-  public hospitalStayDate: number;
+  public Consultant: string;
+  public hospitalStayDate: string;
   public DrInchargeNMC: string;
   public ConsultantNMC: string;
+  public CheckedByNMC: string;
   public ConsultantsSign: string;
+  public ConsultantSignImgPath: string;
+  public DrInchargeSignImgPath: string;
+  public StayDays: number = 0;
+  public HistoryOfPresentingIllness: string;
+  public OtherDiagnosis: string;
+  public HospitalReport: string;
+  public TreatmentDuringHospitalStay: string;
+  public ObstetricHistory: string;
+  public RelevantMaternalHistory: string;
+  public IndicationForAdmission: string;
+  public RespiratorySystem: string;
+  public CardiovascularSystem: string;
+  public GastrointestinalAndNutrition: string;
+  public Renal: string;
+  public NervousSystem: string;
+  public Metabolic: string;
+  public Sepsis: string;
+  public CongenitalAnomalies: string;
+  public Reflexes: string;
+  public MedicationsReceivedInNICUNursery: string;
+  public Discussion: string;
+  ConsultantDepartment: string;
 
-
-
+  public ConfigureValidator(formControls: any) {
+    formControls.forEach(control => {
+      this.DischargeSummaryValidator.addControl(control, new FormControl('', Validators.required));
+    });
+  }
 
   constructor() {
+    // public DischargeSummaryValidator: FormGroup = null;
 
     var _formBuilder = new FormBuilder();
     this.DischargeSummaryValidator = _formBuilder.group({
-      'DischargeTypeId': ['', Validators.compose([Validators.required])],
-      // 'ConsultantId': ['', Validators.compose([Validators.required])],
-      'DoctorInchargeId': ['', Validators.compose([Validators.required])],
-      'DeathTypeId': ['', Validators.compose([Validators.required])],
-
-
-      'AnaesthetistsId': ['', Validators.compose([Validators.required])],
-      'ResidenceDrId': ['', Validators.compose([Validators.required])],
-      'BabyWeight': ['', Validators.compose([Validators.required])],
-      'icd10Description': ['', Validators.compose([Validators.required])],
-      'RestDays': ['', Validators.compose([Validators.required])],
-      'FollowUp': ['', Validators.compose([Validators.required])],
-
-
-      'OperativeProcedure': ['', Validators.compose([Validators.maxLength(1000)])],
-      'OperativeFindings': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      //'Diagnosis': ['', Validators.compose([Validators.required, Validators.maxLength(1000)])],
-      'CaseSummary': ['', Validators.compose([Validators.maxLength(8000), Validators.required])],
-      'Condition': ['', Validators.compose([Validators.maxLength(5000), Validators.required])],
-      //ramavtar: 12May18: Treatment is not mandatory
-      'Treatment': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'HistologyReport': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'SpeicialNotes': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      //'Medications': ['', Validators.compose([Validators.maxLength(1000)])],
-      'Allergies': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'Activities': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'Diet': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'Others': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'ChiefComplaint': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'PendingReports': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'HospitalCourse': ['', Validators.compose([Validators.maxLength(5000), Validators.required])],
-      'PresentingIllness': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'ProcedureNts': ['', Validators.compose([Validators.maxLength(1000), Validators.required])],
-      'ClinicalFindings': ['', Validators.compose([Validators.required])],
-      'PastHistory': ['', Validators.compose([Validators.required])],
-      'DischargeConditionId': ['', Validators.compose([])],
-      'DiagnosisFreeText': ['', Validators.compose([Validators.maxLength(1000), Validators.required])]
+      'DischargeType': ['', Validators.compose([Validators.required])],
+      // 'Consultant': ['', Validators.compose([Validators.required])],
+      'DischargeCondition': ['', Validators.compose([Validators.required])],
+      'DoctorIncharge': ['', Validators.compose([Validators.required])],
+      'Anesthetists': [''],
+      'ResidentDr': [''],
+      'BabyWeight': [''],
+      'SelectDiagnosis': [''],
+      'ProvisonalDiagnosis': [''],
+      'SelectedDiagnosis': [''],
+      'OtherDiagnosis': [''],
+      'ClinicalFindings': [''],
+      'CheifComplain': [''],
+      'HistoryOfPresentingIllness': [''],
+      'PastHistory': [''],
+      'CaseSummery': [''],
+      'Procedure': [''],
+      'OperativeFindings': [''],
+      'HospitalReport': [''],
+      'HospitalCourse': [''],
+      'TreatmentDuringHospitalStay': [''],
+      'ConditionOnDischarge': [''],
+      'PendingReports': [''],
+      'SpecialNotes': [''],
+      'Allergies': [''],
+      'Activities': [''],
+      'Diet': [''],
+      'RestDays': [''],
+      'FollowUP': [''],
+      'Others': [''],
+      'CheckedBy': [''],
+      'Investigations': [''],
+      'LabTests': [''],
+      'Imgaings': [''],
+      'Medications': [''],
+      'DischargeOrder': ['']
     });
+
   }
   public IsDirty(fieldName): boolean {
     if (fieldName == undefined)
@@ -142,7 +171,15 @@ export class DischargeSummary {
       return this.DischargeSummaryValidator.controls[fieldName].dirty;
   }
 
-  public IsValid(): boolean { if (this.DischargeSummaryValidator.valid) { return true; } else { return false; } } public IsValidCheck(fieldName, validator): boolean {
+  public IsValid(): boolean {
+    if (this.DischargeSummaryValidator.valid) {
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
+  public IsValidCheck(fieldName, validator): boolean {
     if (fieldName == undefined)
       return this.DischargeSummaryValidator.valid;
     else

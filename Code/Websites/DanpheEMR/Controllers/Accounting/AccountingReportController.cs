@@ -1,32 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using DanpheEMR.AccTransfer;
+using DanpheEMR.CommonTypes;
 using DanpheEMR.Core.Configuration;
-using DanpheEMR.ServerModel;
 using DanpheEMR.DalLayer;
+using DanpheEMR.Enums;
+using DanpheEMR.Security;
+using DanpheEMR.ServerModel;
+using DanpheEMR.ServerModel.AccountingModels;
+using DanpheEMR.ServerModel.AccountingModels.DTOs;
+using DanpheEMR.Services.Accounting.DTOs;
+using DanpheEMR.Utilities;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using System;
+using System.Collections.Generic;
+using System.Data;
 using System.Data.Entity;
 using System.Data.SqlClient;
-using Microsoft.Extensions.Options;
-using Newtonsoft.Json.Linq;
-using DanpheEMR.Utilities;
-using Newtonsoft.Json;
-using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Http.Features;
-using DanpheEMR.CommonTypes;
-using RefactorThis.GraphDiff;//for entity-update.
-using DanpheEMR.Security;
-using System.Data;
-using System.Dynamic;
-using DocumentFormat.OpenXml.Wordprocessing;
-using Newtonsoft.Json.Converters;
-using DanpheEMR.AccTransfer;
-using DanpheEMR.ServerModel.AccountingModels;
-using DanpheEMR.Enums;
-using DanpheEMR.Services.Accounting.DTOs;
-using DanpheEMR.ServerModel.AccountingModels.DTOs;
-using DocumentFormat.OpenXml.Spreadsheet;
+using System.Linq;
 // For more information on enabling MVC for empty projects, visit http://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace DanpheEMR.Controllers
@@ -48,6 +40,84 @@ namespace DanpheEMR.Controllers
             _inventoryDbContext = new InventoryDbContext(connString);
             _pharmacyDbContext = new PharmacyDbContext(connString);
         }
+        /// <summary>
+        /// This API is used to get Data for Accounting Ageing Report.
+        /// </summary>
+        /// <param name="NumberOfInterval">Count of Date Interval to show in report.</param>
+        /// <param name="IntervalDuration">The Day count between the interval.</param>
+        /// <param name="SectionIds">The section Ids in CSV format will be received from client.</param>
+        /// <param name="IsVendorBillWiseTxn">Either user wants ageing based upon good receipt date or vendor bill date.</param>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("AgeingReport")]
+        public string AgeingReport(int NumberOfInterval, int IntervalDuration, string SectionIds, bool IsVendorBillWiseTxn)
+        {
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+            List<SqlParameter> paramList = new List<SqlParameter>()
+                {
+                    new SqlParameter("@CounterInterval", IntervalDuration),
+                    new SqlParameter("@NumIntervals", NumberOfInterval),
+                    new SqlParameter("@SectionIds",SectionIds),
+                    new SqlParameter("@ShowVendorBillWiseTxn", IsVendorBillWiseTxn)
+                };
+            DataTable result = DALFunctions.GetDataTableFromStoredProc("SP_ACC_RPT_GetAgeingReport", paramList, _accountingDbContext);
+            responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+            responseData.Results = result;
+            return DanpheJSONConvert.SerializeObject(responseData);
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="SectionId">SectionId may be the Id for pharmacy=3 or Inventory=1 modules.</param>
+        /// <param name="FromDate">Start date for the report.</param>
+        /// <param name="ToDate">End data for the report. </param>
+        /// <param name="SupplierId">Supplier Identifier.</param>
+        /// <param name="IsVendorBillWiseTxn">Either user wants ageing based upon good receipt date or vendor bill date.</param>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("AgeingReportDetail")]
+        public string AgeingReportDetailView(int SectionId, DateTime? FromDate, DateTime? ToDate,int SupplierId, bool IsVendorBillWiseTxn)
+        {
+            if (FromDate == DateTime.MinValue)
+            {
+                FromDate = null;
+            }
+
+            if (ToDate == DateTime.MinValue)
+            {
+                ToDate = null;
+            }
+
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+            List<SqlParameter> paramList = new List<SqlParameter>()
+                {
+                    new SqlParameter("@SectionId",SectionId),
+                    new SqlParameter("@FromDate",FromDate),
+                    new SqlParameter("@ToDate",ToDate),
+                    new SqlParameter("@SupplierId",SupplierId),
+                    new SqlParameter("@ShowVendorBillWiseTxn", IsVendorBillWiseTxn)
+                };
+            DataTable result = DALFunctions.GetDataTableFromStoredProc("SP_ACC_RPT_GetAgeingReportDetail", paramList, _accountingDbContext);
+            responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+            responseData.Results = result;
+            return DanpheJSONConvert.SerializeObject(responseData);
+        }
+
+        [HttpGet]
+        [Route("TransactionWiseAgeingReport")]
+        public string TransactionWiseAgeingReport()
+        {
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+            List<SqlParameter> paramList = new List<SqlParameter>()
+                {
+                new SqlParameter("@HospitalId",currentHospitalId)
+                };
+            DataTable result = DALFunctions.GetDataTableFromStoredProc("SP_ACC_RPT_GetLedgerAgingSummaryWithLedgerFilter", paramList, _accountingDbContext);
+            responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+            responseData.Results = result;
+            return DanpheJSONConvert.SerializeObject(responseData);
+        }
 
         [HttpPost]
         [Route("LedgerListReport")]
@@ -58,7 +128,8 @@ namespace DanpheEMR.Controllers
             {
                 int AllCostCenterAliasId = -2;
                 List<int> ledgerIds = clientData.LedgerIds;
-                int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+
+                int currentHospitalId = clientData.HospitalId;
                 AccountingDbContext accountingDBContext = new AccountingDbContext(connString);
 
                 var showTxnItemLevelPar = (from p in accountingDBContext.CFGParameters
@@ -74,7 +145,7 @@ namespace DanpheEMR.Controllers
                 var led = (from l in accountingDBContext.Ledgers
                            join lbh in accountingDBContext.LedgerBalanceHistory on l.LedgerId equals lbh.LedgerId
                            where ledgerIds.Contains(lbh.LedgerId)
-                           && lbh.HospitalId == currentHospitalId && lbh.FiscalYearId == fYearId
+                           && lbh.HospitalId == currentHospitalId && lbh.FiscalYearId == fYearId && l.HospitalId == currentHospitalId
                            select new
                            {
                                OpeningBalance = (clientData.CostCenterId == AllCostCenterAliasId) ? lbh.OpeningBalance : 0,
@@ -90,7 +161,7 @@ namespace DanpheEMR.Controllers
                                   join lbh in accountingDBContext.LedgerBalanceHistory on l.LedgerId equals lbh.LedgerId
                                   where
                                   ti.HospitalId == currentHospitalId
-                                  && l.HospitalId == currentHospitalId &&
+                                  && l.HospitalId == currentHospitalId && l.HospitalId == currentHospitalId && lbh.HospitalId == currentHospitalId && v.HospitalId == currentHospitalId &&
                                   (ledgerIds.Contains(ti.LedgerId)) && (DbFunctions.TruncateTime(t.TransactionDate) >= clientData.FromDate && DbFunctions.TruncateTime(t.TransactionDate) <= clientData.ToDate)
                                   && lbh.FiscalYearId == fYearId && (ti.CostCenterId == clientData.CostCenterId || clientData.CostCenterId == AllCostCenterAliasId)
                                   && t.IsVerified == true
@@ -109,14 +180,17 @@ namespace DanpheEMR.Controllers
                                       ti.Amount,
                                       ti.DrCr,
                                       Description = (t.SectionId == 4) ? ti.Description : "",//get description only for manual voucher entry, 4 Id for Manual section
-                                      ti.LedgerId
+                                      ti.LedgerId,
+                                      Narration = t.Remarks
                                   }).ToList();
 
                 List<DataListDTOModel> dataList = new List<DataListDTOModel>();
 
 
                 var openingBalanceFiscalYear = (from f in accountingDBContext.FiscalYears
-                                                where f.FiscalYearId == fYearId
+                                                join map in accountingDBContext.MapFiscalYears
+                                                on f.FiscalYearId equals map.FiscalYearId
+                                                where map.FiscalYearId == fYearId && map.HospitalId == currentHospitalId
                                                 select f).FirstOrDefault();
                 var dataList1 = (from t in accountingDBContext.Transactions
                                  join ti in accountingDBContext.TransactionItems on t.TransactionId equals ti.TransactionId
@@ -203,6 +277,7 @@ namespace DanpheEMR.Controllers
                                   DepartmentName = "TempTest",
                                   itm.Description,
                                   itm.LedgerId,
+                                  itm.Narration,
                                   TransactionItems = (showTxnItemLevel == true) ? null :
                                                                                     (from txnItm in accountingDBContext.TransactionItems
                                                                                      where txnItm.HospitalId == currentHospitalId
@@ -299,18 +374,17 @@ namespace DanpheEMR.Controllers
         #region Cash/Bank Book Report
         [HttpGet]
         [Route("CashBankBookReport")]
-        public string CashBankBookReport(DateTime fromDate, DateTime toDate, int fiscalYearId, string ledgerIds)
+        public string CashBankBookReport(DateTime fromDate, DateTime toDate, int fiscalYearId, string ledgerIds,int HospitalId)
         {
             AccountingDbContext accountingDBContext = new AccountingDbContext(connString);
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
             List<SqlParameter> paramList = new List<SqlParameter>()
                 {
                     new SqlParameter("@FromDate", fromDate),
                     new SqlParameter("@ToDate", toDate),
                     new SqlParameter("@OpeningFiscalYearId",fiscalYearId),
                     new SqlParameter("@LedgerIds",ledgerIds),
-                    new SqlParameter("@HospitalId", currentHospitalId)
+                    new SqlParameter("@HospitalId", HospitalId)
                 };
             DataSet result = DALFunctions.GetDatasetFromStoredProc("SP_ACC_RPT_Cash_BankBookReport", paramList, accountingDBContext);
             var OpeningData = DataTableToList.ToDynamic(result.Tables[0]);
@@ -329,17 +403,16 @@ namespace DanpheEMR.Controllers
         #region Day Book Report
         [HttpGet]
         [Route("DayBookReport")]
-        public string DayBookReport(DateTime fromDate, DateTime toDate, int fiscalYearId, int ledgerId)
+        public string DayBookReport(DateTime fromDate, DateTime toDate, int fiscalYearId, int ledgerId, int HospitalId)
         {
             AccountingDbContext accountingDBContext = new AccountingDbContext(connString);
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
             List<SqlParameter> paramList = new List<SqlParameter>()
                 {
                     new SqlParameter("@FromDate", fromDate),
                     new SqlParameter("@ToDate", toDate),
                     new SqlParameter("@LedgerId",ledgerId),
-                    new SqlParameter("@HospitalId", currentHospitalId),
+                    new SqlParameter("@HospitalId", HospitalId),
                     new SqlParameter("@OpeningFiscalYearId",fiscalYearId)
                 };
             DataSet result = DALFunctions.GetDatasetFromStoredProc("SP_ACC_RPT_Day_Book_Report", paramList, accountingDBContext);
@@ -359,7 +432,7 @@ namespace DanpheEMR.Controllers
         #region Bank Reconciliation Report
         [HttpGet]
         [Route("BankReconciliationReport")]
-        public string BankReconciliationReport(int ledgerId, DateTime fromDate, DateTime toDate, int fiscalYearId, int voucherTypeId, int status)
+        public string BankReconciliationReport(int ledgerId, DateTime fromDate, DateTime toDate, int fiscalYearId, int voucherTypeId, int status, int subLedgerId)
         {
             AccountingDbContext accountingDBContext = new AccountingDbContext(connString);
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
@@ -370,7 +443,9 @@ namespace DanpheEMR.Controllers
                     new SqlParameter("@ToDate", toDate),
                     new SqlParameter("@LedgerId",ledgerId),
                     new SqlParameter("@VoucherTypeId",voucherTypeId),
-                    new SqlParameter("@Status",status)
+                    new SqlParameter("@Status",status),
+                    new SqlParameter("@SubLedgerId",subLedgerId),
+                    new SqlParameter("@HospitalId",currentHospitalId)
                 };
             DataSet result = DALFunctions.GetDatasetFromStoredProc(ENUM_StoredProcedures.BankReconciliationReport, paramList, accountingDBContext);
             var TransactionData = DataTableToList.ToDynamic(result.Tables[0]);
@@ -429,64 +504,64 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("VoucherReport")]
-        public IActionResult VoucherReport(DateTime FromDate, DateTime ToDate, int sectionId)
+        public IActionResult VoucherReport(DateTime FromDate, DateTime ToDate, int sectionId, int hospitalId)
         {
             //if (reqType == "voucher-report")
-            Func<object> func = () => GetVoucherReport(FromDate, ToDate, sectionId);
+            Func<object> func = () => GetVoucherReport(FromDate, ToDate, sectionId, hospitalId);
             return InvokeHttpGetFunction<object>(func);
 
         }   
 
         [HttpGet]
         [Route("LedgerReport")]
-        public IActionResult LedgerReport(int ledgerId, DateTime FromDate, DateTime ToDate, int FiscalYearId)
+        public IActionResult LedgerReport(int ledgerId, DateTime FromDate, DateTime ToDate, int FiscalYearId, int HospitalId)
         {
             //if (reqType == "ledger-report")
-            Func<object> func = () => GetLedgerReport(ledgerId, FromDate, ToDate, FiscalYearId);
+            Func<object> func = () => GetLedgerReport(ledgerId, FromDate, ToDate, FiscalYearId, HospitalId);
             return InvokeHttpGetFunction<object>(func);
-        }
+        }  
 
         [HttpGet]
         [Route("TrailBalanceReport")]
-        public IActionResult TrailBalanceReport(DateTime FromDate, DateTime ToDate, int FiscalYearId)
+        public IActionResult TrailBalanceReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int HospitalId)
         { //if (reqType == "trailBalanceReport")
-            Func<object> func = () => GetTrailBalanceReport(FromDate, ToDate, FiscalYearId);
+            Func<object> func = () => GetTrailBalanceReport(FromDate, ToDate, FiscalYearId, HospitalId);
             return InvokeHttpGetFunction<object>(func);
         }
 
         [HttpGet]
         [Route("GroupStatementReport")]
-        public IActionResult GroupStatementReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int LedgerGroupId)
+        public IActionResult GroupStatementReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int LedgerGroupId, int HospitalId)
         {
             //if (reqType == "groupStatementReport")
-            Func<object> func = () => GetGroupStatementReport(FromDate, ToDate, FiscalYearId, LedgerGroupId);
+            Func<object> func = () => GetGroupStatementReport(FromDate, ToDate, FiscalYearId, LedgerGroupId, HospitalId);
             return InvokeHttpGetFunction<object>(func);
         }
 
         [HttpGet]
         [Route("ProfitAndLossReport")]
-        public IActionResult ProfitAndLossReport(DateTime FromDate, DateTime ToDate, int FiscalYearId)
+        public IActionResult ProfitAndLossReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int HospitalId)
         {
             //  if (reqType == "profitLossReport")
-            Func<object> func = () => GetProfitLossReport(FromDate, ToDate, FiscalYearId);
+            Func<object> func = () => GetProfitLossReport(FromDate, ToDate, FiscalYearId, HospitalId);
             return InvokeHttpGetFunction<object>(func);
         }
 
         [HttpGet]
         [Route("BalanceSheetReport")]
-        public IActionResult BalanceSheetReport(DateTime selectedDate, int FiscalYearId)
+        public IActionResult BalanceSheetReport(DateTime selectedDate, int FiscalYearId, int HospitalId)
         {
             // else if (reqType == "balanceSheetReportData")
-            Func<object> func = () => GetBalanceSheet(selectedDate, FiscalYearId);
+            Func<object> func = () => GetBalanceSheet(selectedDate, FiscalYearId, HospitalId);
             return InvokeHttpGetFunction<object>(func);
 
         }
         [HttpGet]
         [Route("DailyTransactionReport")]
-        public IActionResult DailyTransactionReport(DateTime FromDate, DateTime ToDate)
+        public IActionResult DailyTransactionReport(DateTime FromDate, DateTime ToDate, int HospitalId)
         {
             //else if (reqType == "daily-txn-report")
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HospitalId;
             Func<object> func = () => (from txn in _accountingDbContext.Transactions
                                        where txn.HospitalId == currentHospitalId 
                                        && (DbFunctions.TruncateTime(txn.TransactionDate) >= FromDate && DbFunctions.TruncateTime(txn.TransactionDate) <= ToDate)
@@ -527,10 +602,10 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("CashFlowReport")]
-        public IActionResult CashFlowReport(DateTime FromDate, DateTime ToDate, int FiscalYearId)
+        public IActionResult CashFlowReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int HospitalId)
         {
             //else if (reqType == "cashflowReportData")
-            Func<object> func = () => GetCashFlowReport(FromDate, DateTime.Today, FiscalYearId);
+            Func<object> func = () => GetCashFlowReport(FromDate, DateTime.Today, FiscalYearId, HospitalId);
             return InvokeHttpGetFunction<object>(func);
         }
         [HttpGet]
@@ -552,10 +627,10 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("SystemAuditReport")]
-        public IActionResult SystemAuditReport(DateTime FromDate, DateTime ToDate, string voucherReportType, int sectionId)
+        public IActionResult SystemAuditReport(DateTime FromDate, DateTime ToDate, string voucherReportType, int sectionId, int HospitalId)
         {
             //if (reqType == "system-aduit-report")
-            Func<object> func = () => GetSystemAuditReport(FromDate, ToDate, voucherReportType, sectionId);
+            Func<object> func = () => GetSystemAuditReport(FromDate, ToDate, voucherReportType, sectionId, HospitalId);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -583,7 +658,7 @@ namespace DanpheEMR.Controllers
 
 
             // else if (reqType == "Bank-Reconciliation-history")
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
 
             Func<object> func = () => (from bank in _accountingDbContext.BankReconciliationModel
                                        join emp in _accountingDbContext.Emmployees on bank.CreatedBy equals emp.EmployeeId
@@ -621,11 +696,13 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("AccountHeadDetailReport")]
-        public object AccountHeadDetailReport()
+        public object AccountHeadDetailReport(int HospitalId)
         {
             AccountingDbContext accountingDBContext = new AccountingDbContext(connString);
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
-            DataTable accountHeadDetailReport = DALFunctions.GetDataTableFromStoredProc("SP_ACC_AccountHeadDetailReport", accountingDBContext);
+            List<SqlParameter> paramList = new List<SqlParameter>()
+                        { new SqlParameter("@HospitalId", HospitalId)};
+            DataTable accountHeadDetailReport = DALFunctions.GetDataTableFromStoredProc("SP_ACC_AccountHeadDetailReport", paramList, accountingDBContext);
 
             responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
 
@@ -666,7 +743,7 @@ namespace DanpheEMR.Controllers
                                                                                                           LedgerId = row.Field<int>("LedgerId"),
                                                                                                           LedgerName = row.Field<string>("LedgerName"),
                                                                                                           LedgerCode = row.Field<string>("LedgerCode"),
-                                                                                                          SubLedgerId = row.Field<int>("SubLedgerId"),
+                                                                                                          SubLedgerId =  row.Field<int>("SubLedgerId"),
                                                                                                           SubLedgerName = row.Field<string>("SubLedgerName"),
                                                                                                           SubLedgerCode = row.Field<string>("SubLedgerCode"),
 
@@ -2558,7 +2635,7 @@ namespace DanpheEMR.Controllers
 
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();//type 'object' since we have variable return types
             responseData.Status = ENUM_DanpheHttpResponseText.OK;//by default status would be OK, hence assigning at the top
-            AccountingDbContext accountingDBContext = new AccountingDbContext(connString);
+            //AccountingDbContext accountingDBContext = new AccountingDbContext(connString);
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             using(var dbTransaction = _accountingDbContext.Database.BeginTransaction())
@@ -2600,26 +2677,28 @@ namespace DanpheEMR.Controllers
                             bankObj.VoucherTypeId = itm.VoucherTypeId;
                             bankObj.PartyLedgerId = itm.PartyLedgerId;
                             bankObj.PartySubLedgerId = itm.PartySubLedgerId;
-                            accountingDBContext.BankReconciliationModel.Add(bankObj);
+                            bankObj.SubLedgerId = itm.SubLedgerId == 0 ? null : itm.SubLedgerId;
+                            bankObj.TransactionItemId = itm.TransactionItemId;
+                            _accountingDbContext.BankReconciliationModel.Add(bankObj);
                         });
 
-                        accountingDBContext.SaveChanges();
+                        _accountingDbContext.SaveChanges();
 
                         if (extraTxns != null)
                         {
-                            var journalVoucher = accountingDBContext.Vouchers.Where(a => a.VoucherCode == ENUM_ACC_VoucherCode.JournalVoucher).FirstOrDefault();
-                            var fiscalyearId = AccountingTransferData.GetFiscalYearIdByDate(accountingDBContext, txnClient[0].BankTransactionDate, currentHospitalId);
-                            CostCenterModel costCenter = accountingDBContext.CostCenters.Where(cc => cc.CostCenterName == ENUM_ACC_DefaultCostCenterName.Hospital).FirstOrDefault();
-                            var isGroupbyData = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "IsAllowGroupby").FirstOrDefault().ParameterValue;
+                            var journalVoucher = _accountingDbContext.Vouchers.Where(a => a.VoucherCode == ENUM_ACC_VoucherCode.JournalVoucher && a.HospitalId==currentHospitalId).FirstOrDefault();
+                            var fiscalyearId = AccountingTransferData.GetFiscalYearIdByDate(_accountingDbContext, txnClient[0].BankTransactionDate, currentHospitalId);
+                            CostCenterModel costCenter = _accountingDbContext.CostCenters.Where(cc => cc.CostCenterName == ENUM_ACC_DefaultCostCenterName.Hospital && cc.HospitalId == currentHospitalId).FirstOrDefault();
+                            var isGroupbyData = _accountingDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "IsAllowGroupby").FirstOrDefault().ParameterValue;
                             var IdGroupBy = (isGroupbyData != "") ? Convert.ToBoolean(isGroupbyData) : true;
 
-                            var subLedgerParam = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "SubLedgerAndCostCenter").FirstOrDefault().ParameterValue;
+                            var subLedgerParam = _accountingDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "SubLedgerAndCostCenter").FirstOrDefault().ParameterValue;
                             var parmValue = DanpheJSONConvert.DeserializeObject<SubLedgerAndCostCenterConfig_DTO>(subLedgerParam);
                             List<TransactionModel> transactions = new List<TransactionModel>();
                             extraTxns.ForEach(txn =>
                             {
-                                var voucherNumber = AccountingBL.GetVoucherNumber(accountingDBContext, journalVoucher.VoucherId, 4, currentHospitalId, fiscalyearId);
-                                var TuId = AccountingBL.GetTUID(accountingDBContext, currentHospitalId);
+                                var voucherNumber = AccountingBL.GetVoucherNumber(_accountingDbContext, journalVoucher.VoucherId, 4, currentHospitalId, fiscalyearId);
+                                var TuId = AccountingBL.GetTUID(_accountingDbContext, currentHospitalId);
 
                                 var accTxn = new TransactionModel
                                 {
@@ -2645,9 +2724,12 @@ namespace DanpheEMR.Controllers
                                     HospitalId = currentHospitalId,
                                     IsReverseVoucher = true,
                                     IsReverseTxnAllow = false,
-                                    IsVerified = true
+                                    IsVerified = true,
+                                    VerifiedBy = currentUser.EmployeeId,
+                                    VerifiedOn = System.DateTime.Now,
+                                    VerificationRemarks = "This voucher is auto verified during bank reconciliation."
                                 };
-                                var defaultCostCenter = _accountingDbContext.CostCenters.Where(a => a.IsDefault == true).FirstOrDefault();
+                                var defaultCostCenter = _accountingDbContext.CostCenters.Where(a => a.IsDefault == true && a.HospitalId == currentHospitalId).FirstOrDefault();
                                 List<TransactionItemModel> txnItems = new List<TransactionItemModel>();
                                 var txnItm = new TransactionItemModel
                                 {
@@ -2668,7 +2750,7 @@ namespace DanpheEMR.Controllers
                                     var subLedgerTxn = new SubLedgerTransactionModel
                                     {
                                         LedgerId = txn.LedgerId,
-                                        SubLedgerId = txn.SubLedgerId,
+                                        SubLedgerId = (int)txn.SubLedgerId,
                                         DrAmount = txn.DrCr ? txn.Amount : 0,
                                         CrAmount = txn.DrCr ? 0 : txn.Amount,
                                         HospitalId = currentHospitalId,
@@ -2699,12 +2781,11 @@ namespace DanpheEMR.Controllers
                                 };
                                 if (parmValue.EnableSubLedger)
                                 {
-                                    var subLedger2 = _accountingDbContext.SubLedger.Where(a => a.LedgerId == txnItm2.LedgerId && a.IsDefault == true).FirstOrDefault();
                                     var subLedTxns2 = new List<SubLedgerTransactionModel>();
                                     var subLedgerTxn2 = new SubLedgerTransactionModel
                                     {
                                         LedgerId = txnItm2.LedgerId,
-                                        SubLedgerId = subLedger2 != null ? subLedger2.SubLedgerId : -1,
+                                        SubLedgerId = (int)txnClient[0].SubLedgerId,
                                         DrAmount = txn.DrCr ? 0 : txn.Amount,
                                         CrAmount = txn.DrCr ? txn.Amount : 0,
                                         HospitalId = currentHospitalId,
@@ -2724,8 +2805,8 @@ namespace DanpheEMR.Controllers
                                 txnItems.Add(txnItm);
                                 txnItems.Add(txnItm2);
                                 accTxn.TransactionItems = txnItems;
-                                accountingDBContext.Transactions.Add(accTxn);
-                                accountingDBContext.SaveChanges();
+                                _accountingDbContext.Transactions.Add(accTxn);
+                                _accountingDbContext.SaveChanges();
                                 transactions.Add(accTxn);
                             });
 
@@ -2752,10 +2833,19 @@ namespace DanpheEMR.Controllers
                                 bankObj.BankRefNumber = null;
                                 bankObj.VoucherTypeId = bankRec.VoucherId;
                                 bankObj.PartyLedgerId = bankRec.TransactionItems[0].LedgerId;
-                                bankObj.PartySubLedgerId = bankRec.TransactionItems[0].SubLedgers[0].SubLedgerId;
-                                accountingDBContext.BankReconciliationModel.Add(bankObj);
+                                bankObj.SubLedgerId = txnClient[0].SubLedgerId == 0 ? null : txnClient[0].SubLedgerId;
+                                bankObj.TransactionItemId = bankRec.TransactionItems[1].TransactionItemId;
+                                if(bankRec.TransactionItems[0].SubLedgers != null)
+                                {
+                                    bankObj.PartySubLedgerId = bankRec.TransactionItems[0].SubLedgers[0].SubLedgerId;
+                                }
+                                else
+                                {
+                                    bankObj.PartySubLedgerId = null;
+                                }
+                                _accountingDbContext.BankReconciliationModel.Add(bankObj);
                             });
-                            accountingDBContext.SaveChanges();
+                            _accountingDbContext.SaveChanges();
                         }
                         dbTransaction.Commit();
                         responseData.Results = "";
@@ -2812,17 +2902,19 @@ namespace DanpheEMR.Controllers
         {
         }
 
-        private object GetVoucherReport(DateTime FromDate, DateTime ToDate, int sectionId)
+        private object GetVoucherReport(DateTime FromDate, DateTime ToDate, int sectionId, int hospitalId)
         {
 
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            //int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = hospitalId;
             var SectionList = AccountingBL.GetSections(_accountingDbContext, currentHospitalId);
             var OpeningBalanceData = (from t in _accountingDbContext.Transactions
                                       where t.HospitalId == currentHospitalId
                                       join ti in _accountingDbContext.TransactionItems on t.TransactionId equals ti.TransactionId
                                       join fisc in _accountingDbContext.FiscalYears on t.FiscalyearId equals fisc.FiscalYearId
+                                      join map in _accountingDbContext.MapFiscalYears on fisc.FiscalYearId equals map.FiscalYearId
                                       where
-                                      ti.HospitalId == currentHospitalId && fisc.HospitalId == currentHospitalId &&
+                                      ti.HospitalId == currentHospitalId  && map.HospitalId == hospitalId && 
                                       (DbFunctions.TruncateTime(t.TransactionDate) == FromDate) && (t.FiscalyearId == fisc.FiscalYearId)
                                       && t.IsVerified == true
                                       group new { fisc, ti, t } by new
@@ -2841,8 +2933,9 @@ namespace DanpheEMR.Controllers
                            where txn.HospitalId == currentHospitalId
                            join voucher in _accountingDbContext.Vouchers on txn.VoucherId equals voucher.VoucherId
                            join fiscal in _accountingDbContext.FiscalYears on txn.FiscalyearId equals fiscal.FiscalYearId
+                           join map in _accountingDbContext.MapFiscalYears on fiscal.FiscalYearId equals map.FiscalYearId
                            where
-                           fiscal.HospitalId == currentHospitalId &&
+                          voucher.HospitalId==currentHospitalId && map.HospitalId == hospitalId &&
                            txn.IsActive == true && (DbFunctions.TruncateTime(txn.TransactionDate) >= FromDate && DbFunctions.TruncateTime(txn.TransactionDate) <= ToDate)
                             && txn.SectionId == sectionId && txn.IsVerified == true
                            select new
@@ -2854,7 +2947,7 @@ namespace DanpheEMR.Controllers
                                SectionId = txn.SectionId,
                                TransactionDate = DbFunctions.TruncateTime(txn.TransactionDate),// txn.TransactionDate.ToString("dd/mm/yyyy"),                                       
                                Amount = (from txnItm in _accountingDbContext.TransactionItems
-                                         where txnItm.TransactionId == txn.TransactionId
+                                         where txnItm.TransactionId == txn.TransactionId && txnItm.HospitalId == currentHospitalId
                                          && txnItm.DrCr == true
                                          group txnItm by new
                                          {
@@ -2873,7 +2966,7 @@ namespace DanpheEMR.Controllers
                                  t.VoucherType,
                                  t.TransactionDate,
                                  t.SectionId,
-                                 t.Narration
+                                 t.Narration,
                              }
                             into x
                              select new
@@ -2890,11 +2983,12 @@ namespace DanpheEMR.Controllers
             return finalData;
 
         }
-        private object GetLedgerReport(int ledgerId, DateTime FromDate, DateTime ToDate, int FiscalYearId)
+        private object GetLedgerReport(int ledgerId, DateTime FromDate, DateTime ToDate, int FiscalYearId, int HospitalId)
         {
 
 
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            //int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HospitalId;
             var showTxnItemLevelPar = (from p in _accountingDbContext.CFGParameters
                                        where p.ParameterGroupName.ToLower() == "accounting" && p.ParameterName == "ShowLedgerReportTxnItemLevel"
                                        select p).FirstOrDefault();
@@ -2942,7 +3036,9 @@ namespace DanpheEMR.Controllers
 
 
             var openingBalanceFiscalYear = (from f in _accountingDbContext.FiscalYears
-                                            where f.FiscalYearId == fYearId
+                                            join map in _accountingDbContext.MapFiscalYears
+                                            on f.FiscalYearId equals map.FiscalYearId
+                                            where map.FiscalYearId == fYearId && map.HospitalId == HospitalId
                                             select f).FirstOrDefault();
             var dataList1 = (from t in _accountingDbContext.Transactions
                              join ti in _accountingDbContext.TransactionItems on t.TransactionId equals ti.TransactionId
@@ -3090,10 +3186,11 @@ namespace DanpheEMR.Controllers
 
         }
 
-        private object GetTrailBalanceReport(DateTime FromDate, DateTime ToDate, int FiscalYearId)
+        private object GetTrailBalanceReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int HospitalId)
         {
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
-            List<SqlParameter> paramList = new List<SqlParameter>()
+            //int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HospitalId;
+            List <SqlParameter> paramList = new List<SqlParameter>()
                                 {
                                         new SqlParameter("@FromDate", FromDate),
                                         new SqlParameter("@ToDate", ToDate),
@@ -3160,18 +3257,18 @@ namespace DanpheEMR.Controllers
 
 
         }
-        private object GetGroupStatementReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int LedgerGroupId)
+        private object GetGroupStatementReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int LedgerGroupId, int HospitalId)
         {
 
 
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HospitalId;//HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             List<SqlParameter> paramList = new List<SqlParameter>()
                                 {
                                         new SqlParameter("@FromDate", FromDate),
                                         new SqlParameter("@ToDate", ToDate),
                                         new SqlParameter("@HospitalId", currentHospitalId),
                                         new SqlParameter("@OpeningFiscalYearId", AccountingTransferData.GetFiscalYearIdForOpeningBalance(_accountingDbContext,FiscalYearId,currentHospitalId)),
-                                        new SqlParameter("@LedgerGroupId", LedgerGroupId),
+                                        new SqlParameter("@LedgerGroupId", LedgerGroupId)
                                 };
             var spDataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_RPT_GetGroupStatementData", paramList, _accountingDbContext);
             var resultStr = JsonConvert.SerializeObject(spDataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" });
@@ -3203,7 +3300,7 @@ namespace DanpheEMR.Controllers
 
         }
 
-        private object GetProfitLossReport(DateTime FromDate, DateTime ToDate, int FiscalYearId)
+        private object GetProfitLossReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int HospitalId)
         {
 
 
@@ -3211,7 +3308,8 @@ namespace DanpheEMR.Controllers
 
             //profit and loss report only consider for Revenue and Expense type ledgers
             //No need to consider opening balance
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            //int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HospitalId;
             List<SqlParameter> paramList = new List<SqlParameter>()
                                 {
                                         new SqlParameter("@FromDate", FromDate),
@@ -3272,14 +3370,15 @@ namespace DanpheEMR.Controllers
 
         }
 
-        private object GetBalanceSheet(DateTime selectedDate, int FiscalYearId)
+        private object GetBalanceSheet(DateTime selectedDate, int FiscalYearId, int HospitalId)
         {
 
             //else if (reqType == "balanceSheetReportData")
             //{
             //NageshBB - 03 Jul 2020
             //Balance sheet will send FiscalYear Id and toDate only                   
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            //int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HospitalId;
             List<SqlParameter> paramList = new List<SqlParameter>()
                                 {  new SqlParameter("@ToDate", selectedDate),
                                     new SqlParameter("@HospitalId", currentHospitalId),
@@ -3352,7 +3451,7 @@ namespace DanpheEMR.Controllers
 
             //else if (reqType == "txn-Origin-details")
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             List<int> referanceIdList = new List<int>();
             List<int> transactionIdList = transactionIds.Split(',').Select(int.Parse).ToList();
 
@@ -3847,12 +3946,13 @@ namespace DanpheEMR.Controllers
 
         }
 
-        private object GetCashFlowReport(DateTime FromDate, DateTime ToDate, int FiscalYearId)
+        private object GetCashFlowReport(DateTime FromDate, DateTime ToDate, int FiscalYearId, int HospitalId)
         {
 
 
 
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            //int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HospitalId;
             List<SqlParameter> paramList = new List<SqlParameter>()
                         {
                             new SqlParameter("@FromDate", FromDate),
@@ -3877,13 +3977,14 @@ namespace DanpheEMR.Controllers
 
 
 
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             var SectionList = AccountingBL.GetSections(_accountingDbContext, currentHospitalId);
             var OpeningBalanceData = (from t in _accountingDbContext.Transactions
                                       join ti in _accountingDbContext.TransactionItems on t.TransactionId equals ti.TransactionId
                                       join fisc in _accountingDbContext.FiscalYears on t.FiscalyearId equals fisc.FiscalYearId
+                                      join map in _accountingDbContext.MapFiscalYears on fisc.FiscalYearId equals map.FiscalYearId
                                       where
-                                      ti.HospitalId == currentHospitalId && fisc.HospitalId == currentHospitalId &&
+                                      ti.HospitalId == currentHospitalId  && map.HospitalId == currentHospitalId && 
                                       (DbFunctions.TruncateTime(t.TransactionDate) == FromDate) && (t.FiscalyearId == fisc.FiscalYearId)
                                       group new { fisc, ti, t } by new
                                       {
@@ -3901,8 +4002,9 @@ namespace DanpheEMR.Controllers
                            where txn.HospitalId == currentHospitalId
                            join voucher in _accountingDbContext.Vouchers on txn.VoucherId equals voucher.VoucherId
                            join fiscal in _accountingDbContext.FiscalYears on txn.FiscalyearId equals fiscal.FiscalYearId
+                           join map in _accountingDbContext.MapFiscalYears on fiscal.FiscalYearId equals map.FiscalYearId
                            where
-                           fiscal.HospitalId == currentHospitalId &&
+                           voucher.HospitalId ==currentHospitalId && map.HospitalId == currentHospitalId &&
                            txn.IsActive == true && (DbFunctions.TruncateTime(txn.TransactionDate) >= FromDate && DbFunctions.TruncateTime(txn.TransactionDate) <= ToDate)
                            && txn.SectionId == sectionId && txn.FiscalyearId == FiscalYearId
                            select new
@@ -3917,6 +4019,7 @@ namespace DanpheEMR.Controllers
                                TransactionDate = DbFunctions.TruncateTime(txn.TransactionDate),// txn.TransactionDate.ToString("dd/mm/yyyy"),                                       
                                Amount = (from txnItm in _accountingDbContext.TransactionItems
                                          where txnItm.TransactionId == txn.TransactionId
+                                         && txnItm.HospitalId ==currentHospitalId
                                          && txnItm.DrCr == true
                                          group txnItm by new
                                          {
@@ -3958,7 +4061,7 @@ namespace DanpheEMR.Controllers
 
             //getting uniqueid and sectionid of transaction 
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             var txnids = (from txn in _accountingDbContext.Transactions
                           where
                           txn.HospitalId == currentHospitalId &&
@@ -3981,6 +4084,7 @@ namespace DanpheEMR.Controllers
                                        select txn).ToList();
                 var alltransactionitems = (from txnitm in _accountingDbContext.TransactionItems.AsEnumerable()
                                            join txn in alltransactions on txnitm.TransactionId equals txn.TransactionId
+                                           where txnitm.HospitalId == currentHospitalId
                                            select txnitm).ToList();
                 //getting only single sales voucher records
                 var transactions = (from txn in alltransactions
@@ -3994,12 +4098,14 @@ namespace DanpheEMR.Controllers
                                         join t in transactions on ti.TransactionId equals t.TransactionId
                                         select ti).ToList();
                 //getting vouchers
-                var vouchers = (from v in _accountingDbContext.Vouchers select v).ToList();
+                var vouchers = (from v in _accountingDbContext.Vouchers where v.HospitalId==currentHospitalId select v).ToList();
                 //getting voucher heads
-                var voucherheads = (from head in _accountingDbContext.VoucherHeads select head).ToList();
+                var voucherheads = (from head in _accountingDbContext.VoucherHeads where head.HospitalId == currentHospitalId select head).ToList();
                 //fiscal year
                 var fiscalYear = (from fiscal in _accountingDbContext.FiscalYears
-                                  where fiscal.HospitalId == currentHospitalId
+                                  join map in _accountingDbContext.MapFiscalYears
+                                  on fiscal.FiscalYearId equals map.FiscalYearId
+                                  where map.HospitalId == currentHospitalId
                                   select fiscal).ToList();
                 //getting ledgers
                 var ledgers = (from l in _accountingDbContext.Ledgers
@@ -4016,7 +4122,7 @@ namespace DanpheEMR.Controllers
                 var patients = (from pat in _accountingDbContext.PatientModel.AsEnumerable()
                                 join txndetail in transactionitemdetails on pat.PatientId equals txndetail.ReferenceId
                                 join txnitm in alltransactionitems on txndetail.TransactionItemId equals txnitm.TransactionItemId
-                                where txndetail.ReferenceType == "Patient"
+                                where txndetail.ReferenceType == "Patient" && txnitm.HospitalId==currentHospitalId
                                 select new
                                 {
                                     txndetail.ReferenceId,
@@ -4185,9 +4291,9 @@ namespace DanpheEMR.Controllers
                                join voucher in _accountingDbContext.Vouchers on txn.VoucherId equals voucher.VoucherId
                                //join costCenter in _accountingDbContext.CostCenters on txn.CostCenterId equals costCenter.CostCenterId
                                join fiscal in _accountingDbContext.FiscalYears on txn.FiscalyearId equals fiscal.FiscalYearId
+                               join map in _accountingDbContext.MapFiscalYears on fiscal.FiscalYearId equals map.FiscalYearId
                                where
-                               //head.HospitalId == currentHospitalId &&
-                               fiscal.HospitalId == currentHospitalId &&
+                               voucher.HospitalId == currentHospitalId && map.HospitalId == currentHospitalId &&                            
                                txn.DayVoucherNumber == DayVoucherNumber && txn.IsActive == true && txn.VoucherId == voucherId
                                select new
                                {
@@ -4329,7 +4435,7 @@ namespace DanpheEMR.Controllers
             return responseData;
 
         }
-        private object GetSystemAuditReport(DateTime FromDate, DateTime ToDate, string voucherReportType, int sectionId)
+        private object GetSystemAuditReport(DateTime FromDate, DateTime ToDate, string voucherReportType, int sectionId, int HospitalId)
         {
 
             //else if (reqType == "system-aduit-report")
@@ -4339,7 +4445,8 @@ namespace DanpheEMR.Controllers
                                         new SqlParameter("@FromDate", FromDate),
                                         new SqlParameter("@ToDate", ToDate),
                                         new SqlParameter("@voucherReportType", voucherReportType),
-                                        new SqlParameter("@SectionId", sectionId)
+                                        new SqlParameter("@SectionId", sectionId),
+                                        new SqlParameter("@HospitalId", HospitalId)
                                 };
             var spDataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_RPT_GetSystemAduitReport", paramList, _accountingDbContext);
             var resultStr = JsonConvert.SerializeObject(spDataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" });
@@ -4374,7 +4481,7 @@ namespace DanpheEMR.Controllers
         {
 
             // else if (reqType == "bank-reconcilation-report")
-            int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             var fYearId = AccountingTransferData.GetFiscalYearIdForOpeningBalance(_accountingDbContext, FiscalYearId, currentHospitalId);
 
             var Ledgers = _accountingDbContext.Ledgers.AsQueryable();
@@ -4418,7 +4525,10 @@ namespace DanpheEMR.Controllers
 
             List<DataListDTOModel> dataList = new List<DataListDTOModel>();
 
-            var openingBalanceFiscalYear = (from f in _accountingDbContext.FiscalYears where f.FiscalYearId == fYearId select f).FirstOrDefault();
+            var openingBalanceFiscalYear = (from f in _accountingDbContext.FiscalYears
+                                            join map in _accountingDbContext.MapFiscalYears 
+                                            on f.FiscalYearId equals map.FiscalYearId 
+                                            where map.FiscalYearId == fYearId && map.HospitalId == currentHospitalId select f).FirstOrDefault();
             var dataList1 = (from t in _accountingDbContext.Transactions
                              join ti in _accountingDbContext.TransactionItems on t.TransactionId equals ti.TransactionId
                              join l in Ledgers on ti.LedgerId equals l.LedgerId
@@ -4517,8 +4627,9 @@ namespace DanpheEMR.Controllers
                            where txn.HospitalId == currentHospitalId
                            join voucher in _accountingDbContext.Vouchers on txn.VoucherId equals voucher.VoucherId
                            join fiscal in _accountingDbContext.FiscalYears on txn.FiscalyearId equals fiscal.FiscalYearId
+                           join map in _accountingDbContext.MapFiscalYears on fiscal.FiscalYearId equals map.FiscalYearId
                            where
-                           fiscal.HospitalId == currentHospitalId &&
+                           voucher.HospitalId ==currentHospitalId && map.HospitalId == currentHospitalId &&
                            txn.IsActive == true && (DbFunctions.TruncateTime(txn.TransactionDate) >= FromDate && DbFunctions.TruncateTime(txn.TransactionDate) <= ToDate)
                             && txn.SectionId == sectionId && txn.IsVerified == false //&& txn.Status == Enums.ENUM_ACC_VoucherStatus.Draft
                            select new
@@ -4531,6 +4642,7 @@ namespace DanpheEMR.Controllers
                                TransactionDate = DbFunctions.TruncateTime(txn.TransactionDate),                                     
                                Amount = (from txnItm in _accountingDbContext.TransactionItems
                                          where txnItm.TransactionId == txn.TransactionId
+                                         && txnItm.HospitalId == currentHospitalId
                                          && txnItm.DrCr == true
                                          group txnItm by new
                                          {

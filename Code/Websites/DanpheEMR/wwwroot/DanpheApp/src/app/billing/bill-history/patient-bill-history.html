@@ -354,7 +354,8 @@
                                     <!--[ngClass]="showHeader ? 'clp' : 'clp clp-hd'"-->
                                     <h5 class="clp clp-hd" data-toggle="collapse" data-target="#PaidItems" aria-expanded="true" style="padding: 0px;">
                                         <b style="text-decoration: underline">Paid Bill Items
-                                            <span>({{patBillHistoryDetail.PaidItems.length}})</span></b> </h5>
+                                            <span>({{patBillHistoryDetail.PaidItems.length}})</span></b>
+                                    </h5>
                                     <div id="PaidItems" class="collapse in clp-cntnt" style="padding: 0">
                                         <!--<p *ngIf="!patBillHistoryDetail.PaidItems.length">No records found</p>-->
                                         <table class="table" *ngIf="patBillHistoryDetail.PaidItems.length">
@@ -431,7 +432,8 @@
                                 <div>
                                     <h5 class="clp clp-hd" data-toggle="collapse" data-target="#UnpaidItems" aria-expanded="true" style="padding: 0">
                                         <b style="text-decoration: underline">Credit Bill Items
-                                            <span>({{patBillHistoryDetail.UnpaidItems.length}})</span></b> </h5>
+                                            <span>({{patBillHistoryDetail.UnpaidItems.length}})</span></b>
+                                    </h5>
                                     <div id="UnpaidItems" class="collapse in clp-cntnt" style="padding: 0">
                                         <!--<p *ngIf="!patBillHistoryDetail.PaidItems.length">No records found</p>-->
                                         <table class="table" *ngIf="patBillHistoryDetail.UnpaidItems.length">
@@ -850,11 +852,11 @@
                                                     {{deposit.ReceiptNo}}</td>
                                                 <td
                                                     style="font-weight: 500; border: 1px solid #000;font-family: 'Verdana'; padding: 7px; font-size: 12px;">
-                                                    <p *ngIf="deposit.TransactionType=='Deposit'">{{deposit.Amount}}</p>
+                                                    <p *ngIf="deposit.TransactionType=='Deposit'">{{deposit.InAmount}}</p>
                                                 </td>
                                                 <td
                                                     style="font-weight: 500; border: 1px solid #000;font-family: 'Verdana'; padding: 7px; font-size: 12px;">
-                                                    <p *ngIf="deposit.TransactionType !='Deposit'">{{deposit.Amount}}</p>
+                                                    <p *ngIf="deposit.TransactionType !='Deposit'">{{deposit.OutAmount}}</p>
                                                 </td>
                                                 <td
                                                     style="font-weight: 500; border: 1px solid #000;font-family: 'Verdana'; padding: 7px; font-size: 12px;">
@@ -862,6 +864,7 @@
                                                 <td
                                                     style="font-weight: 500; border: 1px solid #000;font-family: 'Verdana'; padding: 7px; font-size: 12px;">
                                                     <p *ngIf="deposit.ReferenceInvoice">{{deposit.ReferenceInvoice}}</p>
+                                                    <p *ngIf="deposit.SettlementInvoice">{{deposit.SettlementInvoice}}</p>
                                                 </td>
                                                 <!-- <td style="font-weight: 500; border: 1px solid #000;font-family: 'Verdana'; padding: 7px; font-size: 12px;">
                                                     <p *ngIf="deposit.SettlementInvoice">{{deposit.SettlementInvoice}}</p> 

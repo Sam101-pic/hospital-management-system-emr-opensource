@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import { Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
 import { CoreService } from "../../core/shared/core.service";
 import { GeneralFieldLabels } from "../DTOs/general-field-label.dto";
 import { Municipality } from "./municipality-model";
@@ -8,7 +8,7 @@ import { Municipality } from "./municipality-model";
   templateUrl: 'municipality-select.html'
 })
 
-export class MunicipalitySelectComponent {
+export class MunicipalitySelectComponent implements OnInit {
 
   @Input('municipalityId')
   public municipalityId: number = 0;
@@ -46,7 +46,16 @@ export class MunicipalitySelectComponent {
 
   }
 
+  ngOnChanges() {
+    this.AssignMunicipality();
+
+  }
+
   ngOnInit() {
+    this.AssignMunicipality();
+  }
+
+  private AssignMunicipality() {
     if (this.municipalityId && this.municipalityList.length > 0) {
       this.selectedMunicipality = this.municipalityList.find(m => m.MunicipalityId == this.municipalityId);
       this.bindedMunicipality = this.selectedMunicipality.MunicipalityName;

@@ -1,13 +1,14 @@
-import { ChangeDetectorRef,Component, Directive, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
+import * as moment from 'moment/moment';
+import { CoreService } from '../../../core/shared/core.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { FiscalYearModel } from '../../settings/shared/fiscalyear.model';
 import { AccountingReportsBLService } from "../shared/accounting-reports.bl.service";
 import { BalanceSheetReportVMModel } from "../shared/balance-sheet-reportVM.model";
-import { FiscalYearModel } from '../../settings/shared/fiscalyear.model';
-import * as moment from 'moment/moment';
-import { CommonFunctions } from '../../../shared/common.functions';
-import { CoreService } from '../../../core/shared/core.service';
 
+import { SecurityService } from '../../../security/shared/security.service';
+import { ENUM_DanpheHTTPResponseText, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { Hospital_DTO } from '../../settings/shared/dto/hospitals.dto';
 import { AccountingService } from "../../shared/accounting.service";
 @Component({
   selector: 'my-app',
@@ -38,17 +39,24 @@ export class BalanceSheetReportComponent {
   public showExportbtn: boolean = false;
   public ledgerCode: any;
   public todaysDate: string = "";
-  btndisabled=false;
+  btndisabled = false;
   public showPrint: boolean = false;
   public printDetaiils: any;
+  public DisplayLevel: string = "1";
+  public HospitalList: Array<Hospital_DTO> = new Array<Hospital_DTO>();
+  public SelectedHospital: number = 0;
+  public HospitalId: number = 0;
+  public ActiveHospital: number = 0;
+
   constructor(
     public messageBoxService: MessageboxService,
     public coreservice: CoreService,
+    public securityService: SecurityService,
     public accReportBLService: AccountingReportsBLService, public accountingService: AccountingService
-    ,private changeDetector: ChangeDetectorRef) {
-    this.fromDate = moment().format('YYYY-MM-DD');//default fromdate=today, it'll later be changed from loadfiscalyearlist function. 
-    this.toDate = moment().format('YYYY-MM-DD');
-    this.todaysDate = moment().format('YYYY-MM-DD');
+    , private changeDetector: ChangeDetectorRef) {
+    this.fromDate = moment().format(ENUM_DateTimeFormat.Year_Month_Day);//default fromdate=today, it'll later be changed from loadfiscalyearlist function. 
+    this.toDate = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
+    this.todaysDate = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
 
     this.loadFiscalYearList();
     this.dateRange = "today";
@@ -56,21 +64,31 @@ export class BalanceSheetReportComponent {
 
     this.onDateChange();//Load today's data by default..
     this.accountingService.getCoreparameterValue();
+    this.CheckAndAssignHospital();
 
   }
+  CheckAndAssignHospital() {
+    this.ActiveHospital = this.securityService.AccHospitalInfo.ActiveHospitalId;
+    this.HospitalList = this.accountingService.accCacheData.Hospitals ? this.accountingService.accCacheData.Hospitals : [];
+    if (this.HospitalList.length === 1) {
+      this.SelectedHospital = this.HospitalList[0].HospitalId;
+    } else {
+      this.SelectedHospital = this.ActiveHospital;
+    }
+  }
   public selectedDate: string = "";
-	public fiscalYearId:number=null; 
-  public validDate:boolean=true;
-  selectDate(event){
+  public fiscalYearId: number = null;
+  public validDate: boolean = true;
+  selectDate(event) {
     if (event) {
       this.selectedDate = event.selectedDate;
       this.fiscalYearId = event.fiscalYearId;
-      this.validDate =true;
+      this.validDate = true;
       this.dateRange = "<b>Date:</b>&nbsp;" + this.selectedDate;
-    } 
+    }
     else {
-      this.validDate =false;
-    }     
+      this.validDate = false;
+    }
   }
   //event onDateChange
   onDateChange() {
@@ -84,14 +102,16 @@ export class BalanceSheetReportComponent {
   }
   //Load balance sheet data
   LoadData() {
-    this.btndisabled=true;
+    this.btndisabled = true;
+    this.HospitalId = this.SelectedHospital;
+
     // if (this.checkDateValidation() && this.checkValidFiscalYear()) {
-      if (this.checkDateValidation() &&	this.selectedDate !=null && this.fiscalYearId !=null) {
+    if (this.checkDateValidation() && this.selectedDate != null && this.fiscalYearId != null && this.HospitalId != 0 && this.HospitalId != null) {
       try {
-        this.accReportBLService.GetBalanceSheetReportData(this.selectedDate, this.fiscalYearId)
+        this.accReportBLService.GetBalanceSheetReportData(this.selectedDate, this.fiscalYearId, this.HospitalId)
           .subscribe(res => {
-            if (res.Status == 'OK') {
-              this.btndisabled=false;
+            if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+              this.btndisabled = false;
               this.balanceSheetData = null;
               this.DisplayData = null;
               this.netProfitLoss = 0;
@@ -107,8 +127,8 @@ export class BalanceSheetReportComponent {
               this.showResult = true;
             }
             else {
-              this.btndisabled=false;
-              this.messageBoxService.showMessage("failed", [res.ErrorMessage])
+              this.btndisabled = false;
+              this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [res.ErrorMessage])
             }
           });
       }
@@ -116,53 +136,42 @@ export class BalanceSheetReportComponent {
         this.ShowCatchErrMessage(exception);
       }
     }
-    else{
-      this.btndisabled=false;
+    else {
+      this.btndisabled = false;
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['Select all mandatory field'])
+
     }
   }
   checkDateValidation() {
-    if(!this.validDate){
-      this.messageBoxService.showMessage("error", ['Select proper date']);
+    if (!this.validDate) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Select proper date']);
       return false;
     }
     let flag = true;
     //flag = moment(this.fromDate, "YYYY-MM-DD").isValid() == true ? flag : false;
-    flag = moment(this.toDate, "YYYY-MM-DD").isValid() == true ? flag : false;
-    var momentA = moment(this.toDate).format("YYYY-MM-DD");
-    var momentB = moment().format("YYYY-MM-DD");
+    flag = moment(this.toDate, ENUM_DateTimeFormat.Year_Month_Day).isValid() == true ? flag : false;
+    var momentA = moment(this.toDate).format(ENUM_DateTimeFormat.Year_Month_Day);
+    var momentB = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
     flag = (momentA > momentB) ? false : true;
     //flag = (this.toDate >= this.fromDate) == true ? flag : false;
     if (!flag) {
-      this.messageBoxService.showMessage("error", ['select proper date']);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ['select proper date']);
     }
     return flag;
   }
   checkValidFiscalYear() {
     return true;
-    //NBB-for now we are not considering from date 
-    var frmdate = moment(this.fromDate, "YYYY-MM-DD");
-    var tdate = moment(this.toDate, "YYYY-MM-DD");
-    var flag = false;
-    this.fiscalYears.forEach(a => {
-      if ((moment(a.StartDate, 'YYYY-MM-DD') <= frmdate) && (tdate <= moment(a.EndDate, 'YYYY-MM-DD'))) {
-        flag = true;
-      }
-    });
-    if (!flag) {
-      this.messageBoxService.showMessage("error", ['Selected dates must be with in a fiscal year']);
-    }
-    return flag;
   }
   //Export data grid options for excel file
   gridExportOptions = {
-    fileName: 'AccountingBalanceSheetReport_' + moment().format('YYYY-MM-DD') + '.xls',
+    fileName: 'AccountingBalanceSheetReport_' + moment().format(ENUM_DateTimeFormat.Year_Month_Day) + '.xls',
   };
 
   //This function only for show catch messages
   ShowCatchErrMessage(exception) {
     if (exception) {
       let ex: Error = exception;
-      this.messageBoxService.showMessage("error", ["Check error in Console log !"]);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Check error in Console log !"]);
       console.log("Error Messsage =>  " + ex.message);
       console.log("Stack Details =>   " + ex.stack);
     }
@@ -261,11 +270,11 @@ export class BalanceSheetReportComponent {
       //that year where 
       let currFiscYr = this.fiscalYears.find(x => x.IsActive == true && moment(x.StartDate) <= todayDate_Obj && todayDate_Obj <= moment(x.EndDate));
       if (currFiscYr) {
-        this.fromDate = moment(currFiscYr.StartDate).format('YYYY-MM-DD');
+        this.fromDate = moment(currFiscYr.StartDate).format(ENUM_DateTimeFormat.Year_Month_Day);
       }
     }
     else {
-      this.messageBoxService.showMessage("failed", ['Unable to Load FiscalYearList']);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Unable to Load FiscalYearList']);
     }
   }
 
@@ -407,7 +416,7 @@ export class BalanceSheetReportComponent {
     Obj["Amount"] = amt;
     Obj["Style"] = style;
     Obj["LedgerId"] = ledgerId;
-    Obj["ShowLedgerGroup"] = true;
+    Obj["ShowLedgerGroup"] = false;
     Obj["ShowLedger"] = false;
     if (Details != undefined) {
       for (let i = 0; i < Details.length; i++) {
@@ -438,7 +447,7 @@ export class BalanceSheetReportComponent {
     // this.changeDetector.detectChanges();
     // this.showPrint = true;
     // this.printDetaiils = headerContent + printContents ; //document.getElementById("printpage");
-    this.accountingService.Print(tableId,this.dateRange)
+    this.accountingService.Print(tableId, this.dateRange)
 
   }
   ExportToExcel(tableId) {
@@ -452,7 +461,7 @@ export class BalanceSheetReportComponent {
     //   CommonFunctions.ConvertHTMLTableToExcel(tableId, this.fromDate, this.toDate, workSheetName,
     //     Heading, filename);
     // }
-    this.accountingService.ExportToExcel(tableId,this.dateRange);
+    this.accountingService.ExportToExcel(tableId, this.dateRange);
   }
 
   SwitchViews(row) {
@@ -499,11 +508,35 @@ export class BalanceSheetReportComponent {
   showExport() {
 
     let exportshow = this.coreservice.Parameters.find(a => a.ParameterName == "AllowOtherExport" && a.ParameterGroupName == "Accounting").ParameterValue;
-    if (exportshow == "true") {
+    if (exportshow === "true") {
       this.showExportbtn = true;
     }
     else {
       this.showExportbtn = false;
+    }
+  }
+
+  public OnDisplayLevelChange(event) {
+    if (event) {
+      if (this.DisplayData !== null) {
+        let value = event.target.defaultValue;
+        if (value === "2") {
+          this.DisplayData.forEach(data => {
+            data.ShowLedger = false;
+          });
+        }
+        else if (value === "3") {
+          this.DisplayData.forEach(data => {
+            data.ShowLedgerGroup = false;
+          });
+        }
+        else {
+          this.DisplayData.forEach(data => {
+            data.ShowLedgerGroup = false;
+            data.ShowLedger = false;
+          });
+        }
+      }
     }
   }
 }

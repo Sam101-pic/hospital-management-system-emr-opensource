@@ -46,6 +46,8 @@ export class LabComponentModel {
     public LookUp: CoreCFGLookUp = null;
 
     public LabComponentJsonValidator: FormGroup = null;
+    public ValuePrecision: number = 0;
+    public ShowRangeDescriptionInLabReport: boolean = false;
 
     public SetRangeValue(ipComponent: LabComponentModel, fieldName: string) {
         var minField: string;

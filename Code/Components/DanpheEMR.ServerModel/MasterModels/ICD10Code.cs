@@ -16,6 +16,8 @@ namespace DanpheEMR.ServerModel
         public string ICD10Description { get; set; }
         public Boolean ValidForCoding { get; set; }
         public Boolean Active { get; set; }
+        public string IcdVersion { get; set; }
+        public int? DiseaseGroupId { get; set; }
         public override int GetHashCode()
         {
             return this.ICD10ID.GetHashCode(); 

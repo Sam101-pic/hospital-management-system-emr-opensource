@@ -22,6 +22,13 @@ export class BedFeatureAddComponent {
   public showAddPage: boolean = false;
   @Input("selectedItem")
   public selectedItem: BedFeature;
+
+
+  @Input("bedfeaturelist")
+
+  public BedFeatureList = new Array<BedFeature>();
+
+
   @Output("callback-add")
   callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
   public update: boolean = false;
@@ -69,6 +76,24 @@ export class BedFeatureAddComponent {
       this.CurrentBedFeature.BedFeatureValidator.controls[i].markAsDirty();
       this.CurrentBedFeature.BedFeatureValidator.controls[i].updateValueAndValidity();
     }
+
+    if (this.BedFeatureList && this.BedFeatureList.length) {
+      const isAlreadyExists = this.BedFeatureList.some(a => a.BedFeatureCode === this.CurrentBedFeature.BedFeatureCode);
+      if (isAlreadyExists) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Bed Feature as the Bed Feature with the code "${this.CurrentBedFeature.BedFeatureCode}" already exists.`]);
+        return;
+      }
+    }
+
+    if (this.BedFeatureList && this.BedFeatureList.length) {
+      const isAlreadyExists = this.BedFeatureList.some(a => a.BedFeatureName === this.CurrentBedFeature.BedFeatureName);
+      if (isAlreadyExists) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Bed Feature as the Bed Feature with the Feature Name "${this.CurrentBedFeature.BedFeatureName}" already exists.`]);
+        return;
+      }
+    }
+
+
     if (this.CurrentBedFeature.IsValidCheck(undefined, undefined)) {
       this.settingsBLService.AddBedFeature(this.CurrentBedFeature)
         .subscribe(
@@ -97,6 +122,23 @@ export class BedFeatureAddComponent {
       this.CurrentBedFeature.BedFeatureValidator.controls[i].markAsDirty();
       this.CurrentBedFeature.BedFeatureValidator.controls[i].updateValueAndValidity();
     }
+
+    if (this.BedFeatureList && this.BedFeatureList.length) {
+      const isAlreadyExists = this.BedFeatureList.some(a => a.BedFeatureCode === this.CurrentBedFeature.BedFeatureCode && a.BedFeatureId !== this.CurrentBedFeature.BedFeatureId);
+      if (isAlreadyExists) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Bed Feature as the Bed Feature with the code "${this.CurrentBedFeature.BedFeatureCode}" already exists.`]);
+        return;
+      }
+    }
+
+    if (this.BedFeatureList && this.BedFeatureList.length) {
+      const isAlreadyExists = this.BedFeatureList.some(a => a.BedFeatureName === this.CurrentBedFeature.BedFeatureName && a.BedFeatureId !== this.CurrentBedFeature.BedFeatureId);
+      if (isAlreadyExists) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Bed Feature as the Bed Feature with the Feature Name "${this.CurrentBedFeature.BedFeatureName}" already exists.`]);
+        return;
+      }
+    }
+
     if (this.CurrentBedFeature.IsValidCheck(undefined, undefined)) {
       this.settingsBLService.UpdateBedFeature(this.CurrentBedFeature)
         .subscribe(
@@ -163,6 +205,8 @@ export class BedFeatureAddComponent {
     bedFeature.CreatedOn = bf_Server.CreatedOn;
     bedFeature.CreatedBy = bf_Server.CreatedBy;
     bedFeature.TaxApplicable = bf_Server.TaxApplicable; //yubraj 11 oct 2018
+    bedFeature.IsPresentationGrouping = bf_Server.IsPresentationGrouping;
+    bedFeature.GroupCode = bf_Server.GroupCode;
     this.callbackAdd.emit({ bedFeature: bedFeature });
 
   }

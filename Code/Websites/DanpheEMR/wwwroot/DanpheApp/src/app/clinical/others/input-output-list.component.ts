@@ -1,6 +1,8 @@
 ﻿import { ChangeDetectorRef, Component, OnInit } from "@angular/core";
+import * as moment from "moment";
 import { VisitService } from '../../appointments/shared/visit.service';
 import { SecurityService } from "../../security/shared/security.service";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../shared/danphe-grid/NepaliColGridSettingsModel";
 import GridColumnSettings from "../../shared/danphe-grid/grid-column-settings.constant";
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponseText, ENUM_IntakeOutputType } from "../../shared/shared-enums";
@@ -27,7 +29,7 @@ export class InputOutputListComponent implements OnInit {
     public toDate: string = null;
     public patientVisitId: number = null;
     public showInputOutput: boolean = false;
-
+    NepaliDateInGridSettings = new NepaliDateInGridParams();
     constructor(public visitService: VisitService,
         public ioAllergyVitalsBLService: IOAllergyVitalsBLService,
         public msgBoxServ: MessageboxService,
@@ -37,6 +39,8 @@ export class InputOutputListComponent implements OnInit {
         this.patientVisitId = this.visitService.getGlobal().PatientVisitId;
         var colSettings = new GridColumnSettings(this.securityService);
         this.intakeOutputGridColumns = colSettings.IntakeOutput;
+        this.NepaliDateInGridSettings = new NepaliDateInGridParams();
+        this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('RecordedDate'));
         this.GetPatientInputOutputList();
     }
     ngOnInit() {
@@ -61,6 +65,9 @@ export class InputOutputListComponent implements OnInit {
                             balance = balance - item.IntakeOutputValue;
                             item.Balance = balance;
                         }
+                        const { date, time } = this.formatDateTime(item.CreatedOn);
+                        item.RecordedDate = date;
+                        item.RecordedTime = time;
                     });
                     balance = 0;
                     this.lastBalance = res.Results.lastBalance;
@@ -93,6 +100,12 @@ export class InputOutputListComponent implements OnInit {
         this.showIOAddBox = true;
     }
 
+    formatDateTime(dateTimeString: string) {
+        const dateTime = moment(dateTimeString);
+        const date = dateTime.format('YYYY-MM-DD');
+        const time = dateTime.format('hh:mm A');
+        return { date, time };
+    }
     // UpdateList() {
     //     this.inputoutputLists = this.inputoutputLists.map(obj => {
     //         if (obj.TotalIntake === 0) {

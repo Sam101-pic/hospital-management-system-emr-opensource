@@ -195,13 +195,13 @@ export class ERLamaPatientListComponent {
   public ReturnFromPatRegistrationEdit($event) {
     this.CloseAllERPatientPopUp();
     if ($event.submit) {
-      let itmIndex = this.allLamaPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
-      if (itmIndex >= 0) {
-        this.allLamaPatients.splice(itmIndex, 1, $event.ERPatient);
-        this.allLamaPatients = this.allLamaPatients.slice();
-      } else {
-        this.GetERLamaPatientList();
-      }
+      //   let itmIndex = this.allLamaPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
+      //   if (itmIndex >= 0) {
+      //     this.allLamaPatients.splice(itmIndex, 1, $event.ERPatient);
+      //     this.allLamaPatients = this.allLamaPatients.slice();
+      //   } else {
+      this.GetERLamaPatientList();
+      // }
     }
   }
 

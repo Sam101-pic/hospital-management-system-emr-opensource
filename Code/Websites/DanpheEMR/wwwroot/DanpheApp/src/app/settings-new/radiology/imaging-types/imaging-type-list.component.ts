@@ -1,13 +1,17 @@
 
-import { Component, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component } from "@angular/core";
 
 import { ImagingType } from '../../../radiology/shared/imaging-type.model';
 import { SettingsBLService } from '../../shared/settings.bl.service';
 
-import { SettingsService } from '../../shared/settings-service';
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { SettingsService } from '../../shared/settings-service';
 
-import * as moment from 'moment/moment';
+import { DanpheHTTPResponse } from "../../../shared/common-models";
+
+
 
 @Component({
   selector: 'img-type-list',
@@ -26,22 +30,25 @@ export class ImagingTypeListComponent {
 
   constructor(public settingsBLService: SettingsBLService,
     public settingsServ: SettingsService,
+    public msgBoxServ: MessageboxService,
+
     public changeDetector: ChangeDetectorRef) {
     this.imgTypeGridColumns = this.settingsServ.settingsGridCols.ImgTypeList;
     this.getImgTypeList();
   }
   public getImgTypeList() {
     this.settingsBLService.GetImgTypes()
-      .subscribe(res => {
-        if (res.Status == "OK") {
-          this.imgTypeList = res.Results;
-          this.showImgTypeList = true;
-        }
-        else {
-          alert("Failed ! " + res.ErrorMessage);
-        }
+      .subscribe(
+        (res: DanpheHTTPResponse) => {
+          if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+            this.imgTypeList = res.Results;
+            this.showImgTypeList = true;
+          }
+          else {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Failed ! " + res.ErrorMessage]);
+          }
 
-      });
+        });
   }
   ImgTypeGridActions($event: GridEmitModel) {
 

@@ -123,8 +123,8 @@
               <td colspan="6" style="text-align: left;">
                 <p class="c_paragraphs" style="margin-bottom: 1px;">Hospital No : <strong>{{deposit.PatientCode}}</strong></p>
               </td>
-              <td colspan="6" style="text-align: right;" *ngIf="deposit.Address">
-                <p class="c_paragraphs" style="margin-bottom: 1px;">Address : <strong>{{deposit.Address}}</strong></p>
+              <td colspan="6" style="text-align: right;">
+                <p class="c_paragraphs" style="margin-bottom: 1px;">Address : <strong>{{coreService.SortPatientAddress(deposit)}}</strong></p>
               </td>
             </tr>
             <tr>
@@ -161,14 +161,16 @@
       <tr *ngIf="deposit.TransactionType === 'Deposit'">
         <td colspan="12" style="text-align: center; padding: 0 10px 0 10px;">
           <p class="c_paragraphs">Deposit of <strong> {{coreService.currencyUnit}} {{deposit.InAmount | number : "1.2-2"}} </strong>received
-            <strong *ngIf="deposit.CareOf">from {{deposit.CareOf}}</strong> for <strong>{{deposit.PatientName}}</strong>.
+            <strong *ngIf="deposit.CareOf">from {{deposit.CareOf}}</strong><strong
+                    *ngIf="deposit.CareOfContact">({{deposit.CareOfContact}})</strong> for <strong>{{deposit.PatientName}}</strong>.
           </p>
         </td>
       </tr>
       <tr *ngIf="deposit.TransactionType === 'ReturnDeposit'">
         <td colspan="12" style="text-align: center; padding: 0 10px 0 10px;">
-          <p class="c_paragraphs">Refund of <strong> {{coreService.currencyUnit}} {{deposit.OutAmount | number : "1.2-2"}} </strong>to
-            <strong>{{deposit.CareOf}}</strong> for <strong>{{deposit.PatientName}}</strong>.
+          <p class="c_paragraphs">Refund of <strong> {{coreService.currencyUnit}} {{deposit.OutAmount | number : "1.2-2"}} </strong>
+            <span *ngIf="deposit.CareOf"> to </span> <strong>{{deposit.CareOf}}</strong> <span *ngIf="deposit.PatientName"> for </span>
+            <strong>{{deposit.PatientName}}</strong>.
           </p>
         </td>
       </tr>
@@ -190,6 +192,7 @@
       <tr style="border-top: 1px solid #ccc;">
         <td colspan="12" style="padding: 10px 10px 0 10px; vertical-align: top;">
           <p class="c_paragraphs"><strong>Deposit Balance : </strong> {{deposit.DepositBalance | number : "1.2-2"}}</p>
+          <p *ngIf="deposit.PaymentDetails" class="c_paragraphs">{{deposit.PaymentDetails}}</p>
         </td>
       </tr>
       <tr>
@@ -200,7 +203,8 @@
       <tr style="border-top: 1px solid #ccc;">
         <td colspan="12" style="padding: 10px; text-align: left;">
           <p class="c_paragraphs"><span *ngIf="deposit.TransactionType === 'Deposit'">Received By</span> <span
-                  *ngIf="deposit.TransactionType === 'ReturnDeposit'">Refunded by</span> {{deposit.BillingUser}} on {{DateTimeNow}}</p>
+                  *ngIf="deposit.TransactionType === 'ReturnDeposit'">Refunded by</span> {{deposit.BillingUser}} on {{deposit.CreatedOn |
+            DanpheDateTime:'format':'YYYY-MM-DD'}}</p>
         </td>
       </tr>
     </table>

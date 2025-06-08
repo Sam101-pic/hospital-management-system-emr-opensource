@@ -4,7 +4,7 @@ import { SecurityService } from '../../../security/shared/security.service';
 import { PriceCategory } from '../../../settings-new/shared/price.category.model';
 import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { ENUM_DanpheHTTPResponses, ENUM_IntegrationNames, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { BillingMasterBlService } from '../../shared/billing-master.bl.service';
 import { BillingTransactionItem } from '../../shared/billing-transaction-item.model';
 import { BillingBLService } from '../../shared/billing.bl.service';
@@ -72,7 +72,11 @@ export class UpdateItemPriceComponent implements OnInit {
       this.filteredItems = this.filteredItems.map(a => {
         return Object.assign(new BillingTransactionItem(), a);
       });
+      this.filteredItems.map(item => item.PreviousQuantity = item.Quantity);
 
+      // this.filteredItems.forEach(f => {
+      //   f.IsSelected = false;
+      // });
       this.FilterDiscountApplicableItemsAndPriceChangeAllowed();
       // this.AssignDoc
     }
@@ -128,6 +132,7 @@ export class UpdateItemPriceComponent implements OnInit {
     });
   }
 
+  IsQuantityChanged: boolean = false;
   CalculateTotal(index: number) {
     let item = this.filteredItems[index];
     if (item) {
@@ -136,7 +141,7 @@ export class UpdateItemPriceComponent implements OnInit {
       item.TotalAmount = item.SubTotal - item.DiscountAmount;
       item.TaxableAmount = item.IsTaxApplicable ? (item.SubTotal - item.DiscountAmount) : 0;
       item.NonTaxableAmount = item.IsTaxApplicable ? 0 : (item.SubTotal - item.DiscountAmount);
-      item.IsSelected = true;
+      // item.IsSelected = true;
     }
   }
 
@@ -146,7 +151,7 @@ export class UpdateItemPriceComponent implements OnInit {
     });
   }
 
-  OnChangeItemSelect() {
+  OnChangeItemSelect(index: number) {
     if ((this.filteredItems.every(a => a.IsSelected == true))) {
       this.isAllItemsSelected = true;
       // this.discountGroupItems.every(a => a.DiscountPercent == this.groupDiscountPercent);
@@ -158,6 +163,7 @@ export class UpdateItemPriceComponent implements OnInit {
     else {
       this.isAllItemsSelected = false;
     }
+    this.CalculateTotal(index);
 
   }
 
@@ -216,6 +222,9 @@ export class UpdateItemPriceComponent implements OnInit {
             item.DiscountPercentAgg = this.DiscountPercentAgg; // this is done because DiscountPercentAgg was passing value NAN
             if (item.IsAutoBillingItem) {
               item.IsAutoCalculationStop = true;
+            }
+            if (item.ItemIntegrationName === ENUM_IntegrationNames.BedCharges && this.IsQuantityChanged && item.Quantity !== item.PreviousQuantity) {
+              item.IsBedChargeQuantityEdited = true;
             }
           });
           this.PutTransactionItems(modifiedItems);

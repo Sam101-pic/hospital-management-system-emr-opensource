@@ -256,7 +256,7 @@
                 <div class="col-md-4">
                     <div class="left-img" style=" background-image: url('/themes/theme-default/images/login-left.jpg'); position: relative;">
                         <div class="">
-                            <h1>Danphe Emr</h1>
+                            <h1>@ViewData["CustomHeading"]</h1>
                             <p>A Complete <b style="color: #00ffa1; font-weight: 600 ">Healthcare Management Solution</b> for Hospitals, Clinics and Pharmacy.</p>
                             <ul class="feature">
                                 <li><span>&#9745;</span>EMR</li>
@@ -272,7 +272,8 @@
                         </div>
                         <p class="text-center footer-btm-cprt">
                             <a class="text-right termscondition" href="#" original-title="terms and conditions">Terms & Condition</a><br />
-                            &copy; Copyright 2020 <a href="http://www.danphehealth.com/" target="_blank" title="DanpheHealth Pvt. Ltd.">Danphe Health</a>
+                            &copy; Copyright 2023 @* <a href="http://www.danphehealth.com/" target="_blank" title="DanpheHealth Pvt. Ltd.">Danphe Health</a>*@
+                            @ViewData["CustomFooterText"]
                         </p>
                         @*<div style="position: absolute; left: 0; bottom: 30px; font-size: 12px;">
                                 <span>
@@ -393,7 +394,7 @@
 
                                             <div class="form-group">
                                                     <div class="col-sm-12">
-                                                        <div class="text-center"><span class="txt-xs" style="font-weight: 600;line-height: 5;">Danphe EMR Version 1.0</span> </div>
+                                                        <div class="text-center"><span class="txt-xs" style="font-weight: 600;line-height: 5;">@ViewData["CustomHeading"] Version 1.0</span> </div>
                                                     </div>
                                                 </div>
 

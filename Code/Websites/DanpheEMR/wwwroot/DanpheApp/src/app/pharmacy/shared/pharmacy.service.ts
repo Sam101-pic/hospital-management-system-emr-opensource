@@ -8,6 +8,7 @@ import { PharmacyFiscalYear } from './pharmacy-fiscalyear.model';
 import { PharmacyReceiptModel } from './pharmacy-receipt.model';
 import { PHRMGoodsReceiptModel } from './phrm-goods-receipt.model';
 import { PHRMInvoiceReturnItemsModel } from "./phrm-invoice-return-items.model";
+import { PharmacyStoreStockDetail } from './dtos/pharmacy-store-stock-detail';
 
 @Injectable()
 export class PharmacyService {
@@ -29,6 +30,8 @@ export class PharmacyService {
       _ReturnToSupplietId: number;
       allFiscalYearList: PharmacyFiscalYear[] = [];
       public Stores: PharmacyStore_DTO[] = [];
+      StockForItemDispatch: PharmacyStoreStockDetail[] = [];
+      public genericList: { GenericId: 0, GenericName: '' }[] = [];
 
 
       constructor(public coreService: CoreService, public msgBoxServ: MessageboxService) {
@@ -153,6 +156,21 @@ export class PharmacyService {
 
       public setStores(stores: Array<PharmacyStore_DTO>) {
             this.Stores = stores;
+      }
+
+  public setStockForItemDispatch(stockList: PharmacyStoreStockDetail[]) {
+            this.StockForItemDispatch = stockList;
+      }
+
+      public getStockForItemDispatch() {
+            return this.StockForItemDispatch;
+      }
+      public SetGenericList(genericList: { GenericId: 0, GenericName: '' }[]) {
+            this.genericList = genericList;
+      }
+
+      public GetGenericList() {
+            return this.genericList;
       }
 
 }

@@ -20,33 +20,40 @@
             <from-to-date-select (on-change)="OnFromToDateChange($event)" [date-settings-name]="'billing-reports'">
             </from-to-date-select>
           </div>
-          <div class="col-md-2">
-            <div class="form-group row">
-              <label class="control-label col-md-5">Department<b style="float:right;">:</b></label>
-              <div class="col-md-7">
-                <!-- <input class="form-control" value="" [(ngModel)]="currentdepartmentappointment.departmentName"
-                       [ngModelOptions]="{standalone: true}" placeholder="Enter Department Name" /> -->
-                <input class="form-control" danphe-auto-complete
-                       [(ngModel)]="currentdepartmentappointment.departmentName" [ngModelOptions]="{standalone: true}"
-                       [list-formatter]="myListFormatter" [source]="departmentList" placeholder="Department Name"
-                       display-property-name="DepartmentName" onClick="this.select();" (focusout)="departmentChanged()" />
+          <div class="col-md-7" style="display: flex; justify-content: space-between;">
+            <div class="col-md-4">
+              <div class="form-group row">
+                <label class="control-label col-md-5">Department<b style="float:right;">:</b></label>
+                <div class="col-md-7">
+                  <!-- <input class="form-control" value="" [(ngModel)]="currentdepartmentappointment.departmentName"
+                         [ngModelOptions]="{standalone: true}" placeholder="Enter Department Name" /> -->
+                  <input class="form-control" danphe-auto-complete
+                         [(ngModel)]="currentdepartmentappointment.departmentName" [ngModelOptions]="{standalone: true}"
+                         [list-formatter]="myListFormatter" [source]="departmentList" placeholder="Department Name"
+                         display-property-name="DepartmentName" onClick="this.select();" (focusout)="departmentChanged()" />
+                </div>
               </div>
             </div>
-          </div>
-          <div class="col-md-3">
-            Report Type:
-            <select [(ngModel)]="ReportType" id="ddlGender" [ngModelOptions]="{standalone: true}">
-              <option value="Day" selected>Day</option>
-              <option value="Month">Month</option>
-            </select>
-          </div>
-
-
-          <div class="col-md-2">
-            <div class="form-group">
-              <button class="btn green btn-success" type="button" (click)="Load()"> <i class="fa fa-search"></i> Show
-                Report
-              </button>
+            <div class="col-md-3" style="display: flex; display: flex; width: fit-content;">
+              Report Type&nbsp;:&nbsp;
+              <select [(ngModel)]="ReportType" id="ddlGender" [ngModelOptions]="{standalone: true}" (change)="OnReportTypeChange()">
+                <option value="Day" selected>Day</option>
+                <option value="Month">Month</option>
+              </select>
+            </div>
+            <div class="col-md-2" style="display: flex; display: flex; width: fit-content;">
+              <label for="id_checkbox_freeVisit" class="is-ref mt-checkbox mt-checkbox-outline">
+                <input type="checkbox" id="id_checkbox_freeVisit" style="cursor: pointer;" [(ngModel)]="currentdepartmentappointment.IsFreeVisit"
+                       [ngModelOptions]="{standalone: true}" />
+                <span></span>Free Visit
+              </label>
+            </div>
+            <div class="col-md-2">
+              <div class="form-group">
+                <button class="btn green btn-success" type="button" (click)="Load()"> <i class="fa fa-search"></i> Show
+                  Report
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -69,7 +76,8 @@
                    [grid-showExport]="true"></danphe-grid>
     </div>
     <div class="col-md-12" style="margin-bottom: 50px;margin-top: 20px;">
-      <div id="dvApptSummary" *ngIf="dataLoaded">
+      <div id="dvApptSummary"
+           *ngIf="dataLoaded">
         <div>
           <label class="summ-title"> Summary </label>
           &nbsp;&nbsp;&nbsp;
@@ -80,19 +88,31 @@
           <thead>
             <tr>
               <td style="white-space: nowrap; padding: 5px;">Total New Visit</td>
-              <td style="white-space: nowrap; padding: 5px;">{{summary.tot_new}}</td>
+              <td style="white-space: nowrap; padding: 5px;">{{summary.TotalNewAppointments}}</td>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td style="white-space: nowrap; padding: 5px;">Total Followup Visit</td>
-              <td style="white-space: nowrap; padding: 5px;">{{summary.tot_followup}}</td>
+              <td style="white-space: nowrap; padding: 5px;">{{summary.TotalFollowupAppointments}}</td>
+            </tr>
+          </tbody>
+          <tbody>
+            <tr>
+              <td style="white-space: nowrap; padding: 5px;">Total Revisit Visit</td>
+              <td style="white-space: nowrap; padding: 5px;">{{summary.TotalRevisitAppointments}}</td>
+            </tr>
+          </tbody>
+          <tbody>
+            <tr>
+              <td style="white-space: nowrap; padding: 5px;">Total Referral Visit</td>
+              <td style="white-space: nowrap; padding: 5px;">{{summary.TotalReferralAppointments}}</td>
             </tr>
           </tbody>
           <tbody>
             <tr>
               <td style="white-space: nowrap; padding: 5px;">Total Visit</td>
-              <td style="white-space: nowrap; padding: 5px;">{{summary.tot_all}}</td>
+              <td style="white-space: nowrap; padding: 5px;">{{summary.TotalAppointments}}</td>
             </tr>
           </tbody>
         </table>

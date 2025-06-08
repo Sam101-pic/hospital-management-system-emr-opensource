@@ -13,3 +13,10 @@
 .registrationstickercontainer {
     padding: 10px;
 }
+
+.sticker-button-container {
+    display: flex;
+    justify-content: space-between;
+    width: 400px;
+    margin: 15px 0px 10px 0px;
+}

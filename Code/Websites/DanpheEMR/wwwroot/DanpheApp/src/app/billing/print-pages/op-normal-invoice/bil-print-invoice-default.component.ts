@@ -13,6 +13,10 @@ import { ENUM_Country, ENUM_DanpheHTTPResponseText, ENUM_MembershipTypeName, ENU
 import { BillingBLService } from "../../shared/billing.bl.service";
 import { BillingService } from "../../shared/billing.service";
 import { BilPrint_VM } from "../../shared/invoice-print-vms";
+import { PrintTemplateType } from '../../shared/print-template-type.model';
+//import { BilPrint_VM } from "../../shared/invoice-print-vms";
+
+// import { DanpheHTTPResponse } from 'src/app/shared/common-models';
 
 
 @Component({
@@ -58,7 +62,7 @@ export class Bil_Print_Invoice_DefaultComponent {
   public CreditInvoiceDisplaySettings = { ShowPatAmtForCrOrganization: false, PatAmtValue: "0.00", ValidCrOrgNameList: ["Nepal Govt Dialysis"] };
   public QueueNoSetting = { "ShowInInvoice": false, "ShowInSticker": false };
 
-  public InvoiceDisplaySettings: any = { ShowHeader: true, ShowQR: true, ShowHospLogo: true, ShowPriceCategory: false, HeaderType: '' };
+  public InvoiceDisplaySettings: any = { ShowHeader: true, ShowQR: true, ShowHospLogo: true, ShowPriceCategory: false, HeaderType: '', ShowReferredBy: false };
   public InvoiceFooterNoteSettings: any = { ShowFooter: true, ShowEnglish: true, ShowNepali: false, EnglishText: "Please bring this invoice on your next visit.", NepaliText: "कृपया अर्को पटक आउँदा यो बिल अनिवार्य रुपमा लिएर आउनुहोला ।" };
   public hospitalCode: string = "";
   public isReceiptDetailLoaded: boolean = false;
@@ -78,6 +82,21 @@ export class Bil_Print_Invoice_DefaultComponent {
   public OtherCurrencyDetail: OtherCurrencyDetail = { CurrencyCode: '', ExchangeRate: 0, BaseAmount: 0, ConvertedAmount: 0 };
   public BillingPackageInvoiceColumnSelection = { Unit: false, Price: false, DiscountPercent: false, DiscountAmount: false, Amount: false, InvoiceSubTotal: false, InvoiceDiscount: false };
   public BillingInvoiceDisplaySetting = { Unit: true, Price: true, DiscountPercent: true, DiscountAmount: true, Amount: true, InvoiceSubTotal: true, InvoiceDiscount: true };
+  public OpBilling = {
+    "PrintType": "op-billing",
+    "Enable": false
+  };
+  public IpBilling = {
+    "PrintType": "ip-billing",
+    "Enable": false
+  };
+  public IpDischarge = {
+    "PrintType": "ip-discharge",
+    "Enable": false
+  };
+
+  PrintTemplateTypeSettings = new PrintTemplateType();
+  DynamicReceiptPrintTemplate: string = "";
 
   public EnableEnglishCalendarOnly: boolean = false;
   constructor(
@@ -135,12 +154,26 @@ export class Bil_Print_Invoice_DefaultComponent {
     if (btnObj && this.focusPrintBtn) {
       btnObj.focus();
     }
+    this.RenderDynamicPrintReceipt();
+
   }
 
   GetBillingInvoiceDisplaySetting() {
     let currParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Billing" && a.ParameterName === "BillingInvoiceDisplaySettings");
     if (currParam && currParam.ParameterValue) {
       this.BillingInvoiceDisplaySetting = JSON.parse(currParam.ParameterValue);
+    }
+  }
+  ReadReceiptPrintDisplaySettingParameter() {
+    let currParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "UseDynamicInvoicePrint");
+    if (currParam && currParam.ParameterValue) {
+      const paramValue = JSON.parse(currParam.ParameterValue) as Array<PrintTemplateType>;
+
+      if (paramValue) {
+        this.PrintTemplateTypeSettings = paramValue.find(p => p.PrintType === this.invoice.InvoiceInfo.PrintTemplateType);
+        //!Manual Change Detection is done here in order to reflect the changes of dynamic print receipts, if not done, the dom element is not rendered and will face issues in rendering the receipt.
+        this.changeDetector.detectChanges();
+      }
     }
   }
   public SetInvoiceLabelNameFromParam() {
@@ -178,10 +211,36 @@ export class Bil_Print_Invoice_DefaultComponent {
   public openBrowserPrintWindow: boolean = false;
   public browserPrintContentObj: any;
 
+
+  public PrintDynamicReceipt() {
+    this.loading = true;
+    //Open 'Browser Print' if printer not found or selected printing type is Browser.
+    if (!this.selectedPrinter || this.selectedPrinter.PrintingType === ENUM_PrintingType.browser) {
+      this.GenerateDynamicInvoicePrintBrowser(this.DynamicReceiptPrintTemplate);
+      this.loading = false;
+    }
+  }
+
+  GenerateDynamicInvoicePrintBrowser(dataToPrint: string) {
+    let iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.contentWindow.document.open();
+    iframe.contentWindow.document.write(dataToPrint);
+    iframe.contentWindow.document.close();
+
+    setTimeout(function () {
+      document.body.removeChild(iframe);
+    }, 500);
+
+
+    this.UpdatePrintCount();
+  }
+
   public print() {
     this.loading = true;
     //Open 'Browser Print' if printer not found or selected printing type is Browser.
     if (!this.selectedPrinter || this.selectedPrinter.PrintingType === ENUM_PrintingType.browser) {
+
       this.browserPrintContentObj = document.getElementById("billing-receipt");
       this.openBrowserPrintWindow = false;
       this.changeDetector.detectChanges();
@@ -223,6 +282,23 @@ export class Bil_Print_Invoice_DefaultComponent {
 
   }
 
+
+  RenderDynamicPrintReceipt() {
+    if (document.getElementById('id_dynamic_print_receipt_container') && this.PrintTemplateTypeSettings && this.PrintTemplateTypeSettings.Enable) {
+      let defaultInvoiceData = document.createElement('div');
+      defaultInvoiceData.innerHTML = this.invoice.InvoicePrintTemplate;
+      this.DynamicReceiptPrintTemplate = this.invoice.InvoicePrintTemplate;
+      document.getElementById('id_dynamic_print_receipt_container').appendChild(defaultInvoiceData);
+      this.changeDetector.detectChanges();
+
+      let btnObj = document.getElementById('id_btn_print_dynamic_receipt');
+      if (btnObj && this.focusPrintBtn) {
+        btnObj.focus();
+      }
+
+    }
+
+  }
 
   public headerRightColLen: number = 32;
   public nline: any = '\n';
@@ -369,13 +445,13 @@ export class Bil_Print_Invoice_DefaultComponent {
       );
     }
     //items listing table
-    var tableHead = CommonFunctions.GetTextFIlledToALength('Sn.', hlen_SN) + CommonFunctions.GetTextFIlledToALength('Particular(s)', hlen_Particular) +
+    let tableHead = CommonFunctions.GetTextFIlledToALength('Sn.', hlen_SN) + CommonFunctions.GetTextFIlledToALength('Particular(s)', hlen_Particular) +
       CommonFunctions.GetTextFIlledToALength('Unit', hlen_unit) + CommonFunctions.GetTextFIlledToALength('Price', hlen_price) + CommonFunctions.GetTextFIlledToALength('Amount', hlen_amt) + this.nline;
-    var tableBody = '';
+    let tableBody = '';
     let billItems = this.invoice.InvoiceItems;
     for (let i = 0; i < billItems.length; i++) {
-      var tblRow = '';
-      var totalamount = billItems[i].Quantity * billItems[i].Price;
+      let tblRow = '';
+      let totalamount = billItems[i].Quantity * billItems[i].Price;
       let strProviderName = '';
       if (this.ShowProviderName && billItems[i].PerformerName) {
         strProviderName = '(' + billItems[i].PerformerName + ')';
@@ -434,12 +510,6 @@ export class Bil_Print_Invoice_DefaultComponent {
               (this.isPrintFromVisit && this.closePopUpAfterInvoicePrintFromVisit)) {
               this.router.navigate(['/Billing/SearchPatient']);
             }
-            // if (this.isPrintFromVisit && this.closePopUpAfterInvoicePrintFromVisit) {
-            //   this.router.navigate(['/Billing/SearchPatient']);
-            // }
-            // if (!this.isPrintFromADT && !this.isPrintFromVisit) {
-            //   this.router.navigate(['/Billing/SearchPatient']);
-            //}
           }
         }
 
@@ -450,7 +520,7 @@ export class Bil_Print_Invoice_DefaultComponent {
   ngOnInit() {
 
     if (this.invoice) {
-      console.log(this.invoice.InvoiceInfo)
+      this.ReadReceiptPrintDisplaySettingParameter();
       if (this.invoice.InvoiceInfo.OtherCurrencyDetail) {
         this.OtherCurrencyDetail = JSON.parse(this.invoice.InvoiceInfo.OtherCurrencyDetail);
       } else {
@@ -501,7 +571,6 @@ Invoice No: ` + this.invoice.InvoiceInfo.InvoiceNumFormatted;
       this.closePopUpAfterInvoicePrintFromADT = params.closePopUpAfterInvoicePrint;
     }
   }
-
 
   public LoadCreditInvoiceDisplaySettingsFromParameter() {
     let param = this.coreService.Parameters.find(p => p.ParameterGroupName === "Billing" && p.ParameterName === "CreditInvoiceDisplaySettings");

@@ -11,5 +11,6 @@ export class SubStoreRequisition_DTO {
     RequisitionStatus: string = null;
     IsDirectDispatched: boolean = false;
     verificationId: number = null;
+    RequisitionDate: string = null;
     RequisitionItems: SubStoreRequisitionItems_DTO[];
 }

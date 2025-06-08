@@ -316,5 +316,22 @@ export class GovInsuranceDlService {
       this.options
     );
   }
-
+  public GetPatientDetailsAndEligibilityFromHIBServer(NSHINumber: string) {
+    return this.http.get<any>(`/api/HIB/GetInsurancePatientDetailsAndEligibility?nSHINumber=${NSHINumber}`, this.options);
+  }
+  public CheckEligibility(NSHINumber: string) {
+    return this.http.get<any>(`/api/HIB/CheckEligibility?nSHINumber=${NSHINumber}`, this.options);
+  }
+  public GetNHSIPatientDetailLocally(schemeId, patientId) {
+    return this.http.get<any>(`/api/HIB/GetNHSIPatientLocally?patientId=${patientId}&schemeId=${schemeId}`, this.options);
+  }
+  public CheckIfClaimSubmitted(NSHINumber) {
+    return this.http.get<any>(`/api/HIB/CheckIfClaimSubmitted?nSHINumber=${NSHINumber}`, this.options);
+  }
+  GetPreviousSaleQuantityWithInCappingDays(patientId: number, cappingDaysLimit: number, itemId: number) {
+    try {
+      return this.http.get<any>(`/api/GovInsurance/PreviousSalesQuantityWithInCappingDaysLimit?patientId=${patientId}&cappingDaysLimit=${cappingDaysLimit}&itemId=${itemId}`, this.options);
+    }
+    catch (ex) { throw ex; }
+  }
 }

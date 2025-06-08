@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DanpheEMR.ServerModel.PharmacyModels.Provisional
 {
@@ -39,5 +40,7 @@ namespace DanpheEMR.ServerModel.PharmacyModels.Provisional
         public int StoreId { get; set; }
         public decimal CoPaymentCashAmount { get; set; }
         public decimal CoPaymentCreditAmount { get; set; }
+        [NotMapped]
+        public decimal DispatchQty { get; set; }
     }
 }

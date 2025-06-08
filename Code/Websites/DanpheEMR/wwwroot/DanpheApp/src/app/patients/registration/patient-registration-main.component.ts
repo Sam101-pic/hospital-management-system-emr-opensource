@@ -16,6 +16,7 @@ import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { Patient } from "../shared/patient.model";
 //Parse, validate, manipulate, and display dates and times in JS.
 import { CoreService } from '../../core/shared/core.service';
+import { ENUM_MessageBox_Status } from '../../shared/shared-enums';
 
 @Component({
   templateUrl: "./patient-registration-main.html"
@@ -40,7 +41,7 @@ export class PatientRegistrationMainComponent {
 
 
 
-  //loading varible for double click enable-disabled 
+  //loading varible for double click enable-disabled
   loading: boolean = false;
   editButton: boolean = false;
   validRoutes: any;
@@ -63,7 +64,7 @@ export class PatientRegistrationMainComponent {
 
     this.callbackserv = _callBackServ;
     this.SeperateAgeAndUnit();
-    //checks if the call is made from appointment. 
+    //checks if the call is made from appointment.
     //if made from appointment, then navigates to visit after creating patient
     //if so, we'll pre-fill new patient with available fields from appointment.
 
@@ -88,30 +89,35 @@ export class PatientRegistrationMainComponent {
 
   Update(): void {
 
-    //sud:20Mar'23--Commented since It's giving error.. Need to fix and Use below validator.. 
+    //sud:20Mar'23--Commented since It's giving error.. Need to fix and Use below validator..
     this.Patient.PatientValidator.get("Municipality").clearValidators();
 
     if (this.Patient.IsValidCheck(undefined, undefined) == false) {
-      for (var i in this.Patient.PatientValidator.controls) {
+      for (let i in this.Patient.PatientValidator.controls) {
         this.Patient.PatientValidator.controls[i].markAsDirty();
         this.Patient.PatientValidator.controls[i].updateValueAndValidity();
       }
 
       //alert("One or more fields are invalid, please correct them and submit again.");
-      this.msgBoxServ.showMessage("notice-message", ["One or more fields are invalid. please correct them and submit again."]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["One or more fields are invalid. please correct them and submit again."]);
       this.router.navigate(['/Patient/RegisterPatient/BasicInfo']);
     }
     else if (!this.Patient.IsValidMembershipTypeName) {
-      this.msgBoxServ.showMessage("error", ["Please Enter Valid Membership Type"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please Enter Valid Membership Type"]);
       this.router.navigate(['/Patient/RegisterPatient/BasicInfo']);
       return;
     }
     else {
-      var midName = this.Patient.MiddleName;
+      let midName = this.Patient.MiddleName;
       if (midName) {
         midName = this.Patient.MiddleName.trim() + " ";
       } else {
         midName = "";
+      }
+
+      if (!this.Patient.EthnicGroup) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Ethnic Group is mandatory, Please select one`]);
+        return;
       }
       //removing extra spaces typed by the users
       this.Patient.FirstName = this.Patient.FirstName.trim();
@@ -152,7 +158,7 @@ export class PatientRegistrationMainComponent {
 
   //Register function call
   Add(): void {
-    //sud:20Mar'23--Commented since It's giving error.. Need to fix and Use below validator.. 
+    //sud:20Mar'23--Commented since It's giving error.. Need to fix and Use below validator..
     this.Patient.PatientValidator.get("Municipality").clearValidators();
 
     if (this.Patient.IsValidCheck(undefined, undefined) == false) {
@@ -191,10 +197,21 @@ export class PatientRegistrationMainComponent {
         return;
       }
 
+      if (!this.Patient.EthnicGroup) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select Ethnic Group."]);
+        this.router.navigate(['/Patient/RegisterPatient/BasicInfo']);
+        return;
+      }
+
+      if (!this.Patient.EthnicGroup) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [`Ethnic Group is mandatory, Please select one`]);
+        return;
+      }
+
       //loading varible is now true
       this.loading = true;
 
-      //Check This is check in request or new visit creation                
+      //Check This is check in request or new visit creation
       if (this.Patient.PatientId == 0) {
         //Get existing patient list by FirstName, LastName, Mobile Number
         this.GetExistedMatchingPatientList(this.Patient);
@@ -253,7 +270,7 @@ export class PatientRegistrationMainComponent {
       this.capitalizeFirstLetter('LastName');
       this.capitalizeFirstLetter('Address');
 
-      //check if middlename exists or not to append to Shortname 
+      //check if middlename exists or not to append to Shortname
       var midName = this.Patient.MiddleName;
       if (midName) {
         midName = this.Patient.MiddleName.trim() + " ";
@@ -311,7 +328,7 @@ export class PatientRegistrationMainComponent {
     this.patientBLService.GetPatientById(PatientId)
       .subscribe(res => {
         if (res.Status == 'OK') {
-          //patient Service has Common SetPatient method For Setting Pattient Deatils 
+          //patient Service has Common SetPatient method For Setting Pattient Deatils
           //this common method is for Code reusability
           this.loading = false;
           this.patientService.setGlobal(res.Results),

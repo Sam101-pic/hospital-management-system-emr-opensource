@@ -47,6 +47,9 @@ export class DepositSettingsAddComponent {
 
     }
     ngOnInit() {
+        if (this.BillSchemeList && this.BillSchemeList.length) {
+            this.BillSchemeList = this.BillSchemeList.filter(s => s.IsActive);
+        }
         if (this.update) {
             this.selectedBedFeature = this.bedFeatureList.find(a => a.BedFeatureId === this.SettingDepositAmountToEdit.BedFeatureId);
             this.selectedScheme = this.BillSchemeList.find(a => a.SchemeId === this.SettingDepositAmountToEdit.SchemeId);

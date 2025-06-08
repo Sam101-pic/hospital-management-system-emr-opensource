@@ -36,10 +36,12 @@
   <div class="panel-heading good-panel-heading">
     <div class="row">
       <div class="col-md-2">
+        <button class="btn btn-primary btn-sm" (click)="Back()"><i class="fa fa-angle-left" style="margin-right: 5px;"></i> Back
+        </button>
         <b>Direct Dispatch</b>
       </div>
-      <div class="col-md-7">
-        <label class="control-label">Dispatch&nbsp;Date&nbsp;<span>:</span>
+      <div class="col-md-7" style=" display: flex;">
+        <label class="control-label" style="margin-right:1%;margin-top:1%;">Dispatch&nbsp;Date&nbsp;<span>:</span>
         </label>
         <div *ngIf="canUserEnterDate; else DefaultDate">
           <fiscal-year-calendar [showSingleDatePicker]="true" [showAllFiscalYear]="false"
@@ -49,7 +51,7 @@
         <ng-template #DefaultDate>
           <div style="font-size: 12px; padding-top:6px;">
             {{dispatchDate}} A.D.
-            {{dispatchDate | nepaliDate:'format':'YYYY-MM-DD'}} 
+            {{dispatchDate | nepaliDate:'format':'YYYY-MM-DD'}}
           </div>
         </ng-template>
       </div>
@@ -177,10 +179,10 @@
           <label for="remarks" class="col-md-2">Remarks<sup style="color: red;">*</sup><span class="right">:</span></label>
           <textarea id="remarks" name="remarks" formControlName="remarks" cols="70" rows="3" (keyup.enter)="setFocusById('ReceivedBy')"></textarea>
         </div>
-        <div class="col-md-12">
+        <!-- <div class="col-md-12">
           <label for="ReceivedBy" class="col-md-2"> Received By<span class="right">:</span></label>
           <input id="ReceivedBy" type="text" formControlName="receivedBy" (keyup.enter)="setFocusById('directDispatchButton')">
-        </div>
+        </div> -->
       </form>
     </div>
   </div>

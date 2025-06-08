@@ -1,12 +1,13 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
-import { SecurityService } from '../../../security/shared/security.service';
-import { Employee } from "../../../employee/shared/employee.model";
-import { User } from "../../../security/shared/user.model";
-import { SettingsBLService } from '../../shared/settings.bl.service';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 import * as moment from 'moment/moment';
-import { DanpheCache, MasterType } from "../../../shared/danphe-cache-service-utility/cache-services";
+import { Employee } from "../../../employee/shared/employee.model";
+import { SecurityService } from '../../../security/shared/security.service';
+import { User } from "../../../security/shared/user.model";
+import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { CommonFunctions } from "../../../shared/common.functions";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { SettingsBLService } from '../../shared/settings.bl.service';
 
 @Component({
   selector: "user-add",
@@ -28,7 +29,7 @@ export class UserAddComponent {
   public filteredEmpList: Array<Employee> = new Array<Employee>();
 
   @Input("userList")
-  public userList: Array<User> = new Array<User>();
+  public UserList: Array<User> = new Array<User>();
 
   public selEmployee: User = null;
   public user: User = new User();
@@ -66,19 +67,20 @@ export class UserAddComponent {
   public GetEmpList() {
     //this.empList = DanpheCache.GetData(MasterType.Employee,null);
     this.settingsBLService.GetEmployeeList()
-      .subscribe(res => {
-        if (res.Status == 'OK') {
-          if (res.Results.length) {
-            this.empList = res.Results;
-            CommonFunctions.SortArrayOfObjects(this.empList, "FullName");//this sorts the empList by FullName.
+      .subscribe(
+        (res: DanpheHTTPResponse) => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            if (res.Results.length) {
+              this.empList = res.Results;
+              CommonFunctions.SortArrayOfObjects(this.empList, "FullName");//this sorts the empList by FullName.
 
+            }
+            else {
+              this.msgBoxServ.showMessage("Failed to get Employee List", ['Check log for error message.']);
+              this.logError(res.ErrorMessage);
+            }
           }
-          else {
-            this.msgBoxServ.showMessage("Failed to get Employee List", ['Check log for error message.']);
-            this.logError(res.ErrorMessage);
-          }
-        }
-      },
+        },
         err => {
           this.msgBoxServ.showMessage("Failed to get EmpRoleList", ['Check log for error message.']);
           this.logError(err.ErrorMessage);
@@ -96,15 +98,31 @@ export class UserAddComponent {
       this.CurrentUser.UserProfileValidator.controls[i].updateValueAndValidity();
     }
 
-    ////if the current user enter is validated the update else through error message
+    // Checking if User Name or Employee ID already exists
+    if (this.UserList && this.UserList.length) {
+      const isUserNameExists = this.UserList.some(s => s.UserName === this.CurrentUser.UserName);
+      const isEmployeeAlreadyHasUser = this.UserList.some(s => s.EmployeeId === this.CurrentUser.EmployeeId);
+
+      if (isUserNameExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add User as the User Name "${this.CurrentUser.UserName}" already exists!`]);
+        return;
+      }
+
+      if (isEmployeeAlreadyHasUser) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add User as the User Name for "${this.selEmployee}" already exists!`]);
+        return;
+      }
+    }
+
+    //if the current user enter is validated the update else through error message
     if ((this.CurrentUser.IsValidCheck(undefined, undefined) && !this.CheckUserNameAndEmail())) {
       this.settingsBLService.AddUser(this.CurrentUser)
         .subscribe(
-          res => {
-            if (res.Status == "OK") {
-              this.msgBoxServ.showMessage("success", ['User Added Successfully.']);
+          (res: DanpheHTTPResponse) => {
+            if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['User Added Successfully!']);
               this.CurrentUser = new User();
-              
+
               this.GetEmpList();
               //we're getting new user as res.Results.
               let newUser: User = res.Results;
@@ -112,13 +130,13 @@ export class UserAddComponent {
               this.selEmployee = null;
               this.Close();
 
-            }else if(res.Status == "Failed"){
-              this.msgBoxServ.showMessage("error", ["Something Wrong" + res.ErrorMessage]);
+            } else if (res.Status == ENUM_DanpheHTTPResponses.Failed) {
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Something Wrong" + res.ErrorMessage]);
               console.log(res.ErrorMessage);
             }
             else {
-             
-              this.msgBoxServ.showMessage("Failed", ["UserName or email already exists"]);
+
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["UserName or email already exists"]);
 
             }
 
@@ -132,26 +150,26 @@ export class UserAddComponent {
 
 
   CheckUserNameAndEmail() {
-    var matched = this.userList.filter(user => (user.UserName == this.CurrentUser.UserName));
+    var matched = this.UserList.filter(user => (user.UserName == this.CurrentUser.UserName));
     if (matched.length) {
       if (this.update)
         if (this.CurrentUser.UserName == this.selectedItem.UserName)
           return false;
-      this.msgBoxServ.showMessage("Failed", ["UserName already exists"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["UserName already exists"]);
       return true;
     }
-    matched = this.userList.filter(user => (user.Email == this.CurrentUser.Email));
+    matched = this.UserList.filter(user => (user.Email == this.CurrentUser.Email));
     if (matched.length) {
       if (this.update)
         if (this.CurrentUser.Email == this.selectedItem.Email)
           return false;
-      this.msgBoxServ.showMessage("Failed", ["Email Id already exists"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Email Id already exists"]);
       return true;
     }
   }
   FilterEmployeeList() {
     this.filteredEmpList = this.empList
-    this.userList.forEach(user => {
+    this.UserList.forEach(user => {
       this.filteredEmpList = this.filteredEmpList.filter(emp => (emp.EmployeeId != user.EmployeeId));
     });
 
@@ -172,7 +190,7 @@ export class UserAddComponent {
     this.selectedItem = null;
     this.update = false;
     this.showAddPage = false;
-    this.callbackAdd.emit({  });
+    this.callbackAdd.emit({});
   }
   public AssignSelectedEmployee() {
     try {
@@ -195,12 +213,12 @@ export class UserAddComponent {
   public ShowCatchErrMessage(exception) {
     if (exception) {
       let ex: Error = exception;
-      this.msgBoxServ.showMessage("error", ["Check error in Console log !"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Check error in Console log !"]);
       console.log("Error Messsage =>  " + ex.message);
       console.log("Stack Details =>   " + ex.stack);
     }
   }
-   GoToNextInput(id: string) {
+  GoToNextInput(id: string) {
     window.setTimeout(function () {
       let itmNameBox = document.getElementById(id);
       if (itmNameBox) {
@@ -208,9 +226,9 @@ export class UserAddComponent {
       }
     }, 600);
   }
-  KeysPressed(event){
-    if(event.keyCode == 27){ // For ESCAPE_KEY =>close pop up
-      this.Close(); 
+  KeysPressed(event) {
+    if (event.keyCode == 27) { // For ESCAPE_KEY =>close pop up
+      this.Close();
     }
   }
 

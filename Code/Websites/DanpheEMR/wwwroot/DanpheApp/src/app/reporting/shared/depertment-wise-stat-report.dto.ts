@@ -1,12 +1,16 @@
 export class DepartmentwiseStatReport_DTO {
-    public DepartmentName: string = null;
-    public FollowupFemaleAdult: number = 0;
-    public FollowupFemaleChild: number = 0;
-    public FollowupMaleAdult: number = 0;
-    public FollowupMaleChild: number = 0;
-    public NewFemaleAdult: number = 0;
-    public NewFemaleChild: number = 0;
-    public NewMaleAdult: number = 0;
-    public NewMaleChild: number = 0;
-    public Total: number = 0;
+    DepartmentName: string = null;
+    FollowupFemaleAdult: number = 0;
+    FollowupFemaleChild: number = 0;
+    FollowupMaleAdult: number = 0;
+    FollowupMaleChild: number = 0;
+    NewFemaleAdult: number = 0;
+    NewFemaleChild: number = 0;
+    NewMaleAdult: number = 0;
+    NewMaleChild: number = 0;
+    FollowupOthersChild: number = 0;
+    FollowupOthersAdult: number = 0;
+    NewOthersChild: number = 0;
+    NewOthersAdult: number = 0;
+    Total: number = 0;
 }

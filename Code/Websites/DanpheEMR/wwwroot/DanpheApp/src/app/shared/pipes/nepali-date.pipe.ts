@@ -37,7 +37,7 @@ export class NepaliDatePipe implements PipeTransform {
       if (actionName == "format") {
         let npDate = this.nepaliCalendarServ.ConvertEngToNepaliFormatted(value, actionValue);
         // return npDate;
-        return `(${npDate})`;
+        return `(${npDate} BS)`;
       }
       else {
         let npDate = this.nepaliCalendarServ.ConvertEngToNepDateString(value);
@@ -48,7 +48,7 @@ export class NepaliDatePipe implements PipeTransform {
     else if (actionName == "format") {
       //return this.nepaliCalendarServ.ConvertEngToNepaliFormatted(value, actionValue);
       let npDate = this.nepaliCalendarServ.ConvertEngToNepaliFormatted(value, actionValue);
-      return `(${npDate})`;
+      return `(${npDate} BS)`;
     }
     else {
       return "";

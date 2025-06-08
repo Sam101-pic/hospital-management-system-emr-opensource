@@ -1,13 +1,13 @@
-import { Component, Directive, ViewChild } from '@angular/core';
-import { FormControlName } from '@angular/forms';
-import * as moment from 'moment/moment';
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
-import { WardSupplyBLService } from "../shared/wardsupply.bl.service";
-import WARDGridColumns from "../shared/ward-grid-cloumns";
-import { DLService } from '../../shared/dl.service';
+import { Component } from '@angular/core';
 import { Router } from '@angular/router';
+import * as moment from 'moment/moment';
 import { SecurityService } from '../../security/shared/security.service';
+import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
+import { DLService } from '../../shared/dl.service';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from '../../shared/shared-enums';
+import WARDGridColumns from "../shared/ward-grid-cloumns";
+import { WardSupplyBLService } from "../shared/wardsupply.bl.service";
 
 
 @Component({
@@ -66,8 +66,7 @@ export class WardStockReportComponent {
               this.itemList = res.Results;
             }
             else {
-              this.msgBoxServ.showMessage("Error", ["Failed to get StockDetailsList."]);
-              console.log(res.Errors);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["Failed to get StockDetailsList."]);
             }
           }
         });
@@ -116,10 +115,14 @@ export class WardStockReportComponent {
           this.WardStockReportColumns = WARDGridColumns.WardStockReport;
           ////Assign  Result to PHRMStockItemsReportData
           this.WardStockReportData = res.Results;
-
+          this.WardStockReportData.forEach(w => {
+            if (w.ExpiryDate) {
+              w.ExpiryDate = moment(w.ExpiryDate).format('YYYY-MM-DD');
+            }
+          });
         }
         if (res.Status == 'OK' && res.Results.length == 0) {
-          this.msgBoxServ.showMessage("error", ["No Data is Available for Selected Record"]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ["No Data is Available for Selected Record"]);
         }
 
       });

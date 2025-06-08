@@ -27,6 +27,7 @@ export class INCTVGridColumnSettings {
     //{ headerName: "TDS Percentage", field: "TDSPercentage", width: 100 },
     { headerName: "Description", field: "Description", width: 100 },
     { headerName: "IsActive", field: "IsActive", width: 100 },
+    { headerName: "Price Category", field: "PriceCategoryName", width: 100 },
     //{
     //  headerName: "Actions",
     //  field: "",
@@ -108,6 +109,7 @@ export class INCTVGridColumnSettings {
             Remove
           </a>`
     },
+    { headerName: 'Billing Types Applicable', field: 'BillingTypesApplicable', width: 90 },
   ];
 
   static EmployeeItemListWithOpdIpdSettingEnabled = [
@@ -198,6 +200,7 @@ export class INCTVGridColumnSettings {
     { headerName: "PriceCategory", field: "PriceCategoryName", width: 120 },
     { headerName: "Prescriber", field: "ReferredByEmpName", width: 120 },
     { headerName: "Performer", field: "AssignedToEmpName", width: 120 },
+    { headerName: "Referrer", field: "ReferrerName", width: 120 },
     {
       headerName: "Fraction ?",
       width: 80,
@@ -218,6 +221,7 @@ export class INCTVGridColumnSettings {
       let template =
         `<a danphe-grid-action="edit" class="grid-action">Rename</a>
          <a danphe-grid-action="editItemsPercent" class="grid-action">Edit Items Percentage</a>
+          <a danphe-grid-action="viewMapping" class="grid-action">View Mapping</a>
          <a danphe-grid-action="deactivateProfile" class="grid-action blinking-btn-warning"  style="background-color: orange;color: black;">
               Deactivate
             </a>
@@ -240,6 +244,9 @@ export class INCTVGridColumnSettings {
         `<a danphe-grid-action="editItemsPercent" class="grid-action">
                 Edit Items
              </a>
+          <a danphe-grid-action="viewMapping" class="grid-action">
+                View Mapping
+             </a>   
          <a danphe-grid-action="deactivateEmployeeIncentiveSetup" class="grid-action blinking-btn-warning"  style="background-color: orange;color: black;">
               Deactivate
             </a>

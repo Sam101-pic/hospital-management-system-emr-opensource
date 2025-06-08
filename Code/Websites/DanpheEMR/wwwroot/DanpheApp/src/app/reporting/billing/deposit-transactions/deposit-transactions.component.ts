@@ -1,17 +1,15 @@
-import { Component, Directive, ViewChild } from '@angular/core';
-import { ReportingService } from "../../../reporting/shared/reporting-service";
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { NepaliDateInGridColumnDetail } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
-import { NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { Component } from '@angular/core';
 import * as moment from 'moment/moment';
-import { DLService } from '../../../shared/dl.service';
-import { DanpheCache } from '../../../shared/danphe-cache-service-utility/cache-services';
-import { MasterType } from '../../../shared/danphe-cache-service-utility/cache-services';
-import { User } from '../../../security/shared/user.model';
-import { CommonFunctions } from '../../../shared/common.functions';
-import { SecurityService } from '../../../security/shared/security.service';
-import { SettingsBLService } from '../../../settings-new/shared/settings.bl.service';
 import { CoreService } from '../../../core/shared/core.service';
+import { ReportingService } from "../../../reporting/shared/reporting-service";
+import { SecurityService } from '../../../security/shared/security.service';
+import { User } from '../../../security/shared/user.model';
+import { SettingsBLService } from '../../../settings-new/shared/settings.bl.service';
+import { CommonFunctions } from '../../../shared/common.functions';
+import { DanpheCache, MasterType } from '../../../shared/danphe-cache-service-utility/cache-services';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { DLService } from '../../../shared/dl.service';
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 
 @Component({
   templateUrl: "./deposit-transactions.html"
@@ -47,6 +45,7 @@ export class RPT_BIL_DepositTransactionComponent {
     public settingsBLService: SettingsBLService,
     public coreService: CoreService) {
     this.dlService = _dlService;
+    this.DepositTransactionsColumns = this.reportServ.reportGridCols.DepositTransactionsColumns;
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("DepositDate", false));
     this.LoadCounter();
     this.LoadUser();
@@ -63,7 +62,7 @@ export class RPT_BIL_DepositTransactionComponent {
     this.dlService.Read("/BillingReports/Billing_DepositTransationsReport?FromDate="
       + this.fromDate + "&ToDate=" + this.toDate + "&patSearchText=" + patname + "&employeeId=" + employeeId)
       .map(res => res)
-      .finally(()=>{this.loading=false;})
+      .finally(() => { this.loading = false; })
       .subscribe(res => this.Success(res),
         res => this.Error(res));
 
@@ -76,7 +75,6 @@ export class RPT_BIL_DepositTransactionComponent {
     if (res.Status == "OK") {
       let data = res.Results;
       if (data.length > 0) {
-        this.DepositTransactionsColumns = this.reportServ.reportGridCols.DepositTransactionsColumns;
         this.DepositTransactionsData = data;
         this.getSummary(this.DepositTransactionsData);
       }

@@ -170,21 +170,15 @@
               </thead>
               <tbody *ngFor="let orderedItem of PurchaseOrderVM.OrderedItemList;let i = index">
                 <tr id="itemRow" style="text-align:center" [ngClass]="{'rq-row-background-red': !orderedItem.IsActive}">
-                  <td><i *ngIf="orderedItem.IsActive == true"
-                       [ngClass]="{ 'fa':true,'fa-pencil': !orderedItem.IsEdited , 'fa-undo': orderedItem.IsEdited}"
-                       title="{{ orderedItem.IsEdited ? 'Undo Edit' : 'Edit Item'}}" (click)="EditItem(i)"></i>
+                  <td><i *ngIf="orderedItem.IsActive == true" [ngClass]="{ 'fa':true,'fa-pencil': !orderedItem.IsEdited , 'fa-undo': orderedItem.IsEdited}" title="{{ orderedItem.IsEdited ? 'Undo Edit' : 'Edit Item'}}" (click)="EditItem(i)"></i>
                   </td>
-                  <td><i *ngIf="orderedItem.IsEdited == false"
-                       [ngClass]="{ 'fa':true,'fa-times': orderedItem.IsActive , 'fa-undo': !orderedItem.IsActive}"
-                       title="{{ orderedItem.IsActive ? 'Cancel Item' : 'Undo Cancel'}}" (click)="CancelItem(i)"></i>
+                  <td><i *ngIf="orderedItem.IsEdited == false" [ngClass]="{ 'fa':true,'fa-times': orderedItem.IsActive , 'fa-undo': !orderedItem.IsActive}" title="{{ orderedItem.IsActive ? 'Cancel Item' : 'Undo Cancel'}}" (click)="CancelItem(i)"></i>
                   </td>
                   <td>{{orderedItem.Code}}</td>
                   <td>{{orderedItem.ItemName}}</td>
                   <td>
                     <span [hidden]="orderedItem.IsEdited">{{orderedItem.Quantity}}</span>
-                    <input type="number" class="rqRowEditQty" id="rqRowEditQty{{i}}" [hidden]="!orderedItem.IsEdited"
-                           [(ngModel)]="orderedItem.Quantity" (ngModelChange)="CalculationForPO()" onClick="this.select();" min="1"
-                           (wheel)="coreService.PreventNumberChangeOnScroll($event)" />
+                    <input type="number" class="rqRowEditQty" id="rqRowEditQty{{i}}" [hidden]="!orderedItem.IsEdited" [(ngModel)]="orderedItem.Quantity" (ngModelChange)="CalculationForPO()" onClick="this.select();" min="1" (wheel)="coreService.PreventNumberChangeOnScroll($event)" />
                     <div class="error-message" *ngIf="orderedItem.Quantity < 1" [hidden]="orderedItem.Quantity >= 1">
                       Use&nbsp;<i class="fa fa-times"></i>&nbsp;instead.
                     </div>
@@ -192,9 +186,7 @@
                   <td>{{orderedItem.UOMName}}</td>
                   <td>
                     <span [hidden]="orderedItem.IsEdited">{{orderedItem.StandardRate}}</span>
-                    <input type="number" class="rqRowEditQty" (ngModelChange)="CalculationForPO()" onClick="this.select();"
-                           (wheel)="coreService.PreventNumberChangeOnScroll($event)" [hidden]="!orderedItem.IsEdited"
-                           [(ngModel)]="orderedItem.StandardRate" />
+                    <input type="number" class="rqRowEditQty" (ngModelChange)="CalculationForPO()" onClick="this.select();" (wheel)="coreService.PreventNumberChangeOnScroll($event)" [hidden]="!orderedItem.IsEdited" [(ngModel)]="orderedItem.StandardRate" />
                   </td>
                   <td>{{orderedItem.VatPercentage | number : '1.0-2'}}</td>
                   <td>{{orderedItem.TotalAmount | number : '1.0-2'}}</td>
@@ -239,8 +231,7 @@
               <span class="col-md-10">{{PurchaseOrder.PORemark}}</span>
             </div>
             <div class="row hidden-in-print" style="margin:10px -15px" [hidden]="isVerificationAllowed==false">
-              <label for="VerificationRemarks" class="col-md-2 text-left">Remarks <span class="right">:</span></label>
-              <textarea class="col-md-10" [(ngModel)]="VerificationRemarks" name="VerificationRemarks" rows="3"></textarea>
+              <label for="VerificationRemarks" class="col-md-2 text-left">Remarks <span class="right" style="color: red;">*:</span></label> <textarea class="col-md-10" [(ngModel)]="VerificationRemarks" name="VerificationRemarks" rows="3"></textarea>
             </div>
             <hr />
             <div class="row" *ngIf="PurchaseOrderVM != null" style="font-size: 12px; padding: 10px 0;">

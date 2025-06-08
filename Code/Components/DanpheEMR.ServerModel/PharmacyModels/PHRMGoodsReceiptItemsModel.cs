@@ -63,5 +63,6 @@ namespace DanpheEMR.ServerModel
         public decimal CCAmount { get; set; }
         public decimal CostPrice { get; set; }
         public decimal MRP { get; set; }
+        public decimal StripSalePrice { get; set; }
     }
 }

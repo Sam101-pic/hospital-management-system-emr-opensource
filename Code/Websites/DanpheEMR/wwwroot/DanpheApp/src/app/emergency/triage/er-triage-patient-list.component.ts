@@ -1,12 +1,16 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
 import * as moment from 'moment';
+import { Visit } from '../../appointments/shared/visit.model';
 import { VisitService } from '../../appointments/shared/visit.service';
+import { ClinicalPatientService } from '../../clinical-new/shared/clinical-patient.service';
+import { PatientDetails_DTO } from '../../clinical-new/shared/dto/patient-cln-detail.dto';
 import { CoreService } from '../../core/shared/core.service';
 import { PatientService } from '../../patients/shared/patient.service';
+import { SecurityService } from '../../security/shared/security.service';
 import { DanpheHTTPResponse } from '../../shared/common-models';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../shared/shared-enums';
+import { ENUM_DanpheHTTPResponses, ENUM_EscapeKey, ENUM_MessageBox_Status, ENUM_VisitType } from '../../shared/shared-enums';
 import EmergencyGridColumnSettings from '../shared/emergency-gridcol-settings';
 import { EmergencyPatientModel } from '../shared/emergency-patient.model';
 import { EmergencyBLService } from '../shared/emergency.bl.service';
@@ -15,7 +19,9 @@ import { EmergencyTriagedPatient_DTO } from '../shared/er-triaged-patient-dto';
 @Component({
   selector: 'triage-patient-list',
   templateUrl: './er-triage-patient-list.html',
-  styleUrls: ['./triage-pat-list.css']
+  styleUrls: ['./triage-pat-list.css'],
+  host: { '(window:keydown)': 'hotkeys($event)' }
+
 })
 
 export class ERTriagePatientListComponent {
@@ -43,6 +49,30 @@ export class ERTriagePatientListComponent {
   public AllKeys: Array<string>;
   public ShowUploadConsent = { "upload_files": false, "remove": false };
   public FilteredData: Array<EmergencyTriagedPatient_DTO>;
+  public AdmissionCases: { Name: string, Value: string; }[];
+  public AdmissionCase: string = null;
+  data: any = '';
+  public currentVisit: Visit;
+  public showDischargeSummaryView: boolean = false;
+  public selectedPatient: EmergencyPatientModel = new EmergencyPatientModel();
+  public hasViewSummaryPermission: boolean = false;
+  @HostListener('AfterDischargedPatientSuccess', ['$event'])
+  onCustomEventCaptured(event: any) {
+    if (event && event.detail && event.detail.dischargeSummary) {
+      const dischargedPatient = event.detail.dischargeSummary;
+      let visitInfo = { PatientId: 0, PatientVisitId: 0 };
+      visitInfo.PatientId = dischargedPatient.PatientId;
+      visitInfo.PatientVisitId = dischargedPatient.PatientVisitId;
+
+      let index = this.FilteredData.findIndex(a => a.PatientId == visitInfo.PatientId && a.PatientVisitId == visitInfo.PatientVisitId);
+      this.FilteredData.splice(index, 1);
+      this.FilteredData = this.FilteredData.slice();
+    }
+  }
+  ShowTriagedPatientList: boolean = false;
+  ShowDischargeSummary: boolean = false;
+  ShowSummaryView = false;
+  SelectedDischarge: any;
 
   constructor(
     private _changeDetector: ChangeDetectorRef,
@@ -50,17 +80,25 @@ export class ERTriagePatientListComponent {
     private _router: Router,
     private _emergencyBLService: EmergencyBLService,
     private _coreService: CoreService,
+    private _securityService: SecurityService,
     private _patientService: PatientService,
-    private _visitService: VisitService
+    private _visitService: VisitService,
+    private _selectedPatientService: ClinicalPatientService
   ) {
     this.TriagedERPatientGridCol = EmergencyGridColumnSettings.TriagedERPatientList;
     this.GetDoctorsList();
+    this.hasViewSummaryPermission = this._securityService.HasPermission('emergency-Discharge-summary-view');
+
   }
 
   ngOnInit() {
     this.CurrentDepartmentName = this._coreService.GetERDepartmentName();
     this.AllKeys = Object.keys(this.ShowUploadConsent);
+    this.AdmissionCases = this._coreService.GetAdmissionCases();
+    this.ShowTriagedPatientList = true;
+
   }
+
 
   GetDoctorsList(): void {
     this._emergencyBLService.GetDoctorsList()
@@ -88,11 +126,45 @@ export class ERTriagePatientListComponent {
           if (res.Results.length > 0) {
             res.Results.forEach(element => {
               let jsonPatientCases = JSON.parse(element.PatientCases);
-              if (jsonPatientCases)
+              if (jsonPatientCases) {
                 element.PatientCases = jsonPatientCases;
+              }
             });
           }
           this.TriagedERPatients = res.Results;
+          this.TriagedERPatients.forEach(element => {
+            if (element.PatientCases && element.PatientCases.MainCase) {
+              switch (element.PatientCases.MainCase) {
+                case 1: {
+                  element.Case = "General";
+                  break;
+                }
+                case 2: {
+                  element.Case = "Dog Bite";
+                  break;
+                }
+                case 3: {
+                  element.Case = "Snake Bite";
+                  break;
+                }
+                case 4: {
+                  element.Case = "Animal Bite";
+                  break;
+                }
+                case 5: {
+                  element.Case = "Emergency Labor";
+                  break;
+                }
+                case 6: {
+                  element.Case = "Medico-legal";
+                  break;
+                }
+                default: {
+                  break;
+                }
+              }
+            }
+          });
           this.FilteredData = res.Results;
           if (this.CaseIdList[0] === 6) {
             this.FilterNestedDetails();
@@ -142,6 +214,7 @@ export class ERTriagePatientListComponent {
     this.ShowERPatRegistration = false;
     this._changeDetector.detectChanges();
     this.SelectedERPatientToEdit = Object.assign(this.SelectedERPatientToEdit, selPat);
+    this.SelectedERPatientToEdit.IsExistingPatient = true;
     this.ShowERPatRegistration = true;
   }
 
@@ -164,6 +237,34 @@ export class ERTriagePatientListComponent {
     this._changeDetector.detectChanges();
     this.SelectedPatient = Object.assign(this.SelectedPatient, selectedPat);
     this.Action = "admitted";
+
+    if (selectedPat.PatientCases && selectedPat.PatientCases.MainCase) {
+      const mainCase = selectedPat.PatientCases.MainCase;
+      if (mainCase === 0) {
+        const generalAdmissionCase = this.AdmissionCases.find(item => item.Name === "General");
+        if (generalAdmissionCase) {
+          this.AdmissionCase = generalAdmissionCase.Name;
+        } else {
+          this.AdmissionCase = "General";
+        }
+      }
+      else {
+        const matchedAdmissionCase = this.AdmissionCases.find(item => Number(item.Value) === mainCase);
+        if (matchedAdmissionCase) {
+          this.AdmissionCase = matchedAdmissionCase.Name;
+        } else {
+          this.AdmissionCase = "General";
+        }
+      }
+    }
+    else {
+      const generalAdmissionCase = this.AdmissionCases.find(item => item.Name === "General");
+      if (generalAdmissionCase) {
+        this.AdmissionCase = generalAdmissionCase.Name;
+      } else {
+        this.AdmissionCase = "General";
+      }
+    }
     this.ShowAdmitPopUp = true;
   }
 
@@ -186,12 +287,14 @@ export class ERTriagePatientListComponent {
   }
 
   DischargeERPatient(selectedPat: EmergencyPatientModel): void {
-    this.ResetAllAndHideParentBodyScroll();
+    // this.ResetAllAndHideParentBodyScroll();
     this.SelectedPatient = new EmergencyPatientModel();
     this._changeDetector.detectChanges();
     this.SelectedPatient = Object.assign(this.SelectedPatient, selectedPat);
     this.Action = "discharged";
     this.showLamaPopUp = true;
+    // this.SetPatDataToGlobal(this.SelectedPatient);
+    // this.RouteToPatientOverview(this.SelectedPatient);
   }
 
   LeaveERPatOnMedicalAdvice(selectedPat: EmergencyPatientModel): void {
@@ -209,6 +312,14 @@ export class ERTriagePatientListComponent {
     this._changeDetector.detectChanges();
     this.SelectedPatient = Object.assign(this.SelectedPatient, selectedPat);
     this.Action = "dor";
+    this.showLamaPopUp = true;
+  }
+  Absconded(selectedPat: EmergencyPatientModel): void {
+    this.ResetAllAndHideParentBodyScroll();
+    this.SelectedPatient = new EmergencyPatientModel();
+    this._changeDetector.detectChanges();
+    this.SelectedPatient = Object.assign(this.SelectedPatient, selectedPat);
+    this.Action = "Absconded";
     this.showLamaPopUp = true;
   }
 
@@ -257,6 +368,7 @@ export class ERTriagePatientListComponent {
       if (itmIndex >= 0) {
         this.TriagedERPatients.splice(itmIndex, 1, $event.ERPatient);
         this.TriagedERPatients = this.TriagedERPatients.slice();
+        this.GetERTriagedPatientList();
       } else {
         this.GetERTriagedPatientList();
       }
@@ -289,6 +401,10 @@ export class ERTriagePatientListComponent {
   AddVitals(selPat: EmergencyPatientModel): void {
     this.ResetAllAndHideParentBodyScroll();
     this.SelectedERPatientToEdit = Object.assign(this.SelectedERPatientToEdit, selPat);
+    const updatedPatient = new PatientDetails_DTO();
+    updatedPatient.PatientId = this.SelectedERPatientToEdit.PatientId;
+    updatedPatient.PatientVisitId = this.SelectedERPatientToEdit.PatientVisitId;
+    this._selectedPatientService.SelectedPatient = updatedPatient;
     if (this.DoctorsList.length) {
       this.ShowAddVitals = true;
       this.VisitId = this.SelectedERPatientToEdit.PatientVisitId;
@@ -296,7 +412,26 @@ export class ERTriagePatientListComponent {
       this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Please Try Later"]);
     }
   }
+  CloseVitalsPopUp() {
+    this.ShowAddVitals = false;
+  }
 
+
+  AddSummary(selPat: EmergencyPatientModel): void {
+    this.SelectedDischarge = null;
+    this._changeDetector.detectChanges();
+    this.SelectedDischarge = selPat;
+    // this.showDischargedList = false;
+    this.ShowTriagedPatientList = false;
+    this.ShowDischargeSummary = true;
+  }
+  ViewSummary(selPat: EmergencyPatientModel): void {
+    this.SelectedDischarge = null;
+    this._changeDetector.detectChanges();
+    this.SelectedDischarge = selPat;
+    this.ShowTriagedPatientList = false;
+    this.ShowSummaryView = true;
+  }
   ReturnFromAllERPatientActions($event): void {
     this.CloseAllERPatientPopUp();
     if ($event.submit) {
@@ -306,19 +441,29 @@ export class ERTriagePatientListComponent {
 
   GoToPatientOverview(pat): void {
     this.SetPatDataToGlobal(pat);
-    this._router.navigate(["/Emergency/PatientOverviewMain"]);
+    // this._router.navigate(["/Emergency/PatientOverviewMain"]);
+    pat['Name'] = `${pat.FirstName} ${pat.MiddleName ? pat.MiddleName : ''} ${pat.LastName}`;
+    pat['VisitType'] = ENUM_VisitType.emergency;
+    pat['AppointmentDate'] = pat.VisitDateTime;
+    this._selectedPatientService.SelectedPatient = pat as PatientDetails_DTO;
+    this._router.navigate(['/Emergency/Clinical-Overview']);
   }
 
   SetPatDataToGlobal(data): void {
     this.GlobalPatient = this._patientService.CreateNewGlobal();
     this.GlobalPatient.PatientId = data.PatientId;
     this.GlobalPatient.PatientCode = data.PatientCode;
-    this.GlobalPatient.ShortName = data.Name;
+    this.GlobalPatient.ShortName = data.Name ? data.Name : data.FullName;
     this.GlobalPatient.DateOfBirth = data.DateOfBirth;
     this.GlobalPatient.Gender = data.Gender;
     this.GlobalPatient.Age = data.Age;
     this.GlobalPatient.Address = data.Address;
+    this.GlobalPatient.CountryName = data.CountryName;
+    this.GlobalPatient.CountrySubDivisionName = data.CountrySubDivisionName;
+    this.GlobalPatient.MunicipalityName = data.MunicipalityName;
+    this.GlobalPatient.WardNumber = data.WardNumber;
     this.GlobalPatient.PhoneNumber = data.ContactNo;
+    this.GlobalPatient.VisitCode = data.VisitCode;
     this.GlobalVisit = this._visitService.CreateNewGlobal();
     this.GlobalVisit.ERTabName = "triaged";
     this.GlobalVisit.PatientVisitId = data.PatientVisitId;
@@ -328,6 +473,7 @@ export class ERTriagePatientListComponent {
     this.GlobalVisit.PerformerName = data.PerformerName;
     this.GlobalVisit.VisitDate = moment(data.VisitDateTime).format("YYYY-MM-DD");
     this.GlobalVisit.VisitTime = moment(data.VisitDateTime).format("HH:MM");
+    this.GlobalVisit.VisitCode = data.VisitCode;
   }
 
   PatientCasesOnChange($event): void {
@@ -343,7 +489,7 @@ export class ERTriagePatientListComponent {
       }
     } else {
       this.CaseIdList = [];
-      this.CaseIdList.push($event.mainDetails)
+      this.CaseIdList.push($event.mainDetails);
     }
     this.GetERTriagedPatientList();
   }
@@ -365,6 +511,67 @@ export class ERTriagePatientListComponent {
   CallBackForClose(event): void {
     if (event && event.close) {
       this.AllKeys.forEach(k => this.ShowUploadConsent[k] = false);
+    }
+  }
+  CloseUpload() {
+    this.ShowUploadConsent.upload_files = false;
+    this.AllKeys.forEach(k => this.ShowUploadConsent[k] = false);
+  }
+  RouteToPatientOverview(selectedVisit: EmergencyPatientModel) {
+    this.SelectVisit(selectedVisit);
+    this._router.navigate(["Emergency/PatientOverviewMain/DischargeSummary"]);
+  }
+  SelectVisit(selectedVisit: EmergencyPatientModel) {
+    let currPatient = this._patientService.getGlobal();
+    let visitGlobal = this._visitService.getGlobal();
+    currPatient.PatientId = selectedVisit.PatientId;
+    currPatient.PatientCode = selectedVisit.PatientCode;
+    currPatient.Address = selectedVisit.Address;
+    visitGlobal.PatientId = selectedVisit.PatientId;
+    visitGlobal.PatientVisitId = selectedVisit.PatientVisitId;
+    currPatient.FirstName = selectedVisit.FirstName;
+    currPatient.LastName = selectedVisit.LastName;
+    currPatient.Gender = selectedVisit.Gender;
+    currPatient.DateOfBirth = selectedVisit.DateOfBirth;
+    currPatient.Age = selectedVisit.Age;
+    currPatient.VisitCode = selectedVisit.VisitCode;
+    currPatient.ShortName = selectedVisit.ShortName ? selectedVisit.ShortName : selectedVisit.FullName;
+    visitGlobal.PerformerId = selectedVisit.PerformerId;
+    visitGlobal.PerformerName = selectedVisit.PerformerName;
+    visitGlobal.VisitDate = selectedVisit.VisitDateTime;
+    visitGlobal.VisitCode = selectedVisit.VisitCode;
+    this.currentVisit = visitGlobal;
+  }
+  Close() {
+    this.showDischargeSummaryView = false;
+  }
+  HideDischargeSummary() {
+    this.ShowDischargeSummary = false;
+    this.ShowSummaryView = false;
+    this.ShowTriagedPatientList = true;
+    this._visitService.PatientVisitId = null;
+  }
+
+  DischargeSummaryCallback(data) {
+    if (data.Status === ENUM_DanpheHTTPResponses.OK) {
+      this.HideDischargeSummary();
+    }
+  }
+
+  CallBackFromAddEdit(data): void {
+    this.ShowDischargeSummary = false;
+    this.ShowTriagedPatientList = false;
+    this._visitService.PatientVisitId = null;
+    this.ShowSummaryView = true;
+  }
+  CallbackFromViewPage($event): void {
+    this.ShowSummaryView = false;
+    this.ShowDischargeSummary = true;
+    this.ShowTriagedPatientList = false;
+  }
+  public hotkeys(event: KeyboardEvent) {
+    if (event.key === ENUM_EscapeKey.EscapeKey) {
+      this.ShowAddVitals = false;
     }
   }
 }

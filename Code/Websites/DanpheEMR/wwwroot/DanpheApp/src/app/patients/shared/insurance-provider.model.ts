@@ -1,17 +1,14 @@
 ﻿import {
-    NgForm,
+    FormBuilder,
     FormGroup,
-    FormControl,
-    Validators,
-    FormBuilder
-} from '@angular/forms'
+    Validators
+} from '@angular/forms';
 
-import * as moment from 'moment/moment';
 
 export class InsuranceProviderModel {
 
     public InsuranceProviderId: number;
-    public InsuranceProviderName: string = null;
+    public InsuranceProviderName: string = '';
     public Description: string = null;
     public CreatedOn: string = null;
 

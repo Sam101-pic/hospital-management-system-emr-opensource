@@ -79,12 +79,12 @@
 </style>
 
 <div class="headin-left"
-     style="width:100%; border: 1px solid #96969a;margin-top: 8px; margin-bottom:15px; border-radius: 2px !important;padding: 20px 0px 10px;">
+     style="width:100%; border: 1px solid #96969a;margin-top: 8px; margin-bottom:15px; border-radius: 2px !important;padding: 10px 0px 10px;">
   <h3 class="col-md-6 visit-head" style="width: 50%; margin: 0px;">
     <i class="fa fa-file-o"></i>Billing Information
     <label *ngIf="!ShowAdditionalBillItemPanel">Billing Not Required.</label>
   </h3>
-  <div class="col-md-6" style="text-align: right; padding-bottom: 5px; margin: 0px;">
+  <div *ngIf="this.RegistrationSchemeDto.IsDiscountEditable" class="col-md-6" style="text-align: right; padding-bottom: 5px; margin: 0px;">
     <label for="chkEnableDiscountAmount" class="is-ref mt-checkbox mt-checkbox-outline">
       <input type="checkbox"
              id="chkEnableDiscountAmount" [(ngModel)]="EnableDiscountAmount" title="Enable Discount Amount"
@@ -93,7 +93,7 @@
   </div>
   <div class="form-horizontal">
     <div class="row">
-      <div class="col-md-12" *ngIf="ShowBillSummaryPanel">
+      <div class="col-md-12" style="margin-top:-15px;" *ngIf="ShowBillSummaryPanel">
         <div
              style="margin-bottom: 5px;">
           <!-- <div class="form-group" style="margin-bottom: 5px;" *ngIf="showAdditionalBillItemPanel">
@@ -143,7 +143,8 @@
                   <input [(ngModel)]="billItem.Price" class="form-control" type="number" min="0"
                          (ngModelChange)="Calculation()" placeholder="Price"
                          [attr.disabled]="(billItem.IsPriceChangeAllowed === true ? null : true)"
-                         style="text-align: right; padding: 0px !important; height: 25px; width: 100% !important;" />
+                         style="text-align: right; padding: 0px !important; height: 25px; width: 100% !important;"
+                         (wheel)="coreService.PreventNumberChangeOnScroll($event)" />
                 </td>
                 <td class="print-rate" style="padding: 5px !important; font-weight: 600; width:10%">
                   <input [(ngModel)]="billItem.DiscountPercent" class="form-control" type="number" min="0"
@@ -186,9 +187,9 @@
         </div>
         <div class="form-group" style="margin: 0;">
           <div class="col-wrapper">
-            <div class="col">
+            <div class="col" style="padding:10px;">
               <div class="row">
-                <label class="col-md-5" style="">Discount %</label>
+                <label class="col-md-5">Discount %</label>
                 <div class="col-md-7">
                   <input [(ngModel)]="BillingTransaction.DiscountPercent" class="form-control" type="number" min="0"
                          onClick="this.select();" [disabled]="DisableDiscountPercent || EnableDiscountAmount" max="100"
@@ -216,10 +217,10 @@
                      *ngIf="BillingTransaction.DiscountPercent || BillingTransaction.IsInsuranceBilling || this.BillingTransaction.PaymentMode == 'credit'"
                      class="color-red">*</b>
                 </label>
-                <div class="col-md-8" style="">
+                <div class="col-md-8">
                   <input class="form-control" id="id_billing_remarks" maxlength="200" [(ngModel)]="BillingTransaction.Remarks"
                          value="{{BillingTransaction.Remarks | CapitalFirstLetter}}" placeholder="Remarks"
-                         style="height: 30px;"
+                         style="height: 30px; width: 90%;"
                          (keyup.enter)="SetFocusById('btnPrintInvoice')" />
                 </div>
               </div>
@@ -227,7 +228,7 @@
           </div>
         </div>
 
-        <div class="col-md-6" style="padding: 0;">
+        <div class="col-md-6" style="padding: 10px;">
           <div class="row">
             <label class="col-md-5">SubTotal:</label>
             <div class="col-md-7">
@@ -273,8 +274,8 @@
                      name="Tender"
                      placeholder="Rupees" id="tender"
                      (wheel)="coreService.PreventNumberChangeOnScroll($event)"
-                     [disabled]="BillingTransaction.PaymentMode === 'credit'"
-                     onClick="this.select();">
+                     onClick="this.select();"
+                     [disabled]="BillingTransaction.PaymentMode === 'credit'">
             </div>
           </div>
           <div class="row">
@@ -296,7 +297,7 @@
 
       </div>
 
-      <div class="col-md-8 visit-billing-payment" style="padding-left: 0px;left:15px;">
+      <div class="col-md-8 visit-billing-payment" style="padding-left: 10px;left:15px;">
         <payment-mode-info
                            [default-payment-mode]="RegistrationSchemeDto.DefaultPaymentMode"
                            [total-amount]="BillingTransaction.ReceivedAmount"

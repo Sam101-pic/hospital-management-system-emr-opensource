@@ -10,7 +10,7 @@
 <div class="row">
     <div class="col-lg-12 col-sm-12">
         <danphe-grid [grid-colDefaults]="lisMappingGridCols" [grid-data]="allMappedData"
-            (grid-actions)="GridActions($event)"> </danphe-grid>
+                     (grid-actions)="GridActions($event)"> </danphe-grid>
     </div>
 </div>
 
@@ -26,7 +26,7 @@
                 </div>
                 <div class="modelbox-body">
                     <lis-map-add [selectedMapId]="selectedLisCompMapId"
-                        (callback-AddUpdate)="CloseAddMappingPopUp($event)">
+                                 (callback-AddUpdate)="CloseAddMappingPopUp($event)">
                     </lis-map-add>
                 </div>
                 <div class="close-modelbox lb-close-btn">
@@ -53,8 +53,8 @@
                 </div>
                 <div class="modelbox-footer">
                     <button class="btn btn-cancel grey" id="btnCancelMachineChange"
-                        (click)="Remove(false)">Cancel</button>
-                    <button class="btn btn-success blue" id="btnProceed" (click)="Remove(true)">Yes</button>
+                            (click)="Remove(false)">Cancel</button>
+                    <button class="btn btn-success green" id="btnProceed" (click)="Remove(true)">Yes</button>
                 </div>
                 <div class="close-modelbox lb-close-btn">
                     <button class="btn btn-danger" (click)="Remove(false)">

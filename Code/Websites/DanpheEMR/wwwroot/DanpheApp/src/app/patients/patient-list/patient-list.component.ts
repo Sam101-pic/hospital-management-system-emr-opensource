@@ -1,28 +1,30 @@
-import { Component, Injectable, ChangeDetectorRef, ViewChild } from '@angular/core';
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
+import { ChangeDetectorRef, Component } from '@angular/core';
+import { Router } from '@angular/router';
 import * as moment from 'moment/moment';
 
-import { PatientService } from '../shared/patient.service';
 import { AppointmentService } from '../../appointments/shared/appointment.service';
+import { PatientService } from '../shared/patient.service';
 import { PatientsBLService } from '../shared/patients.bl.service';
 
 import GridColumnSettings from '../../shared/danphe-grid/grid-column-settings.constant';
 import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
 
-import { Patient } from "../shared/patient.model";
-import { Guarantor } from "../shared/guarantor.model";
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { PatientFilesModel } from '../shared/patient-files.model';
-import { APIsByType } from '../../shared/search.service';
-import { CoreService } from '../../core/shared/core.service';
 import { SecurityService } from '../../../app/security/shared/security.service';
+import { CoreService } from '../../core/shared/core.service';
+import { DanpheHTTPResponse } from '../../shared/common-models';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { APIsByType } from '../../shared/search.service';
+import { ENUM_DanpheHTTPResponses } from '../../shared/shared-enums';
+import { PatientFilesModel } from '../shared/patient-files.model';
+import { Patient } from "../shared/patient.model";
 @Component({
   templateUrl: "./patient-list.html"
 })
 
 export class PatientListComponent {
   // binding logic
-
+  public AssisgnMember: boolean = false;
+  public ShowMedicareMember: boolean = false;
   public selectedPatient: Patient = new Patient();
   patients: Array<Patient> = new Array<Patient>();
   searchmodel: Patient = new Patient();
@@ -42,6 +44,9 @@ export class PatientListComponent {
   public showNeighbourCard: boolean = false;
   public patGirdDataApi: string = "";
   searchText: string = '';
+  public SearchPatientUsingHospitalNo: boolean = false;
+  public IsHospitalNoSearch: boolean = false; //This flag is send to server.
+
   public enableServerSideSearch: boolean = false;
   public showPatientSticker: boolean;
   constructor(
@@ -69,24 +74,64 @@ export class PatientListComponent {
   //Test() {
   //    this.msgBoxServ.showMessage("success", ["Message box"])
   //}
-
+  CallBackAddMember($event) {
+    this.ShowMedicareMember = false;
+  }
   ngAfterViewInit() {
     document.getElementById('quickFilterInput').focus();
   }
+  isStringJson(str) {
+    try {
+      JSON.parse(str);
+    } catch (e) {
+      return false;
+    }
+    return true;
+  }
+
   serverSearchTxt(searchTxt) {
-    this.searchText = searchTxt;
-    this.Load(this.searchText);
+    let searchTextData = searchTxt;
+    if (this.isStringJson(searchTextData)) {
+      searchTextData = JSON.parse(searchTextData);
+      if (searchTextData && searchTextData.text && searchTextData.searchUsingHospitalNo) {
+        this.searchText = searchTextData.text;
+        this.IsHospitalNoSearch = searchTextData.searchUsingHospitalNo;
+        this.Load(this.searchText);
+      } else {
+        this.searchText = searchTextData;
+        this.IsHospitalNoSearch = false;
+        this.Load(this.searchText);
+      }
+    } else {
+      this.searchText = searchTextData;
+      this.IsHospitalNoSearch = false;
+      this.Load(this.searchText);
+    }
+
   }
   getParamter() {
     let parameterData = this.coreService.Parameters.find(p => p.ParameterGroupName == "Common" && p.ParameterName == "ServerSideSearchComponent").ParameterValue;
     var data = JSON.parse(parameterData);
     this.enableServerSideSearch = data["PatientSearchPatient"];
+    let parameterToSearchUsingHospNo = this.coreService.Parameters.find(a => a.ParameterGroupName == "Appointment" && a.ParameterName == "SearchPatientUsingHospitalNo");
+    if (parameterToSearchUsingHospNo) {
+      let obj = JSON.parse(parameterToSearchUsingHospNo.ParameterValue);
+      this.SearchPatientUsingHospitalNo = obj.SearchPatientUsingHospitalNumber;
+      this.IsHospitalNoSearch = false;
+    }
+
   }
   Load(searchTxt): void {
-    this.patientBLService.GetPatientsList(searchTxt)
-      .subscribe(res => {
-        if (res.Status == 'OK') {
-          this.patients = res.Results;
+    this.patientBLService.GetPatientsList(searchTxt, this.IsHospitalNoSearch)
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.patients = res.Results.map(patient => {
+            const sortedAddress = this.coreService.SortPatientAddress(patient);
+            return {
+              ...patient,
+              SortedAddress: sortedAddress
+            }
+          });
         }
         else {
           //alert(res.ErrorMessage);
@@ -102,7 +147,6 @@ export class PatientListComponent {
   }
 
   SelectPatient(event, _patient) {
-    var pat = this._patientservice.getGlobal();
     this.patientBLService.GetPatientById(_patient.PatientId)
       .subscribe(res => {
         if (res.Status == 'OK') {
@@ -231,7 +275,15 @@ export class PatientListComponent {
           this.displayHealthcard = false;
           this.showNeighbourCard = false;
           this.showPatientSticker = true;
-        }  
+        }
+        break;
+      case "assignMember":
+        {
+          this.selectedPatient = $event.Data;
+          this.ShowMedicareMember = true;
+          this.AssisgnMember = true;
+        }
+
 
       default:
         break;
@@ -254,11 +306,11 @@ export class PatientListComponent {
   closeUploadFiles() {
     this.uploadFilesShow = false;
   }
-  ClosePrintStickerPopup(){
+  ClosePrintStickerPopup() {
     this.showPatientSticker = false;
   }
-  AfterStickerPrint(event){
-    if(event.showOpdSticker){
+  AfterStickerPrint(event) {
+    if (event.showOpdSticker) {
       this.showPatientSticker = false;
     }
   }

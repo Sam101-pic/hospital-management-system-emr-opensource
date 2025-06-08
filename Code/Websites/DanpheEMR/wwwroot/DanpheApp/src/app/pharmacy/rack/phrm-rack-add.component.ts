@@ -23,6 +23,10 @@ export class PhrmRackAddComponent {
     public StoreList: Array<Store> = new Array<Store>();
     @Input("parent-rack-list")
     public ParentRackList: Array<PhrmRackModel> = new Array<PhrmRackModel>();
+
+    @Input("rackList")
+    public RackList = new Array<PhrmRackModel>();
+
     @Input("selectedStore")
     public selectedStore: Store = new Store();
     @Output("callback-add")
@@ -79,6 +83,16 @@ export class PhrmRackAddComponent {
             this.CurrentRack.RackValidator.controls[i].updateValueAndValidity();
         }
 
+        if (this.RackList && this.RackList.length) {
+            const isRackNoAlreadyExists = this.RackList.some(a => a.RackNo.toLowerCase() === this.CurrentRack.RackNo.toLowerCase());
+            if (isRackNoAlreadyExists) {
+                this.showMessageBox(ENUM_MessageBox_Status.Notice, `Cannot add Rack as the Rack No. "${this.CurrentRack.RackNo}" already exists!`);
+
+                return;
+
+            }
+        }
+
         if (this.CurrentRack.IsValidCheck(undefined, undefined)) {
             this.loading = true;
             this.CurrentRack.CreatedOn = moment().format('YYYY-MM-DD');
@@ -102,6 +116,16 @@ export class PhrmRackAddComponent {
         for (let i in this.CurrentRack.RackValidator.controls) {
             this.CurrentRack.RackValidator.controls[i].markAsDirty();
             this.CurrentRack.RackValidator.controls[i].updateValueAndValidity();
+        }
+
+        if (this.RackList && this.RackList.length) {
+            const isRackNoAlreadyExists = this.RackList.some(a => a.RackNo.toLowerCase() === this.CurrentRack.RackNo.toLowerCase() && a.RackId !== this.CurrentRack.RackId);
+            if (isRackNoAlreadyExists) {
+                this.showMessageBox(ENUM_MessageBox_Status.Notice, `Cannot update Rack as the Rack No. "${this.CurrentRack.RackNo}" already exists!`);
+
+                return;
+
+            }
         }
 
         if (this.CurrentRack.IsValidCheck(undefined, undefined)) {

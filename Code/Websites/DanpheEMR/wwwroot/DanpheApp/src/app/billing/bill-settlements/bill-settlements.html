@@ -16,15 +16,33 @@
     border: 1px solid #f1f1f1;
   }
 </style>
+<div class="popup-static portlet box portlet-fullscreen" *ngIf="loadingScreen === true">
+  <div class="portlet-body form" style="background-color:white">
+    <div style="display: flex; height: 100vh; align-items: center; justify-content: center; flex-direction: column;gap: 10px 0;"
+         id='id_settlement_danpheLoading'>
+      <h3>Please Wait...</h3>
+      <div class="progress-bar">
+        <div class="progress-fill"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="wrapper">
   <div class="col-md-12" *ngIf="showGrid">
     <div class="col-md-6"></div>
     <div class="col-md-6">
       <label for="id_creditOrganization" style="margin-right: 10px;">Credit Organizations</label>
-      <select id="id_creditOrganization" (change)="OrganizationBasedBillsForSettlement($event)">
-        <option value="{{row.OrganizationId}}" [attr.selected]="row.OrganizationId == OrganizationId?true:null"
-                *ngFor="let row of creditOrganizationsList"> {{ row.OrganizationName }} </option>
-      </select>
+      <div style="display: inline-block;">
+        <input id="id" danphe-auto-complete class="form-control" style="width:120%"
+               [list-formatter]="ORGListFormatter"
+               [source]="creditOrganizationsList"
+               placeholder="Select Organization"
+               onclick="this.select()"
+               [ngModel]="SelectedOrganization"
+               (valueChanged)="OrganizationBasedBillsForSettlement($event)"
+               display-property-name="OrganizationName" />
+      </div>
     </div>
   </div>
   <div class="row" *ngIf="showGrid">
@@ -130,10 +148,12 @@
           </tr>
           <tr>
             <td colspan="2">
-              <span class="control-label" style="font-weight:bold; display: block; margin-bottom: 5px;" *ngIf="model.PaidAmount"> ( In words: {{
-                model.PaidAmount | NumberInWords}} only ) </span>
-              <span class="control-label" style="font-weight:bold; display: block; margin-bottom: 5px;" *ngIf="model.RefundableAmount"> ( In words:
-                {{ model.RefundableAmount | NumberInWords}} only ) </span>
+              <span class="control-label" style="font-weight:bold; display: block; margin-bottom: 5px;" *ngIf="model.PaidAmount">
+                ( In words: {{model.PaidAmount | number : "1.4-4" | NumberInWords}} only )
+              </span>
+              <span class="control-label" style="font-weight:bold; display: block; margin-bottom: 5px;" *ngIf="model.RefundableAmount">
+                ( In words: {{ model.RefundableAmount | number : "1.4-4" | NumberInWords}} only )
+              </span>
             </td>
           </tr>
         </table>
@@ -141,6 +161,7 @@
           <payment-mode-info
                              [deposit-balance]="DepositInfo.Deposit_Balance"
                              [total-amount]="model.PayableAmount"
+                             [actual-total-amount-to-compare-only]="model.PayableAmount"
                              [page-name]="'Settlements'"
                              (on-paymentMode-change)="PaymentModeChanges($event)"
                              (on-multiple-paymentMode)="MultiplePaymentCallBack($event)">

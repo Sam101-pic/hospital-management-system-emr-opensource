@@ -1,3 +1,4 @@
+
 export class InsurancePendingClaim {
     public ClaimSubmissionId: number = 0;
     public ClaimCode: number = 0;
@@ -21,4 +22,38 @@ export class InsurancePendingClaim {
     public ServiceCommissionAmount: number = 0;
     public PendingAmount: number = 0;
     public CreditOrganizationId: number = 0;
+    public ApiIntegrationName: string = "";
+    public PatientVisitId: number = 0;
+    public DateOfBirth: string = '';
+    public CountryId: number = 0;
+    public CountryName: string = '';
+    public CountrySubDivisionId: number = 0;
+    public CountrySubDivisionName: string = '';
+    public Address: string = '';
+    public MunicipalityName: string = '';
+    public PhoneNumber: number = 0;
+    MembershipTypeId: number = 0;
+    MembershipTypeName: string = '';
+    PANNumber: string = '';
+    PatientNameLocal: string = '';
+    NSHINumber: string = '';
+    VisitCreationDate: string = '';
+    VisitType: string = '';
+    VisitTypeFormatted: string = '';
+    Diagnosis: string = '';
+    PolicyHolderUID: string = '';
+    Age: string = '';
+    VisitCode: string = '';
+    Gender: string = '';
+    ClaimApiResponseId: number = 0;
+    WardNumber: string = '';
+    DepartmentName: string = '';
+    ConsultingDoctor: string = '';
+    SchemeId: number = 0;
+    IsSubmitted: boolean = false;
+    DischargeDate: string = '';
+    AdmissionDate: string = '';
+    CareType: string = "";
+    Ward: string = '';
+    BedNumber: string = '';
 }

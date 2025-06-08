@@ -3,12 +3,14 @@ using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.InventoryModels;
-using DanpheEMR.ServerModel.LabModels;
 using DanpheEMR.Services.Verification;
 using DanpheEMR.ViewModel.Substore;
+using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Entity;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -305,6 +307,7 @@ namespace DanpheEMR.Controllers
 
             var mainStoreId = pharmacyDbContext.PHRMStore.Where(s => s.SubCategory == ENUM_StoreSubCategory.Pharmacy).Select(s => s.StoreId).FirstOrDefault();
             //Transaction Begins
+            var DispatchedDate = DateTime.Now;
             using (var dbContextTransaction = wardSupplyDbContext.Database.BeginTransaction())
             {
                 try
@@ -322,7 +325,7 @@ namespace DanpheEMR.Controllers
                                 SalePrice = (decimal)newTransferedStock.SalePrice,
                                 BatchNo = newTransferedStock.BatchNo,
                                 DispatchedQuantity = (double)newTransferedStock.DispachedQuantity,
-                                DispatchedDate = DateTime.Now,
+                                DispatchedDate = DispatchedDate,
                                 ExpiryDate = newTransferedStock.ExpiryDate,
                                 ItemRemarks = newTransferedStock.Remarks,
                                 Remarks = newTransferedStock.Remarks,
@@ -461,91 +464,167 @@ namespace DanpheEMR.Controllers
 
             }
         }
+        public static void UpdateWardStockFromInventoryConsumption(WardSupplyDbContext db, RbacUser currentUser, WARDInventoryConsumptionModel consumption)
+        {
+            var currentDate = DateTime.Now;
+            var stockList = db.StoreStocks.Include(s => s.StockMaster).Where(stock => stock.ItemId == consumption.ItemId && stock.StoreId == consumption.StoreId && stock.AvailableQuantity > 0 && stock.IsActive == true && stock.CostPrice == consumption.CostPrice).ToList();
+            var totalConsumeQty = consumption.ConsumeQuantity;
+            foreach (var stock in stockList)
+            {
+                if (stock.AvailableQuantity < totalConsumeQty)
+                {
+                    var consumeQty = stock.AvailableQuantity;
+                    stock.DecreaseStock(
+                        quantity: stock.AvailableQuantity,
+                        transactionType: ENUM_INV_StockTransactionType.ConsumptionItem,
+                        transactionDate: consumption.ConsumptionDate,
+                        currentDate: currentDate,
+                        referenceNo: consumption.ConsumptionId,
+                        createdBy: currentUser.EmployeeId,
+                        fiscalYearId: GetCurrentInvFiscalYear(db).FiscalYearId,
+                        needConfirmation: false
+                        );
+                    totalConsumeQty -= consumeQty;
+                    db.SaveChanges();
+                }
+                else
+                {
+                    stock.DecreaseStock(
+                        quantity: totalConsumeQty,
+                        transactionType: ENUM_INV_StockTransactionType.ConsumptionItem,
+                        transactionDate: consumption.ConsumptionDate,
+                        currentDate: currentDate,
+                        referenceNo: consumption.ConsumptionId,
+                        createdBy: currentUser.EmployeeId,
+                        fiscalYearId: GetCurrentInvFiscalYear(db).FiscalYearId,
+                        needConfirmation: false
+
+                        );
+                    totalConsumeQty = 0;
+                    db.SaveChanges();
+                    break;
+                }
+
+            }
+        }
         public static InventoryFiscalYear GetCurrentInvFiscalYear(WardSupplyDbContext db, DateTime? DecidingDate = null)
         {
             DecidingDate = (DecidingDate == null) ? DateTime.Now.Date : DecidingDate;
             return db.InvFiscalYears.Where(fsc => fsc.StartDate <= DecidingDate && fsc.EndDate >= DecidingDate).FirstOrDefault();
         }
 
-        public async static Task<int> ReceiveDispatchedStocks(int DispatchId, InventoryDbContext db, RbacUser currentUser, string receivedRemarks)
+        public static object ReceiveDispatchedStocks(int DispatchId, InventoryDbContext db, RbacUser currentUser, string receivedRemarks)
         {
             // check if receive feature is enabled, to decide whether to increase in stock or increase unconfirmed quantity
             var isReceiveFeatureEnabled = db.CfgParameters
                                             .Where(param => param.ParameterGroupName == "Inventory" && param.ParameterName == "EnableReceivedItemInSubstore")
                                             .Select(param => param.ParameterValue == "true" ? true : false)
                                             .FirstOrDefault();
-
-            var DispatchDetails = await db.Dispatch.Include(d => d.DispatchItems).Where(itm => itm.DispatchId == DispatchId).FirstOrDefaultAsync();
-
-            if (DispatchDetails == null)
+            using (var dbTransaction = db.Database.BeginTransaction())
             {
-                throw new Exception("Dispatch Detail Not Found");
-            }
-            if (DispatchDetails.DispatchItems == null || DispatchDetails.DispatchItems.Count == 0)
-            {
-                throw new Exception("Items Not Found.");
-            };
-            var RequisitionDetails = db.Requisitions.FirstOrDefault(a => a.RequisitionId == DispatchDetails.RequisitionId);
-
-            var dispatchTxnTypes = new List<string>() { ENUM_INV_StockTransactionType.DispatchedItem, ENUM_INV_StockTransactionType.DispatchedItemReceivingSide };
-
-            foreach (var dispatchedItem in DispatchDetails.DispatchItems)
-            {
-                var stockTxnList = await db.StockTransactions.Where(ST => ST.ReferenceNo == dispatchedItem.DispatchItemsId && dispatchTxnTypes.Contains(ST.TransactionType)).ToListAsync();
-                foreach (var stkTxn in stockTxnList)
+                try
                 {
+                    int FiscalYearId = 0;
+                    var currentFiscalYear = db.InventoryFiscalYears.Where(fsc => fsc.StartDate <= DateTime.Now && fsc.EndDate >= DateTime.Now).FirstOrDefault();
+                    if (currentFiscalYear != null)
+                    {
+                        FiscalYearId = currentFiscalYear.FiscalYearId;
+                    }
 
-                    var stock = await db.StoreStocks.FindAsync(stkTxn.StoreStockId);
-                    if (stock.StoreId == dispatchedItem.SourceStoreId)
+                    var DispatchDetails = db.Dispatch.Include(d => d.DispatchItems).Where(itm => itm.DispatchId == DispatchId).FirstOrDefault();
+
+                    if (DispatchDetails == null)
                     {
-                        // Find source store stock and update the quantity.
-                        stock.ConfirmStockDispatched(quantity: stkTxn.OutQty);
+                        throw new Exception("Dispatch Detail Not Found");
                     }
-                    else
+                    if (DispatchDetails.DispatchItems == null || DispatchDetails.DispatchItems.Count == 0)
                     {
-                        // Find target stock id and update the stock quantity
-                        stock.ConfirmStockReceived(quantity: stkTxn.InQty);
+                        throw new Exception("Items Not Found.");
                     }
-                    await db.SaveChangesAsync();
+
+                    if (DispatchDetails.ReceivedBy != null)
+                    {
+                        throw new Exception("Dispatch Items Already Received.");
+                    }
+
+
+                    //var RequisitionDetails = db.Requisitions.FirstOrDefault(a => a.RequisitionId == DispatchDetails.RequisitionId && a.FiscalYearId == FiscalYearId);
+                    var RequisitionDetails = db.Requisitions.FirstOrDefault(a => a.RequisitionId == DispatchDetails.RequisitionId);
+
+                    if (RequisitionDetails == null)
+                    {
+                        throw new Exception("Requisition Details not found");
+                    }
+
+                    var dispatchTxnTypes = new List<string>() { ENUM_INV_StockTransactionType.DispatchedItem, ENUM_INV_StockTransactionType.DispatchedItemReceivingSide };
+
+                    foreach (var dispatchedItem in DispatchDetails.DispatchItems)
+                    {
+                        var stockTxnList = db.StockTransactions.Where(ST => ST.ReferenceNo == dispatchedItem.DispatchItemsId && dispatchTxnTypes.Contains(ST.TransactionType)).ToList();
+                        foreach (var stkTxn in stockTxnList)
+                        {
+
+                            var stock = db.StoreStocks.Find(stkTxn.StoreStockId);
+                            if (stock.StoreId == dispatchedItem.SourceStoreId)
+                            {
+                                // Find source store stock and update the quantity.
+                                if (stock.UnConfirmedQty_Out > 0)
+                                {
+                                    stock.ConfirmStockDispatched(quantity: stkTxn.OutQty);
+                                }
+                            }
+                            else
+                            {
+                                // Find target stock id and update the stock quantity
+                                stock.ConfirmStockReceived(quantity: stkTxn.InQty);
+                            }
+                            db.SaveChanges();
+                        }
+                        dispatchedItem.ReceivedById = currentUser.EmployeeId;
+                        dispatchedItem.ReceivedOn = DateTime.Now;
+                        dispatchedItem.ReceivedRemarks = receivedRemarks;
+                        db.Entry(dispatchedItem).Property(a => a.ReceivedById).IsModified = true;
+                        db.Entry(dispatchedItem).Property(a => a.ReceivedOn).IsModified = true;
+                        db.Entry(dispatchedItem).Property(a => a.ReceivedRemarks).IsModified = true;
+
+                    }
+                    DispatchDetails.ReceivedBy = currentUser.EmployeeId;
+                    DispatchDetails.ReceivedOn = DateTime.Now;
+                    DispatchDetails.ReceivedRemarks = receivedRemarks;
+                    db.Entry(DispatchDetails).Property(a => a.ReceivedBy).IsModified = true;
+                    db.Entry(DispatchDetails).Property(a => a.ReceivedOn).IsModified = true;
+                    db.Entry(DispatchDetails).Property(a => a.ReceivedRemarks).IsModified = true;
+
+                    db.SaveChanges();
+                    UpdateReceivedQuantityInRequisitionItems(DispatchId, FiscalYearId, db);
+                    dbTransaction.Commit();
+                    return DispatchId;
                 }
-                dispatchedItem.ReceivedById = currentUser.EmployeeId;
-                dispatchedItem.ReceivedOn = DateTime.Now;
-                dispatchedItem.ReceivedRemarks = receivedRemarks;
-                db.Entry(dispatchedItem).Property(a => a.ReceivedById).IsModified = true;
-                db.Entry(dispatchedItem).Property(a => a.ReceivedOn).IsModified = true;
-                db.Entry(dispatchedItem).Property(a => a.ReceivedRemarks).IsModified = true;
-
-
-                if (isReceiveFeatureEnabled)
+                catch (Exception ex)
                 {
-                    RequisitionDetails.EnableReceiveFeature = false;
-                    db.Entry(RequisitionDetails).Property(a => a.EnableReceiveFeature).IsModified = true;
+                    Log.Error("Failed to receive dispatch items" + ex.ToString());
+                    dbTransaction.Rollback();
+                    throw ex;
                 }
-
             }
-            DispatchDetails.ReceivedBy = currentUser.EmployeeId;
-            DispatchDetails.ReceivedOn = DateTime.Now;
-            DispatchDetails.ReceivedRemarks = receivedRemarks;
-            db.Entry(DispatchDetails).Property(a => a.ReceivedBy).IsModified = true;
-            db.Entry(DispatchDetails).Property(a => a.ReceivedOn).IsModified = true;
-            db.Entry(DispatchDetails).Property(a => a.ReceivedRemarks).IsModified = true;
 
-            await db.SaveChangesAsync();
-            UpdateReceivedQuantityInRequisitionItems(DispatchId, db);
-            return DispatchId;
         }
 
-        private static void UpdateReceivedQuantityInRequisitionItems(int DispatchId, InventoryDbContext db)
+        private static void UpdateReceivedQuantityInRequisitionItems(int DispatchId, int FiscalYearId, InventoryDbContext db)
         {
             var modifiedRequisitionItems = new List<RequisitionItemsModel>(); // to Collect modified items
-            var dispatchItems = db.DispatchItems.Where(d => d.DispatchId == DispatchId).ToList();
-            if (dispatchItems != null)
+            var dispatchItems = db.DispatchItems.Where(d => d.DispatchId == DispatchId && d.FiscalYearId == FiscalYearId).ToList();
+            if (dispatchItems.Count > 0)
             {
                 dispatchItems.ForEach(d =>
                 {
                     var requisitionItem = db.RequisitionItems.Where(r => r.RequisitionId == d.RequisitionId && r.RequisitionItemId == d.RequisitionItemId).FirstOrDefault();
-                    requisitionItem.ReceivedQuantity = (requisitionItem.ReceivedQuantity + d.DispatchedQuantity) ?? 0;
-                    modifiedRequisitionItems.Add(requisitionItem); // Collect modified item
+
+                    if (requisitionItem != null)
+                    {
+                        requisitionItem.ReceivedQuantity = (requisitionItem.ReceivedQuantity + d.DispatchedQuantity) ?? 0;
+                        modifiedRequisitionItems.Add(requisitionItem); // Collect modified item
+                    }
                 });
             }
             // Perform a bulk update for all modified requisitionItem entities
@@ -686,6 +765,54 @@ namespace DanpheEMR.Controllers
                                     }).ToList());
             return VerifiersList;
 
+        }
+        #endregion
+
+        #region WardSupply Inventory Stock
+        public static object GetSubStoreInventoryStocks(int storeId, InventoryDbContext inventoryDbContext)
+        {
+            List<SqlParameter> paramList = new List<SqlParameter>()
+            {
+                new SqlParameter("@StoreId", storeId)
+            };
+
+            DataTable substoreStocks = DALFunctions.GetDataTableFromStoredProc("SP_Ward_InventoryStocks", paramList, inventoryDbContext);
+            return substoreStocks;
+        }
+        #endregion
+
+        #region Barcodes of Capital Item
+        /// <summary>
+        /// This method returns the BarCodes of the Particular item within a substore
+        /// </summary>
+        /// <param name="ItemId"></param>
+        /// <param name="SubStoreId"></param>
+        /// <param name="inventoryDbContext"></param>
+        /// <returns>BarCodes of particular item within a substore</returns>
+        public static object GetBarCodeOfCapitalItemByItemId(int SubStoreId, int ItemId, InventoryDbContext inventoryDbContext)
+        {
+            var BarCodeList = (from fixedAssetStock in inventoryDbContext.FixedAssetStock.Where(a => a.SubStoreId == SubStoreId && a.ItemId == ItemId && a.IsActive == true)
+                               select new BarCodeNumberDTO
+                               {
+                                   BarCodeNumber = fixedAssetStock.BarCodeNumber,
+                                   StockId = fixedAssetStock.FixedAssetStockId
+                               }).ToList();
+
+            return BarCodeList;
+        }
+        public static object GetReturnReportData(DateTime FromDate, DateTime ToDate,int SourceStoreId,int? TargetStoreId,string ItemCategory,int? ItemId, InventoryDbContext inventoryDbContext)
+        {
+            List<SqlParameter> paramList = new List<SqlParameter>() {
+                        new SqlParameter("@FromDate", FromDate),
+                        new SqlParameter("@ToDate", ToDate),
+                        new SqlParameter("@SourceStoreId", SourceStoreId),
+                        new SqlParameter("@TargetStoreId",TargetStoreId),
+                        new SqlParameter("@ItemCategory",ItemCategory),
+                        new SqlParameter("@ItemId",ItemId)
+
+                    };
+            DataTable dt = DALFunctions.GetDataTableFromStoredProc("SP_WardInv_ReturnReport", paramList, inventoryDbContext);
+            return dt;
         }
         #endregion
 

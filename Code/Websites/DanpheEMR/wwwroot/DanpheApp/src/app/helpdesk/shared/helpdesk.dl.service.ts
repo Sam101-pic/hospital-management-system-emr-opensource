@@ -1,7 +1,5 @@
-﻿import { Injectable, Directive } from '@angular/core';
-import { RouterModule, Router } from '@angular/router';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import * as _ from 'lodash';
+﻿import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Injectable } from '@angular/core';
 @Injectable()
 export class HelpDeskDLService {
   public options = {
@@ -38,8 +36,9 @@ export class HelpDeskDLService {
     return this.http.get<any>('/api/Helpdesk/BedsWithPatientsInfo', this.options);
   }
 
-  public GetAppointmentData(deptId,doctorId,pendingOnly){
-    return this.http.get<any>("/api/QueueManagement/GetAppointmentData?deptId="+deptId+"&doctorId="+doctorId+"&pendingOnly="+pendingOnly, this.options);
+  public GetAppointmentData(deptId: number, doctorIds: number[], pendingOnly: boolean) {
+    let doctorId = JSON.stringify(doctorIds);
+    return this.http.get<any>("/api/QueueManagement/GetAppointmentData?deptId=" + deptId + "&doctorId=" + doctorId + "&pendingOnly=" + pendingOnly, this.options);
   }
   public GetAllApptDepartment() {
     return this.http.get<any>("/api/QueueManagement/GetAllApptDepartment", this.options);
@@ -48,4 +47,5 @@ export class HelpDeskDLService {
   public GetAllAppointmentApplicableDoctor() {
     return this.http.get<any>("/api/QueueManagement/GetAllAppointmentApplicableDoctor", this.options);
   }
+
 }

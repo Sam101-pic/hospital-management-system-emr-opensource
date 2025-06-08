@@ -1,25 +1,24 @@
 
-import { Component, ChangeDetectorRef, AfterViewInit } from '@angular/core'
-import { Router, ActivatedRoute } from '@angular/router'
-import { SecurityService } from "../../../security/shared/security.service";
-import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { PHRMSupplierModel } from "../../shared/phrm-supplier.model";
-import { PHRMReturnToSupplierModel } from "../../shared/phrm-return-to-supplier.model";
-import { PHRMReturnToSupplierItemModel } from "../../shared/phrm-return-to-supplier-items.model";
-import { PHRMGoodsReceiptItemsModel } from "../../shared/phrm-goods-receipt-items.model";
-import { CommonFunctions } from "../../../shared/common.functions";
+import { ChangeDetectorRef, Component } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import * as moment from 'moment/moment';
 import { BillingFiscalYear } from '../../../billing/shared/billing-fiscalyear.model';
 import { BillingBLService } from '../../../billing/shared/billing.bl.service';
-import { DanpheHTTPResponse } from '../../../shared/common-models';
-import PHRMGridColumns from '../../shared/phrm-grid-columns';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import { PHRMGoodsReceiptModel } from '../../shared/phrm-goods-receipt.model';
-import { PharmacyService } from '../../shared/pharmacy.service';
 import { CoreService } from '../../../core/shared/core.service';
+import { SecurityService } from "../../../security/shared/security.service";
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { CommonFunctions } from "../../../shared/common.functions";
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
-import { ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
+import { PharmacyService } from '../../shared/pharmacy.service';
+import { PHRMGoodsReceiptModel } from '../../shared/phrm-goods-receipt.model';
+import PHRMGridColumns from '../../shared/phrm-grid-columns';
+import { PHRMReturnToSupplierItemModel } from "../../shared/phrm-return-to-supplier-items.model";
+import { PHRMReturnToSupplierModel } from "../../shared/phrm-return-to-supplier.model";
+import { PHRMSupplierModel } from "../../shared/phrm-supplier.model";
 
 @Component({
     templateUrl: "./phrm-return-items-to-supplier.html"
@@ -62,6 +61,7 @@ export class PHRMReturnItemsToSupplierComponent {
     public newGoodsReceiptList: Array<PHRMGoodsReceiptModel> = new Array<PHRMGoodsReceiptModel>();
     public checked: boolean;
     public dateRange: string = "last1Week";  //by default show last 1 week data.;
+    public RestrictDatePicker = new Date();
     IsNepali: boolean;
     showPopUp: boolean;
     showFreeQty: boolean;
@@ -73,6 +73,7 @@ export class PHRMReturnItemsToSupplierComponent {
     loading: boolean = false;
     canUserEnterDate: boolean = false;
     currentDate: string = moment().format("YYYY-MM-DD");
+    minDate: string = moment().format("YYYY-MM-DD");;
 
     constructor(public securityService: SecurityService,
         public changeDetectorRef: ChangeDetectorRef,
@@ -201,6 +202,10 @@ export class PHRMReturnItemsToSupplierComponent {
         this.invoiceNo = this.currGRDetail.InvoiceNo ? this.currGRDetail.InvoiceNo : null;
         this.suppId = this.selSupplier != null ? this.selSupplier.SupplierId : null;
 
+        if (!this.fromDate && !this.toDate) {
+            this.msgserv.showMessage('failed', ['Please enter valid From date and To date']);
+        }
+
         this.pharmacyBLService.GetGoodsReceiptsInfo(this.suppId, grNo, this.invoiceNo, this.fromDate, this.toDate)
             .subscribe(res => {
                 if (res.Status == "OK") {
@@ -218,17 +223,17 @@ export class PHRMReturnItemsToSupplierComponent {
                 });
 
     }
-    onGridDateChange($event) {
+    OnFromToDateChange($event) {
         this.fromDate = $event.fromDate;
         this.toDate = $event.toDate;
-        if (this.fromDate != null && this.toDate != null) {
-            if (moment(this.fromDate).isBefore(this.toDate) || moment(this.fromDate).isSame(this.toDate)) {
-                this.getReturnToSupplier();
-            } else {
-                this.msgserv.showMessage('failed', ['Please enter valid From date and To date']);
-            }
+        // if (this.fromDate != null && this.toDate != null) {
+        //     if (moment(this.fromDate).isBefore(this.toDate) || moment(this.fromDate).isSame(this.toDate)) {
+        //         this.getReturnToSupplier();
+        //     } else {
+        //         this.msgserv.showMessage('failed', ['Please enter valid From date and To date']);
+        //     }
 
-        }
+        // }
 
     }
 
@@ -559,10 +564,8 @@ export class PHRMReturnItemsToSupplierComponent {
 
 
     PostReturnToSupplier() {
-
         // this CheckIsValid varibale is used to check whether all the validation are proper or not ..
         //if the CheckIsValid == true the validation is proper else no
-
         var CheckIsValid = true;
         if (this.curtRetSuppModel.ReturnStatus == undefined) {
             alert("Please fill the Return Status");
@@ -626,34 +629,30 @@ export class PHRMReturnItemsToSupplierComponent {
                 this.loading = true;
                 this.pharmacyBLService.PostReturnToSupplierItems(this.curtRetSuppModel).finally(() => {
                     this.loading = false;
-                }).
-                    subscribe(res => {
-                        if (res.Status == 'OK') {
-                            this.msgserv.showMessage("success", ["Return Order is Generated and Saved"]);
-                            this.changeDetectorRef.detectChanges();
-                            this.curtRetSuppModel.returnToSupplierItems = new Array<PHRMReturnToSupplierItemModel>();
-                            this.curtRetSuppModel = new PHRMReturnToSupplierModel();
-                            this.curtRetSuppItemModel = new PHRMReturnToSupplierItemModel();
-                            this.curtRetSuppModel.returnToSupplierItems.push(this.curtRetSuppItemModel);
-                            this.pharmacyService.setReturnToSupplietId(res.Results);
-                            this.router.navigate(['/Pharmacy/Store/ReturnItemsToSupplierList']);
-                        }
-                        else {
-                            this.msgserv.showMessage("failed", ['failed to add Return Item To Supplier.. please check log for details.']);
-                            console.log(res);
-                        }
-                    });
-            }
-            else {
+                })
+                    .subscribe(
+                        (res) => {
+                            if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+                                this.msgserv.showMessage("success", ["Return Order is Generated and Saved"]);
+                                this.changeDetectorRef.detectChanges();
+                                this.curtRetSuppModel.returnToSupplierItems = new Array<PHRMReturnToSupplierItemModel>();
+                                this.curtRetSuppModel = new PHRMReturnToSupplierModel();
+                                this.curtRetSuppItemModel = new PHRMReturnToSupplierItemModel();
+                                this.curtRetSuppModel.returnToSupplierItems.push(this.curtRetSuppItemModel);
+                                this.pharmacyService.setReturnToSupplietId(res.Results);
+                                this.router.navigate(['/Pharmacy/Store/ReturnItemsToSupplierList']);
+                            } else {
+                                this.msgserv.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+                                console.log(res.ErrorMessage);
+                            }
+                        },
+                    );
+            } else {
                 this.msgserv.showMessage("notice-message", ['No Quantity to return.']);
             }
-
-
+        } else {
+            this.msgserv.showMessage("notice-message", ['Some Required Field is Missing. Please Fill.']);
         }
-        else {
-            this.msgserv.showMessage("notice-message", ['Some Required Field is Missing ??....Please Fill...']);
-        }
-
     }
     BackToReturnSupplier() {
         this.showReturnSupp = false;
@@ -760,6 +759,7 @@ export class PHRMReturnItemsToSupplierComponent {
                     curretsupitemModel.SalePrice = this.grDetailsToReturn[i].SalePrice;
                     curretsupitemModel.FreeQuantity = this.grDetailsToReturn[i].FreeQuantity;
                     curretsupitemModel.DiscountPercentage = this.grDetailsToReturn[i].DiscountPercentage;
+                    this.minDate = curretsupitemModel.GoodReceiptDate = this.grDetailsToReturn[i].GoodReceiptDate;
                     this.curtRetSuppModel.SupplierId = this.grDetailsToReturn[0].SupplierId;
                     curretsupitemModel.ExpiryDate = this.grDetailsToReturn[i].ExpiryDate;
                     this.curtRetSuppModel.ReturnDate = moment(todayDate).format('YYYY-MM-DD');
@@ -869,6 +869,7 @@ export class PHRMReturnItemsToSupplierComponent {
     OnFiscalYearDateChange($event) {
         this.curtRetSuppModel.ReturnDate = $event ? $event.selectedDate : null;
     }
+
 }
 
 

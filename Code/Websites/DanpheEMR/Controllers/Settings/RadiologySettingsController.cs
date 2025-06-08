@@ -11,6 +11,12 @@ using DanpheEMR.Core.Configuration;
 using DanpheEMR.Security;
 using Microsoft.AspNetCore.Http;
 using DanpheEMR.Enums;
+using Newtonsoft.Json;
+using DanpheEMR.Controllers.Radiology.DTO;
+using System.Threading.Tasks;
+using DanpheEMR.Services.Radiology;
+using DanpheEMR.ServerModel.RadiologyModels.DTOs;
+using FluentValidation;
 
 namespace DanpheEMR.Controllers
 {
@@ -20,15 +26,43 @@ namespace DanpheEMR.Controllers
         private readonly MasterDbContext _masterDbContext;
         private readonly RadiologyDbContext _radiologyDbContext;
         private readonly BillingDbContext _billingDbContext;
+        private readonly IRadiologySettingService _radiologySettingService;
+        private readonly RbacDbContext _rbacDbContext;
 
-        public RadiologySettingsController(IOptions<MyConfiguration> _config) : base(_config)
+
+        public RadiologySettingsController(IRadiologySettingService radiologySettingService ,IOptions<MyConfiguration> _config) : base(_config)
         {
-            _masterDbContext = new MasterDbContext(connString); 
+            _masterDbContext = new MasterDbContext(connString);
             _radiologyDbContext = new RadiologyDbContext(connString);
             _billingDbContext = new BillingDbContext(connString);
+            _radiologySettingService = radiologySettingService;
+            _rbacDbContext = new RbacDbContext(connString);
         }
 
         #region Get APIs
+
+        /// <summary>
+        /// Retrieves a list of all template styles.
+        /// </summary>
+        /// <remarks>
+        /// This API fetches a list of template styles, including details such as template name, header style, footer style, 
+        /// creation details, and active status. It joins relevant tables to provide comprehensive information for each template style.
+        /// </remarks>
+        /// <returns>
+        /// <response code="200">Returns a list of all template styles.</response>
+        /// <response code="500">An internal server error occurred during the operation.</response>
+        /// </returns>
+        /// <exception cref="Exception">Thrown when an unexpected error occurs during the data retrieval process.</exception>
+        /// <returns>The templateStyleList from the database.</returns>
+
+        [HttpGet]
+        [Route("TemplateStyle")]
+        public async Task<IActionResult>GetTemplateStyleList()
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<Task<object>> func = () =>  _radiologySettingService.GetTemplateStyleList( _radiologyDbContext);
+            return await InvokeHttpGetFunctionAsync(func);
+        }
 
         [HttpGet]
         [Route("ImagingItems")]
@@ -36,19 +70,19 @@ namespace DanpheEMR.Controllers
         {
             //if (reqType == "get-rad-imaging-item")
             Func<object> func = () => (from i in _radiologyDbContext.ImagingItems.Include("ImagingTypes")
-                                                         select new
-                                                         {
-                                                             ImagingTypeName = i.ImagingTypes.ImagingTypeName,
-                                                             ImagingTypeId = i.ImagingTypes.ImagingTypeId,
-                                                             ImagingItemName = i.ImagingItemName,
-                                                             ImagingItemId = i.ImagingItemId,
-                                                             ProcedureCode = i.ProcedureCode,
-                                                             IsActive = i.IsActive,
-                                                             CreatedOn = i.CreatedOn,
-                                                             CreatedBy = i.CreatedBy,
-                                                             TemplateId = i.TemplateId,
-                                                             IsValidForReporting = i.IsValidForReporting
-                                                         }).OrderBy(i => i.ImagingTypeName).ToList();
+                                       select new
+                                       {
+                                           ImagingTypeName = i.ImagingTypes.ImagingTypeName,
+                                           ImagingTypeId = i.ImagingTypes.ImagingTypeId,
+                                           ImagingItemName = i.ImagingItemName,
+                                           ImagingItemId = i.ImagingItemId,
+                                           ProcedureCode = i.ProcedureCode,
+                                           IsActive = i.IsActive,
+                                           CreatedOn = i.CreatedOn,
+                                           CreatedBy = i.CreatedBy,
+                                           TemplateId = i.TemplateId,
+                                           IsValidForReporting = i.IsValidForReporting
+                                       }).OrderBy(i => i.ImagingTypeName).ToList();
             return InvokeHttpGetFunction(func);
         }
 
@@ -86,23 +120,45 @@ namespace DanpheEMR.Controllers
         {
             //if (reqType == "get-rad-report-template-byid")
             Func<object> func = () => (from rTemplate in _radiologyDbContext.RadiologyReportTemplate
-                                         where rTemplate.TemplateId == templateId
-                                         select rTemplate).FirstOrDefault();
+                                       where rTemplate.TemplateId == templateId
+                                       select rTemplate).FirstOrDefault();
             return InvokeHttpGetFunction(func);
         }
 
         #endregion
 
         #region Post APIs
+        /// <summary>
+        /// Creates a new template style.
+        /// </summary>
+        /// <remarks>
+        /// This endpoint allows the creation of a new template style for a radiology template. 
+        /// It validates the request payload and checks for duplicate entries before saving to the database.
+        /// </remarks>
+        /// <param name="addTemplateStyleRequest">An object containing the details of the template style to be created.</param>
+        /// <response code="200">Successfully created the template style.</response>
+        /// <response code="400">Validation errors or duplicate template style detected.</response>
+        /// <response code="500">An internal server error occurred during the operation.</response>
+        /// <exception cref="InvalidOperationException">Thrown when a template style with the same TemplateId already exists.</exception>
+        /// <exception cref="ValidationException">Thrown when the input validation fails for the request payload.</exception>
+        /// <exception cref="Exception">Thrown when an unexpected error occurs during the process.</exception>
+        /// <returns>The ID of the newly created template style.</returns>
+        [HttpPost]
+        [Route("TemplateStyle")]
+        public async Task<ActionResult> PostTemplateStyle([FromBody] AddTemplateStyleRequest addTemplateStyleRequest)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<Task<object>> func = async () => await _radiologySettingService.PostTemplateStyle(addTemplateStyleRequest, currentUser, _radiologyDbContext);
+            return await InvokeHttpPostFunctionAsync(func);
+        }
 
         [HttpPost]
         [Route("ImagingItem")]
-        public IActionResult PostImagingItem()
+        public IActionResult PostImagingItem([FromBody] ImagingItemDTO imagingItem_dto)
         {
             //if (reqType == "post-rad-imaging-item")
-            string ipDataStr = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => SaveImagingItem(ipDataStr, currentUser);
+            Func<object> func = () => SaveImagingItem(imagingItem_dto, currentUser);
             return InvokeHttpPostFunction(func);
         }
 
@@ -129,15 +185,63 @@ namespace DanpheEMR.Controllers
         #endregion
 
         #region Put APIs
+        /// <summary>
+        /// Updates an existing template style.
+        /// </summary>
+        /// <remarks>
+        /// This endpoint updates the header and footer styles of an existing radiology template style. 
+        /// It validates the request payload before applying changes and ensures the updated data is valid.
+        /// </remarks>
+        /// <param name="updateTemplateStyleRequest">An object containing the details of the template style to be updated.</param>
+        /// <response code="200">Successfully updated the template style.</response>
+        /// <response code="400">Validation errors in the request payload or template style not found.</response>
+        /// <response code="404">The specified template style does not exist.</response>
+        /// <response code="500">An internal server error occurred during the operation.</response>
+        /// <exception cref="ValidationException">Thrown when input validation fails for the request payload.</exception>
+        /// <exception cref="Exception">Thrown when an unexpected error occurs during the process.</exception>
+        /// <returns>The updated `UpdateTemplateStyleRequest` object.</returns>
 
+        [HttpPut]
+        [Route("TemplateStyle")]
+        public async Task<IActionResult> PutTemplateStyle([FromBody] UpdateTemplateStyleRequest updateTemplateStyleRequest)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => _radiologySettingService.PutTemplateStyle(updateTemplateStyleRequest, currentUser, _radiologyDbContext);
+            return await InvokeHttpPutFunctionAsync(func);
+        }
+        /// <summary>
+        /// Updates the active status of a template style.
+        /// </summary>
+        /// <remarks>
+        /// This API is used to toggle the active status of a radiology template style. 
+        /// It modifies the `IsActive` property of the template style and ensures the updated data is valid.
+        /// </remarks>
+        /// <param name="templateStyleId">The ID of the template style whose active status needs to be updated.</param>
+        /// <returns>
+        /// <response code="200">Returns the `templateStyleId` upon successfully updating the active status.</response>
+        /// <response code="400">Returns validation errors if the input data is invalid or the template style is not found.</response>
+        /// <response code="500">An internal server error occurred during the operation.</response>
+        /// </returns>
+        /// <exception cref="ValidationException">Thrown when input validation fails for the request payload or the active status update is invalid.</exception>
+        /// <exception cref="Exception">Thrown when an unexpected error occurs during the process.</exception>
+        /// <returns>The `templateStyleId` indicating the template style whose active status was updated.</returns>
+        
+        [HttpPut]
+        [Route("ActiveStatus")]
+        public async Task<IActionResult> PutActiveStatus( int templateStyleId)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => _radiologySettingService.PutActiveStatus(templateStyleId, currentUser,_radiologyDbContext);
+            return await InvokeHttpPutFunctionAsync(func);
+        }
         [HttpPut]
         [Route("ImagingItem")]
         public IActionResult PutImagingItem()
         {
             //if (reqType == "put-rad-imaging-item")
             string ipDataStr = this.ReadPostData();
-            Func<object> func = () =>  UpdateImagingItem(ipDataStr);
-            return InvokeHttpPutFunction(func);     
+            Func<object> func = () => UpdateImagingItem(ipDataStr);
+            return InvokeHttpPutFunction(func);
         }
 
         [HttpPut]
@@ -161,33 +265,94 @@ namespace DanpheEMR.Controllers
         }
 
         #endregion
-
-        private object SaveImagingItem(string ipDataStr, RbacUser currentUser)
+        private object SaveImagingItem(ImagingItemDTO imagingItem_dto, RbacUser currentUser)
         {
-            RadiologyImagingItemModel radImgItem = DanpheJSONConvert.DeserializeObject<RadiologyImagingItemModel>(ipDataStr);
-            radImgItem.CreatedOn = DateTime.Now;
-            radImgItem.CreatedBy = currentUser.EmployeeId;
-            _radiologyDbContext.ImagingItems.Add(radImgItem);
-            _radiologyDbContext.SaveChanges();
-            return radImgItem;
+            using (var dbContextTransaction = _radiologyDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    RadiologyImagingItemModel radImgItem = DanpheJSONConvert.DeserializeObject<RadiologyImagingItemModel>(JsonConvert.SerializeObject(imagingItem_dto));
+                    radImgItem.CreatedOn = DateTime.Now;
+                    radImgItem.CreatedBy = currentUser.EmployeeId;
+
+                    _radiologyDbContext.ImagingItems.Add(radImgItem);
+                    _radiologyDbContext.SaveChanges();
+
+                    BillServiceItemModel billServiceItem = new BillServiceItemModel();
+                    {
+                        billServiceItem.ItemName = radImgItem.ImagingItemName;
+                        billServiceItem.ItemCode = radImgItem.ProcedureCode;
+                        billServiceItem.IntegrationName = ENUM_IntegrationNames.Radiology;
+                        billServiceItem.DefaultDoctorList = "[]";
+                        Int64 ImagingItemId = radImgItem.ImagingItemId;//ImagingItemId comes only after this model is saved to database
+                        if (string.IsNullOrEmpty(billServiceItem.ItemCode))
+                        {
+                            billServiceItem.ItemCode = "RAD-" + radImgItem.ImagingItemId.ToString("D6");
+                        }
+                        billServiceItem.ServiceDepartmentId = imagingItem_dto.ServiceDepartmentId ?? default(int); //typecase for default int
+                                                                                                                   //billServiceItem.Price = 0;
+                        billServiceItem.IntegrationItemId = Convert.ToInt32(radImgItem.ImagingItemId);
+                        //billServiceItem.IsTaxApplicable = radImgItem.IsTaxApplicable.HasValue ? radImgItem.IsTaxApplicable.Value : false;
+                        billServiceItem.CreatedBy = currentUser.EmployeeId;
+                        billServiceItem.CreatedOn = System.DateTime.Now;
+                        billServiceItem.IsActive = true;
+                        billServiceItem.IsValidForReporting = radImgItem.IsValidForReporting;
+                    }
+                    if (string.IsNullOrEmpty(radImgItem.ProcedureCode))
+                    {
+                        string ITM = imagingItem_dto.ImagingItemName.Length >= 3 ? imagingItem_dto.ImagingItemName.Substring(0, 3) : imagingItem_dto.ImagingItemName;
+                        radImgItem.ProcedureCode = ITM + radImgItem.ImagingItemId.ToString("D6");
+                    }
+                    _radiologyDbContext.Entry(radImgItem).Property(t => t.ProcedureCode).IsModified = true;
+                    _radiologyDbContext.BillServiceItems.Add(billServiceItem);
+                    _radiologyDbContext.SaveChanges();
+                    dbContextTransaction.Commit();
+                    return radImgItem;
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    throw (ex);
+                }
+            }
         }
 
         private object SaveImagingType(string ipDataStr)
         {
-            RadiologyImagingTypeModel radImgType = DanpheJSONConvert.DeserializeObject<RadiologyImagingTypeModel>(ipDataStr);
-            radImgType.CreatedOn = DateTime.Now;
-            _radiologyDbContext.ImagingTypes.Add(radImgType);
-            _radiologyDbContext.SaveChanges();
-            return radImgType;
+            try
+            {
+                RadiologyImagingTypeModel radImgType = DanpheJSONConvert.DeserializeObject<RadiologyImagingTypeModel>(ipDataStr);
+                radImgType.CreatedOn = DateTime.Now;
+                _radiologyDbContext.ImagingTypes.Add(radImgType);
+                RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+                var application = _rbacDbContext.Applications.FirstOrDefault(a => a.ApplicationCode == "RAD-IMG-TYPE");
+                var radPermission = new RbacPermission
+                {
+                    PermissionName = "Radiology-" + radImgType.ImagingTypeName + "-selection-Category",
+                    Description = "auto-generated after Imaging Type creation",
+                    ApplicationId = application.ApplicationId,
+                    CreatedBy = currentUser.EmployeeId,
+                    CreatedOn = DateTime.Now,
+                    IsActive = true
+                };
+                RBAC.CreatePermission(radPermission, _rbacDbContext);
+                _radiologyDbContext.SaveChanges();
+                return radImgType;
+            }
+            catch (Exception ex)
+            {
+
+                throw new Exception("An error occurred while adding imaging type, with Exception Details: {ex}", ex);
+            }
         }
 
         private object SaveReportTemplete(string ipDataStr)
         {
-                RadiologyReportTemplateModel clientRadRptTemplateData = DanpheJSONConvert.DeserializeObject<RadiologyReportTemplateModel>(ipDataStr);
-                clientRadRptTemplateData.CreatedOn = DateTime.Now;
-                _radiologyDbContext.RadiologyReportTemplate.Add(clientRadRptTemplateData);
-                _radiologyDbContext.SaveChanges();
-                return clientRadRptTemplateData;
+            RadiologyReportTemplateModel clientRadRptTemplateData = DanpheJSONConvert.DeserializeObject<RadiologyReportTemplateModel>(ipDataStr);
+            clientRadRptTemplateData.CreatedOn = DateTime.Now;
+            _radiologyDbContext.RadiologyReportTemplate.Add(clientRadRptTemplateData);
+            _radiologyDbContext.SaveChanges();
+            return clientRadRptTemplateData;
         }
 
         private object UpdateImagingItem(string ipDataStr)

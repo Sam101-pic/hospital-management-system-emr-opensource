@@ -1,13 +1,17 @@
-import { ChangeDetectorRef, Component, Directive, ViewChild } from '@angular/core';
-import { DLService } from "../../../shared/dl.service"
+import { ChangeDetectorRef, Component } from '@angular/core';
 import * as moment from 'moment/moment';
+import { Observable } from 'rxjs';
+import { DispensaryService } from '../../../dispensary/shared/dispensary.service';
+import { BillingScheme_DTO } from '../../../settings-new/billing/shared/dto/billing-scheme.dto';
+import { SettingsBLService } from '../../../settings-new/shared/settings.bl.service';
+import { IGridFilterParameter } from '../../../shared/danphe-grid/grid-filter-parameter.interface';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_ServiceBillingContext } from '../../../shared/shared-enums';
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
+import { PHRMPatient } from '../../shared/phrm-patient.model';
 import PHRMReportsGridColumns from "../../shared/phrm-reports-grid-columns";
 import { PHRMReportsModel } from '../../shared/phrm-reports-model';
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
-import { DispensaryService } from '../../../dispensary/shared/dispensary.service';
 import { PHRMStoreModel } from '../../shared/phrm-store.model';
 
 @Component({
@@ -16,12 +20,9 @@ import { PHRMStoreModel } from '../../shared/phrm-store.model';
 })
 export class PHRMBillingReportComponent {
 
-    ///Pharmacy Billing Report Columns variable
     PHRMBillingReportColumns: Array<any> = null;
-    ///Pharmacy Billing Report Data variable
     PHRMBillingReportData: Array<any> = new Array<any>();
-    ////Variable to Bind Item Name
-    public InvoiceNumber: number = 0;
+    public InvoiceNumber: number = null;
     public phrmReports: PHRMReportsModel = new PHRMReportsModel();
     public NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
 
@@ -29,21 +30,44 @@ export class PHRMBillingReportComponent {
     public dateRange: string = "";
 
     dispensaryList: any[] = [];
-    storeWiseBillingSummary: { StoreName: string, SubTotal: number, Discount: number, TotalAmount: number, ReceivedAmount: number, CreditAmount: number }[] = [];
+    storeWiseBillingSummary: { StoreName: string, SubTotal: number, Discount: number, TotalAmount: number, CreditAmount: number }[] = [];
     public loading: boolean = false;
+    SalesTypes = [
+        { value: 'CashSales', label: 'Cash Sales' },
+        { value: 'CashSalesReturn', label: 'Cash Sales Return' },
+        { value: 'CreditSales', label: 'Credit Sales' },
+        { value: 'CreditSalesReturn', label: 'Credit Sales Return' },
+    ];
 
+    VisitTypes = [
+        { value: null, label: 'All' },
+        { value: 'Inpatient', label: 'Inpatient' },
+        { value: 'Outpatient', label: 'Outpatient' },
+        { value: 'Emergency', label: 'Emergency' }
+    ];
+    SalesType: string = null;
+    PatientId: number = null;
+    VisitType: string = null;
+    TransactionType: string = null;
+    SelectedSalesTypes: { value: string, label: string }[] = [];
+    SearchedPatient: PHRMPatient = null;
+    SelectedDispensary: PHRMStoreModel = null;
+    FilterParameters: IGridFilterParameter[] = [];
+    PatientName: string = null;
+    StoreName: string = null;
+    public membershipList: Array<BillingScheme_DTO> = new Array<BillingScheme_DTO>();
+    selMembershipId: number = null;
+    SchemeName: string = null;
 
-
-    constructor(public pharmacyBLService: PharmacyBLService, public dlService: DLService, public msgBoxServ: MessageboxService,
-        public changeDetector: ChangeDetectorRef, public dispensaryService: DispensaryService) {
+    constructor(public pharmacyBLService: PharmacyBLService, public messageBoxService: MessageboxService,
+        public changeDetector: ChangeDetectorRef, public dispensaryService: DispensaryService, public settingsBLService: SettingsBLService) {
         this.PHRMBillingReportColumns = PHRMReportsGridColumns.PHRMBillingReport;
         this.InvoiceNumber = null;
         this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("InvoiceDate"));
         this.getAllDispensaries();
+        this.LoadPharmacySchemesList();
     }
 
-
-    //////Export data grid options for excel file
     gridExportOptions = {
         fileName: 'BillingReport_' + moment().format('YYYY-MM-DD') + '.xls',
     };
@@ -54,83 +78,89 @@ export class PHRMBillingReportComponent {
                 this.dispensaryList = res.Results;
             }
             else {
-                this.msgBoxServ.showMessage("Failed", ["Failed to load the dispensaries."]);
+                this.messageBoxService.showMessage("Failed", ["Failed to load the dispensaries."]);
             }
         });
     }
 
-    //////Function Call on Button Click of Report
     GetReportData() {
         if (this.phrmReports.FromDate == null || this.phrmReports.ToDate == null) {
-            this.msgBoxServ.showMessage('Notice', ['Please select valid date.']);
+            this.messageBoxService.showMessage('Notice', ['Please select valid date.']);
+            return;
+        }
+        if (!this.SelectedSalesTypes.length) {
+            this.messageBoxService.showMessage('Notice', ['Please select sales type.']);
             return;
         }
         this.loading = true;
+        this.TransactionType = this.SelectedSalesTypes.join(',')
         if (this.phrmReports.FromDate && this.phrmReports.ToDate) {
             this.PHRMBillingReportData = [];
-            this.pharmacyBLService.GetPharmacyBillingReport(this.phrmReports, this.InvoiceNumber).finally(() => {
+            this.FilterParameters = [
+                { DisplayName: "DateRange:", Value: this.dateRange },
+                { DisplayName: "Invoice No:", Value: this.InvoiceNumber == null ? 'All' : this.InvoiceNumber.toString() },
+                { DisplayName: "Patient Name:", Value: this.PatientName == '' ? 'All' : this.PatientName },
+                { DisplayName: "Visit Type:", Value: this.VisitType == null ? 'All' : this.VisitType },
+                { DisplayName: "Transaction Type :", Value: this.TransactionType == null ? 'All' : this.TransactionType },
+                { DisplayName: "Store :", Value: this.StoreName == null ? 'All' : this.StoreName },
+                { DisplayName: "Scheme :", Value: this.SchemeName == null ? 'All' : this.SchemeName }
+            ];
+            this.pharmacyBLService.GetPharmacyBillingReport(this.phrmReports, this.InvoiceNumber, this.PatientId, this.phrmReports.StoreId, this.VisitType, this.TransactionType, this.selMembershipId).finally(() => {
                 this.loading = false;
             }).subscribe(res => {
-                if (res.Status == 'OK' && res.Results.length > 0) {
-                    ////Assign report Column from GridConstant to PHRMBillingReportColumns
+                if (res.Status == 'OK') {
+                    this.SearchedPatient = null;
+                    this.PatientId = null;
+                    this.SelectedDispensary = null;
+                    this.phrmReports.StoreId = null;
                     this.PHRMBillingReportColumns = PHRMReportsGridColumns.PHRMBillingReport;
-                    ////Assign  Result to PHRMBillingReportData
                     this.PHRMBillingReportData = res.Results;
-                    this.calulateSummaryData();
-
+                    this.CalculateSummaryData();
                     this.changeDetector.detectChanges();
-                    this.footerContent = document.getElementById("print_summary").innerHTML;
                 }
                 if (res.Status == 'OK' && res.Results.length == 0) {
-                    this.msgBoxServ.showMessage("Notice-Message", ["No Data is Available for Selected Record"]);
+                    this.messageBoxService.showMessage("Notice-Message", ["No Data is Available for Selected Record"]);
                 }
             });
         }
     }
 
-    calulateSummaryData() {
+    CalculateSummaryData() {
+
+        this.storeWiseBillingSummary = [];
+        let storeWiseSubtotalAmount = 0;
+        let storeWiseTotalDiscount = 0;
+        let storeWiseTotalAmount = 0;
+        let storeWiseCreditAmount = 0;
+        let grandSubTotal = 0;
+        let grandTotalDiscount = 0;
+        let grandTotalAmount = 0;
+        let grandCreditAmount = 0;
+
         this.storeWiseBillingSummary = [];
         this.dispensaryList.forEach(dispensary => {
-            var storeWiseReportData = this.PHRMBillingReportData.filter(a => a.StoreId == dispensary.StoreId);
+            let storeWiseReportData = this.PHRMBillingReportData.filter(a => a.StoreId == dispensary.StoreId);
 
-            var storeWiseSubtotalAmount = storeWiseReportData.reduce((a, b) => a + b.SubTotal, 0);
-            var storeWiseTotalDiscount = storeWiseReportData.reduce((a, b) => a + b.DiscountAmount, 0);
-            var storeWiseTotalAmount = storeWiseReportData.reduce((a, b) => a + b.TotalAmount, 0);
-            var storeWiseReceivedAmount = storeWiseReportData.reduce((a, b) => a + b.ReceivedAmount, 0);
-            var storeWiseCreditAmount = storeWiseReportData.reduce((a, b) => a + b.CreditAmount, 0);
+            storeWiseSubtotalAmount = storeWiseReportData.reduce((a, b) => a + b.SubTotal, 0);
+            storeWiseTotalDiscount = storeWiseReportData.reduce((a, b) => a + b.DiscountAmount, 0);
+            storeWiseTotalAmount = storeWiseReportData.reduce((a, b) => a + b.TotalAmount, 0);
+            storeWiseCreditAmount = storeWiseReportData.reduce((a, b) => a + b.CreditAmount, 0);
             this.storeWiseBillingSummary.push(
-                { StoreName: dispensary.Name, SubTotal: storeWiseSubtotalAmount, Discount: storeWiseTotalDiscount, TotalAmount: storeWiseTotalAmount, ReceivedAmount: storeWiseReceivedAmount, CreditAmount: storeWiseCreditAmount }
+                { StoreName: dispensary.Name, SubTotal: storeWiseSubtotalAmount, Discount: storeWiseTotalDiscount, TotalAmount: storeWiseTotalAmount, CreditAmount: storeWiseCreditAmount }
             );
         });
 
-        var grandSubTotal = this.PHRMBillingReportData.reduce((a, b) => a + b.SubTotal, 0);
-        var grandTotalDiscount = this.PHRMBillingReportData.reduce((a, b) => a + b.DiscountAmount, 0);
-        var grandTotalAmount = this.PHRMBillingReportData.reduce((a, b) => a + b.TotalAmount, 0);
-        var grandReceivedAmount = this.PHRMBillingReportData.reduce((a, b) => a + b.ReceivedAmount, 0);
-        var grandCreditAmount = this.PHRMBillingReportData.reduce((a, b) => a + b.CreditAmount, 0);
+        grandSubTotal = this.PHRMBillingReportData.reduce((a, b) => a + b.SubTotal, 0);
+        grandTotalDiscount = this.PHRMBillingReportData.reduce((a, b) => a + b.DiscountAmount, 0);
+        grandTotalAmount = this.PHRMBillingReportData.reduce((a, b) => a + b.TotalAmount, 0);
+        grandCreditAmount = this.PHRMBillingReportData.reduce((a, b) => a + b.CreditAmount, 0);
         this.storeWiseBillingSummary.push(
-            { StoreName: "All", SubTotal: grandSubTotal, Discount: grandTotalDiscount, TotalAmount: grandTotalAmount, ReceivedAmount: grandReceivedAmount, CreditAmount: grandCreditAmount }
+            { StoreName: "All", SubTotal: grandSubTotal, Discount: grandTotalDiscount, TotalAmount: grandTotalAmount, CreditAmount: grandCreditAmount }
         );
     }
 
-    ////on click grid export button we are catching in component an event.. 
-    ////and in that event we are calling the server excel export....
-    OnGridExport($event: GridEmitModel) {
-        this.dlService.ReadExcel("/api/PharmacyReport/ExportToExcelPHRMBillingReport?InvoiceNumber=" + this.InvoiceNumber)
-            .map(res => res)
-            .subscribe(data => {
-                let blob = data;
-                let a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = "BillingReport" + moment().format("DD-MMM-YYYY_HHmmA") + '.xls';
-                document.body.appendChild(a);
-                a.click();
-            },
-
-                res => this.ErrorMsg(res));
-    }
     ErrorMsg(err) {
-        this.msgBoxServ.showMessage("error", ["Sorry!!! Not able export the excel file."]);
+        this.messageBoxService.showMessage("error", ["Sorry!!! Not able export the excel file."]);
         console.log(err.ErrorMessage);
     }
 
@@ -141,6 +171,76 @@ export class PHRMBillingReportComponent {
             this.dateRange = "<b>Date:</b>&nbsp;" + this.phrmReports.FromDate + "&nbsp;<b>To</b>&nbsp;" + this.phrmReports.ToDate;
         }
 
+    }
+
+    OnSalesTypeSelected(event) {
+        this.SelectedSalesTypes = [];
+        event.forEach(a => {
+            this.SelectedSalesTypes.push(a.value);
+        });
+    }
+    public AllPatientSearchAsync = (keyword: any): Observable<any[]> => {
+        return this.pharmacyBLService.GetPatients(keyword, false);
+    }
+
+    patientListFormatter(data: any): string {
+        let html = `${data["ShortName"]} [ ${data['PatientCode']} ]`;
+        return html;
+    }
+
+    OnPatientChanged() {
+        if (this.SearchedPatient && this.SearchedPatient.PatientId) {
+            this.PatientId = this.SearchedPatient.PatientId;
+            this.PatientName = this.SearchedPatient.ShortName;
+        }
+        else {
+            this.PatientId = null;
+            this.PatientName = null;
+        }
+    }
+
+    DispensaryListFormatter(data: any): string {
+        return data["Name"];
+    }
+
+    OnDispensaryChange() {
+        if (this.SelectedDispensary && this.SelectedDispensary.StoreId) {
+            this.phrmReports.StoreId = this.SelectedDispensary.StoreId;
+            this.StoreName = this.SelectedDispensary.Name;
+        }
+        else {
+            this.phrmReports.StoreId = null;
+            this.StoreName = null;
+        }
+    }
+
+    ngAfterViewChecked() {
+        if (document.getElementById("print_summary") != null) {
+            this.footerContent = document.getElementById("print_summary").innerHTML;
+        }
+    }
+    public LoadPharmacySchemesList() {
+        this.settingsBLService.GetBillingSchemesDtoList(ENUM_ServiceBillingContext.OpPharmacy)
+            .subscribe(res => {
+                if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                    this.membershipList = res.Results;
+                    if (this.membershipList) {
+                        this.membershipList.forEach(mem => {
+                            mem.MembershipDisplayName = mem.SchemeName;
+                        });
+                    }
+                }
+                else {
+                    this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Sorry!!! Not able export the excel file."]);
+                }
+            });
+    }
+    MembershipTypeChange() {
+        if (this.selMembershipId && this.membershipList && this.membershipList.length > 0) {
+            const selectedSchemeObj = this.membershipList.find(a => a.SchemeId === +this.selMembershipId);
+            this.selMembershipId = selectedSchemeObj.SchemeId;
+            this.SchemeName = selectedSchemeObj.SchemeName;
+        }
     }
 }
 

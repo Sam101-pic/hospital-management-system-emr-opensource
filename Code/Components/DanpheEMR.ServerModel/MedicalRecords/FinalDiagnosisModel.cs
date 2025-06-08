@@ -14,7 +14,7 @@ namespace DanpheEMR.ServerModel
         public int PatientVisitId { get; set; }
         public int PatientId { get; set; }
         public int ICD10ID { get; set; }
-
+        public int? DiseaseGroupId { get; set; }
         public int CreatedBy { get; set; }
         public DateTime CreatedOn { get; set; }
 

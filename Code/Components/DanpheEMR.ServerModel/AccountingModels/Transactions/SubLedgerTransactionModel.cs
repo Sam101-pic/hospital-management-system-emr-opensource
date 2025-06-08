@@ -13,7 +13,7 @@ namespace DanpheEMR.ServerModel.AccountingModels
         public int SubLedgerTransactionId { get; set; }
         public int LedgerId { get; set; }
         public int TransactionItemId { get; set; }
-        public int SubLedgerId { get; set; }
+        public int? SubLedgerId { get; set; }
         public decimal DrAmount { get; set; }
         public decimal CrAmount { get; set; }
         public string VoucherNo { get; set; }

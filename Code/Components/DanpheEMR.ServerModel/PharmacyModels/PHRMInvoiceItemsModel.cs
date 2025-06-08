@@ -25,7 +25,7 @@ namespace DanpheEMR.ServerModel
 
         //Rohit/Sud:IMPORTANT !!! We need below(NormalSalePrice) for Comparision during StockOut action for Sale, Don't Change this
         [NotMapped]
-        public decimal NormalSalePrice { get; set; }    
+        public decimal NormalSalePrice { get; set; }
         public decimal GrItemPrice { get; set; }
         public double FreeQuantity { get; set; }
         public decimal SubTotal { get; set; }
@@ -109,7 +109,42 @@ namespace DanpheEMR.ServerModel
         public decimal CoPaymentCreditAmount { get; set; }
         public int SchemeId { get; set; }
         public int? ReceiptNo { get; set; }
-        public int FiscalYearId { get; set; } 
+        public int FiscalYearId { get; set; }
+
+
+        //Below field are for capping validation purpose
+        /// <summary>
+        /// This flag check if Capping is applicable or not.
+        /// </summary>
+        [NotMapped]
+        public bool IsCappingEnable { get; set; }
+        /// <summary>
+        /// This is the capping quantity limit.
+        /// </summary>
+        [NotMapped]
+        public decimal CappingQuantity { get; set; }
+        /// <summary>
+        /// This is the limit for the capping interval
+        /// </summary>
+        [NotMapped]
+        public int CappingDaysLimit { get; set; }
+
+        /// <summary>
+        /// This keep the history of sale price if it is updated during package modification.
+        /// </summary>
+        public decimal PreviousSalePrice { get; set; }
+        /// <summary>
+        /// This keeps the service item id from Bill Service Item.
+        /// </summary>
+        public int? BillServiceItemId { get; set; }
+        /// <summary>
+        /// This is used for capping server side validation purpose.
+        /// </summary>
+        public string ItemCode { get; set; }
+        [NotMapped]
+        public string HSCode { get; set; }
+
+        public long? ClaimCode { get; set; }
     }
 
 }

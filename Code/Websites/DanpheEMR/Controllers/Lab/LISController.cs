@@ -157,7 +157,7 @@ namespace DanpheEMR.Controllers
         {
             try
             {
-                RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+                RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
                 foreach (var item in mapping)
                 {
                     if (item.LISComponentMapId > 0)
@@ -190,7 +190,7 @@ namespace DanpheEMR.Controllers
         {
             try
             {
-                RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+                RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
                 foreach (var item in result)
                 {
                     item.CreatedBy = currentUser.EmployeeId;
@@ -242,7 +242,7 @@ namespace DanpheEMR.Controllers
         {
             try
             {
-                RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+                RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
                 var res = await _lisService.UpdateMachineResultSyncStatus(resultIds);
                 if (res)
                 {
@@ -266,8 +266,27 @@ namespace DanpheEMR.Controllers
         {
             try
             {
-                RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+                RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
                 _lisService.DeleteMapping(id, currentUser.EmployeeId);
+                responseData.Status = ENUM_DanpheHttpResponseText.OK;
+                return Ok(responseData);
+            }
+            catch (Exception ex)
+            {
+                responseData.Status = ENUM_DanpheHttpResponseText.Failed;
+                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
+                return BadRequest(responseData);
+            }
+        }
+
+        [Route("ActivateMapping")]
+        [HttpDelete]
+        public IActionResult ActivateMapping(int id)
+        {
+            try
+            {
+                RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+                _lisService.ActivateMapping(id, currentUser.EmployeeId);
                 responseData.Status = ENUM_DanpheHttpResponseText.OK;
                 return Ok(responseData);
             }

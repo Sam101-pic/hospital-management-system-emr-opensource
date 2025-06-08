@@ -29,7 +29,7 @@ export class NursingOpdChekoutComponent implements OnInit {
   @Input("visit")
   public visit: Visit = new Visit();
   @Output() discardInput: EventEmitter<boolean> = new EventEmitter<boolean>();
-  @Output('nursing-opd-refer-callback)')
+  @Output('nursing-opd-refer-callback')
   NursingOpdReferCallback = new EventEmitter<object>();
   public selectedDiagnosis: ICD10[] = [];
   public FinalDiagnosisList: FinalDiagnosisModel[] = [];

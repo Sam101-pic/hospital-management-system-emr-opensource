@@ -6,16 +6,17 @@ import { PHRMPatient } from '../../../../pharmacy/shared/phrm-patient.model';
 import { PHRMStoreModel } from '../../../../pharmacy/shared/phrm-store.model';
 import { DanpheHTTPResponse } from '../../../../shared/common-models';
 import { GridEmitModel } from '../../../../shared/danphe-grid/grid-emit.model';
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../../shared/shared-enums';
 import DispensaryGridColumns from '../../../shared/dispensary-grid.column';
 import { DispensaryService } from '../../../shared/dispensary.service';
-import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../../shared/shared-enums';
 
 @Component({
   selector: 'app-provisional-return',
   templateUrl: './provisional-return.component.html',
-  styles: []
+  styles: [],
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class ProvisionalReturnComponent implements OnInit {
 
@@ -39,6 +40,7 @@ export class ProvisionalReturnComponent implements OnInit {
   ShowProvisionalReturnReceipt: boolean = false;
 
   ReturnReceiptNo: number = 0;
+  FiscalYearId: number = 0;
   constructor(private _dispensaryService: DispensaryService,
     public pharmacyBLService: PharmacyBLService,
     public msgBoxServ: MessageboxService
@@ -79,6 +81,7 @@ export class ProvisionalReturnComponent implements OnInit {
       case "view": {
         if ($event.Data != null) {
           this.ReturnReceiptNo = $event.Data.CancellationReceiptNo;
+          this.FiscalYearId = $event.Data.FiscalYearId;
           this.ShowProvisionalReturnReceipt = true;
         }
         break;
@@ -116,6 +119,13 @@ export class ProvisionalReturnComponent implements OnInit {
     this.ShowProvisionalReturnReceipt = false;
   }
 
+  public hotkeys(event) {
+    if (event.keyCode === 27) {
+      this.OnPopUpClose();
+
+    }
+  }
+
 }
 export class ProvisionalReturn_DTO {
   PatientCode: number = null;
@@ -129,5 +139,6 @@ export class ProvisionalReturn_DTO {
   Gender: string = '';
   DateOfBirth: string = '';
   LastReturnDate: string = '';
+  FiscalYearId: number = 0;
 
 }

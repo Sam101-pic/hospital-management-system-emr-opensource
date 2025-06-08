@@ -1,15 +1,15 @@
 
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
-import { AccountingSettingsBLService } from '../shared/accounting-settings.bl.service';
-import { AccountingBLService } from '../../shared/accounting.bl.service';
-import { ledgerGroupModel } from '../shared/ledgerGroup.model';
-import { LedgerModel } from '../shared/ledger.model';
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 import { SecurityService } from '../../../security/shared/security.service';
-import * as moment from 'moment/moment';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { AccountingService } from "../../shared/accounting.service"
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { AccountingBLService } from '../../shared/accounting.bl.service';
+import { AccountingService } from "../../shared/accounting.service";
+import { AccountingSettingsBLService } from '../shared/accounting-settings.bl.service';
+import { LedgerModel } from '../shared/ledger.model';
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 import { CoreService } from "../../../core/shared/core.service";
+
 @Component({
   selector: 'ledger-edit',
   templateUrl: './ledger-edit.html'
@@ -45,7 +45,7 @@ export class LedgersEditComponent {
   public typevendor: any = false;
   public phrmSupplierList: any;
   public ledgerMappingList: any;
-  public ledgerCode:any;
+  public ledgerCode: any;
 
   public GeneralFieldLabel = new GeneralFieldLabels();
   constructor(public accountingSettingsBLService: AccountingSettingsBLService,
@@ -112,9 +112,9 @@ export class LedgersEditComponent {
     }
   }
   GetLedgerGroup() {
-      if(!!this.accountingService.accCacheData.LedgerGroups && this.accountingService.accCacheData.LedgerGroups.length>0){//mumbai-team-june2021-danphe-accounting-cache-change
-        this.CallBackLedgerGroup(this.accountingService.accCacheData.LedgerGroups);//mumbai-team-june2021-danphe-accounting-cache-change
-      }
+    if (!!this.accountingService.accCacheData.LedgerGroups && this.accountingService.accCacheData.LedgerGroups.length > 0) {//mumbai-team-june2021-danphe-accounting-cache-change
+      this.CallBackLedgerGroup(this.accountingService.accCacheData.LedgerGroups);//mumbai-team-june2021-danphe-accounting-cache-change
+    }
   }
 
   CallBackLedgerGroup(res) {
@@ -167,39 +167,39 @@ export class LedgersEditComponent {
   //update Ledger
   UpdateLedger() {
     //if (this.checkUniqueLedgerName()) { //NageshBB- no need to check duplicate ledger name for update Ledger
-      this.CheckDrCrValidation();
-      //for checking validations, marking all the fields as dirty and checking the validity.
-      for (var i in this.CurrentLedger.LedgerValidator.controls) {
-        this.CurrentLedger.LedgerValidator.controls[i].markAsDirty();
-        this.CurrentLedger.LedgerValidator.controls[i].updateValueAndValidity();
-      }
-      if (this.CurrentLedger.IsValidCheck(undefined, undefined)) {
-        this.loading = true;
-        this.accountingSettingsBLService.UpdateLedger(this.CurrentLedger)
-          .subscribe(
-            res => {
-              if (res.Status == "OK") {
-                // remove the element which was edited
-                let index = this.accountingService.accCacheData.LedgersALL.findIndex(x => x.LedgerId == this.CurrentLedger.LedgerId)//mumbai-team-june2021-danphe-accounting-cache-change
-                this.accountingService.accCacheData.LedgersALL.splice(index, 1); //mumbai-team-june2021-danphe-accounting-cache-change
-                this.msgBoxServ.showMessage("success", ["Ledger Updated !"]);
-                this.CallBackAddLedger(res);
-                this.CurrentLedger = new LedgerModel();
-                this.selLedgerGroup = null;
-                this.loading = false;
-              }
-              else {
-                this.msgBoxServ.showMessage("error", ["error in update, please try again !"]);
-                this.loading = false;
-              }
-            },
-            err => {
-              this.logError(err);
+    this.CheckDrCrValidation();
+    //for checking validations, marking all the fields as dirty and checking the validity.
+    for (var i in this.CurrentLedger.LedgerValidator.controls) {
+      this.CurrentLedger.LedgerValidator.controls[i].markAsDirty();
+      this.CurrentLedger.LedgerValidator.controls[i].updateValueAndValidity();
+    }
+    if (this.CurrentLedger.IsValidCheck(undefined, undefined)) {
+      this.loading = true;
+      this.accountingSettingsBLService.UpdateLedger(this.CurrentLedger)
+        .subscribe(
+          res => {
+            if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+              // remove the element which was edited
+              let index = this.accountingService.accCacheData.LedgersALL.findIndex(x => x.LedgerId == this.CurrentLedger.LedgerId)//mumbai-team-june2021-danphe-accounting-cache-change
+              this.accountingService.accCacheData.LedgersALL.splice(index, 1, res.Results); //mumbai-team-june2021-danphe-accounting-cache-change
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Ledger Updated !"]);
+              this.CallBackAddLedger(res);
+              this.CurrentLedger = new LedgerModel();
+              this.selLedgerGroup = null;
               this.loading = false;
-            });
-      } else {
-        this.loading = false;
-      }
+            }
+            else {
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, res.ErrorMessage);
+              this.loading = false;
+            }
+          },
+          err => {
+            this.logError(err);
+            this.loading = false;
+          });
+    } else {
+      this.loading = false;
+    }
     //}
   }
   Close() {
@@ -225,7 +225,7 @@ export class LedgersEditComponent {
       tempForCacheLedgerObj.LedgerGroupId = temp.LedgerGroupId = this.CurrentLedger.LedgerGroupId;//mumbai-team-june2021-danphe-accounting-cache-change
       tempForCacheLedgerObj.LedgerGroupName = temp.LedgerGroupName = this.CurrentLedger.LedgerGroupName;//mumbai-team-june2021-danphe-accounting-cache-change
       tempForCacheLedgerObj.LedgerName = temp.LedgerName = this.CurrentLedger.LedgerName;//mumbai-team-june2021-danphe-accounting-cache-change
-      this.accountingService.accCacheData.LedgersALL.push(tempForCacheLedgerObj);//mumbai-team-june2021-danphe-accounting-cache-change
+      // this.accountingService.accCacheData.LedgersALL.push(tempForCacheLedgerObj);//mumbai-team-june2021-danphe-accounting-cache-change
       this.sourceLedgerList.push(temp);
       this.ledgergroupList = new Array<LedgerModel>();
       this.ledgerList = new Array<LedgerModel>();
@@ -318,10 +318,10 @@ export class LedgersEditComponent {
     }
   }
   public getLedgerList() {
-      if(!!this.accountingService.accCacheData.LedgersALL && this.accountingService.accCacheData.LedgersALL.length>0){//mumbai-team-june2021-danphe-accounting-cache-change
-        this.sourceLedgerList = this.accountingService.accCacheData.LedgersALL;//mumbai-team-june2021-danphe-accounting-cache-change
-        this.sourceLedgerList = this.sourceLedgerList.slice();//mumbai-team-june2021-danphe-accounting-cache-change
-      }
+    if (!!this.accountingService.accCacheData.LedgersALL && this.accountingService.accCacheData.LedgersALL.length > 0) {//mumbai-team-june2021-danphe-accounting-cache-change
+      this.sourceLedgerList = this.accountingService.accCacheData.LedgersALL;//mumbai-team-june2021-danphe-accounting-cache-change
+      this.sourceLedgerList = this.sourceLedgerList.slice();//mumbai-team-june2021-danphe-accounting-cache-change
+    }
   }
   LedgerGroupListFormatter(data: any): string {
     return data["LedgerGroupName"];

@@ -1,23 +1,23 @@
-import { Component, OnInit, ChangeDetectorRef, Input, Output, EventEmitter } from "@angular/core";
-import { Patient } from "../../../patients/shared/patient.model";
-import { BillingService } from "../../shared/billing.service";
-import { BillingTransaction } from "../../shared/billing-transaction.model";
-import { ServiceDepartmentVM } from "../../../shared/common-masters.model";
-import { CoreService } from "../../../core/shared/core.service";
-import { BillingBLService } from "../../shared/billing.bl.service";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { DanpheHTTPResponse } from "../../../shared/common-models";
-import { PatientBillingContextVM } from "../../shared/patient-billing-context-vm";
-import { BillingTransactionItem } from "../../shared/billing-transaction-item.model";
-import { CommonFunctions } from "../../../shared/common.functions";
-import * as moment from 'moment/moment';
-import { SecurityService } from "../../../security/shared/security.service";
-import { CurrentVisitContextVM } from "../../../appointments/shared/current-visit-context.model";
-import { BillingReceiptModel } from "../../shared/billing-receipt.model";
-import { PatientService } from "../../../patients/shared/patient.service";
-import { CreditOrganization } from "../../../settings-new/shared/creditOrganization.model";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 import { Router } from "@angular/router";
-import { ENUM_BillingStatus, ENUM_VisitType, ENUM_BillingType } from "../../../shared/shared-enums";
+import * as moment from 'moment/moment';
+import { CurrentVisitContextVM } from "../../../appointments/shared/current-visit-context.model";
+import { CoreService } from "../../../core/shared/core.service";
+import { Patient } from "../../../patients/shared/patient.model";
+import { PatientService } from "../../../patients/shared/patient.service";
+import { SecurityService } from "../../../security/shared/security.service";
+import { CreditOrganization } from "../../../settings-new/shared/creditOrganization.model";
+import { ServiceDepartmentVM } from "../../../shared/common-masters.model";
+import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { CommonFunctions } from "../../../shared/common.functions";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_BillingStatus, ENUM_BillingType, ENUM_VisitType } from "../../../shared/shared-enums";
+import { BillingReceiptModel } from "../../shared/billing-receipt.model";
+import { BillingTransactionItem } from "../../shared/billing-transaction-item.model";
+import { BillingTransaction } from "../../shared/billing-transaction.model";
+import { BillingBLService } from "../../shared/billing.bl.service";
+import { BillingService } from "../../shared/billing.service";
+import { PatientBillingContextVM } from "../../shared/patient-billing-context-vm";
 
 @Component({
   selector: 'insurance-bill-item-request',
@@ -648,7 +648,7 @@ export class InsuranceBillItemRequest {
 
   GetVisitContext(patientId: number, visitId: number) {
     if (patientId && visitId) {
-      this.billingBLService.GetDataOfInPatient(patientId, visitId)
+      this.billingBLService.GetPatientCurrentVisitContext(patientId, visitId)
         .subscribe(res => {
           if (res.Status == "OK" && res.Results.Current_WardBed) {
             this.currPatVisitContext = res.Results;

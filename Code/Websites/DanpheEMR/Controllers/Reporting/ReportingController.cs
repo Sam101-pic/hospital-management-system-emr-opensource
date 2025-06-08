@@ -3,6 +3,7 @@ using DanpheEMR.Core.Configuration;
 using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
 using DanpheEMR.ServerModel;
+using DanpheEMR.ServerModel.MasterModels;
 using DanpheEMR.ServerModel.ReportingModels;
 using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Mvc;
@@ -11,9 +12,6 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Data.Entity;
-using Newtonsoft.Json;
-using Org.BouncyCastle.Asn1.Ocsp;
 using System.Linq;
 
 namespace DanpheEMR.Controllers.Reporting
@@ -161,21 +159,40 @@ namespace DanpheEMR.Controllers.Reporting
         }
         #endregion
 
-        #region Rank-Membershipwise Admitted Patient Report
-        public string RankMembershipwiseAdmittedPatientReport(string fromDate, string toDate, string memberships, string ranks)
+        #region Rank Membershipwise Admitted Patient Report
+        public string RankMembershipWiseAdmittedPatientReport(string fromDate, string toDate, string schemeIds, string ranks)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
             {
                 ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
-                DataTable adtlist = reportingDbContext.RankMembershipwiseAdmittedPatientReport(fromDate, toDate, memberships, ranks);
+                DataTable admittedPatientList = reportingDbContext.RankMembershipWiseAdmittedPatientReport(fromDate, toDate, schemeIds, ranks);
                 responseData.Status = "OK";
-                responseData.Results = adtlist;
+                responseData.Results = admittedPatientList;
             }
             catch (Exception ex)
             {
-                //Insert exception details into database table.
                 responseData.Status = ENUM_DanpheHttpResponseText.Failed;
+                responseData.ErrorMessage = ex.Message;
+            }
+            return DanpheJSONConvert.SerializeObject(responseData);
+        }
+        #endregion
+
+        #region Rank Membershipwise Discharged Patient Report
+        public string RankMembershipWiseDischargePatientReport(DateTime fromDate, DateTime toDate, string schemeIds, string ranks)
+        {
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+            try
+            {
+                ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
+                DataTable dischargedPatientList = reportingDbContext.RankMembershipWiseDischargePatientReport(fromDate, toDate, schemeIds, ranks);
+                responseData.Status = "OK";
+                responseData.Results = dischargedPatientList;
+            }
+            catch (Exception ex)
+            {
+                responseData.Status = "Failed";
                 responseData.ErrorMessage = ex.Message;
             }
             return DanpheJSONConvert.SerializeObject(responseData);
@@ -358,16 +375,16 @@ namespace DanpheEMR.Controllers.Reporting
         #endregion
         #region Daily Appointment Report
         //Daily Appointment Report
-        public string DailyAppointmentReport(DateTime FromDate, DateTime ToDate, string Doctor_Name, string AppointmentType)
+        public string DailyAppointmentReport(DateTime FromDate, DateTime ToDate, int? DoctorId, string AppointmentType, int? SchemeId, bool IsFreeVisit)
         {
             //DanpheHTTPResponse<List<DailyAppointmentReport>> responseData = new DanpheHTTPResponse<List<DailyAppointmentReport>>();
-            DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             try
             {
                 ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
-                DataTable dailyappointment = reportingDbContext.DailyAppointmentReport(FromDate, ToDate, Doctor_Name, AppointmentType);
+                object dailyappointment = reportingDbContext.DetailedDailyAppointmentReport(FromDate, ToDate, DoctorId, AppointmentType, SchemeId, IsFreeVisit);
 
-                responseData.Status = "OK";
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
                 responseData.Results = dailyappointment;
             }
             catch (Exception ex)
@@ -463,7 +480,7 @@ namespace DanpheEMR.Controllers.Reporting
 
         #region DistrictWise Report 
 
-        public string DistrictWiseAppointmentReport(DateTime FromDate, DateTime ToDate, string CountrySubDivisionName, string gender)
+        public string DistrictWiseAppointmentReport(DateTime FromDate, DateTime ToDate, string CountrySubDivisionName, string gender, int? SchemeId)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
@@ -475,6 +492,7 @@ namespace DanpheEMR.Controllers.Reporting
                 paramsList.Add(new SqlParameter("@ToDate", ToDate));
                 paramsList.Add(new SqlParameter("@CountrySubDivisionName", CountrySubDivisionName));
                 paramsList.Add(new SqlParameter("@Gender", gender));
+                paramsList.Add(new SqlParameter("@SchemeId", SchemeId));
 
                 DataTable dtDeptWiseRpt = DALFunctions.GetDataTableFromStoredProc("SP_Report_Appointment_DistrictWiseAppointmentReport", paramsList, reportingDbContext);
                 responseData.Status = "OK";
@@ -680,13 +698,13 @@ namespace DanpheEMR.Controllers.Reporting
         #endregion
 
         #region Doctorwise OutPatient Report
-        public string DoctorwiseOutPatientReport(DateTime FromDate, DateTime ToDate)
+        public string DoctorwiseOutPatientReport(DateTime FromDate, DateTime ToDate, int? SchemeId)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
             {
                 ReportingDbContext repDbContext = new ReportingDbContext(connString);
-                DataTable reportData = repDbContext.DoctorWisePatientReport(FromDate, ToDate);
+                DataTable reportData = repDbContext.DoctorWisePatientReport(FromDate, ToDate, SchemeId);
                 responseData.Status = "OK";
                 responseData.Results = reportData;
             }
@@ -729,7 +747,7 @@ namespace DanpheEMR.Controllers.Reporting
         }
         #endregion
 
-        public string GeographicalStatReport(DateTime FromDate, DateTime ToDate, string CountrySubDivisionName,string MunicipalityName, string GeoStatType)
+        public string GeographicalStatReport(DateTime FromDate, DateTime ToDate, int? CountrySubDivisionId, int? MunicipalityId, string GeoStatType, int? SchemeId, bool IsFreeVisit)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
@@ -739,9 +757,11 @@ namespace DanpheEMR.Controllers.Reporting
                 List<SqlParameter> paramsList = new List<SqlParameter>();
                 paramsList.Add(new SqlParameter("@FromDate", FromDate));
                 paramsList.Add(new SqlParameter("@ToDate", ToDate));
-                paramsList.Add(new SqlParameter("@CountrySubDivisionName", CountrySubDivisionName));
-                paramsList.Add(new SqlParameter("@MunicipalityName", MunicipalityName));
+                paramsList.Add(new SqlParameter("@CountrySubDivisionId", CountrySubDivisionId));
+                paramsList.Add(new SqlParameter("@MunicipalityId", MunicipalityId));
                 paramsList.Add(new SqlParameter("@GeoStatType", GeoStatType));
+                paramsList.Add(new SqlParameter("@SchemeId", SchemeId));
+                paramsList.Add(new SqlParameter("@IsFreeVisit", IsFreeVisit));
 
 
                 DataTable geoStatReport = DALFunctions.GetDataTableFromStoredProc("SP_Report_Appointment_GeographicalStatReport", paramsList, reportingDbContext);
@@ -889,9 +909,9 @@ namespace DanpheEMR.Controllers.Reporting
         #endregion
         #region DepartmentWise Patient Report 
 
-        public string DepartmentWiseAppointmentReport(DateTime FromDate, DateTime ToDate, int DepartmentId, string gender)
+        public object DepartmentWiseAppointmentReport(DateTime FromDate, DateTime ToDate, int DepartmentId, string gender, int? SchemeId, bool IsFreeVisit)
         {
-            DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             try
             {
                 ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
@@ -901,9 +921,16 @@ namespace DanpheEMR.Controllers.Reporting
                 paramsList.Add(new SqlParameter("@ToDate", ToDate));
                 paramsList.Add(new SqlParameter("@DepartmentId", DepartmentId));
                 paramsList.Add(new SqlParameter("@Gender", gender));
+                paramsList.Add(new SqlParameter("@SchemeId", SchemeId));
+                paramsList.Add(new SqlParameter("@IsFreeVisit", IsFreeVisit));
 
-                DataTable dtDeptWiseRpt = DALFunctions.GetDataTableFromStoredProc("SP_Report_Appointment_DepartmentWiseAppointmentReport", paramsList, reportingDbContext);
-                responseData.Status = "OK";
+                DataSet dtDeptWiseRptDataSet = DALFunctions.GetDatasetFromStoredProc("SP_Report_Appointment_DepartmentWiseAppointmentReport", paramsList, reportingDbContext);
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+                var dtDeptWiseRpt = new
+                {
+                    DepartmentWiseAppointmentReport = dtDeptWiseRptDataSet.Tables[0],
+                    DepartmentWiseAppointmentReportSummary = dtDeptWiseRptDataSet.Tables[1],
+                };
                 responseData.Results = dtDeptWiseRpt;
             }
             catch (Exception ex)
@@ -921,9 +948,9 @@ namespace DanpheEMR.Controllers.Reporting
         }
         #endregion
         #region Daily Visit Report
-        public string DayAndMonthWiseVisitReport(DateTime FromDate, DateTime ToDate, int DepartmentId, string ReportType)
+        public object DayAndMonthWiseVisitReport(DateTime FromDate, DateTime ToDate, int DepartmentId, string ReportType, bool IsFreeVisit)
         {
-            DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             try
             {
                 ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
@@ -933,10 +960,16 @@ namespace DanpheEMR.Controllers.Reporting
                 paramsList.Add(new SqlParameter("@ToDate", ToDate));
                 paramsList.Add(new SqlParameter("@DepartmentId", DepartmentId));
                 paramsList.Add(new SqlParameter("@ReportType", ReportType));
+                paramsList.Add(new SqlParameter("@IsFreeVisit", IsFreeVisit));
 
-                DataTable dtDeptWiseRpt = DALFunctions.GetDataTableFromStoredProc("SP_Report_Appointment_DayAndMonthWiseVisitReport", paramsList, reportingDbContext);
+                DataSet dtDayMonthWiseRpt = DALFunctions.GetDatasetFromStoredProc("SP_Report_Appointment_DayAndMonthWiseVisitReport", paramsList, reportingDbContext);
                 responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
-                responseData.Results = dtDeptWiseRpt;
+                var DayMonthWiseReport = new
+                {
+                    DayMonthWiseAppointmentReport = dtDayMonthWiseRpt.Tables[0],
+                    DayMonthWiseAppointmentReportSummary = dtDayMonthWiseRpt.Tables[1],
+                };
+                responseData.Results = DayMonthWiseReport;
             }
             catch (Exception ex)
             {
@@ -950,7 +983,7 @@ namespace DanpheEMR.Controllers.Reporting
         #endregion
         #region DepartmentWise Stat Report 
 
-        public string DepartmentWiseStatReport(DateTime FromDate, DateTime ToDate, int? DepartmentId, string gender)
+        public string DepartmentWiseStatReport(DateTime FromDate, DateTime ToDate, int? DepartmentId, string gender, int? SchemeId, bool IsFreeVisit)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
@@ -962,6 +995,8 @@ namespace DanpheEMR.Controllers.Reporting
                 paramsList.Add(new SqlParameter("@ToDate", ToDate));
                 paramsList.Add(new SqlParameter("@DepartmentId", DepartmentId));
                 paramsList.Add(new SqlParameter("@Gender", gender));
+                paramsList.Add(new SqlParameter("@SchemeId", SchemeId));
+                paramsList.Add(new SqlParameter("@IsFreeVisit", IsFreeVisit));
 
                 DataTable dtDeptWiseRpt = DALFunctions.GetDataTableFromStoredProc("SP_Report_Appointment_DepartmentWiseStatReport", paramsList, reportingDbContext);
                 responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
@@ -1005,7 +1040,7 @@ namespace DanpheEMR.Controllers.Reporting
 
         #region Age Classified Stats Report 
 
-        public string AgeClassifiedOPStatsReport(DateTime FromDate, DateTime ToDate, int? DepartmentId)
+        public string AgeClassifiedOPStatsReport(DateTime FromDate, DateTime ToDate, int? DepartmentId, bool IsFreeVisit)
         {
             DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
             try
@@ -1016,6 +1051,7 @@ namespace DanpheEMR.Controllers.Reporting
                 paramsList.Add(new SqlParameter("@FromDate", FromDate));
                 paramsList.Add(new SqlParameter("@ToDate", ToDate));
                 paramsList.Add(new SqlParameter("@DepartmentId", DepartmentId));
+                paramsList.Add(new SqlParameter("@IsFreeVisit", IsFreeVisit));
 
                 DataTable dtDeptWiseRpt = DALFunctions.GetDataTableFromStoredProc("SP_Report_AgeClassifiedReport", paramsList, reportingDbContext);
                 responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
@@ -2305,6 +2341,36 @@ namespace DanpheEMR.Controllers.Reporting
         }
 
 
+        #endregion
+
+        #region Patient Bed Details Report
+        /// <summary>
+        /// This API is responsible to generate Patient Bed Details Report in which patient's bed transactions information is to be tracked
+        /// </summary>
+        /// <param name="fromDate">start date</param>
+        /// <param name="toDate">end date</param>
+        /// <param name="patientId">provide patientId if you want specific patients bed info</param>
+        /// <param name="wardId">provide wardId if you want specific wards bed info</param>
+        /// <param name="bedFeatureId">provide bedFeatureId if you want specific bed features info</param>
+        /// <param name="admissionStatus">provide admissionStatus like 'admission', 'transfer', 'discharged'</param>
+        /// <returns>It returns a datatable with bed transaction information based on provided search criteria</returns>
+        public string PatientBedDetailsReport(DateTime fromDate, DateTime toDate, int? patientId, int? wardId, int? bedFeatureId, string admissionStatus)
+        {
+            DanpheHTTPResponse<DataTable> responseData = new DanpheHTTPResponse<DataTable>();
+            try
+            {
+                ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
+                DataTable patientBedDetailsReport = reportingDbContext.PatientBedDetailsReport(fromDate, toDate, patientId, wardId, bedFeatureId, admissionStatus);
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+                responseData.Results = patientBedDetailsReport;
+            }
+            catch (Exception ex)
+            {
+                responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.Failed;
+                responseData.ErrorMessage = ex.Message;
+            }
+            return DanpheJSONConvert.SerializeObject(responseData);
+        }
         #endregion
     }
 }

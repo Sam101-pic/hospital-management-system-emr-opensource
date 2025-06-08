@@ -1,20 +1,21 @@
+import { animate, style, transition, trigger } from '@angular/animations';
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
-import { RequisitionItems } from "../shared/requisition-items.model";
-import { InventoryBLService } from "../shared/inventory.bl.service";
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { RouteFromService } from "../../shared/routefrom.service";
-import { InventoryService } from '../shared/inventory.service';
-import { CoreService } from "../../core/shared/core.service"
-import * as moment from 'moment/moment';
-import { Requisition } from '../shared/requisition.model';
+import { Router } from '@angular/router';
+import { CoreService } from "../../core/shared/core.service";
 import { SecurityService } from '../../security/shared/security.service';
 import { DanpheHTTPResponse } from '../../shared/common-models';
-import { CommonFunctions } from '../../shared/common.functions';
-import { trigger, transition, style, animate } from '@angular/animations';
-import { VerificationActor } from '../../verification/inventory/requisition-details/inventory-requisition-details.component';
 import { InventoryFieldCustomizationService } from '../../shared/inventory-field-customization.service';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { RouteFromService } from "../../shared/routefrom.service";
+import { ENUM_DanpheHTTPResponses } from '../../shared/shared-enums';
+import { VerificationActor } from '../../verification/inventory/requisition-details/inventory-requisition-details.component';
+import { SubStoreRequisition_DTO } from '../shared/dtos/substore-requisition.dto';
+import { InventoryBLService } from "../shared/inventory.bl.service";
+import { InventoryService } from '../shared/inventory.service';
+import { RequisitionItems } from "../shared/requisition-items.model";
+import { Requisition } from '../shared/requisition.model';
 import { GeneralFieldLabels } from '../../shared/DTOs/general-field-label.dto';
+
 @Component({
   animations: [
     trigger(
@@ -62,7 +63,12 @@ export class RequisitionDetailsComponent implements OnInit {
   public printDetaiils: HTMLElement;
   public showPrint: boolean;
   showSpecification: boolean = false;
+  IsDirectDispatched: boolean = false;
   @Output('call-back-requisition-details-popup-close') callBackPopupClose: EventEmitter<Object> = new EventEmitter<Object>();
+  public Requisition: SubStoreRequisition_DTO = new SubStoreRequisition_DTO();
+  public Verifiers: VerificationActor[] = [];
+  public Dispatchers: VerificationActor[] = [];
+  Receivers: VerificationActor[] = [];
 
   public GeneralFieldLabel = new GeneralFieldLabels();
 
@@ -120,42 +126,11 @@ export class RequisitionDetailsComponent implements OnInit {
   }
 
   ShowRequisitionDetails(res: DanpheHTTPResponse) {
-    if (res.Status == "OK") {
-      this.reqItemsDetail = res.Results;
-      if (this.reqItemsDetail && this.reqItemsDetail.RequisitionItemsInfo && this.reqItemsDetail.RequisitionItemsInfo.length > 0) {
-        this.reqItemsDetail.RequisitionItemsInfo.forEach(itm => {
-          itm.CreatedOn = moment(itm.CreatedOn).format('YYYY-MM-DD HH:mm:ss');
-        });
-
-        this.requisitionDate = this.reqItemsDetail.RequisitionItemsInfo[0].CreatedOn;
-        this.requisitionNo = this.reqItemsDetail.RequisitionItemsInfo[0].RequisitionNo;
-        this.issueNo = this.reqItemsDetail.RequisitionItemsInfo[0].IssueNo;
-        this.dispatchNo = this.reqItemsDetail.RequisitionItemsInfo[0].DispatchNo;
-        this.createdby = this.reqItemsDetail.RequisitionItemsInfo[0].CreatedByName;
-        this.mainRemarks = this.reqItemsDetail.RequisitionItemsInfo[0].Remarks;
-        this.receivedby = null;
-        // we may have multiple dispatch, we have to handle differently.. 
-        if (this.reqItemsDetail.DispatchInfo && this.reqItemsDetail.DispatchInfo.length > 0) {
-          let allDispatchedByArray = this.reqItemsDetail.DispatchInfo.map(dis => {
-            return dis.DispatchedByName;
-          })
-          let allReceivedByArray = this.reqItemsDetail.DispatchInfo.map(dis => {
-            return dis.ReceivedBy;
-          })
-
-          let uniqueDispatchByNameArr = CommonFunctions.GetUniqueItemsFromArray(allDispatchedByArray);
-          let uniqueReceivedByNameArr = CommonFunctions.GetUniqueItemsFromArray(allReceivedByArray);
-
-          this.dispatchedby = uniqueDispatchByNameArr.join(";");
-          this.receivedby = uniqueReceivedByNameArr.join(";");
-
-        }
-
-      }
-      else {
-        this.messageBoxService.showMessage("notice-message", ["Selected Requisition is without Items"]);
-        this.requisitionList();
-      }
+    if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+      this.Requisition = res.Results.Requisition;
+      this.Verifiers = res.Results.Verifiers;
+      this.Dispatchers = res.Results.Dispatchers;
+      this.Receivers = res.Results.Receivers;
     }
     else {
       this.messageBoxService.showMessage("notice-message", ["There is no Requisition details !"]);
@@ -259,4 +234,5 @@ class RequisitionItemInfoVM {
   public DispatchInfo: Array<any> = [];
   public Verifiers: VerificationActor[] = null; // by default, this will be null
   public Dispatchers: VerificationActor[] = []; // by default, this will be empty array.
+  public Receivers: VerificationActor[] = []; // by default, this will be empty array.
 }

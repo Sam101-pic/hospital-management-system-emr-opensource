@@ -3,7 +3,7 @@ export class DispensaryReportModel {
     public ToDate: string = null;
     public Status: string = null;
     public StoreId: number = null;
-    public CounterId: string = "";
-    public CreatedBy: string = "";
+  public CounterId: number = null;
+  public EmployeeId: number = null;
   
   }

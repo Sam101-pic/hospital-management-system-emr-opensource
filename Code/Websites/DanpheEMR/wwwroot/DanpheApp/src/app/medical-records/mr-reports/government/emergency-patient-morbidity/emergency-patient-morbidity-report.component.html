@@ -1,11 +1,14 @@
 <button class="btn btn-primary" style="float: left;" (click)="Back()">Back</button>
 <h3 style="font-weight: 600; padding-left: 130px;">Common Emergency Disease</h3>
-<from-to-date-select (on-change)="OnFromToDateChange($event)" [date-settings-name]="null" [emit-always]="false">
+<from-to-date-select (on-change)="OnFromToDateChange($event)"
+                     [date-settings-name]="'common-range-with-today'"
+                     [emit-always]="false">
 </from-to-date-select>
 <p>
   <button class="btn green btn-success" (click)="Print()"> Print Report <i class="glyphicon glyphicon-print"></i>
   </button>
-  <button class="blue btn" type="button" title="Export to Excel" (click)="ExportToExcel('dvPrintPage_OpMorbidityRpt')"> <i class="fa fa-file-excel-o"></i> Export </button>
+  <button class="blue btn" type="button" title="Export to Excel" (click)="ExportToExcel('dvPrintPage_OpMorbidityRpt')"> <i
+       class="fa fa-file-excel-o"></i> Export </button>
 </p>
 
 <div style="width: 46%;" id="dvPrintPage_OpMorbidityRpt">
@@ -46,5 +49,6 @@
 <p>
   <button class="btn green btn-success" (click)="Print()"> Print Report <i class="glyphicon glyphicon-print"></i>
   </button>
-  <button class="blue btn" type="button" title="Export to Excel" (click)="ExportToExcel('dvPrintPage_OpMorbidityRpt')"> <i class="fa fa-file-excel-o"></i> Export </button>
+  <button class="blue btn" type="button" title="Export to Excel" (click)="ExportToExcel('dvPrintPage_OpMorbidityRpt')"> <i
+       class="fa fa-file-excel-o"></i> Export </button>
 </p>

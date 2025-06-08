@@ -14,4 +14,8 @@ export class DispensaryAvailableStockDetail_DTO {
     IsNarcotic: boolean = false;
     IsVATApplicable: boolean = false;
     SalesVATPercentage: number = 0;
+    ItemCode: string = '';
+    IsCappingEnable: boolean =false;
+    CappingDaysLimit: number = 0;
+    CappingQuantity: number = 0;
 }

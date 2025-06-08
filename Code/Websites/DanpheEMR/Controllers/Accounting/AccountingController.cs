@@ -1,39 +1,34 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using DanpheEMR.Core.Configuration;
-using DanpheEMR.ServerModel;
-using DanpheEMR.DalLayer;
-using System.Data.Entity;
-using System.Data.SqlClient;
-using Microsoft.Extensions.Options;
-using Newtonsoft.Json.Linq;
-using DanpheEMR.Utilities;
-using Newtonsoft.Json;
-using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Http.Features;
+﻿using DanpheEMR.AccTransfer;
 using DanpheEMR.CommonTypes;
-using RefactorThis.GraphDiff;//for entity-update.
-using DanpheEMR.Security;
-using System.Data;
-using System.Data.Entity.Core.Objects;
-using System.Collections;
-using DanpheEMR.AccTransfer;
 using DanpheEMR.Core.Caching;
-using DanpheEMR.ServerModel.IncentiveModels;
-using DanpheEMR.Core;
-using DanpheEMR.ServerModel.AccountingModels;
-using Newtonsoft.Json.Converters;
+using DanpheEMR.Core.Configuration;
+using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
-using DanpheEMR.ServerModel.AccountingModels.ViewModels;
-using DanpheEMR.Controllers.Stickers.DTOs;
-using DanpheEMR.Controllers.Accounting.DTOs;
-using DanpheEMR.Services.Accounting.DTOs;
-using DanpheEMR.ServerModel.MedicareModels;
+using DanpheEMR.Security;
+using DanpheEMR.ServerModel;
+using DanpheEMR.ServerModel.AccountingModels;
+using DanpheEMR.ServerModel.AccountingModels.Config;
 using DanpheEMR.ServerModel.AccountingModels.DTOs;
 using DanpheEMR.ServerModel.AccountingModels.Transactions;
+using DanpheEMR.ServerModel.AccountingModels.ViewModels;
+using DanpheEMR.ServerModel.IncentiveModels;
+using DanpheEMR.ServerModel.MedicareModels;
+using DanpheEMR.Services.Accounting.DTOs;
+using DanpheEMR.Utilities;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using Microsoft.Isam.Esent.Interop;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Remotion.Linq.Clauses;
+using Serilog;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Entity;
+using System.Data.SqlClient;
+using System.Linq;
 //using System.Collections;
 
 namespace DanpheEMR.Controllers
@@ -85,6 +80,19 @@ namespace DanpheEMR.Controllers
             int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             Func<object> func = () => GetLedgerList(currentHospitalId);
             return InvokeHttpGetFunction<object>(func);
+        }
+        #endregion
+
+        #region Get Supplier List
+        [HttpGet]
+        [Route("GetSupplierList")]
+        public IActionResult GetSupplierList()
+        {
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+
+            Func<object> func = () => GetSupplierListByHospitals(currentHospitalId);
+            return InvokeHttpGetFunction<object>(func);
+
         }
         #endregion
 
@@ -150,11 +158,11 @@ namespace DanpheEMR.Controllers
         #region Get Transaction By VoucherNumber
         [HttpGet]
         [Route("TransactionByVoucherNumber")]
-        public IActionResult GetTransactionByVoucherNumber(string voucherNumber, int? sectionId, int FiscalYearId)
+        public IActionResult GetTransactionByVoucherNumber(string voucherNumber, int? sectionId, int FiscalYearId, int HospitalId)
         {
             //else if (reqType == "transactionbyVoucher")
-            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
-            Func<object> func = () => GetTransactionByVoucherNumber(currentHospitalId, sectionId, voucherNumber, FiscalYearId);
+            //int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            Func<object> func = () => GetTransactionByVoucherNumber(HospitalId, sectionId, voucherNumber, FiscalYearId);
             return InvokeHttpGetFunction<object>(func);
         }
         #endregion
@@ -232,6 +240,18 @@ namespace DanpheEMR.Controllers
         }
         #endregion
 
+        #region Get Inventory SubStore Ledgers
+        [HttpGet]
+        [Route("InventorySubStoreLedgers")]
+        public IActionResult GetInventorySubStoreLedgers()
+        {
+            //else if (reqType == "get-invSubcategory-list")
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            Func<object> func = () => GetInventorySubStoreLedgers(currentHospitalId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+        #endregion
+
         #region Get Inventory SubCategory Ledgers
         [HttpGet]
         [Route("InventorySubCategoryLedgers")]
@@ -256,7 +276,7 @@ namespace DanpheEMR.Controllers
         }
         #endregion
 
-   
+
 
         #region Get Data For Billing To Accounting
         [HttpGet]
@@ -312,7 +332,7 @@ namespace DanpheEMR.Controllers
         #region Get Provisional Voucher Number
         [HttpGet]
         [Route("ProvisionalVoucherNumber")]
-        public IActionResult GetProvisionalVoucherNumber(int? voucherId,int? sectionId, DateTime transactiondate)
+        public IActionResult GetProvisionalVoucherNumber(int? voucherId, int? sectionId, DateTime transactiondate)
         {
             //else if (reqType == "gettempVoucherNumber")
             int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
@@ -374,7 +394,8 @@ namespace DanpheEMR.Controllers
         public IActionResult FiscalYearLogs()
         {
             //else if (reqType == "get-fsyearactivity")
-            Func<object> func = () => GetFiscalYearLogs();
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            Func<object> func = () => GetFiscalYearLogs(currentHospitalId);
             return InvokeHttpGetFunction<object>(func);
         }
         #endregion
@@ -385,7 +406,8 @@ namespace DanpheEMR.Controllers
         public IActionResult GetAllEmployeeLedgers()
         {
             //else if (reqType == "acc-get-employee-ledger-list")
-            Func<object> func = () => GetEmployeeLedgers();
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            Func<object> func = () => GetEmployeeLedgers(currentHospitalId);
             return InvokeHttpGetFunction<object>(func);
         }
         #endregion
@@ -408,7 +430,8 @@ namespace DanpheEMR.Controllers
         public IActionResult BankReconciliationCategoies(DateTime FromDate, DateTime ToDate, int? sectionId)
         {
             //if (reqType == "get-bank-reconciliation-category")
-            Func<object> func = () => GetBanckReconciliationCategories();
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            Func<object> func = () => GetBanckReconciliationCategories(currentHospitalId);
             return InvokeHttpGetFunction<object>(func);
         }
         #endregion
@@ -416,10 +439,10 @@ namespace DanpheEMR.Controllers
         #region Get Good Receipt List
         [HttpGet]
         [Route("GoodReceipts")]
-        public IActionResult GoodReceiptList(int? sectionId, int? voucherId, DateTime transactiondate, string voucherNumber)
+        public IActionResult GoodReceiptList(int? sectionId, int? vendorId, DateTime transactiondate, string invoiceNumber, int goodReceiptNo)
         {
             //if (reqType == "get-grlist")
-            Func<object> func = () => GetGoodReceiptList(sectionId, voucherId, transactiondate, voucherNumber);
+            Func<object> func = () => GetGoodReceiptList(sectionId, vendorId, transactiondate, invoiceNumber, goodReceiptNo);
             return InvokeHttpGetFunction<object>(func);
         }
         #endregion
@@ -432,7 +455,8 @@ namespace DanpheEMR.Controllers
         {
             DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
             AccountingDbContext accountingDBContext = new AccountingDbContext(connString);
-            var BankReconciliationCategory = _accountingDbContext.BankReconciliationCategory.Where(c => c.IsActive == true).ToList();
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            var BankReconciliationCategory = _accountingDbContext.BankReconciliationCategory.Where(c => c.IsActive == true && c.HospitalId == currentHospitalId).ToList();
 
             responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
             responseData.Results = BankReconciliationCategory;
@@ -471,7 +495,7 @@ namespace DanpheEMR.Controllers
                                         from led in ld.DefaultIfEmpty()
                                         join subLedger in _accountingDbContext.SubLedger on ledM.SubLedgerId equals subLedger.SubLedgerId into sl
                                         from subLed in sl.DefaultIfEmpty()
-                                        where payMod.ShowInMultiplePaymentMode == true
+                                        where payMod.ShowInMultiplePaymentMode == true && led != null ? led.HospitalId == currentHospitalId : true
                                         select new
                                         {
                                             LedgerId = led != null ? led.LedgerId > 0 ? led.LedgerId : 0 : 0,
@@ -518,10 +542,39 @@ namespace DanpheEMR.Controllers
         [Route("SuspenseAccountReconciliationDetail")]
         public IActionResult GetSuspenaseAccountReconciliationInfo(int BankLedgerId, int SuspenseAccountLedgerId)
         {
-            Func<object> func = () => GetSuspenseAccountReconciliationDetail(BankLedgerId,SuspenseAccountLedgerId);
+            Func<object> func = () => GetSuspenseAccountReconciliationDetail(BankLedgerId, SuspenseAccountLedgerId);
             return InvokeHttpGetFunction<object>(func);
         }
         #endregion
+
+        [HttpGet]
+        [Route("AccountTenantSectionMap")]
+        public IActionResult GetAccountTenantSectionMap()
+        {
+            Func<object> func = () =>
+            {
+                var map = (from hospital in _accountingDbContext.Hospitals
+                           join section in _accountingDbContext.Section on hospital.HospitalId equals section.HospitalId
+                           into sectionGrp
+                           from sec in sectionGrp.DefaultIfEmpty()
+                           select new AccountTenantSectionMapDTO
+                           {
+                               HospitalName = hospital.HospitalLongName,
+                               HospitalShortCode = hospital.HospitalShortName,
+                               SectionName = sec != null ? sec.SectionName : "Manual_Voucher",
+                               SectionCode = sec != null ? sec.SectionCode : "",
+                               IsActive = hospital.IsActive,
+                           }).ToList();
+                var sections = _accountingDbContext.Section.Where(a => a.SectionId != 4).ToList();
+                var result = new AccountTenantMapWrapperDTO
+                {
+                    Maps = map,
+                    SectionList = sections
+                };
+                return result;
+            };
+            return InvokeHttpGetFunction<object>(func);
+        }
         #endregion
 
 
@@ -2240,7 +2293,7 @@ namespace DanpheEMR.Controllers
 
         #region Post Transaction
         [HttpPost]
-        [Route("Trannsaction")]
+        [Route("Transaction")]
         public IActionResult PostTransaction()
         {
             //if (reqType == "postTransaction")
@@ -2301,7 +2354,8 @@ namespace DanpheEMR.Controllers
             //else if (reqType == "create-ledger-shared-component")
             string postStringContent = this.ReadPostData();
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => AddLedgersFromSharedComponents(postStringContent, currentUser);
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            Func<object> func = () => AddLedgersFromSharedComponents(postStringContent, currentUser, currentHospitalId);
             return InvokeHttpPostFunction<object>(func);
         }
         #endregion
@@ -2329,7 +2383,8 @@ namespace DanpheEMR.Controllers
             string postStringContent = this.ReadPostData();
             string transactionObject = this.ReadQueryStringData("transactionObj");
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => PostIncentivePaymentVoucher(currentUser, postStringContent, transactionObject);
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+            Func<object> func = () => PostIncentivePaymentVoucher(currentUser, postStringContent, transactionObject, currentHospitalId);
             return InvokeHttpPostFunction<object>(func);
         }
         #endregion
@@ -2340,10 +2395,9 @@ namespace DanpheEMR.Controllers
         public IActionResult MakePayment([FromBody] MakePayment_DTO makePayment_dto)
         {
             //else if (reqType == "post-payment")
-            //string postStringContent = this.ReadPostData();
-            //string transactionObject = this.ReadQueryStringData("transactionObj");
+            int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => PostAccountingPayment(makePayment_dto,currentUser);
+            Func<object> func = () => PostAccountingPayment(makePayment_dto, currentUser, currentHospitalId);
             return InvokeHttpPostFunction<object>(func);
         }
         #endregion
@@ -2387,12 +2441,13 @@ namespace DanpheEMR.Controllers
             medicareType.ForEach(a =>
             {
                 var item = accountingDBContext.MedicareType.FirstOrDefault(med => med.MedicareTypeId == a.MedicareTypeId);
-               
-                    if (a.LedgerId == null)
-                    {
-                        throw new Exception("LedgerId cannot be null.");
-                    }
-                else { 
+
+                if (a.LedgerId == null)
+                {
+                    throw new Exception("LedgerId cannot be null.");
+                }
+                else
+                {
 
                     item.LedgerId = a.LedgerId;
                     accountingDBContext.Entry(item).Property(x => x.LedgerId).IsModified = true;
@@ -2415,11 +2470,31 @@ namespace DanpheEMR.Controllers
         {
             int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => SaveSuspenaseAccountReconciliation(txnDTO,currentUser,currentHospitalId);
+            Func<object> func = () => SaveSuspenaseAccountReconciliation(txnDTO, currentUser, currentHospitalId);
             return InvokeHttpPostFunction<object>(func);
 
         }
         #endregion
+
+        [HttpPost]
+        [Route("AccountTenant")]
+        public IActionResult AddNewAccountTenant([FromBody] AddAccountTenantPost_DTO addAccountTenantPost_DTO)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () =>
+            {
+                List<SqlParameter> paramList = new List<SqlParameter>()
+                        {
+                                 new SqlParameter("@HospitalShortCode",addAccountTenantPost_DTO.HospitalShortCode),
+                                 new SqlParameter("@HospitalLongName", addAccountTenantPost_DTO.HospitalName),
+                                 new SqlParameter("@SectionIds", addAccountTenantPost_DTO.SectionIds),
+                                 new SqlParameter("@EmployeeId", currentUser.EmployeeId)
+                        };
+                int ret = DALFunctions.ExecuteStoredProcedure("SP_ACC_AddNewAccountTenant", paramList, _accountingDbContext);
+                return addAccountTenantPost_DTO;
+            };
+            return InvokeHttpPostFunction<object>(func);
+        }
 
         #endregion
 
@@ -3334,7 +3409,7 @@ namespace DanpheEMR.Controllers
                         var EnableVoucherVerificationParam = _accountingDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "EnableVoucherVerification").FirstOrDefault();
                         var IdGroupBy = (isGroupbyData != "") ? Convert.ToBoolean(isGroupbyData) : true;
                         txnClient.IsGroupTxn = (IdGroupBy) ? IdGroupBy : false;
-
+                        var isVoucherVerificationEnabled = Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue);
                         txnClient.TransactionDate = Convert.ToDateTime(txnClient.TransactionDate.ToString()).Date;
                         // txnClient.Remarks = "manual voucher entry on " + txnClient.TransactionDate;
                         txnClient.IsCustomVoucher = false; //for manual voucher there is no custom voucher things 
@@ -3348,7 +3423,7 @@ namespace DanpheEMR.Controllers
                         txnClient.HospitalId = currentHospitalId;
                         txnClient.IsAllowReverseVoucher = txnClient.IsAllowReverseVoucher ? txnClient.IsAllowReverseVoucher : true;
                         txnClient.IsVoucherReversed = txnClient.IsReverseVoucher == true ? true : false;
-                        if (EnableVoucherVerificationParam != null && Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue))
+                        if (EnableVoucherVerificationParam != null && isVoucherVerificationEnabled)
                         {
                             txnClient.Status = Enums.ENUM_ACC_VoucherStatus.Draft;
                         }
@@ -3360,9 +3435,9 @@ namespace DanpheEMR.Controllers
                             txnClient.VerifiedOn = DateTime.Now;
                             txnClient.VerificationRemarks = "Voucher Verification is disabled. Thus, auto verifying the voucher.";
                         }
-                        _accountingDbContext.Transactions.Add(ProcessTransactions(txnClient, currentHospitalId));
+                        _accountingDbContext.Transactions.Add(ProcessTransactions(txnClient, currentHospitalId, isVoucherVerificationEnabled));
                         _accountingDbContext.SaveChanges();
-                       // var referenceIds = txnClient.TransactionLinks.Select(s => s.ReferenceId).ToArray();
+                        // var referenceIds = txnClient.TransactionLinks.Select(s => s.ReferenceId).ToArray();
 
                         // Vikas: 20-Aug-2020: If Reversed vucher entry in Reverse Transaction table.
                         if (txnClient.IsReverseVoucher == true)
@@ -3382,8 +3457,8 @@ namespace DanpheEMR.Controllers
                                     txn.TransactionItems = _accountingDbContext.TransactionItems.Where(p => p.HospitalId == currentHospitalId && p.TransactionId == txn.TransactionId).Select(p => p).ToList();
                                     txn.TransactionItems.ForEach(b =>
                                     {
-                                        b.TransactionItemDetails = _accountingDbContext.TransactionItemDetails.Where(c => c.TransactionItemId == b.TransactionItemId).Select(x => x).ToList();
-                                        b.SubLedgers = _accountingDbContext.SubLedgerRecord.Where(d => d.TransactionItemId == b.TransactionItemId).Select(y => y).ToList();
+                                        b.TransactionItemDetails = _accountingDbContext.TransactionItemDetails.Where(c => c.TransactionItemId == b.TransactionItemId && b.HospitalId == currentHospitalId).Select(x => x).ToList();
+                                        b.SubLedgers = _accountingDbContext.SubLedgerRecord.Where(d => d.TransactionItemId == b.TransactionItemId && b.HospitalId == currentHospitalId).Select(y => y).ToList();
                                         b.TransactionLinks = _accountingDbContext.TransactionLinks.Where(x => x.TransactionItemId == b.TransactionItemId).Select(x => x).ToList();
                                     });
                                     //txn.TransactionLinks = _accountingDbContext.TransactionLinks.Where(x => x.TransactionId == txn.TransactionId).Select(x => x).ToList();
@@ -3401,7 +3476,7 @@ namespace DanpheEMR.Controllers
                                 _accountingDbContext.SaveChanges();
                             }
 
-                            var PreviousVoucher = _accountingDbContext.Transactions.Where(txn => txn.TransactionId == txnClient.PrevTransactionId).FirstOrDefault();
+                            var PreviousVoucher = _accountingDbContext.Transactions.Where(txn => txn.TransactionId == txnClient.PrevTransactionId && txn.HospitalId == currentHospitalId).FirstOrDefault();
                             if (PreviousVoucher != null)
                             {
                                 if (PreviousVoucher.IsAllowReverseVoucher == false)
@@ -3439,8 +3514,9 @@ namespace DanpheEMR.Controllers
 
         private object GetVoucher()
         {
+            int hospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             var voucherList = (from voc in _accountingDbContext.Vouchers
-                               where voc.IsActive == true
+                               where voc.IsActive == true && voc.HospitalId == hospitalId
                                select new
                                {
                                    VoucherId = voc.VoucherId,
@@ -3509,7 +3585,7 @@ namespace DanpheEMR.Controllers
             var HospId = 0;
             if (ledgerType == ENUM_ACC_LedgerType.InventorySubCategory)
             {
-                HospId = (currentHospitalId > 0) ? currentHospitalId : AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
+                HospId = (currentHospitalId > 0) ? currentHospitalId : HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
             }
             else
             {
@@ -3540,9 +3616,32 @@ namespace DanpheEMR.Controllers
         private object GetFiscalYear(int currentHospitalId)
         {
             var currentDate = DateTime.Now.Date;
-            var fscList = (from fsc in _accountingDbContext.FiscalYears
-                           where fsc.HospitalId == currentHospitalId && fsc.IsActive == true
-                           select fsc).OrderByDescending(a => a.FiscalYearId).ToList();
+            var fscList = (from fsYear in _accountingDbContext.FiscalYears
+                           join map in _accountingDbContext.MapFiscalYears
+                           on fsYear.FiscalYearId equals map.FiscalYearId
+                           where fsYear.IsActive == true && map.HospitalId == currentHospitalId && map.IsActive == true
+                           select new AccountingFiscalYear_DTO
+                           {
+                               FiscalYearId = fsYear.FiscalYearId,
+                               FiscalYearName = fsYear.FiscalYearName,
+                               NpFiscalYearName = fsYear.NpFiscalYearName,
+                               StartDate = fsYear.StartDate,
+                               EndDate = fsYear.EndDate,
+                               Description = fsYear.Description,
+                               CreatedOn = fsYear.CreatedOn,
+                               CreatedBy = fsYear.CreatedBy,
+                               IsActive = map.IsActive,
+                               nStartDate = null,
+                               nEndDate = null,
+                               IsClosed = map.IsClosed,
+                               ClosedBy = map.ClosedBy,
+                               ClosedOn = map.ClosedOn,
+                               ReadyToClose = map.ReadyToClose,
+                               Remark = null,
+                               showreopen = false,
+                               HospitalId = map.HospitalId,
+                               CurrentDate = currentDate
+                           }).OrderByDescending(a => a.FiscalYearId).ToList();
             var todaydate = DateTime.Now;
             var currentFsId = AccountingTransferData.GetFiscalYearIdByDate(_accountingDbContext, todaydate, currentHospitalId);
             var currentfs = fscList.Where(fs => fs.FiscalYearId == currentFsId).FirstOrDefault();
@@ -3574,7 +3673,9 @@ namespace DanpheEMR.Controllers
         private object GetActiveFiscalYears(int currentHospitalId)
         {
             var res = (from yr in _accountingDbContext.FiscalYears
-                       where yr.IsActive == true && yr.HospitalId == currentHospitalId
+                       join map in _accountingDbContext.MapFiscalYears
+                       on yr.FiscalYearId equals map.FiscalYearId
+                       where yr.IsActive == true && map.HospitalId == currentHospitalId
                        select yr).FirstOrDefault();
             return res;
         }
@@ -3584,9 +3685,9 @@ namespace DanpheEMR.Controllers
             var txnList = (from txn in _accountingDbContext.Transactions
                            where txn.HospitalId == currentHospitalId
                            join voucher in _accountingDbContext.Vouchers on txn.VoucherId equals voucher.VoucherId
-                          // join costCenter in _accountingDbContext.CostCenterItems on txn.CostCenterId equals costCenter.CostCenterItemId
                            join fiscal in _accountingDbContext.FiscalYears on txn.FiscalyearId equals fiscal.FiscalYearId
-                           where txn.TransactionId == transactionId && txn.IsActive == true && fiscal.HospitalId == currentHospitalId
+                           join map in _accountingDbContext.MapFiscalYears on fiscal.FiscalYearId equals map.FiscalYearId
+                           where txn.TransactionId == transactionId && txn.IsActive == true && voucher.HospitalId == currentHospitalId && map.HospitalId == currentHospitalId
                            select new
                            {
                                TransactionId = txn.TransactionId,
@@ -3616,12 +3717,13 @@ namespace DanpheEMR.Controllers
             return txnList;
         }
 
-        private object GetTransactionByVoucherNumber(int currentHospitalId, int? sectionId, string voucherNumber, int FiscalYearId)
+        private object GetTransactionByVoucherNumber(int HospitalId, int? sectionId, string voucherNumber, int FiscalYearId)
         {
             //getting uniqueid and sectionid of transaction 
 
             try
             {
+                var currentHospitalId = HospitalId;
                 var CostCenterNotApplicableCostCenterId = -1;
                 var IsCustomVoucher = _accountingDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "CustomSaleVoucher").Select(a => a.ParameterValue).FirstOrDefault();
                 //NageshBB- 22Jul 2020-if this api called from other module , then we have hospital Id issue 
@@ -3630,7 +3732,7 @@ namespace DanpheEMR.Controllers
                 //This is not correct solution , well solution is to show activate hospital popup when user get logged in into system.
                 //so, this will help us to make software as multi tenant. if user have 2 or more hospital permission then this popup will come.
                 //if user have only one hsopital permission then automatically activate this hospital
-                var HospId = (currentHospitalId > 0) ? currentHospitalId : AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
+                var HospId = (currentHospitalId > 0) ? currentHospitalId : HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
 
                 var sectionIdStr = (sectionId > 0) ? sectionId.ToString() : string.Empty;
                 var txnids = (from txn in _accountingDbContext.Transactions
@@ -3653,12 +3755,22 @@ namespace DanpheEMR.Controllers
                                    //join costCenters in _accountingDbContext.CostCenters on txn.CostCenterId equals costCenters.CostCenterId into cc
                                    //from costCenter in cc.DefaultIfEmpty()
                                    join fiscal in _accountingDbContext.FiscalYears on txn.FiscalyearId equals fiscal.FiscalYearId
+                                   join map in _accountingDbContext.MapFiscalYears on fiscal.FiscalYearId equals map.FiscalYearId
                                    join emp in _accountingDbContext.Emmployees on txn.CreatedBy equals emp.EmployeeId
                                    join emp2 in _accountingDbContext.Emmployees on txn.VerifiedBy equals emp2.EmployeeId into data
                                    from verifier in data.DefaultIfEmpty()
-                                   where //head.HospitalId == currentHospitalId
-                                   fiscal.HospitalId == currentHospitalId
-                                   && txn.VoucherNumber == voucherNumber && txn.IsActive == true && txn.FiscalyearId == FiscalYearId
+                                   join editedVoucher in _accountingDbContext.EditVoucherLog
+                                       .Where(ev => ev.HospitalId == currentHospitalId)
+                                       .GroupBy(ev => ev.VoucherNumber)
+                                       .Select(g => new
+                                       {
+                                           VoucherNumber = g.Key,
+                                           LatestReason = g.OrderByDescending(e => e.CreatedOn).FirstOrDefault().Reason
+                                       })
+                                       on txn.VoucherNumber equals editedVoucher.VoucherNumber into evlog
+                                   from edited in evlog.DefaultIfEmpty()
+                                   where voucher.HospitalId == currentHospitalId && map.HospitalId == HospId &&
+                                         txn.VoucherNumber == voucherNumber && txn.IsActive == true && txn.FiscalyearId == FiscalYearId
                                    select new
                                    {
                                        VoucherNumber = txn.VoucherNumber,
@@ -3683,17 +3795,18 @@ namespace DanpheEMR.Controllers
                                        IsVerified = txn.IsVerified,
                                        IsVoucherReversed = txn.IsVoucherReversed,
                                        VerifiedBy = verifier == null ? null : verifier.FullName,
+                                       HasEditLog = edited != null, // Flag to indicate presence in EditVoucherLog
+                                       LatestReason = edited.LatestReason, // Latest Reason column
                                        TransactionItems = (from txnItm in _accountingDbContext.TransactionItems
-                                                           where txnItm.HospitalId == currentHospitalId
+                                                           where txnItm.HospitalId == HospId
                                                            join ledger in _accountingDbContext.Ledgers on txnItm.LedgerId equals ledger.LedgerId
                                                            join ledgp in _accountingDbContext.LedgerGroups on ledger.LedgerGroupId equals ledgp.LedgerGroupId
                                                            join costCenters in _accountingDbContext.CostCenters on txnItm.CostCenterId equals costCenters.CostCenterId
                                                            where
-                                                           ledger.HospitalId == currentHospitalId && ledgp.HospitalId == currentHospitalId &&
+                                                           ledger.HospitalId == HospId && ledgp.HospitalId == currentHospitalId &&
                                                            txn.VoucherNumber == voucherNumber && txnItm.TransactionId == txn.TransactionId
                                                            select new
                                                            {
-
                                                                LedgerId = ledger.LedgerId,
                                                                LedgerGroupName = ledgp.LedgerGroupName,
                                                                LedgerName = ledger.LedgerName,
@@ -3706,7 +3819,7 @@ namespace DanpheEMR.Controllers
                                                                TransactionItemId = txnItm.TransactionItemId,
                                                                SubLedgers = (from subLedgerTxn in _accountingDbContext.SubLedgerRecord
                                                                              join subLedger in _accountingDbContext.SubLedger on subLedgerTxn.SubLedgerId equals subLedger.SubLedgerId
-                                                                             where subLedgerTxn.TransactionItemId == txnItm.TransactionItemId
+                                                                             where subLedgerTxn.TransactionItemId == txnItm.TransactionItemId && subLedger.HospitalId == HospId
                                                                              select new
                                                                              {
                                                                                  LedgerId = subLedgerTxn.LedgerId,
@@ -3721,7 +3834,7 @@ namespace DanpheEMR.Controllers
                                                                                  SubLedgerTransactionId = subLedgerTxn.SubLedgerTransactionId,
                                                                                  TransactionItemId = subLedgerTxn.TransactionItemId
                                                                              }).ToList()
-                                                           }).OrderBy(a=> a.TransactionItemId).ToList()
+                                                           }).OrderBy(a => a.TransactionItemId).ToList()
                                    }).FirstOrDefault();
                     var res = new
                     {
@@ -4457,6 +4570,7 @@ namespace DanpheEMR.Controllers
                                     from dep in dept.DefaultIfEmpty()
                                     join subLedger in _accountingDbContext.SubLedger on ledM.SubLedgerId equals subLedger.SubLedgerId into sl
                                     from subLed in sl.DefaultIfEmpty()
+                                    where led != null ? led.HospitalId == currentHospitalId : true
                                     select new
                                     {
                                         LedgerId = led != null ? led.LedgerId : 0,
@@ -4479,7 +4593,7 @@ namespace DanpheEMR.Controllers
                                         LandlineNo = led != null ? led.LandlineNo : "",
                                         EmployeeName = empl.FullName,
                                         EmployeeId = empl.EmployeeId,
-                                        DepartmentName = dep != null ? dep.DepartmentName: "",
+                                        DepartmentName = dep != null ? dep.DepartmentName : "",
                                         IsSelected = false,
                                         IsMapped = ((led != null ? led.LedgerId : -1) > 0) ? true : false,
                                         SubLedgerId = subLed != null ? subLed.SubLedgerId : 0,
@@ -4508,6 +4622,7 @@ namespace DanpheEMR.Controllers
                                     from led in ld.DefaultIfEmpty()
                                     join subLedger in _accountingDbContext.SubLedger on ledM.SubLedgerId equals subLedger.SubLedgerId into sl
                                     from subLed in sl.DefaultIfEmpty()
+                                    where led != null ? led.HospitalId == currentHospitalId : true
                                     select new
                                     {
                                         LedgerId = led != null ? led.LedgerId : 0,
@@ -4526,7 +4641,7 @@ namespace DanpheEMR.Controllers
                                         Address = led != null ? led.Address : "",
                                         MobileNo = led != null ? led.MobileNo : "",
                                         CreditPeriod = led != null ? led.CreditPeriod : null,
-                                        TDSPercent = led != null ? led.TDSPercent: 0,
+                                        TDSPercent = led != null ? led.TDSPercent : 0,
                                         LandlineNo = led != null ? led.LandlineNo : "",
                                         SupplierName = phrmsup.SupplierName,
                                         SupplierId = phrmsup.SupplierId,
@@ -4549,7 +4664,7 @@ namespace DanpheEMR.Controllers
                                   LedgerMappingId = lm.LedgerMappingId,
                                   LedgerType = (lm.LedgerType == ENUM_ACC_LedgerType.InventoryVendor) ? lm.LedgerType : "",
                                   ReferenceId = (lm.LedgerType == ENUM_ACC_LedgerType.InventoryVendor) ? lm.ReferenceId : 0,
-                                   SubLedgerId = (lm.LedgerType == ENUM_ACC_LedgerType.InventoryVendor) ? lm.SubLedgerId : 0
+                                  SubLedgerId = (lm.LedgerType == ENUM_ACC_LedgerType.InventoryVendor) ? lm.SubLedgerId : 0
 
                               }).AsQueryable();
             var NewEmpledgerList = (from invVendor in _accountingDbContext.InvVendors
@@ -4559,16 +4674,17 @@ namespace DanpheEMR.Controllers
                                     from led in ld.DefaultIfEmpty()
                                     join subLedger in _accountingDbContext.SubLedger on ledM.SubLedgerId equals subLedger.SubLedgerId into sl
                                     from subLed in sl.DefaultIfEmpty()
+                                    where led != null ? led.HospitalId == currentHospitalId : true
                                     select new
                                     {
                                         LedgerId = led != null ? led.LedgerId : 0,
                                         LedgerGroupId = led != null ? led.LedgerGroupId : 0,
                                         LedgerName = led != null ? led.LedgerName : "",
                                         LedgerReferenceId = led != null ? led.LedgerReferenceId : null,
-                                        Description =led != null ? led.Description: "",
-                                        IsActive = led != null ? led.IsActive :false,
+                                        Description = led != null ? led.Description : "",
+                                        IsActive = led != null ? led.IsActive : false,
                                         IsCostCenterApplicable = led != null ? led.IsCostCenterApplicable : false,
-                                        OpeningBalance = led != null ? led.OpeningBalance: 0,
+                                        OpeningBalance = led != null ? led.OpeningBalance : 0,
                                         DrCr = led != null ? led.DrCr : false,
                                         Name = led != null ? led.Name : "",
                                         LedgerType = ledM != null ? ledM.LedgerType : "",
@@ -4590,7 +4706,7 @@ namespace DanpheEMR.Controllers
             return NewEmpledgerList;
         }
 
-        private object GetInventorySubCategoryLedgers(int currentHospitalId)
+        private object GetInventorySubStoreLedgers(int currentHospitalId)
         {
             var CostCenterNotApplicableCostCenterId = -1;
             var ledMapLsit = (from lm in _accountingDbContext.LedgerMappings
@@ -4605,14 +4721,15 @@ namespace DanpheEMR.Controllers
                                   CostCenterId = lm.CostCenterId
 
                               }).AsQueryable();
-            var NewEmpledgerList = (from invSubstore in _accountingDbContext.PHRMStore 
+            var NewEmpledgerList = (from invSubstore in _accountingDbContext.PHRMStore
                                     join ledMp in ledMapLsit on invSubstore.StoreId equals ledMp.ReferenceId into lm
                                     from ledM in lm.DefaultIfEmpty()
                                     join ledger in _accountingDbContext.Ledgers on ledM.LedgerId equals ledger.LedgerId into ld
                                     from led in ld.DefaultIfEmpty()
                                     join subLedger in _accountingDbContext.SubLedger on ledM.SubLedgerId equals subLedger.SubLedgerId into sl
                                     from subLed in sl.DefaultIfEmpty()
-                                    where invSubstore.Category == "substore"
+                                    where ((((invSubstore.Category != "store" && invSubstore.SubCategory != "pharmacy") || (invSubstore.Category != "store" && invSubstore.SubCategory != "inventory")) && led != null ? led.HospitalId == currentHospitalId : true
+))
                                     select new
                                     {
                                         LedgerId = led != null ? led.LedgerId : 0,
@@ -4644,6 +4761,61 @@ namespace DanpheEMR.Controllers
             return NewEmpledgerList;
         }
 
+
+        private object GetInventorySubCategoryLedgers(int currentHospitalId)
+        {
+            var CostCenterNotApplicableCostCenterId = -1;
+            var ledMapLsit = (from lm in _accountingDbContext.LedgerMappings
+                              where lm.HospitalId == currentHospitalId
+                              select new
+                              {
+                                  LedgerId = (lm.LedgerType == ENUM_ACC_LedgerType.InventorySubCategory) ? lm.LedgerId : 0,
+                                  LedgerMappingId = lm.LedgerMappingId,
+                                  LedgerType = (lm.LedgerType == ENUM_ACC_LedgerType.InventorySubCategory) ? lm.LedgerType : "",
+                                  ReferenceId = (lm.LedgerType == ENUM_ACC_LedgerType.InventorySubCategory) ? lm.ReferenceId : 0,
+                                  SubLedgerId = (lm.LedgerType == ENUM_ACC_LedgerType.InventorySubCategory) ? lm.SubLedgerId : 0,
+                                  CostCenterId = lm.CostCenterId
+
+                              }).AsQueryable();
+            var NewEmpledgerList = (from invSubCategory in _accountingDbContext.ItemSubCategoryMaster
+                                    join ledMp in ledMapLsit on invSubCategory.SubCategoryId equals ledMp.ReferenceId into lm
+                                    from ledM in lm.DefaultIfEmpty()
+                                    join ledger in _accountingDbContext.Ledgers on ledM.LedgerId equals ledger.LedgerId into ld
+                                    from led in ld.DefaultIfEmpty()
+                                    join subLedger in _accountingDbContext.SubLedger on ledM.SubLedgerId equals subLedger.SubLedgerId into sl
+                                    from subLed in sl.DefaultIfEmpty()
+                                    where led != null ? led.HospitalId == currentHospitalId : true
+                                    select new
+                                    {
+                                        LedgerId = led != null ? led.LedgerId : 0,
+                                        LedgerGroupId = led != null ? led.LedgerGroupId : 0,
+                                        LedgerName = led != null ? led.LedgerName : "",
+                                        LedgerReferenceId = led != null ? led.LedgerReferenceId : null,
+                                        Description = led != null ? led.Description : "",
+                                        IsActive = led != null ? led.IsActive : false,
+                                        IsCostCenterApplicable = led != null ? led.IsCostCenterApplicable : false,
+                                        OpeningBalance = led != null ? led.OpeningBalance : 0,
+                                        DrCr = led != null ? led.DrCr : false,
+                                        Name = led != null ? led.Name : "",
+                                        LedgerType = ledM != null ? ledM.LedgerType : "",
+                                        Code = led != null ? led.Code : "",
+                                        PANNo = led != null ? led.PANNo : "",
+                                        Address = led != null ? led.Address : "",
+                                        MobileNo = led != null ? led.MobileNo : "",
+                                        CreditPeriod = led != null ? led.CreditPeriod : null,
+                                        TDSPercent = led != null ? led.TDSPercent : 0,
+                                        LandlineNo = led != null ? led.LandlineNo : "",
+                                        StoreName = invSubCategory.SubCategoryName,
+                                        StoreId = invSubCategory.SubCategoryId,
+                                        IsSelected = false,
+                                        IsMapped = ((led != null ? led.LedgerId : -1) > 0) ? true : false,
+                                        CostCenterId = ledM != null ? ledM.CostCenterId : CostCenterNotApplicableCostCenterId,
+                                        SubLedgerId = subLed != null ? subLed.SubLedgerId : 0,
+                                        SubLedgerName = subLed != null ? subLed.SubLedgerName : ""
+                                    }).OrderByDescending(l => l.LedgerId).ToList();
+            return NewEmpledgerList;
+        }
+
         private object GetCreditOrganizationLedgers(int currentHospitalId)
         {
             var ledMapLsit = (from lm in _accountingDbContext.LedgerMappings
@@ -4664,11 +4836,12 @@ namespace DanpheEMR.Controllers
                                     from led in ld.DefaultIfEmpty()
                                     join subLedger in _accountingDbContext.SubLedger on ledM.SubLedgerId equals subLedger.SubLedgerId into sl
                                     from subLed in sl.DefaultIfEmpty()
+                                    where led != null ? led.HospitalId == currentHospitalId : true
                                     select new
                                     {
                                         LedgerId = led != null ? led.LedgerId : 0,
                                         LedgerGroupId = led != null ? led.LedgerGroupId : 0,
-                                        LedgerName = led != null ? led.LedgerName:"",
+                                        LedgerName = led != null ? led.LedgerName : "",
                                         LedgerReferenceId = led != null ? led.LedgerReferenceId : null,
                                         Description = led != null ? led.Description : "",
                                         IsActive = led != null ? led.IsActive : false,
@@ -4694,7 +4867,7 @@ namespace DanpheEMR.Controllers
             return NewEmpledgerList;
         }
 
-       
+
 
         private object GetBillingDataForPostToAccounting(RbacUser currentUser, int currentHospitalId, DateTime SelectedDate, int FiscalYearId)
         {
@@ -4811,7 +4984,7 @@ namespace DanpheEMR.Controllers
                                             ,
                                            TransactionItems = (from txnItem in _accountingDbContext.TransactionItems
                                                                join costCenter in _accountingDbContext.CostCenters on txnItem.CostCenterId equals costCenter.CostCenterId
-                                                               where txnItem.TransactionId == txn.TransactionId
+                                                               where txnItem.TransactionId == txn.TransactionId && txnItem.HospitalId == currentHospitalId
                                                                select new
                                                                {
                                                                    CreatedOn = txnItem.CreatedOn,
@@ -4823,7 +4996,7 @@ namespace DanpheEMR.Controllers
                                                                    HospitalId = txnItem.HospitalId,
                                                                    TransactionItemId = txnItem.TransactionItemId,
                                                                    CostCenterId = costCenter.CostCenterId,
-                                                                   SubLedgers = _accountingDbContext.SubLedgerRecord.Where(sub => sub.TransactionItemId == txnItem.TransactionItemId).ToList(),
+                                                                   SubLedgers = _accountingDbContext.SubLedgerRecord.Where(sub => sub.TransactionItemId == txnItem.TransactionItemId && sub.HospitalId == currentHospitalId).ToList(),
                                                                    CreatedBy = txnItem.CreatedBy,
                                                                    TransactionId = txnItem.TransactionId
                                                                }).ToList()
@@ -4844,13 +5017,13 @@ namespace DanpheEMR.Controllers
                 }
                 else
                 {
-                    throw new Exception("No maching Voucher Number for selected fiscal year");
+                    throw new Exception("No matching Voucher Number for selected fiscal year");
                 }
             }
 
             else
             {
-                throw new Exception("No maching Voucher Number");
+                throw new Exception("No matching Voucher Number");
             }
         }
 
@@ -5049,15 +5222,27 @@ namespace DanpheEMR.Controllers
 
         private object GetActiveTenants()
         {
-            var result = _accountingDbContext.Hospitals.Where(h => h.IsActive == true).ToList();
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            List<DanpheRoute> allRoutes = new List<DanpheRoute>();
+            List<RbacPermission> userAllPerms = RBAC.GetUserAllPermissions(currentUser.UserId);
+            var activeHospitals = _accountingDbContext.Hospitals.Where(hosp => hosp.IsActive == true).ToList();
+
+            // Perform the join in memory
+            var result = (from hosp in activeHospitals
+                          join perm in userAllPerms
+                          on hosp.PermissionId equals perm.PermissionId
+                          select hosp).Distinct().ToList();
+
             return result;
         }
 
-        private object GetFiscalYearLogs()
+        private object GetFiscalYearLogs(int currentHospitalId)
         {
             var result = (from fslog in _accountingDbContext.FiscalYearLog
                           join fs in _accountingDbContext.FiscalYears on fslog.FiscalYearId equals fs.FiscalYearId
+                          join map in _accountingDbContext.MapFiscalYears on fs.FiscalYearId equals map.FiscalYearId
                           join emp in _accountingDbContext.Emmployees on fslog.CreatedBy equals emp.EmployeeId
+                          where map.HospitalId == currentHospitalId
                           select new
                           {
                               fs.FiscalYearName,
@@ -5069,7 +5254,7 @@ namespace DanpheEMR.Controllers
             return result;
         }
 
-        private object GetEmployeeLedgers()
+        private object GetEmployeeLedgers(int HospId)
         {
             //NageshBB- 22Jul 2020-if this api called from other module , then we have hospital Id issue 
             //for this resolution we have temp solution
@@ -5077,8 +5262,8 @@ namespace DanpheEMR.Controllers
             //This is not correct solution , well solution is to show activate hospital popup when user get logged in into system.
             //so, this will help us to make software as multi tenant. if user have 2 or more hospital permission then this popup will come.
             //if user have only one hsopital permission then automatically activate this hospital
-            var HospId = AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
-
+            //var HospId = AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
+            HospId = (HospId > 0) ? HospId : AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
             List<SqlParameter> paramList = new List<SqlParameter>() { new SqlParameter("@HospitalId", HospId) };
             //sud: 20Jun'20-- new param is added in below sp.. hence changed..
             DataTable dt = DALFunctions.GetDataTableFromStoredProc(ENUM_StoredProcedures.EmployeeLedgerList, paramList, _accountingDbContext);
@@ -5096,75 +5281,90 @@ namespace DanpheEMR.Controllers
             return dt;
         }
 
-        private object GetBanckReconciliationCategories()
+        private object GetBanckReconciliationCategories(int currentHospitalId)
         {
-            var BankReconciliationCategory = _accountingDbContext.BankReconciliationCategory.Where(c => c.IsActive == true).ToList();
+            var BankReconciliationCategory = _accountingDbContext.BankReconciliationCategory.Where(c => c.IsActive == true && c.HospitalId == currentHospitalId).ToList();
             return BankReconciliationCategory;
         }
 
-        private object GetGoodReceiptList(int? sectionId, int? voucherId, DateTime transactiondate, string voucherNumber)
+        private object GetGoodReceiptList(int? SectionId, int? VendorId, DateTime? TransactionDate, string InvoiceNo, int GoodReceiptNo)
         {
-            if (sectionId == 1)
+            if (TransactionDate == DateTime.MinValue)
             {
-                var grInvList = (from gr in _accountingDbContext.GoodsReceiptModels
-                                 join v in _accountingDbContext.InvVendors on gr.VendorId equals v.VendorId
-                                 join pm in _accountingDbContext.AccountingPaymentModels on gr.GoodsReceiptID equals pm.GoodReceiptID into p
-                                 from pay in p.DefaultIfEmpty().OrderByDescending(a => a.PaymentId).Take(1)
-                                 where gr.VendorId == voucherId && gr.PaymentMode.ToLower().ToString() == ENUM_BillPaymentMode.credit && gr.IsCancel == false && gr.IsPaymentDoneFromAcc == false
-                                 select new
-                                 {
-                                     GRId = gr.GoodsReceiptID,
-                                     GRDate = gr.GoodsReceiptDate,
-                                     GRNo = gr.GoodsReceiptNo,
-                                     TotalAmount = gr.TotalAmount,
-                                     VendorId = gr.VendorId,
-                                     VendorName = v.VendorName,
-                                     PaidAmount = pay == null ? 0 : pay.PaidAmount,
-                                     RemainingAmount = pay == null ? gr.TotalAmount : pay.RemainingAmount,
-                                     DueAmount = pay == null ? gr.TotalAmount : gr.TotalAmount - pay.PaidAmount
-                                 }).ToList();
-                if (transactiondate != DateTime.MinValue)
-                {
-                    grInvList = grInvList.Where(a => a.GRDate.Value.Date == transactiondate.Date).ToList();
-
-                }
-                if (!string.IsNullOrEmpty(voucherNumber))
-                {
-                    grInvList = grInvList.Where(a => a.GRNo == short.Parse(voucherNumber)).ToList();
-                }
-                return grInvList;
+                TransactionDate = null;
             }
-            else
-            {
-                var grPhrmList = (from gr in _accountingDbContext.PHRMGoodsReceipt
-                                  join s in _accountingDbContext.PHRMSupplier on gr.SupplierId equals s.SupplierId
-                                  join pm in _accountingDbContext.AccountingPaymentModels on gr.GoodReceiptId equals pm.GoodReceiptID into p
-                                  from pay in p.DefaultIfEmpty().OrderByDescending(a => a.PaymentId).Take(1)
-                                  where gr.SupplierId == voucherId && gr.TransactionType.ToLower().ToString() == ENUM_BillPaymentMode.credit && gr.IsCancel == false && gr.IsPaymentDoneFromAcc == false
-                                  select new
-                                  {
-                                      GRId = gr.GoodReceiptId,
-                                      GRDate = gr.GoodReceiptDate,
-                                      InvoiceNo = gr.InvoiceNo,
-                                      TotalAmount = gr.TotalAmount,
-                                      SupplierId = gr.SupplierId,
-                                      SupplierName = s.SupplierName,
-                                      VatAmount = gr.VATAmount,
-                                      PaidAmount = pay == null ? 0 : pay.PaidAmount,
-                                      RemainingAmount = pay == null ? gr.TotalAmount : pay.RemainingAmount,
-                                      DueAmount = pay == null ? gr.TotalAmount : gr.TotalAmount - pay.PaidAmount
-                                  }).ToList();
-                if (transactiondate != DateTime.MinValue)
-                {
-                    grPhrmList = grPhrmList.Where(a => a.GRDate.Date == transactiondate.Date).ToList();
+            List<SqlParameter> paramList = new List<SqlParameter>() {
+                            new SqlParameter("@VendorId",VendorId),
+                            new SqlParameter("@GoodReceiptNo", GoodReceiptNo),
+                            new SqlParameter("@InvoiceNo", InvoiceNo),
+                            new SqlParameter("@TransactionDate", TransactionDate),
+                            new SqlParameter("@SectionId", SectionId)
+            };
+            DataTable dt = DALFunctions.GetDataTableFromStoredProc("SP_ACC_GetGoodReceiptForPayment", paramList, _accountingDbContext);
+            return dt;
+            //if (sectionId == 1)
+            //{
+            //    var grInvList = (from gr in _accountingDbContext.GoodsReceiptModels.Include(a => a.GoodsReceiptItem)
+            //                     join v in _accountingDbContext.InvVendors on gr.VendorId equals v.VendorId
+            //                     join pm in _accountingDbContext.AccountingPaymentModels on gr.GoodsReceiptID equals pm.GoodReceiptID into p
+            //                     from pay in p.DefaultIfEmpty().OrderByDescending(a => a.PaymentId).Take(1)
+            //                     where gr.VendorId == voucherId && gr.PaymentMode.ToLower().ToString() == ENUM_BillPaymentMode.credit && gr.IsCancel == false && gr.IsPaymentDoneFromAcc == false
+            //                     && gr.GoodsReceiptItem.Any(a => a.IsTransferredToACC == true)
+            //                     select new
+            //                     {
+            //                         GRId = gr.GoodsReceiptID,
+            //                         GRDate = gr.GoodsReceiptDate,
+            //                         GRNo = gr.GoodsReceiptNo,
+            //                         TotalAmount = gr.TotalAmount,
+            //                         VendorId = gr.VendorId,
+            //                         VendorName = v.VendorName,
+            //                         PaidAmount = pay == null ? 0 : pay.PaidAmount,
+            //                         RemainingAmount = pay == null ? gr.TotalAmount : pay.RemainingAmount,
+            //                         DueAmount = pay == null ? gr.TotalAmount : gr.TotalAmount - pay.PaidAmount
+            //                     }).ToList();
+            //    if (transactiondate != DateTime.MinValue)
+            //    {
+            //        grInvList = grInvList.Where(a => a.GRDate.Value.Date == transactiondate.Date).ToList();
 
-                }
-                if (!string.IsNullOrEmpty(voucherNumber))
-                {
-                    grPhrmList = grPhrmList.Where(a => a.InvoiceNo.Trim().ToLower() == voucherNumber.Trim().ToLower()).ToList();
-                }
-                return grPhrmList;
-            }
+            //    }
+            //    if (!string.IsNullOrEmpty(voucherNumber))
+            //    {
+            //        grInvList = grInvList.Where(a => a.GRNo == short.Parse(voucherNumber)).ToList();
+            //    }
+            //    return grInvList;
+            //}
+            //else
+            //{
+            //    var grPhrmList = (from gr in _accountingDbContext.PHRMGoodsReceipt
+            //                      join s in _accountingDbContext.PHRMSupplier on gr.SupplierId equals s.SupplierId
+            //                      join pm in _accountingDbContext.AccountingPaymentModels on gr.GoodReceiptId equals pm.GoodReceiptID into p
+            //                      from pay in p.DefaultIfEmpty().OrderByDescending(a => a.PaymentId).Take(1)
+            //                      where gr.SupplierId == voucherId && gr.TransactionType.ToLower().ToString() == ENUM_BillPaymentMode.credit && gr.IsCancel == false && gr.IsPaymentDoneFromAcc == false
+            //                      && gr.IsTransferredToACC == true
+            //                      select new
+            //                      {
+            //                          GRId = gr.GoodReceiptId,
+            //                          GRDate = gr.GoodReceiptDate,
+            //                          InvoiceNo = gr.InvoiceNo,
+            //                          TotalAmount = gr.TotalAmount,
+            //                          SupplierId = gr.SupplierId,
+            //                          SupplierName = s.SupplierName,
+            //                          VatAmount = gr.VATAmount,
+            //                          PaidAmount = pay == null ? 0 : pay.PaidAmount,
+            //                          RemainingAmount = pay == null ? gr.TotalAmount : pay.RemainingAmount,
+            //                          DueAmount = pay == null ? gr.TotalAmount : gr.TotalAmount - pay.PaidAmount
+            //                      }).ToList();
+            //    if (transactiondate != DateTime.MinValue)
+            //    {
+            //        grPhrmList = grPhrmList.Where(a => a.GRDate.Date == transactiondate.Date).ToList();
+
+            //    }
+            //    if (!string.IsNullOrEmpty(voucherNumber))
+            //    {
+            //        grPhrmList = grPhrmList.Where(a => a.InvoiceNo.Trim().ToLower() == voucherNumber.Trim().ToLower()).ToList();
+            //    }
+            //    return grPhrmList;
+            //}
         }
 
         private object PostTransactionList(string str, RbacUser currentUser, int currentHospitalId)
@@ -5183,17 +5383,22 @@ namespace DanpheEMR.Controllers
 
             FiscalYearModel fiscalYear = DanpheJSONConvert.DeserializeObject<FiscalYearModel>(str);
             var CurrentDate = DateTime.Now.Date;
-            var CurrentfiscalYear = _accountingDbContext.FiscalYears.Where(f => f.HospitalId == currentHospitalId && f.FiscalYearId == fiscalYear.FiscalYearId).FirstOrDefault();
+            var CurrentfiscalYear = (from fy in _accountingDbContext.FiscalYears
+                                     join map in _accountingDbContext.MapFiscalYears on fy.FiscalYearId equals map.FiscalYearId
+                                     where map.FiscalYearId == fiscalYear.FiscalYearId && map.HospitalId == currentHospitalId
+                                     select fy
+                                    ).FirstOrDefault();
+            //_accountingDbContext.FiscalYears.Where(f => f.FiscalYearId == fiscalYear.FiscalYearId && f.HospitalId == currentHospitalId).FirstOrDefault();
 
             // 1. Check next yeard fiscal year available or not.
             var nextFiscalYearId = AccountingTransferData.GetFiscalYearIdByDate(_accountingDbContext, CurrentfiscalYear.EndDate.AddDays(10), currentHospitalId);
 
             if (nextFiscalYearId > 0)
             {
-                var unvarifiedVoucherExists = _accountingDbContext.Transactions.Any(a => a.Status == Enums.ENUM_ACC_VoucherStatus.Draft || a.Status == Enums.ENUM_ACC_VoucherStatus.InReview);
-                if (unvarifiedVoucherExists)
+                var unverifiedVoucherExists = _accountingDbContext.Transactions.Any(a => (a.Status == Enums.ENUM_ACC_VoucherStatus.Draft || a.Status == Enums.ENUM_ACC_VoucherStatus.InReview) && a.HospitalId == currentHospitalId && a.FiscalyearId == CurrentfiscalYear.FiscalYearId);
+                if (unverifiedVoucherExists)
                 {
-                    throw new Exception("There are some unvarified vouchers, Please verify them before account closure.");
+                    throw new Exception("There are some unverified vouchers, Please verify them before account closure.");
                 }
                 else
                 {
@@ -5208,15 +5413,38 @@ namespace DanpheEMR.Controllers
                     tempModel.FiscalYearId = fiscalYear.FiscalYearId;
                     tempModel.HospitalId = currentHospitalId;
                     tempModel.LogType = "closed";
-                    tempModel.LogDetails = "closed for testing purpose";
+                    tempModel.LogDetails = "This fiscal year has been closed.";
                     tempModel.CreatedOn = CurrentDate;
                     tempModel.CreatedBy = currentUser.EmployeeId;
                     _accountingDbContext.FiscalYearLog.Add(tempModel);
                     _accountingDbContext.SaveChanges();
 
                     var Results = (from fy in _accountingDbContext.FiscalYears
-                                   where fy.IsActive == true
-                                   select fy).ToList();
+                                   join map in _accountingDbContext.MapFiscalYears
+                                   on fy.FiscalYearId equals map.FiscalYearId
+                                   where fy.IsActive == true && map.HospitalId == currentHospitalId
+                                   select new AccountingFiscalYear_DTO
+                                   {
+                                       FiscalYearId = fy.FiscalYearId,
+                                       FiscalYearName = fy.FiscalYearName,
+                                       NpFiscalYearName = fy.NpFiscalYearName,
+                                       StartDate = fy.StartDate,
+                                       EndDate = fy.EndDate,
+                                       Description = fy.Description,
+                                       CreatedOn = fy.CreatedOn,
+                                       CreatedBy = fy.CreatedBy,
+                                       IsActive = map.IsActive,
+                                       nStartDate = null,
+                                       nEndDate = null,
+                                       IsClosed = map.IsClosed,
+                                       ClosedBy = map.ClosedBy,
+                                       ClosedOn = map.ClosedOn,
+                                       ReadyToClose = map.ReadyToClose,
+                                       Remark = null,
+                                       showreopen = false,
+                                       HospitalId = map.HospitalId,
+                                       CurrentDate = CurrentDate
+                                   }).ToList();
                     return Results;
                 }
             }
@@ -5242,7 +5470,7 @@ namespace DanpheEMR.Controllers
                             led.LedgerName = led.LedgerName.Trim();
                             _accountingDbContext.Ledgers.Add(led);
                             _accountingDbContext.SaveChanges();
-                            AccountingTransferData.AddLedgerForClosedFiscalYears(_accountingDbContext, led);
+                            AccountingTransferData.AddLedgerForClosedFiscalYears(_accountingDbContext, led, currentHospitalId);
                             if (led.LedgerType != "" && led.LedgerType.Length > 0)
                             {
                                 LedgerMappingModel ledgerMapping = new LedgerMappingModel();
@@ -5275,7 +5503,7 @@ namespace DanpheEMR.Controllers
             }
         }
 
-        private object AddLedgersFromSharedComponents(string str, RbacUser currentUser)
+        private object AddLedgersFromSharedComponents(string str, RbacUser currentUser, int HospId)
         {
             using (var dbContextTransaction = _accountingDbContext.Database.BeginTransaction())
             {
@@ -5287,7 +5515,8 @@ namespace DanpheEMR.Controllers
                     //This is not correct solution , well solution is to show activate hospital popup when user get logged in into system.
                     //so, this will help us to make software as multi tenant. if user have 2 or more hospital permission then this popup will come.
                     //if user have only one hsopital permission then automatically activate this hospital
-                    var HospId = AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
+                    //var HospId = AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
+                    HospId = (HospId > 0) ? HospId : AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
 
                     LedgerModel ledger = DanpheJSONConvert.DeserializeObject<LedgerModel>(str);
                     LedgerMappingModel ledgerMapping = new LedgerMappingModel();
@@ -5305,7 +5534,7 @@ namespace DanpheEMR.Controllers
                         ledger.LedgerName = ledger.LedgerName.Trim();
                         _accountingDbContext.Ledgers.Add(ledger);
                         _accountingDbContext.SaveChanges();
-                        AccountingTransferData.AddLedgerForClosedFiscalYears(_accountingDbContext, ledger);
+                        AccountingTransferData.AddLedgerForClosedFiscalYears(_accountingDbContext, ledger, HospId);
                         if (ledger.LedgerType != ENUM_ACC_LedgerType.InventorySubCategory && ledger.LedgerType.Length > 0)
                         {
                             ledgerMapping.LedgerId = ledger.LedgerId;
@@ -5363,8 +5592,8 @@ namespace DanpheEMR.Controllers
                         txn.TransactionItems = _accountingDbContext.TransactionItems.Where(p => p.HospitalId == currentHospitalId && p.TransactionId == txn.TransactionId).Select(p => p).ToList();
                         txn.TransactionItems.ForEach(b =>
                         {
-                            b.TransactionItemDetails = _accountingDbContext.TransactionItemDetails.Where(c => c.TransactionItemId == b.TransactionItemId).Select(x => x).ToList();
-                            b.SubLedgers = _accountingDbContext.SubLedgerRecord.Where(d => d.TransactionItemId == b.TransactionItemId).ToList();
+                            b.TransactionItemDetails = _accountingDbContext.TransactionItemDetails.Where(c => c.TransactionItemId == b.TransactionItemId && b.HospitalId == currentHospitalId).Select(x => x).ToList();
+                            b.SubLedgers = _accountingDbContext.SubLedgerRecord.Where(d => d.TransactionItemId == b.TransactionItemId && b.HospitalId == currentHospitalId).ToList();
                             b.TransactionLinks = _accountingDbContext.TransactionLinks.Where(x => x.TransactionItemId == b.TransactionItemId).Select(x => x).ToList();
                         });
                         //txn.TransactionLinks = _accountingDbContext.TransactionLinks.Where(x => x.TransactionId == txn.TransactionId).Select(x => x).ToList();
@@ -5392,7 +5621,7 @@ namespace DanpheEMR.Controllers
                         var distinctTxnTypeList = new List<string>();
                         txnList.ForEach(txn =>
                         {
-                            var txnType = txn.TransactionItems.Select(item => item.TransactionType).Distinct().ToList();
+                            var txnType = txn.TransactionItems.Where(a => a.HospitalId == currentHospitalId).Select(item => item.TransactionType).Distinct().ToList();
                             distinctTxnTypeList.AddRange(txnType);
                         });
                         distinctTxnTypeList = distinctTxnTypeList.Distinct().ToList();
@@ -5402,7 +5631,7 @@ namespace DanpheEMR.Controllers
                             var filteredData = new List<TransactionItemModel>();
                             txnList.ForEach(txn =>
                             {
-                                var data = txn.TransactionItems.Where(item => item.TransactionType == distinctTxnTypeList[i]).ToList();
+                                var data = txn.TransactionItems.Where(item => item.HospitalId == currentHospitalId && item.TransactionType == distinctTxnTypeList[i]).ToList();
                                 filteredData.AddRange(data);
                             });
                             List<string> allReferenceIds = new List<string>();
@@ -5432,7 +5661,7 @@ namespace DanpheEMR.Controllers
                         var distinctTxnTypeList = new List<string>();
                         txnList.ForEach(txn =>
                         {
-                            var txnType = txn.TransactionItems.Select(item => item.TransactionType).Distinct().ToList();
+                            var txnType = txn.TransactionItems.Where(a => a.HospitalId == currentHospitalId).Select(item => item.TransactionType).Distinct().ToList();
                             distinctTxnTypeList.AddRange(txnType);
                         });
                         distinctTxnTypeList = distinctTxnTypeList.Distinct().ToList();
@@ -5442,7 +5671,7 @@ namespace DanpheEMR.Controllers
                             var filteredData = new List<TransactionItemModel>();
                             txnList.ForEach(txn =>
                             {
-                                var data = txn.TransactionItems.Where(item => item.TransactionType == distinctTxnTypeList[i]).ToList();
+                                var data = txn.TransactionItems.Where(item => item.HospitalId == currentHospitalId && item.TransactionType == distinctTxnTypeList[i]).ToList();
                                 filteredData.AddRange(data);
                             });
                             List<string> allReferenceIds = new List<string>();
@@ -5470,7 +5699,7 @@ namespace DanpheEMR.Controllers
                         var distinctTxnTypeList = new List<string>();
                         txnList.ForEach(txn =>
                         {
-                            var txnType = txn.TransactionItems.Select(item => item.TransactionType).Distinct().ToList();
+                            var txnType = txn.TransactionItems.Where(a => a.HospitalId == currentHospitalId).Select(item => item.TransactionType).Distinct().ToList();
                             distinctTxnTypeList.AddRange(txnType);
                         });
                         distinctTxnTypeList = distinctTxnTypeList.Distinct().ToList();
@@ -5480,7 +5709,7 @@ namespace DanpheEMR.Controllers
                             var filteredData = new List<TransactionItemModel>();
                             txnList.ForEach(txn =>
                             {
-                                var data = txn.TransactionItems.Where(item => item.TransactionType == distinctTxnTypeList[i]).ToList();
+                                var data = txn.TransactionItems.Where(item => item.HospitalId == currentHospitalId && item.TransactionType == distinctTxnTypeList[i]).ToList();
                                 filteredData.AddRange(data);
                             });
                             List<string> allReferenceIds = new List<string>();
@@ -5508,7 +5737,7 @@ namespace DanpheEMR.Controllers
                         var distinctTxnTypeList = new List<string>();
                         txnList.ForEach(txn =>
                         {
-                            var txnType = txn.TransactionItems.Select(item => item.TransactionType).Distinct().ToList();
+                            var txnType = txn.TransactionItems.Where(a => a.HospitalId == currentHospitalId).Select(item => item.TransactionType).Distinct().ToList();
                             distinctTxnTypeList.AddRange(txnType);
                         });
                         distinctTxnTypeList = distinctTxnTypeList.Distinct().ToList();
@@ -5518,7 +5747,7 @@ namespace DanpheEMR.Controllers
                             var filteredData = new List<TransactionItemModel>();
                             txnList.ForEach(txn =>
                             {
-                                var data = txn.TransactionItems.Where(item => item.TransactionType == distinctTxnTypeList[i]).ToList();
+                                var data = txn.TransactionItems.Where(item => item.HospitalId == currentHospitalId && item.TransactionType == distinctTxnTypeList[i]).ToList();
                                 filteredData.AddRange(data);
                             });
                             List<string> allReferenceIds = new List<string>();
@@ -5574,7 +5803,7 @@ namespace DanpheEMR.Controllers
             }
         }
 
-        private object PostIncentivePaymentVoucher(RbacUser currentUser, string str, string transactionObject)
+        private object PostIncentivePaymentVoucher(RbacUser currentUser, string str, string transactionObject, int HospitalId)
         {
             PaymentInfoModel paymentInfoModel = DanpheJSONConvert.DeserializeObject<PaymentInfoModel>(str);
 
@@ -5591,21 +5820,25 @@ namespace DanpheEMR.Controllers
                         var EnableVoucherVerificationParam = _accountingDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "EnableVoucherVerification").FirstOrDefault();
                         var IdGroupBy = (isGroupbyData != "") ? Convert.ToBoolean(isGroupbyData) : true;
                         txnClient.IsGroupTxn = (IdGroupBy) ? IdGroupBy : false;
+                        var isVoucherVerificationEnabled = Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue);
 
-                        var HospitalId = AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
+
+                        //var HospitalId = AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
+                        HospitalId = (HospitalId > 0) ? HospitalId : AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
+
                         txnClient.HospitalId = HospitalId;
                         txnClient.TransactionDate = System.DateTime.Now.Date;
                         txnClient.FiscalyearId = AccountingTransferData.GetFiscalYearIdByDate(_accountingDbContext, txnClient.TransactionDate, HospitalId);
-                        CostCenterModel costCenter = _accountingDbContext.CostCenters.Where(cc => cc.CostCenterName == ENUM_ACC_DefaultCostCenterName.Hospital).FirstOrDefault();
+                        CostCenterModel costCenter = _accountingDbContext.CostCenters.Where(cc => cc.CostCenterName == ENUM_ACC_DefaultCostCenterName.Hospital && cc.HospitalId == HospitalId).FirstOrDefault();
                         //txnClient.CostCenterId = costCenter != null ? costCenter.CostCenterId : 1;//There will be at-least one voucher head. -- remove this hardcode and take from parameter
                         txnClient.TransactionType = "IncentivePayment";
                         txnClient.IsCustomVoucher = false;
-                        txnClient.VoucherId = _accountingDbContext.Vouchers.Where(v => v.VoucherCode.ToLower() == "pmtv").FirstOrDefault().VoucherId;
+                        txnClient.VoucherId = _accountingDbContext.Vouchers.Where(v => v.VoucherCode.ToLower() == "pmtv" && v.HospitalId == HospitalId).FirstOrDefault().VoucherId;
                         txnClient.VoucherNumber = GetVoucherNumber(_accountingDbContext, txnClient.VoucherId, 5, HospitalId, txnClient.FiscalyearId);
                         txnClient.TUId = GetTUID(_accountingDbContext, HospitalId);
                         txnClient.SectionId = 5;//for manual entry we are using section 4
                         txnClient.IsReverseTxnAllow = false;
-                        if (EnableVoucherVerificationParam != null && Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue))
+                        if (EnableVoucherVerificationParam != null && isVoucherVerificationEnabled)
                         {
                             txnClient.Status = Enums.ENUM_ACC_VoucherStatus.Draft;
                         }
@@ -5619,13 +5852,13 @@ namespace DanpheEMR.Controllers
                         }
                         txnClient.TransactionItems.ForEach(item =>
                         {
-                            var defaultCostCenter = _accountingDbContext.CostCenters.Where(a => a.IsDefault == true).FirstOrDefault();
+                            var defaultCostCenter = _accountingDbContext.CostCenters.Where(a => a.IsDefault == true && a.HospitalId == HospitalId).FirstOrDefault();
                             if (defaultCostCenter != null)
                             {
                                 item.CostCenterId = defaultCostCenter.CostCenterId;
                             }
                         });
-                        _accountingDbContext.Transactions.Add(ProcessTransactions(txnClient, txnClient.HospitalId));
+                        _accountingDbContext.Transactions.Add(ProcessTransactions(txnClient, txnClient.HospitalId, isVoucherVerificationEnabled));
                         _accountingDbContext.SaveChanges();
 
                         //var referenceIds = txnClient.TransactionLinks.Select(s => s.ReferenceId).ToArray();
@@ -5658,7 +5891,7 @@ namespace DanpheEMR.Controllers
             return resFinal;
         }
 
-        private object PostAccountingPayment(MakePayment_DTO makePayment_dto, RbacUser currentUser)
+        private object PostAccountingPayment(MakePayment_DTO makePayment_dto, RbacUser currentUser, int HospitalId)
         {
             AccountingPaymentModel payment = makePayment_dto.Payment;
             TransactionModel txnClient = makePayment_dto.Transaction;
@@ -5675,21 +5908,24 @@ namespace DanpheEMR.Controllers
                         var parmValue = DanpheJSONConvert.DeserializeObject<SubLedgerAndCostCenterConfig_DTO>(subLedgerParam);
                         var IdGroupBy = (isGroupbyData != "") ? Convert.ToBoolean(isGroupbyData) : true;
                         txnClient.IsGroupTxn = (IdGroupBy) ? IdGroupBy : false;
+                        var isVoucherVerificationEnabled = Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue);
+                        //var HospitalId = AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
+                        HospitalId = (HospitalId > 0) ? HospitalId : AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
 
-                        var HospitalId = AccountingTransferData.GetAccPrimaryHospitalId(_accountingDbContext);
                         txnClient.HospitalId = HospitalId;
                         txnClient.TransactionDate = System.DateTime.Now.Date;
                         txnClient.FiscalyearId = AccountingTransferData.GetFiscalYearIdByDate(_accountingDbContext, txnClient.TransactionDate, HospitalId);
-                        CostCenterModel costCenter = _accountingDbContext.CostCenters.Where(cc => cc.CostCenterName == ENUM_ACC_DefaultCostCenterName.Hospital).FirstOrDefault();
+                        CostCenterModel costCenter = _accountingDbContext.CostCenters.Where(cc => cc.CostCenterName == ENUM_ACC_DefaultCostCenterName.Hospital && cc.HospitalId == HospitalId).FirstOrDefault();
                         //txnClient.CostCenterId = costCenter != null ? costCenter.CostCenterId : 1;//There will be at-least one voucher head. -- remove this hardcode and take from parameter
                         txnClient.TransactionType = payment.SectionId == 1 ? "InventoryPayment" : "PharmacyPayment";
                         txnClient.IsCustomVoucher = false;
-                        txnClient.VoucherId = _accountingDbContext.Vouchers.Where(v => v.VoucherCode.ToLower() == "pmtv").FirstOrDefault().VoucherId;
+                        int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+                        txnClient.VoucherId = _accountingDbContext.Vouchers.Where(v => v.VoucherCode.ToLower() == "pmtv" && v.HospitalId == currentHospitalId).FirstOrDefault().VoucherId;
                         txnClient.VoucherNumber = GetVoucherNumber(_accountingDbContext, txnClient.VoucherId, payment.SectionId, HospitalId, txnClient.FiscalyearId);
                         txnClient.TUId = GetTUID(_accountingDbContext, HospitalId);
                         txnClient.SectionId = payment.SectionId;
                         txnClient.IsReverseTxnAllow = false;
-                        if (EnableVoucherVerificationParam != null && Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue))
+                        if (EnableVoucherVerificationParam != null && isVoucherVerificationEnabled)
                         {
                             txnClient.Status = Enums.ENUM_ACC_VoucherStatus.Draft;
                         }
@@ -5703,14 +5939,14 @@ namespace DanpheEMR.Controllers
                         }
                         txnClient.TransactionItems.ForEach(item =>
                         {
-                            var defaultCostCenter = _accountingDbContext.CostCenters.Where(a => a.IsDefault == true).FirstOrDefault();
+                            var defaultCostCenter = _accountingDbContext.CostCenters.Where(a => a.IsDefault == true && a.HospitalId == HospitalId).FirstOrDefault();
                             if (defaultCostCenter != null)
                             {
                                 item.CostCenterId = defaultCostCenter.CostCenterId;
                             }
                         });
 
-                        var transaction = ProcessTransactions(txnClient, txnClient.HospitalId);
+                        var transaction = ProcessTransactions(txnClient, txnClient.HospitalId, isVoucherVerificationEnabled);
                         _accountingDbContext.Transactions.Add(transaction);
                         _accountingDbContext.SaveChanges();
 
@@ -5722,6 +5958,7 @@ namespace DanpheEMR.Controllers
                         payment.VoucherNumber = txnClient.VoucherNumber;
                         payment.TransactionId = txnClient.TransactionId;
                         payment.PaymentDate = System.DateTime.Now;
+                        payment.HospitalId = HospitalId;
                         _accountingDbContext.AccountingPaymentModels.Add(payment);
                         _accountingDbContext.SaveChanges();
                         payInfoId = payment.PaymentId;
@@ -5784,12 +6021,34 @@ namespace DanpheEMR.Controllers
             {
                 try
                 {
+                    //int currentHospitalId = HttpContext.Session.Get<int>("AccSelectedHospitalId");
                     if (txnFromClient != null && txnFromClient.TransactionItems != null && txnFromClient.TransactionItems.Count > 0)
                     {
                         var txnId = txnFromClient.TransactionId;
                         var ToUpdate = (from txnData in _accountingDbContext.Transactions
-                                        where txnData.TransactionId == txnFromClient.TransactionId
+                                        where txnData.TransactionId == txnFromClient.TransactionId && txnData.HospitalId == currentHospitalId
                                         select txnData).FirstOrDefault();
+                        if (ToUpdate == null)
+                        {
+                            throw new Exception("Transaction not found.");
+                        }
+                        var EnableVoucherVerificationParam = _accountingDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "EnableVoucherVerification").FirstOrDefault();
+                        if(EnableVoucherVerificationParam != null)
+                        {
+                            var isVoucherVerificationEnabled = Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue);
+                            if (isVoucherVerificationEnabled && ToUpdate.IsVerified)
+                            {
+                                // Reset to Unverified
+                                ToUpdate.Status = Enums.ENUM_ACC_VoucherStatus.Draft;
+                                ToUpdate.VerificationRemarks = null;
+                                ToUpdate.VerifiedBy = null;
+                                ToUpdate.VerifiedOn = null;
+                                ToUpdate.IsVerified = false;
+
+                                // Log the change
+                                editvoucherLog.Reason += " - Reverted to Unverified due to update.";
+                            }
+                        }
                         //if any old item has been deleted, we need to compareitemidlist
                         List<int> txnItmIdList = _accountingDbContext.TransactionItems.Where(a => a.HospitalId == currentHospitalId && a.TransactionId == txnId).Select(a => a.TransactionItemId).ToList();
                         //accountingDBContext.Transactions.Attach(ToUpdate);
@@ -5836,12 +6095,14 @@ namespace DanpheEMR.Controllers
                                         subLed.DrAmount = item.DrCr ? item.Amount : 0;
                                         subLed.CrAmount = item.DrCr ? 0 : item.Amount;
                                         subLed.HospitalId = currentHospitalId;
+                                        subLed.VoucherDate = txnFromClient.TransactionDate;
                                         _accountingDbContext.SubLedgerRecord.Attach(subLed);
                                         _accountingDbContext.Entry(subLed).Property(a => a.DrAmount).IsModified = true;
                                         _accountingDbContext.Entry(subLed).Property(a => a.CrAmount).IsModified = true;
                                         _accountingDbContext.Entry(subLed).Property(a => a.SubLedgerId).IsModified = true;
                                         _accountingDbContext.Entry(subLed).Property(a => a.LedgerId).IsModified = true;
                                         _accountingDbContext.Entry(subLed).Property(a => a.CostCenterId).IsModified = true;
+                                        _accountingDbContext.Entry(subLed).Property(a => a.VoucherDate).IsModified = true;
                                     });
                                 }
                                 _accountingDbContext.SaveChanges();
@@ -5881,7 +6142,7 @@ namespace DanpheEMR.Controllers
                         {
                             foreach (int reqitmid in txnItmIdList)
                             {
-                                var _subledgerList = _accountingDbContext.SubLedgerRecord.Where(a => a.TransactionItemId == reqitmid).Select(a => a.SubLedgerTransactionId).ToList();
+                                var _subledgerList = _accountingDbContext.SubLedgerRecord.Where(a => a.TransactionItemId == reqitmid && a.HospitalId == currentHospitalId).Select(a => a.SubLedgerTransactionId).ToList();
                                 _subledgerList.ForEach(subLed =>
                                 {
                                     var _subLedger = _accountingDbContext.SubLedgerRecord.Find(subLed);
@@ -5930,7 +6191,7 @@ namespace DanpheEMR.Controllers
 
             sectionId = (sectionId > 0) ? sectionId : 4; //here we are checking if sectionid send then we will take or default manual voucher section id 4 assigned           
             var voucherCode = (from v in accountingDBContext.Vouchers
-                               where v.VoucherId == voucherId
+                               where v.VoucherId == voucherId && v.HospitalId == currHospitalId
                                select v.VoucherCode).FirstOrDefault();
             int? maxVNo = (from txn in accountingDBContext.Transactions
                            where txn.HospitalId == currHospitalId && txn.FiscalyearId == fYearId &&
@@ -5940,8 +6201,10 @@ namespace DanpheEMR.Controllers
                                where sec.SectionId == sectionId && sec.HospitalId == currHospitalId
                                select sec.SectionCode).FirstOrDefault();
 
+            var hospitalCode = _accountingDbContext.Hospitals.Where(h => h.HospitalId == currHospitalId).Select(h => h.HospitalShortName).FirstOrDefault();
+
             var newVoucherNo = (maxVNo > 0) ? maxVNo + 1 : 1;
-            var voucherNumberFinal = (SectionCode.Length > 0) ? SectionCode + '-' + voucherCode + '-' + newVoucherNo.ToString() : voucherCode + '-' + newVoucherNo.ToString();
+            var voucherNumberFinal = string.IsNullOrEmpty(SectionCode) ? $"{hospitalCode}-{voucherCode}-{newVoucherNo.ToString()}" : $"{hospitalCode}-{SectionCode}-{voucherCode}-{newVoucherNo.ToString()}";
             return voucherNumberFinal;
         }
 
@@ -5971,9 +6234,11 @@ namespace DanpheEMR.Controllers
         #endregion
 
         #region Process Transaction
-        private TransactionModel ProcessTransactions(TransactionModel transaction, int currHospitalId)
+        private TransactionModel ProcessTransactions(TransactionModel transaction, int currHospitalId, bool isVoucherVerificationEnabled)
         {
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            var subLedgerParam = _accountingDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "SubLedgerAndCostCenter").FirstOrDefault().ParameterValue;
+            var parmValue = DanpheJSONConvert.DeserializeObject<SubLedgerAndCostCenterConfig_DTO>(subLedgerParam);
             transaction.CreatedBy = currentUser.EmployeeId;
             transaction.CreatedOn = DateTime.Now;
             transaction.HospitalId = currHospitalId;
@@ -5982,7 +6247,7 @@ namespace DanpheEMR.Controllers
                 txnItem.HospitalId = currHospitalId;
                 txnItem.CreatedOn = DateTime.Now;
                 txnItem.CreatedBy = currentUser.EmployeeId;
-                if (txnItem.SubLedgers != null)
+                if (txnItem.SubLedgers != null && parmValue.EnableSubLedger)
                 {
                     txnItem.SubLedgers.ForEach(subLedgerItems =>
                     {
@@ -5996,7 +6261,18 @@ namespace DanpheEMR.Controllers
                         subLedgerItems.CrAmount = txnItem.DrCr ? 0 : txnItem.Amount;
                         subLedgerItems.FiscalYearId = transaction.FiscalyearId;
                         subLedgerItems.CostCenterId = txnItem.CostCenterId;
+                        subLedgerItems.IsVerified = transaction.IsVerified;
+                        subLedgerItems.IsActive = true;
+                        subLedgerItems.Description = txnItem.Description;
+                        //if (!isVoucherVerificationEnabled)
+                        //{
+                        //    subLedgerItems.IsVerified = true;
+                        //}
                     });
+                }
+                else
+                {
+                    txnItem.SubLedgers = null;
                 }
             });
             return transaction;
@@ -6009,7 +6285,8 @@ namespace DanpheEMR.Controllers
             {
                 try
                 {
-                    var transaction = _accountingDbContext.Transactions.Where(a => a.VoucherNumber == voucherData.VoucherNumber && a.FiscalyearId == voucherData.FiscalYearId).ToList();
+                    int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+                    var transaction = _accountingDbContext.Transactions.Where(a => a.VoucherNumber == voucherData.VoucherNumber && a.FiscalyearId == voucherData.FiscalYearId && a.HospitalId == currentHospitalId).ToList();
                     if (transaction != null)
                     {
                         transaction.ForEach(txn =>
@@ -6022,7 +6299,7 @@ namespace DanpheEMR.Controllers
                             _accountingDbContext.Entry(txn).State = EntityState.Modified;
                             _accountingDbContext.SaveChanges();
 
-                            var transactionItem = _accountingDbContext.TransactionItems.Where(a => a.TransactionId == txn.TransactionId).ToList();
+                            var transactionItem = _accountingDbContext.TransactionItems.Where(a => a.TransactionId == txn.TransactionId && a.HospitalId == currentHospitalId).ToList();
                             if (transactionItem != null)
                             {
                                 transactionItem.ForEach(item =>
@@ -6032,7 +6309,7 @@ namespace DanpheEMR.Controllers
                                     _accountingDbContext.Entry(item).State = EntityState.Modified;
                                     _accountingDbContext.SaveChanges();
 
-                                    var subLedgerTransactions = _accountingDbContext.SubLedgerRecord.Where(a => a.TransactionItemId == item.TransactionItemId).ToList();
+                                    var subLedgerTransactions = _accountingDbContext.SubLedgerRecord.Where(a => a.TransactionItemId == item.TransactionItemId && a.HospitalId == currentHospitalId).ToList();
                                     if (subLedgerTransactions != null)
                                     {
                                         subLedgerTransactions.ForEach(subLedgerTxn =>
@@ -6085,6 +6362,7 @@ namespace DanpheEMR.Controllers
                         var EnableVoucherVerificationParam = _accountingDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "EnableVoucherVerification").FirstOrDefault();
                         var IdGroupBy = (isGroupbyData != "") ? Convert.ToBoolean(isGroupbyData) : true;
                         txnClient.IsGroupTxn = (IdGroupBy) ? IdGroupBy : false;
+                        var isVoucherVerificationEnabled = Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue);
 
                         txnClient.TransactionDate = Convert.ToDateTime(txnClient.TransactionDate.ToString()).Date;
                         txnClient.IsCustomVoucher = false;
@@ -6098,7 +6376,7 @@ namespace DanpheEMR.Controllers
                         txnClient.HospitalId = hospitalId;
                         txnClient.IsAllowReverseVoucher = txnClient.IsAllowReverseVoucher ? txnClient.IsAllowReverseVoucher : true;
                         txnClient.IsVoucherReversed = txnClient.IsReverseVoucher == true ? true : false;
-                        if (EnableVoucherVerificationParam != null && Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue))
+                        if (EnableVoucherVerificationParam != null && isVoucherVerificationEnabled)
                         {
                             txnClient.Status = Enums.ENUM_ACC_VoucherStatus.Draft;
                         }
@@ -6110,7 +6388,7 @@ namespace DanpheEMR.Controllers
                             txnClient.VerifiedOn = DateTime.Now;
                             txnClient.VerificationRemarks = "Voucher Verification is disabled. Thus, auto verifying the voucher.";
                         }
-                        _accountingDbContext.Transactions.Add(ProcessTransactions(txnClient, hospitalId));
+                        _accountingDbContext.Transactions.Add(ProcessTransactions(txnClient, hospitalId, isVoucherVerificationEnabled));
                         _accountingDbContext.SaveChanges();
 
                         var mapReconciliation = new BankAndSuspenseAccountReconciliationMapModel();
@@ -6141,6 +6419,39 @@ namespace DanpheEMR.Controllers
                 }
             }
         }
+        private object GetSupplierListByHospitals(int currentHospitalId)
+        {
+            if (currentHospitalId == 0)
+            {
+                Log.Error("Hospital ID is null or invalid.");
+                throw new ArgumentNullException("The selected hospital ID is null or invalid.");
+            }
 
+            var supplierList = (from ledger in _accountingDbContext.Ledgers
+                                join ledgerGroup in _accountingDbContext.LedgerGroups on ledger.HospitalId equals ledgerGroup.HospitalId
+                                join hospital in _accountingDbContext.Hospitals on ledger.HospitalId equals hospital.HospitalId
+                                join section in _accountingDbContext.Section on ledger.SectionId equals section.SectionId
+                                where ledger.HospitalId == currentHospitalId
+                                      && (ledger.LedgerType == ENUM_ACC_LedgerType.PharmacySupplier || ledger.LedgerType == ENUM_ACC_LedgerType.InventoryVendor)
+                                      && ledgerGroup.Name == "LCL_SUNDRY_CREDITORS"
+                                select new
+                                {
+                                    LedgerId = ledger.LedgerId,
+                                    LedgerName = ledger.LedgerName,
+                                    HospitalName = hospital.HospitalLongName,
+                                    SectionName = section.SectionName
+                                }).ToList();
+
+            return supplierList;
+        }
+
+
+        [HttpGet]
+        [Route("CurrentFiscalYear")]
+        public IActionResult GetCurrentFiscalYear()
+        {
+            Func<object> func = () => _accountingDbContext.FiscalYears.Where(fy => fy.StartDate <= DateTime.Now && fy.EndDate >= DateTime.Now).FirstOrDefault();
+            return InvokeHttpGetFunction<object>(func);
+        }
     }
 }

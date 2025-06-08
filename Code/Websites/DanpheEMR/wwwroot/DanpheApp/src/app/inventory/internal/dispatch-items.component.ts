@@ -43,7 +43,6 @@ export class DispatchItemsComponent {
   //Get Requisition and Requisition Items for Dispatch
   Load(RequisitionId: number) {
     if (RequisitionId != null && RequisitionId != 0) {
-      this.CheckIfDispatchAllowed();
       this.StoreName = this.inventoryService.StoreName;//sud:3Mar'20-changed propertyname.
       this.RequestedOn = moment(this.inventoryService.RequestedOn).format('YYYY-MM-DD');
       this.InventoryBLService.GetRequisitionWithRItemsById(RequisitionId)
@@ -70,6 +69,9 @@ export class DispatchItemsComponent {
   LoadRequisitionDataForDispatch(res) {
     if (res.Status == "OK") {
       this.requisitionStockVM = res.Results;
+      if (this.requisitionStockVM && this.requisitionStockVM.requisition && (this.requisitionStockVM.requisition.IsVerificationEnabled || this.requisitionStockVM.requisition.VerifierIds)) {
+        this.CheckIfDispatchAllowed();
+      }
       this.requisitionStockVM.requisition.RequisitionItems = this.requisitionStockVM.requisition.RequisitionItems.filter(RI => RI.IsActive == true);
       for (var r = 0; r < this.requisitionStockVM.requisition.RequisitionItems.length; r++) {
         var currDispatchItem = new DispatchItems();
@@ -209,12 +211,37 @@ export class DispatchItemsComponent {
   }
 
   GoToNextInput(currRowNum: string) {
-    let nextRow = currRowNum + 1;
+    let nextRow = parseInt(currRowNum, 10) + 1;
     let idToSelect = 'dispatchQty' + nextRow;
-    if (document.getElementById(idToSelect)) {
-      let nextEl = <HTMLInputElement>document.getElementById(idToSelect);
-      nextEl.focus();
-      nextEl.select();
+    let nextEl = document.getElementById(idToSelect) as HTMLInputElement;
+
+    if (nextEl) {
+      while (nextEl) {
+        let barcodeId = 'barcode' + nextRow;
+        let barcodeEl = document.getElementById(barcodeId);
+
+        if (barcodeEl) {
+          nextRow++;
+          idToSelect = 'dispatchQty' + nextRow;
+          nextEl = document.getElementById(idToSelect) as HTMLInputElement
+          if (!nextEl) {
+            let remarksEl = document.getElementById('remarks') as HTMLTextAreaElement;
+            if (remarksEl) {
+              remarksEl.focus();
+            }
+            break;
+          }
+        } else {
+          nextEl.focus();
+          nextEl.select();
+          break;
+        }
+      }
+    } else {
+      let remarksEl = document.getElementById('remarks') as HTMLTextAreaElement;
+      if (remarksEl) {
+        remarksEl.focus();
+      }
     }
   }
   ToogleAllDispatchItems() {
@@ -254,4 +281,9 @@ export class DispatchItemsComponent {
     let parameter = this.inventoryFieldCustomizationService.GetInventoryFieldCustomization();
     this.showBarcode = parameter.showBarcode;
   }
+
+  Back() {
+    this.router.navigate(['/Inventory/InternalMain/Requisition/RequisitionList']);
+  }
+
 }

@@ -19,6 +19,9 @@ export class SchemeParameters {
   public ShowPolicyHolderDesignation: boolean = false;
   public PolicyHolderDesignationLabelName: string = null;
   public ShowDependents: boolean = false;
+  public ShowAvailableBalance: boolean = false;
+  public ShowNGHISLoadButton: boolean = false;
+  public ShowSSFCaseSelections: boolean = false;
   public static GetSchemeParamSettings(settingName: string) {
     let retValue: SchemeParameters = new SchemeParameters();
 
@@ -34,6 +37,7 @@ export class SchemeParameters {
       retValue.SelectEmployer = true;
       retValue.ShowOpIpBalance = true;
       retValue.ShowGeneralBalance = true;
+      retValue.ShowSSFCaseSelections = true;
 
     }
     else if (settingName === "ECHS") {
@@ -48,14 +52,23 @@ export class SchemeParameters {
       retValue.ShowMemberNo = true;
       retValue.EnterMemberNumber = true;
       retValue.MemberNoLabelName = "NSHI No.";
-      retValue.EnterClaimCode = true;
       retValue.ShowGeneralBalance = true;
+      retValue.ShowNGHISLoadButton = true;
+      retValue.MembershipLoadButtonDisplayName = "Load NGHIS Details";
+      retValue.ShowAvailableBalance = true;
     }
     else if (settingName === "Medicare") {
       retValue.SchemeParameterName = "Medicare";
       retValue.ShowMemberNo = true;
       retValue.MemberNoLabelName = "Member No.";
       retValue.ShowOpIpBalance = true;
+    }
+    else if (settingName === "Dialysis") {
+      retValue.SchemeParameterName = "Dialysis";
+      retValue.ShowMemberNo = true;
+      retValue.MemberNoLabelName = "Dialysis No.";
+      retValue.ShowOpIpBalance = false;
+      retValue.EnterMemberNumber = true;
     }
     else {
       //return default values

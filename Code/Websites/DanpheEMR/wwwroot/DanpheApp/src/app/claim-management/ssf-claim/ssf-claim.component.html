@@ -89,7 +89,8 @@
   <div class="col-md-10 col-md-offset-1">
     <div class="modelbox-div">
       <div class="modelbox-header">
-        <h4 class="margin-0-vr">Select Your Files To Upload</h4>
+        <h4 class="margin-0-vr">Process Claim of {{SelectedClaimObject.PatientInfo[0].ShortName}}({{SelectedClaimObject.PatientInfo[0].PatientCode}})
+        </h4>
       </div>
       <div class="modelbox-body">
         <div class="dropdown" style="display:inline-block;">
@@ -110,6 +111,45 @@
               <option *ngFor="let item of SchemeTypeSubProduct" value="{{ item.value }}"> {{ item.name }}</option>
             </select>
           </div>
+          <div *ngIf="SelectedSubProduct && SelectedSubProduct.name">
+            <label><strong>Scheme SubProduct Selected From registration is: {{SelectedSubProduct.name}}</strong> </label>
+          </div>
+
+          <!--START: Diagnosis Section-->
+          <div class="diagnosis-section">
+            <div class="row pd-5">
+              <div class="col-md-5">
+                <label>Select Diagnosis:</label>
+                <div class="autocomplete-item">
+                  <input danphe-auto-complete class="form-control"
+                         [(ngModel)]="SelectedDiagnosis" [source]="DiagnosisList"
+                         [list-formatter]="ICDCodeFormatter"
+                         placeholder="--Select Diagnosis--"
+                         display-property-name="ICDDescription" value-property-name=null
+                         onClick="this.select();" (valueChanged)="OnDiagnosisSelect()"
+                         max-num-list="100" id="Input_ICDCode"
+                         [grid-sort]="'ICDDescription'" match-formatted="true"
+                         [attr.disabled]="(IsClaimProcessed === true || isSubmitClicked === true) ? true : null"
+                         #Input_ICDCode />
+                </div>
+              </div>
+              <div class="col-md-5">
+                <table class="tbl table-bordered selected-diagnosis-tbl">
+                  <tr *ngFor="let icdCode of SelectedDiagnosisList; let i =index;">
+                    <td style="font-size: 14px;">({{icdCode.ICDCode}}){{icdCode.ICDDescription}} </td>
+                    <td style="width: 20px; text-align: center; cursor: pointer; font-size: 14px;">
+                      <i *ngIf="!IsClaimProcessed" class="fa fa-close close-icon"
+                         (click)="RemoveSelectedICDCode(i)">
+                      </i>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!--END: Diagnosis Section-->
+
           <div style="padding-top: 10px;">
             <h4><strong>Generate Below mentioned documents automatically:</strong></h4>
           </div>
@@ -221,8 +261,11 @@
             </select>
           </div>
         </div>
+        <div *ngIf="SelectedSubProduct && SelectedSubProduct.name">
+          <label><strong>Scheme SubProduct Selected From registration is: {{SelectedSubProduct.name}}</strong> </label>
+        </div>
         <div>
-          <table style="margin-top: 10px;" *ngIf="Invoices && Invoices.length > 0">
+          <table style="margin-top: 10px;" *ngIf="ClaimDetailsInvoices && ClaimDetailsInvoices.length > 0">
             <thead>
               <th>#</th>
               <th>InvoiceNo</th>
@@ -232,10 +275,10 @@
               <th>Action</th>
             </thead>
             <tbody style="margin-top: 5px !important;">
-              <tr *ngFor="let inv of Invoices; let i = index">
+              <tr *ngFor="let inv of ClaimDetailsInvoices; let i = index">
                 <td>{{i+1}}</td>
                 <td>{{ inv.InvoiceNoFormatted }}</td>
-                <td>{{ inv.InvoiceTotalAmount | number : "1.2-2" }}</td>
+                <td>{{ inv.InvoiceTotalAmountWithoutReturn | number : "1.2-2" }}</td>
                 <td>{{ inv.ModuleName }}</td>
                 <td>{{ inv.BookingStatus }}</td>
                 <td>
@@ -246,11 +289,11 @@
             </tbody>
           </table>
           <hr>
-          <div class="row">
+          <!-- <div class="row">
             <div class="col-md-4"></div>
             <div class="col-md-4"></div>
             <div class="col-md-4">
-              <table *ngIf="Invoices && Invoices.length > 0" style="color: #354ae7;">
+              <table *ngIf="ClaimDetailsInvoices && ClaimDetailsInvoices.length > 0" style="color: #354ae7;">
                 <tr>
                   <td>TotalInvoiceAmount:</td>
                   <td> <strong>{{ TotalInvoiceAmountForClaim | number : "1.2-2" }}</strong> </td>
@@ -278,7 +321,7 @@
                 </tr>
               </table>
             </div>
-          </div>
+          </div> -->
         </div>
       </div>
       <div class="modelbox-footer" style="text-align: right;">
@@ -352,7 +395,7 @@
 <div class="wrapper">
 
   <div class="row">
-    <div class="col-md-8 col-xs-12">
+    <div class="col-md-6 col-xs-12">
       <from-to-date-select (on-change)="OnFromToDateChange($event)" [date-settings-name]="'billing-reports'">
       </from-to-date-select>
     </div>
@@ -362,6 +405,11 @@
     <div class="col-md-2">
       <button id="reload" [disabled]="loading" (click)=" loading = true; GetSSFInvoiceDetail()"
               class="btn btn-primary"><i class="fa fa-refresh"></i> Load Data</button>
+    </div>
+
+    <div class="col-md-2">
+      <button id="id_btn_check_claim_booking_status" *ngIf="ShowCheckBookingStatusButton" (click)="OpenPopupToCheckClaimBookingStatus()"
+              class="btn btn-success">Check Booking Status</button>
     </div>
   </div>
   <div class="row" style="margin-top: 20px;">
@@ -377,7 +425,7 @@
       <option value="outpatient">Outpatient</option>
     </select>
   </div>
-  <div class="col-md-12" style="padding:0px;" id="print_ledger">
+  <div class="col-md-12" style="padding:0px;" id="id_claicode_wise_invoice_list">
     <div class="row">
     </div>
     <table class="table-bordered" style="width:100%;  margin-bottom: 20px;" border="1"
@@ -617,10 +665,10 @@
                       </p>
                     </td>
                     <td colspan="4" style="text-align: right;">
-                      <p class="c_paragraphs" style="margin-bottom: 0px;" *ngIf="SelectedClaimObject.PatientInfo[0].DepartmentName">Dept:
+                      <p class="c_paragraphs" style="margin-bottom: 0px;" *ngIf="BillingInvoiceInfo.DepartmentName">Dept:
                         <strong><span
                                 style="text-transform:uppercase;">
-                            {{SelectedClaimObject.PatientInfo[0].DepartmentName }}
+                            {{BillingInvoiceInfo.DepartmentName }}
                           </span></strong>
                       </p>
                     </td>
@@ -1117,3 +1165,74 @@
       <!-- END: Pharmacy Invoice -->
     </div>
   </div>
+
+  <!--START: Check Claim Booking Status-->
+  <div class="popup-static portlet box portlet-fullscreen" *ngIf="ShowCheckClaimBookingStatusPopup">
+    <div class="col-md-10 col-md-offset-1">
+      <div class="modelbox-div">
+        <div class="modelbox-header">
+          <h4 class="margin-0-vr">Check Claim Booking Status</h4>
+        </div>
+        <div class="modelbox-body">
+          <div class="row">
+            <div class="col-md-1">
+              <label>SSF Policy No: </label>
+            </div>
+            <div class="col-md-4">
+              <input class="form-control" type="text" name="ssf_policyNo" id="id_text_ssf_policyNo"
+                     [(ngModel)]="SSFPolicyNoToCheckClaimBookingStatus" placeholder="Enter SSF PolicyNo">
+            </div>
+            <div class="col-md-1">
+              <input type="button" id="id_btn_check_claim_booking_status" class="btn btn-success" value="Check" (click)="CheckClaimBookingStatus()"
+                     [disabled]="loading" />
+            </div>
+            <div class="col-md-6">
+              <strong *ngIf="loading">Working On it, Please have patience!</strong>
+            </div>
+          </div>
+          <div>
+            <table style="margin-top: 10px;" *ngIf="CheckClaimBookingStatusResponseList && CheckClaimBookingStatusResponseList.length > 0">
+              <thead>
+                <th>#</th>
+                <th>PolicyNo</th>
+                <th>ClientInvoiceNo</th>
+                <th>BookedAmount</th>
+                <th>BookedBy</th>
+                <th>ClientClaimCode</th>
+                <th>BookedDate</th>
+                <th>Scheme</th>
+                <th>SubProduct</th>
+              </thead>
+              <tbody style="margin-top: 5px !important;">
+                <tr *ngFor="let inv of CheckClaimBookingStatusResponseList; let i = index">
+                  <td>{{i+1}}</td>
+                  <td>{{ inv.chfid }}</td>
+                  <td>{{ inv.clientInvoiceNumber }}</td>
+                  <td>{{ inv.booked }}</td>
+                  <td>{{ inv.booked_by }}</td>
+                  <td>{{ inv.clientClaimId }}</td>
+                  <td>{{ inv.date }}</td>
+                  <td>{{ inv.scheme }}</td>
+                  <td>{{ inv.subProduct }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="8">
+                    <strong style="color: red;">NOTE: All the data is fetched from SSF Server.</strong>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="modelbox-footer" style="text-align: right;">
+          <!-- <button type="button" id="id_ssfClaim_btn_bookClaim" class="btn green btn-success" [disabled]="bookClaimClicked" (click)="BookClaim()">Book Claim</button> -->
+        </div>
+        <div class="close-modelbox lb-close-btn">
+          <button class="btn btn-danger" (click)="CloseCheckClaimBookingStatusPopup()">X</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!--END: Check Claim Booking Status-->

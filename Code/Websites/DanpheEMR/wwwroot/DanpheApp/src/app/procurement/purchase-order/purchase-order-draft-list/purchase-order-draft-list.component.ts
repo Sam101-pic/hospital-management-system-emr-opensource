@@ -13,7 +13,8 @@ import { PurchaseOrderDraft } from '../purchase-order-draft.model';
 @Component({
     selector: 'purchase-order-draft-list',
     templateUrl: './purchase-order-draft-list.html',
-    styles: []
+    styles: [],
+    host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class PurchaseOrderDraftListComponent implements OnInit {
     public purchaseorderDraft: PurchaseOrderDraft = new PurchaseOrderDraft();
@@ -186,5 +187,11 @@ export class PurchaseOrderDraftListComponent implements OnInit {
     ClosePurchaseOrderDraftViewPage() {
         this.showPurchaseOrderDraftViewPage = false;
         this.LoadPODraftListByStatus();
+    }
+
+    public hotkeys(event) {
+        if (event.keyCode == 27) {
+            this.ClosePurchaseOrderDraftListPage();
+        }
     }
 }

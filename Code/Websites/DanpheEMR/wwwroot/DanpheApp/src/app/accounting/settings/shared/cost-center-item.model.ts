@@ -1,11 +1,8 @@
 ﻿import {
-    NgForm,
-    FormGroup,
-    FormControl,
-    Validators,
     FormBuilder,
-    ReactiveFormsModule
-} from '@angular/forms'
+    FormGroup,
+    Validators
+} from '@angular/forms';
 
 export class CostCenterItemModel {
     public CostCenterItemId: number = 0;
@@ -14,8 +11,9 @@ export class CostCenterItemModel {
     public CreatedBy: number = 0;
     public CreatedOn: string = "";
     public IsActive: boolean = true;
-    
-    public CostCenterItemValidator:FormGroup= null;
+    public HospitalId: number = 0;
+
+    public CostCenterItemValidator: FormGroup = null;
 
     constructor() {
 
@@ -32,7 +30,7 @@ export class CostCenterItemModel {
             return this.CostCenterItemValidator.controls[fieldName].dirty;
     }
 
-    public IsValid():boolean{if(this.CostCenterItemValidator.valid){return true;}else{return false;}} public IsValidCheck(fieldName, validator): boolean {
+    public IsValid(): boolean { if (this.CostCenterItemValidator.valid) { return true; } else { return false; } } public IsValidCheck(fieldName, validator): boolean {
         if (fieldName == undefined) {
             return this.CostCenterItemValidator.valid;
 

@@ -94,6 +94,7 @@ namespace DanpheEMR.Controllers
                                            PercentageOfBedCharges = bill.PercentageOfBedCharges,
                                            UsePercentageOfBedCharges = bill.UsePercentageOfBedCharges,
                                            IsRepeatable = bill.IsRepeatable,
+                                           AllowAutoCancellation = bill.AllowAutoCancellation,
                                            IsActive = bill.IsActive
 
                                        }).OrderByDescending(b => b.AdtAutoBillingItemId).ToList();
@@ -123,7 +124,8 @@ namespace DanpheEMR.Controllers
                                            BedId = g.Key.i.BedId,
                                            BedNumber = g.Key.i.BedNumber,
                                            IsActive = g.Key.i.IsActive,
-                                           IsOccupied = g.Key.i.IsOccupied,
+                                           IsOccupied = (g.Key.i.IsOccupied == true || g.Key.i.IsReserved == true) ? true : false,
+                                           
                                            CreatedOn = g.Key.i.CreatedOn,
                                            CreatedBy = g.Key.i.CreatedBy,
                                            BedFeature = g.Select(a =>
@@ -159,7 +161,9 @@ namespace DanpheEMR.Controllers
                                            BedFeatureCode = bed.BedFeatureCode,
                                            BedFeatureName = bed.BedFeatureName,
                                            BedFeatureFullName = bed.BedFeatureFullName,
-                                           IsActive = bed.IsActive
+                                           IsActive = bed.IsActive,
+                                           GroupCode = bed.GroupCode,
+                                           IsPresentationGrouping = bed.IsPresentationGrouping
                                        }).OrderBy(e => e.BedFeatureName).ToList();
             return InvokeHttpGetFunction(func);
 
@@ -762,6 +766,7 @@ namespace DanpheEMR.Controllers
                     autobillingItems.UsePercentageOfBedCharges = adtAutoBillingItemdto.UsePercentageOfBedCharges;
                     autobillingItems.IsActive = true;
                     autobillingItems.IsRepeatable = adtAutoBillingItemdto.IsRepeatable;
+                    autobillingItems.AllowAutoCancellation = adtAutoBillingItemdto.AllowAutoCancellation;
                     _admissionDbContext.AdtAutoBillingItems.Add(autobillingItems);
                     _admissionDbContext.SaveChanges();
                     dbContextTransaction.Commit();
@@ -819,7 +824,8 @@ namespace DanpheEMR.Controllers
                     bedFeature.BedFeatureFullName = bedFeatureDTO.BedFeatureFullName;
                     bedFeature.BedPrice = bedFeatureDTO.BedPrice;
                     bedFeature.IsActive = bedFeatureDTO.IsActive;
-
+                    bedFeature.GroupCode = bedFeatureDTO.GroupCode.Trim();
+                    bedFeature.IsPresentationGrouping = bedFeatureDTO.IsPresentationGrouping;
                     _admissionDbContext.BedFeatures.Add(bedFeature);
                     _admissionDbContext.SaveChanges();
 
@@ -883,6 +889,8 @@ namespace DanpheEMR.Controllers
             _admissionDbContext.BedFeatures.Attach(bedFeature);
             bedFeature.BedFeatureFullName = bedFeatureDTO.BedFeatureFullName;
             bedFeature.IsActive = bedFeatureDTO.IsActive;
+            bedFeature.GroupCode = bedFeatureDTO.GroupCode.Trim();
+            bedFeature.IsPresentationGrouping = bedFeatureDTO.IsPresentationGrouping;
             bedFeature.ModifiedOn = System.DateTime.Now;
             bedFeature.ModifiedBy = currentUser.EmployeeId;
             _admissionDbContext.SaveChanges();
@@ -926,6 +934,7 @@ namespace DanpheEMR.Controllers
                     autoBilling.UsePercentageOfBedCharges = adtAutoBillingItemdto.UsePercentageOfBedCharges;
                     autoBilling.PercentageOfBedCharges = adtAutoBillingItemdto.PercentageOfBedCharges;
                     autoBilling.IsRepeatable = adtAutoBillingItemdto.IsRepeatable;
+                    autoBilling.AllowAutoCancellation = adtAutoBillingItemdto.AllowAutoCancellation;
                     autoBilling.IsActive = adtAutoBillingItemdto.IsActive;
                     autoBilling.ModifiedOn = System.DateTime.Now;
                     autoBilling.ModifiedBy = currentUser.EmployeeId;

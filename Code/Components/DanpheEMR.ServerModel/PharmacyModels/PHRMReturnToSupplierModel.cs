@@ -13,7 +13,7 @@ namespace DanpheEMR.ServerModel
         [Key]
         public int ReturnToSupplierId { get; set; }
         public string CreditNoteId { get; set; }
-        public int? CreditNotePrintId { get; set; }
+        public int CreditNotePrintId { get; set; }
         public int? SupplierId { get; set; }
         public int? GoodReceiptId { get; set; }
         public int? ReturnStatus { get; set; }
@@ -27,6 +27,7 @@ namespace DanpheEMR.ServerModel
         public string Remarks { get; set; }
         public bool? IsTransferredToACC { get; set; }
         public decimal CCAmount { get; set; }
-        public virtual List<PHRMReturnToSupplierItemsModel> returnToSupplierItems { get; set; }
-    }  
+        public virtual List<PHRMReturnToSupplierItemsModel> ReturnToSupplierItems { get; set; }
+        public int FiscalYearId { get; set; }
+    }
 }

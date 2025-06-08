@@ -45,6 +45,9 @@
     <Reference Include="EntityFramework.SqlServer, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
       <HintPath>..\..\Solutions\packages\EntityFramework.6.2.0\lib\net45\EntityFramework.SqlServer.dll</HintPath>
     </Reference>
+    <Reference Include="FluentValidation, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7de548da2fbae0f0, processorArchitecture=MSIL">
+      <HintPath>..\..\Solutions\packages\FluentValidation.9.5.4\lib\net461\FluentValidation.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\..\Solutions\packages\Newtonsoft.Json.11.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
@@ -60,6 +63,8 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AccountingModels\Config\MapFiscalYearModel.cs" />
+    <Compile Include="AccountingModels\DTOs\AccountingFiscalYear_DTO.cs" />
     <Compile Include="AccountingModels\DTOs\AccountingSync_DTO.cs" />
     <Compile Include="AccountingModels\DTOs\BankReconciliationAdditionalTransaction_DTO.cs" />
     <Compile Include="AccountingModels\DTOs\ConsultantLedger_DTO.cs" />
@@ -71,6 +76,7 @@
     <Compile Include="AccountingModels\DTOs\SubLedgerForMakePayment_DTO.cs" />
     <Compile Include="AccountingModels\DTOs\SubLedgerReportRequst_DTO.cs" />
     <Compile Include="AccountingModels\DTOs\SuspenseAccountTransaction_DTO.cs" />
+    <Compile Include="AccountingModels\DTOs\TransactionLinkRefDTO.cs" />
     <Compile Include="AccountingModels\Transactions\AccountingPaymentModel.cs" />
     <Compile Include="AccountingModels\Transactions\BankReconciliationModel.cs" />
     <Compile Include="AccountingModels\Config\BankReconciliationCategoryModel.cs" />
@@ -152,6 +158,8 @@
     <Compile Include="BillingModels\Config\BillingPackageServiceItemModel.cs" />
     <Compile Include="BillingModels\Config\BillingSubSchemeModel.cs" />
     <Compile Include="BillingModels\Config\CurrencyModel.cs" />
+    <Compile Include="BillingModels\Config\DynamicReportGroup.cs" />
+    <Compile Include="BillingModels\Config\InsuranceMasterItemsModel.cs" />
     <Compile Include="BillingModels\DepositHeadModel.cs" />
     <Compile Include="BillingModels\DischargeModel\DischargeStatement.cs" />
     <Compile Include="BillingModels\DischargeModel\PendingBill.cs" />
@@ -166,7 +174,9 @@
     <Compile Include="BillingModels\Config\BillServiceCategoryModel.cs" />
     <Compile Include="BillingModels\Config\BillServiceItemSchemeSettingModel.cs" />
     <Compile Include="BillingModels\POS\keyAttribute.cs" />
+    <Compile Include="BillingModels\POS\POSValidators\BillingTransactionValidator.cs" />
     <Compile Include="BillingModels\Reporting\DynamicReportNameModel.cs" />
+    <Compile Include="BillingModels\ViewModels\AdditionalBedReservation_DTO.cs" />
     <Compile Include="BillingModels\ViewModels\InvoicePrintVMs.cs" />
     <Compile Include="BillingModels\ViewModels\BillingTransactionItemVM.cs" />
     <Compile Include="BillingModels\POS\BillInvoiceReturnItemsModel.cs" />
@@ -189,14 +199,49 @@
     <Compile Include="BillingModels\Logs\IRDLogModel.cs" />
     <Compile Include="BillingModels\PatientInsurancePackageTransactionModel.cs" />
     <Compile Include="BillingModels\Config\PriceCategoryModel.cs" />
+    <Compile Include="ClaimManagementModels\InsuranceClaimAPIResponse.cs" />
     <Compile Include="ClinicalModels\Diet\DietTypeModel.cs" />
     <Compile Include="ClinicalModels\Diet\PatientDietDTO.cs" />
     <Compile Include="ClinicalModels\Diet\PatientDietModel.cs" />
     <Compile Include="ClinicalModels\BloodSugarMonitoring\BloodSugarModel.cs" />
     <Compile Include="ClinicalModels\ConsulationRequests\ConsultationRequestModel.cs" />
-    <Compile Include="ClinicalModels\DTOs\ConsultationRequestDTO.cs" />
-    <Compile Include="ClinicalModels\DTOs\ConsultationRequestForGetDTO.cs" />
     <Compile Include="ClinicalModels\ClinicalIntakeOutputParameterModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalPreDefinedTemplatesModel.cs" />
+    <Compile Include="ClinicalModel_New\DiagnosisModel.cs" />
+    <Compile Include="ClinicalModel_New\BabyBirthRecordModel.cs" />
+    <Compile Include="ClinicalModel_New\BirthConditionModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalAnswerOptionsModel.cs" />
+    <Compile Include="ClinicalModel_New\ChiefComplainsModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalAssessmentAndPlanModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalFieldOptionModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalFieldsQuestionaryOptionModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalHeadingFieldsQuestionaryModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalHeadingsModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalInformationsModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalMasterNotesMapping.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalMasterNotesModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalNoteModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalVitalsModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalVitalsTransactionModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalMedicationFrequencyStandardModel.cs" />
+    <Compile Include="ClinicalModel_New\DischargeInformationModel.cs" />
+    <Compile Include="ClinicalModel_New\MedicationIntakeModel.cs" />
+    <Compile Include="ClinicalModel_New\PatientComplaintsModel.cs" />
+    <Compile Include="ClinicalModel_New\PatientMedicationModel.cs" />
+    <Compile Include="ClinicalModel_New\SectionMappingModel.cs" />
+    <Compile Include="ClinicalModel_New\TreatmentCardexPlanModel.cs" />
+    <Compile Include="ClinicalModel_New\ViewModels\SmartPrintableFormVariablesViewModel.cs" />
+    <Compile Include="ClinicalModel_New\ViewModels\SmartPrintableFormVitalVariablesViewModel.cs" />
+    <Compile Include="CommonModels\PatientVisitConsultantsModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalHeadingFieldsSetupModel.cs" />
+    <Compile Include="ClinicalModel_New\ClnicalUserFieldMappingModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalOptionRecordsModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalQuestionAnswersModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalQuestionOptionModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalUserFieldsMapModel.cs" />
+    <Compile Include="ClinicalModel_New\PreDevelopedComponentListModel.cs" />
+    <Compile Include="ClinicalModel_New\QuestionaryModel.cs" />
+    <Compile Include="ClinicalModel_New\ClinicalTemplatesModel.cs" />
     <Compile Include="CommonModels\PrinterSettingsModel.cs" />
     <Compile Include="BillingModels\Reporting\ReportingItemBillingItemMapping.cs" />
     <Compile Include="BillingModels\Reporting\ReportingItemsModel.cs" />
@@ -252,6 +297,7 @@
     <Compile Include="CommonModels\EmpCashTransactionModel.cs" />
     <Compile Include="CommonModels\ImageUploadModel.cs" />
     <Compile Include="CommonModels\InvoiceHeaderModel.cs" />
+    <Compile Include="CommonModels\PrintTemplateSettingsNewModel.cs" />
     <Compile Include="CommonModels\RequisitionItem.cs" />
     <Compile Include="CSSD\CssdItemTransaction.cs" />
     <Compile Include="DICOMModels\DCMPatientStudyModel.cs" />
@@ -275,6 +321,7 @@
     <Compile Include="EmployeeModels\EmployeeRole.cs" />
     <Compile Include="EmployeeModels\EmployeeProfileVM.cs" />
     <Compile Include="ExtReferralModels\ExtReferralVMs.cs" />
+    <Compile Include="FewaPayLogModel\FewaPayTransactionLogModel.cs" />
     <Compile Include="FixedAssetModels\FixedAssetCategoryModel.cs" />
     <Compile Include="FixedAssetModels\FixedAssetConditionCheckListModel.cs" />
     <Compile Include="FixedAssetModels\FixedAssetContractModel.cs" />
@@ -287,6 +334,7 @@
     <Compile Include="FixedAssetModels\FixedAssetLocationsModel.cs" />
     <Compile Include="FixedAssetModels\FixedAssetServiceModel.cs" />
     <Compile Include="FixedAssetModels\FixedAssetStockModel.cs" />
+    <Compile Include="FonePayLog\FonePayTransactionLogModel.cs" />
     <Compile Include="FractionModels\Designation.cs" />
     <Compile Include="FractionModels\FractionCalculation.cs" />
     <Compile Include="FractionModels\FractionPercent.cs" />
@@ -307,6 +355,7 @@
     <Compile Include="IncentiveModels\ProfileModel.cs" />
     <Compile Include="InsuranceModels\InsuranceBalanceHistoryModel.cs" />
     <Compile Include="ClaimManagementModels\InsuranceClaim.cs" />
+    <Compile Include="InsuranceModels\INS_ClaimDocResponseDetails.cs" />
     <Compile Include="InsuranceModels\INS_NewClaimCodeDTO.cs" />
     <Compile Include="InventoryModels\CurrencyMasterModel.cs" />
     <Compile Include="InventoryModels\DispatchItemsModel.cs" />
@@ -315,12 +364,14 @@
     <Compile Include="InventoryModels\DonationItemsVM.cs" />
     <Compile Include="InventoryModels\DonationModel.cs" />
     <Compile Include="InventoryModels\DonationVM.cs" />
+    <Compile Include="InventoryModels\DTOs\InventoryConsumptionType_DTO.cs" />
     <Compile Include="InventoryModels\DTOs\PurchaseOderDraftDTO.cs" />
     <Compile Include="InventoryModels\DTOs\PurchaseOrderDraftItemDTO.cs" />
     <Compile Include="InventoryModels\GoodsReceiptItemsModel.cs" />
     <Compile Include="InventoryModels\GoodsReceiptModel.cs" />
     <Compile Include="InventoryModels\InventoryChargesMasterModel.cs" />
     <Compile Include="InventoryModels\InventoryCompanyModel.cs" />
+    <Compile Include="InventoryModels\InventoryConsumptionTypeMasterModel.cs" />
     <Compile Include="InventoryModels\InventoryFiscalYear.cs" />
     <Compile Include="InventoryModels\InventoryFiscalYearStock.cs" />
     <Compile Include="InventoryModels\InventoryReportModel\ApprovedMaterialStockRegisterModel.cs" />
@@ -399,6 +450,7 @@
     <Compile Include="LabModels\LabSelectionVM.cs" />
     <Compile Include="LabModels\LabSignatoriesViewModel.cs" />
     <Compile Include="LabModels\LabSMSModel.cs" />
+    <Compile Include="LabModels\LabStatusTransitionLogModel.cs" />
     <Compile Include="LabModels\LabTestCategoryModel.cs" />
     <Compile Include="LabModels\LabTestComponentResultModel.cs" />
     <Compile Include="LabModels\LabRequisitionModel.cs" />
@@ -416,11 +468,13 @@
     <Compile Include="LISModels\LISComponentMapModel.cs" />
     <Compile Include="LISModels\LISComponentMasterVM.cs" />
     <Compile Include="LookUpTypeEnum.cs" />
+    <Compile Include="MarketingReferralModel\PatientReferralCommissionModel.cs" />
     <Compile Include="MarketingReferralModel\ReferralComissionModel.cs" />
     <Compile Include="MarketingReferralModel\ReferralSchemeModel.cs" />
     <Compile Include="MarketingReferralModel\ReferringOrganizationModel.cs" />
     <Compile Include="MarketingReferralModel\ReferringPartyGroupModel.cs" />
     <Compile Include="MarketingReferralModel\ReferringPartyModel.cs" />
+    <Compile Include="MasterModels\AgeClassificationModel.cs" />
     <Compile Include="MasterModels\CfgParameterModel.cs" />
     <Compile Include="MasterModels\CfgPaymentModesSettings.cs" />
     <Compile Include="MasterModels\CookieAuthInfoModel.cs" />
@@ -434,6 +488,7 @@
     <Compile Include="MasterModels\ICDEmergencyGroup\ICDEmergencyDiseaseGroupModel.cs" />
     <Compile Include="MasterModels\ICDEmergencyGroup\ICDEmergencyReportingGroupModel.cs" />
     <Compile Include="MasterModels\LoginInformationModel.cs" />
+    <Compile Include="MasterModels\MasterFiscalYearModel.cs" />
     <Compile Include="MasterModels\Municipality.cs" />
     <Compile Include="MasterModels\PaymentModes.cs" />
     <Compile Include="MasterModels\PrintExportConfigModel.cs" />
@@ -463,13 +518,26 @@
     <Compile Include="MedicareModels\MedicareMembers.cs" />
     <Compile Include="MedicareModels\MedicareTypes.cs" />
     <Compile Include="NotificationModels\NotificationViewModel.cs" />
-    <Compile Include="OtModels\OtBookingListModel.cs" />
-    <Compile Include="OtModels\OtCheckListInfoModel.cs" />
-    <Compile Include="OtModels\OTSummaryModel.cs" />
-    <Compile Include="OtModels\OTTeamsModel.cs" />
+    <Compile Include="OTModels\CheckListInputTypeModel.cs" />
+    <Compile Include="OTModels\OTAnaesthesiaModel.cs" />
+    <Compile Include="OTModels\OTAnaesthesiaTypeModel.cs" />
+    <Compile Include="OTModels\OTBookingDetailsModel.cs" />
+    <Compile Include="OTModels\OTCheckListInfoModel.cs" />
+    <Compile Include="OTModels\OTCheckListModel.cs" />
+    <Compile Include="OTModels\OTImplantDetailModel.cs" />
+    <Compile Include="OTModels\OTMachineDetailModel.cs" />
+    <Compile Include="OTModels\OTMapSurgeryCheckListModel.cs" />
+    <Compile Include="OTModels\OTMSTCheckListModel.cs" />
+    <Compile Include="OTModels\OTICDModel.cs" />
+    <Compile Include="OTModels\OTMachineModel.cs" />
+    <Compile Include="OTModels\OTPersonnelTypeModel.cs" />
+    <Compile Include="OTModels\OTSummaryModel.cs" />
+    <Compile Include="OTModels\OTTeamInfoModel.cs" />
+    <Compile Include="OTModels\OTSurgeryModel.cs" />
     <Compile Include="PatientModels\HealthCardInfoModel.cs" />
     <Compile Include="PatientModels\InsuranceProviderModel.cs" />
     <Compile Include="PatientModels\NeighbourhoodCardModel.cs" />
+    <Compile Include="PatientModels\PatientReferralModel.cs" />
     <Compile Include="PatientModels\PatientSchemeMapModel.cs" />
     <Compile Include="PatientModels\PatientFilesModel.cs" />
     <Compile Include="PatientModels\PatientMembershipModel_Depricated.cs" />
@@ -528,6 +596,7 @@
     <Compile Include="PharmacyModels\PHRMInvoiceReturnItemsModel.cs" />
     <Compile Include="PharmacyModels\PHRMExpiryDateBatchNoHistoryModel.cs" />
     <Compile Include="PharmacyModels\PHRMInvoiceReturnModel.cs" />
+    <Compile Include="PharmacyModels\PHRMPackageItemModel.cs" />
     <Compile Include="PharmacyModels\PHRMPackingTypeModel.cs" />
     <Compile Include="PharmacyModels\PHRMMRPHistoryModel.cs" />
     <Compile Include="PharmacyModels\PHRMNarcoticRecord.cs" />
@@ -565,20 +634,28 @@
     <Compile Include="PharmacyModels\PHRMWriteOffModel.cs" />
     <Compile Include="PharmacyModels\PHRM_MAP_ItemToRack.cs" />
     <Compile Include="PharmacyModels\PHRM_MAP_MstItemsPriceCategory.cs" />
+    <Compile Include="PharmacyModels\PHRMPackageModel.cs" />
     <Compile Include="PharmacyModels\Provisional\PHRMTransactionProvisionalReturnItemsModel.cs" />
+    <Compile Include="PharmacyModels\Validators\PHRMGoodReceiptValidator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ClinicalModels\SocialHistoryModel.cs" />
     <Compile Include="ClinicalModels\SurgicalHistoryModel.cs" />
     <Compile Include="AppointmentModels\VisitModel.cs" />
     <Compile Include="ClinicalModels\VitalsModel.cs" />
+    <Compile Include="RadiologyModels\DTOs\AddTemplateStyleRequest.cs" />
+    <Compile Include="RadiologyModels\DTOs\UpdateTemplateStyleRequest.cs" />
+    <Compile Include="RadiologyModels\DTOs\ViewTemplateStyleResponse.cs" />
+    <Compile Include="RadiologyModels\FileUpload_DTO.cs" />
     <Compile Include="RadiologyModels\FilmTypeModel.cs" />
     <Compile Include="RadiologyModels\ImageAttachmentModel.cs" />
     <Compile Include="RadiologyModels\RadEmailModel.cs" />
+    <Compile Include="RadiologyModels\RadiologyValidators\TemplateStyleValidator.cs" />
     <Compile Include="RadiologyModels\ReportingDoctorModel.cs" />
     <Compile Include="RadiologyModels\ImagingViewModels.cs" />
     <Compile Include="RadiologyModels\ImagingReportModel.cs" />
     <Compile Include="RadiologyModels\ImagingRequisitionModel.cs" />
     <Compile Include="RadiologyModels\RadiologyReportTemplateModel.cs" />
+    <Compile Include="RadiologyModels\TemplateStyleModel.cs" />
     <Compile Include="ReportingModels\ADTInpatientCensusSummary.cs" />
     <Compile Include="ReportingModels\BillingReportVMs.cs" />
     <Compile Include="ReportingModels\HospitalMortalityReportModel.cs" />
@@ -589,12 +666,14 @@
     <Compile Include="ReportingModels\PatientBillHistory.cs" />
     <Compile Include="ReportingModels\DynamicReport.cs" />
     <Compile Include="ReportingModels\PharmacyReportVMs.cs" />
+    <Compile Include="SalutationModel\SalutationModel.cs" />
     <Compile Include="SchedulingModels\EmpDayWiseAvailability.cs" />
     <Compile Include="SchedulingModels\EmployeeShiftMap.cs" />
     <Compile Include="SchedulingModels\EmployeeShifts.cs" />
     <Compile Include="SchedulingModels\EmpSchedules.cs" />
     <Compile Include="SchedulingModels\SchedulingViewModels.cs" />
     <Compile Include="SchedulingModels\ShiftsMasterModel.cs" />
+    <Compile Include="Shared\ENUM_ValidatorActionNames.cs" />
     <Compile Include="SocialServiceUnit\SSU_InformationModel.cs" />
     <Compile Include="SSFModels\PAT_SSFClaimResponseDetails.cs" />
     <Compile Include="SSFModels\SSF.cs" />
@@ -605,7 +684,9 @@
     <Compile Include="SSFModels\SSFPatientDetail.cs" />
     <Compile Include="SSFModels\SSFPatientEligibility.cs" />
     <Compile Include="SSFModels\SSFResponse.cs" />
+    <Compile Include="StickerModels\DTOs\RegistrationSticker_DTO.cs" />
     <Compile Include="StickerModels\PatientStickerModel.cs" />
+    <Compile Include="StickerModels\RegistrationStickerModel.cs" />
     <Compile Include="SystemAdminModels\AuditTableDisplayName.cs" />
     <Compile Include="SystemAdminModels\AuditTrailModel.cs" />
     <Compile Include="SystemAdminModels\DatabaseLogModel.cs" />

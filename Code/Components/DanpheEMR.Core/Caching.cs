@@ -255,6 +255,11 @@ namespace DanpheEMR.Core.Caching
 
         }
 
+        public static void RemoveCache(string key)
+        {
+            DanpheCache.globalMemcache.Remove(key);
+        }
+
     }
 
 }

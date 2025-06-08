@@ -8,16 +8,16 @@
                 <div class="row">
                     <div class="col-md-12" style="text-align: right;">
                         <select class="form-control" style="display: inline-block;width: 65%;"
-                            [(ngModel)]="selectedMachineId" id="ddlMachineSelection"
-                            [disabled]="allMachines && allMachines.length == 1">
+                                [(ngModel)]="selectedMachineId" id="ddlMachineSelection"
+                                [disabled]="allMachines && allMachines.length == 1">
                             <option value="0" *ngIf="allMachines && (allMachines.length > 1)">Select Lab Machine
                             </option>
                             <option *ngFor="let machine of allMachines; let i=index;"
-                                [value]="allMachines[i].MachineId">
+                                    [value]="allMachines[i].MachineId">
                                 {{allMachines[i].MachineName}}-{{allMachines[i].ModelName}}
                             </option>
                         </select>
-                        <button class="btn blue" (click)="LoadMachineData()">Load</button>
+                        <button class="btn btn-success green" (click)="LoadMachineData()">Load</button>
                     </div>
                 </div>
             </div>
@@ -25,8 +25,8 @@
     </div>
 </div>
 <div class="row">
-    <div class="col-md-4" style="text-align: left;">
-        <button *ngIf="anySelected" class="btn green" (click)="SaveMachineDataToDanphe()">Save</button>
+    <div class="col-md-12" style="text-align: left;">
+        <button *ngIf="anySelected" style="float:right;" class="btn btn-success green" (click)="SaveMachineDataToDanphe()">Save Result</button>
     </div>
 </div>
 
@@ -39,7 +39,7 @@
                         <th>
                             <label class="mt-checkbox mt-checkbox-outline" for="selectAll">
                                 <input id="selectAll" class="dontShowInPrint outer-select" [(ngModel)]="selectedAll"
-                                    (change)="SelectComps(1)" type="checkbox" /><span></span><b></b>
+                                       (change)="SelectComps(1)" type="checkbox" /><span></span><b></b>
                             </label>
                         </th>
                         <th>S.N.</th>
@@ -62,8 +62,8 @@
                             <td>
                                 <label class="mt-checkbox mt-checkbox-outline" for="selectAll{{i}}{{j}}">
                                     <input id="selectAll{{i}}{{j}}" class="dontShowInPrint outer-select"
-                                        [disabled]="!innerRes.IsValueValid" [(ngModel)]="innerRes.IsSelected"
-                                        (change)="SelectComps(0)" type="checkbox" /><span></span><b></b>
+                                           [disabled]="!innerRes.IsValueValid" [(ngModel)]="innerRes.IsSelected"
+                                           (change)="SelectComps(0)" type="checkbox" /><span></span><b></b>
                                 </label>
                             </td>
                             <td>{{j==0 ? i+1 : ''}}</td>
@@ -73,7 +73,16 @@
                             <td>{{j==0 ? innerRes.RunNumber : ''}}</td>
                             <td>{{innerRes.LISComponentName}}</td>
                             <td>{{innerRes.Component.ComponentName}}</td>
-                            <td><input type="number" class="form-control" [(ngModel)]="innerRes.Value"></td>
+                            <td>
+                                <span *ngIf="innerRes.IsSelected==true">
+                                    <i *ngIf="!innerRes.IsGroupValid" class="fa fa-info-circle icn-group" style="color:red !important"
+                                       title="{{innerRes.ErrorMessage}}"></i>
+                                </span>
+                                <input type="text" id="MachineResult_{{i}}{{j}}"
+                                       (keydown.enter)="FocusOnInputField(res,innerRes,'MachineResult_',i,j)"
+                                       class="form-control" [(ngModel)]="innerRes.Value" style="float: right;width:85%;"
+                                       (ngModelChange)="ApplyGroupValidation(res.Data)">
+                            </td>
                             <td>{{innerRes.MachineUnit}}</td>
                             <td>{{innerRes.Component.Unit}}</td>
                             <td>{{innerRes.Component.RangeDescription}}</td>

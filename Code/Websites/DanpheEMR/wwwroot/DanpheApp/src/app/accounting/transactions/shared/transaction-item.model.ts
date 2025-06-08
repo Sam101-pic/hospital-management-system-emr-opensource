@@ -1,7 +1,10 @@
 ﻿import {
+    AbstractControl,
     FormBuilder,
     FormControl,
     FormGroup,
+    ValidationErrors,
+    ValidatorFn,
     Validators
 } from '@angular/forms';
 import * as moment from 'moment';
@@ -49,11 +52,11 @@ export class TransactionItem {
         this.CreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute)
         var _formBuilder = new FormBuilder();
         this.TransactionItemValidator = _formBuilder.group({
-            'LedgerId': [{}, Validators.compose([Validators.required])],
-            'DrCr': ['', Validators.compose([Validators.required])],
+            'LedgerId': ['', Validators.compose([Validators.required])],
+            'DrCr': ['', Validators.compose([Validators.required, this.NoWhitespaceValidator()])],
             'Amount': ['', Validators.compose([this.numberValidator])],
             'CostCenter': ['', Validators.compose([Validators.required])],
-            'SubLedgerId': [{}, Validators.compose([Validators.required])],
+            'SubLedgerId': ['', Validators.compose([Validators.required])],
         });
     }
     public numberValidator(control: FormControl): { [key: string]: boolean } {
@@ -65,6 +68,19 @@ export class TransactionItem {
             return { 'invalidNumber': true };
 
     }
+
+    public NoWhitespaceValidator(): ValidatorFn {
+        return (control: AbstractControl): ValidationErrors | null => {
+            const value = control.value;
+            if (typeof value === 'string') {
+                const isWhitespace = value.trim().length === 0;
+                const isValid = !isWhitespace;
+                return isValid ? null : { 'whitespace': true };
+            }
+            return null;
+        };
+    }
+
     public IsDirty(fieldName): boolean {
         if (fieldName == undefined)
             return this.TransactionItemValidator.dirty;
@@ -80,5 +96,17 @@ export class TransactionItem {
         }
         else
             return !(this.TransactionItemValidator.hasError(validator, fieldName));
+    }
+
+    public UpdateValidator(onOff: string, formControlName: string, validatorType: string) {
+        let validator = null;
+        if (validatorType == 'required' && onOff == "on") {
+            validator = Validators.compose([Validators.required]);
+        }
+        else {
+            validator = Validators.compose([]);
+        }
+        this.TransactionItemValidator.controls[formControlName].validator = validator;
+        this.TransactionItemValidator.controls[formControlName].updateValueAndValidity();
     }
 }

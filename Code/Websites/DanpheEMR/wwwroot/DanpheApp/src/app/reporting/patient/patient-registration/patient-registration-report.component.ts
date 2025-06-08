@@ -6,6 +6,7 @@ import { DanpheCache, MasterType } from "../../../shared/danphe-cache-service-ut
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_Genders } from '../../../shared/shared-enums';
 import { DynamicReport } from "../../shared/dynamic-report.model";
 import { ReportingService } from "../../shared/reporting-service";
 import { RPT_PAT_PatientRegistrationReportModel } from './patient-registration-report.model';
@@ -41,7 +42,7 @@ export class RPT_PAT_PatientRegistrationReportComponent {
     this.dlService = _dlService;
     // this.loadDoctorsList();
     this.GetCountry();
-    this, this.LoadGender('Male');
+    this.LoadGender('All');
     this.currentPatRegreport.fromDate = moment().format('YYYY-MM-DD');
     this.currentPatRegreport.toDate = moment().format('YYYY-MM-DD');
 
@@ -54,14 +55,14 @@ export class RPT_PAT_PatientRegistrationReportComponent {
   };
   LoadGender(status) {
 
-    if (status == "Male") {
-      this.Status = "Male";
+    if (status === "Male") {
+      this.Status = ENUM_Genders.Male;
     }
-    else if (status == "Female") {
-      this.Status = "Female";
+    else if (status === "Female") {
+      this.Status = ENUM_Genders.Female;
     }
-    else if (status == "All") {
-      this.Status = 'Male,Female';
+    else if (status === "All") {
+      this.Status = `${ENUM_Genders.Male},${ENUM_Genders.Female},${ENUM_Genders.Others}`;
     }
     else {
       this.Status = "All"

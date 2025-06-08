@@ -39,5 +39,6 @@ namespace DanpheEMR.Services.Pharmacy.DTOs.Provisional
         public decimal CoPaymentCashAmount { get; set; }
         public decimal CoPaymentCreditAmount { get; set; }
         public int StoreId { get; set; }
+        public decimal DispatchQty { get; set; }
     }
 }

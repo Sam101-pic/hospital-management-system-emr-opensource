@@ -63,10 +63,9 @@ namespace DanpheEMR.Controllers
 
         public static string GetVoucherNumber(AccountingDbContext accountingDBContext, int? voucherId, int sectionId, int currHospitalId, int fYearId)
         {
-            var incrementCounter = 1;
-            sectionId = (sectionId > 0) ? sectionId : 4;          
+            sectionId = (sectionId > 0) ? sectionId : 4; //here we are checking if sectionid send then we will take or default manual voucher section id 4 assigned           
             var voucherCode = (from v in accountingDBContext.Vouchers
-                               where v.VoucherId == voucherId
+                               where v.VoucherId == voucherId && v.HospitalId == currHospitalId
                                select v.VoucherCode).FirstOrDefault();
             int? maxVNo = (from txn in accountingDBContext.Transactions
                            where txn.HospitalId == currHospitalId && txn.FiscalyearId == fYearId &&
@@ -76,8 +75,10 @@ namespace DanpheEMR.Controllers
                                where sec.SectionId == sectionId && sec.HospitalId == currHospitalId
                                select sec.SectionCode).FirstOrDefault();
 
-            var newVoucherNo = (maxVNo > 0) ? maxVNo + incrementCounter : 1;
-            var voucherNumberFinal = (SectionCode.Length > 0) ? SectionCode + '-' + voucherCode + '-' + newVoucherNo.ToString() : voucherCode + '-' + newVoucherNo.ToString();
+            var hospitalCode = accountingDBContext.Hospitals.Where(h => h.HospitalId == currHospitalId).Select(h => h.HospitalShortName).FirstOrDefault();
+
+            var newVoucherNo = (maxVNo > 0) ? maxVNo + 1 : 1;
+            var voucherNumberFinal = string.IsNullOrEmpty(SectionCode) ? $"{hospitalCode}-{voucherCode}-{newVoucherNo.ToString()}" : $"{hospitalCode}-{SectionCode}-{voucherCode}-{newVoucherNo.ToString()}";
             return voucherNumberFinal;
         }
 

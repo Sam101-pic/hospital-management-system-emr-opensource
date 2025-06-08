@@ -5,13 +5,14 @@ import * as moment from 'moment/moment';
 import { CoreService } from "../../../core/shared/core.service";
 import { Patient } from "../../../patients/shared/patient.model";
 import { SecurityService } from "../../../security/shared/security.service";
-import { ENUM_PrintingType, PrinterSettingsModel } from "../../../settings-new/printers/printer-settings.model";
+import { ENUM_PrintType, ENUM_PrintingType, PrinterSettingsModel } from "../../../settings-new/printers/printer-settings.model";
 import { NepaliCalendarService } from "../../../shared/calendar/np/nepali-calendar.service";
 import { CommonFunctions } from "../../../shared/common.functions";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { BillingTransactionItem } from "../../shared/billing-transaction-item.model";
 import { BillingBLService } from "../../shared/billing.bl.service";
 import { BillingService } from "../../shared/billing.service";
+import { PrintTemplateType } from '../../shared/print-template-type.model';
 
 @Component({
   selector: "bil-print-provisional-slip",
@@ -63,6 +64,11 @@ export class BIL_Print_ProvisionalSlip_Component {
   public IsCoPaymentTransactions: boolean = false;
   public SchemeName: string = "";
   public PolicyNo: string = "";
+  printContent: string = "";
+  public loading: boolean = false;
+  public PrintTemplateTypeSettings = new PrintTemplateType();
+
+
 
   constructor(
     public billingBLService: BillingBLService,
@@ -89,6 +95,7 @@ export class BIL_Print_ProvisionalSlip_Component {
     //this.SetPrinterFromParam();
     this.CurrentDate = moment().format("YYYY-MM-DD HH:mm:ss");
     this.ShowProviderName = this.coreService.SetShowProviderNameFlag();
+    this.ReadPrintReceiptDisplaySettingParameter();
   }
 
   ngOnInit() {
@@ -107,10 +114,21 @@ export class BIL_Print_ProvisionalSlip_Component {
         res => {
           if (res.Status == "OK") {
             //this.RouteToReceipt(res.Results)
+            let htmlElement = document.getElementById("id_provisional_slip");
+            if (htmlElement) {
+              let dischargeInvoiceData = document.createElement('div');
+              dischargeInvoiceData.innerHTML = res.Results.InvoicePrintTemplate;
+              this.printContent = res.Results.InvoicePrintTemplate;
+              document.getElementById('id_provisional_slip').appendChild(dischargeInvoiceData);
+              this.changeDetector.detectChanges();
+            }
             this.ProvisionalSlipDetails = res.Results;
             if (this.ProvisionalSlipDetails && this.ProvisionalSlipDetails.ItemsList.length > 0) {
               this.SchemeName = this.ProvisionalSlipDetails.ItemsList[0].SchemeName;
               this.PolicyNo = this.ProvisionalSlipDetails.ItemsList[0].PatientPolicyNo;
+            }
+            if (this.ProvisionalSlipDetails && this.ProvisionalSlipDetails.DateOfBirth) {
+              this.ProvisionalSlipDetails.Age = this.coreService.CalculateAge(this.ProvisionalSlipDetails.DateOfBirth);
             }
             this.CalculateTotalAmounts(this.ProvisionalSlipDetails.ItemsList);
             this.isReceiptLoaded = true;
@@ -181,8 +199,42 @@ export class BIL_Print_ProvisionalSlip_Component {
   //we're assigning these values to separate child component afterwards..
   public openBrowserPrintWindow: boolean = false;
   public browserPrintContentObj: any;
+  ReadPrintReceiptDisplaySettingParameter() {
+    let currParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "UseDynamicInvoicePrint");
+    if (currParam && currParam.ParameterValue) {
+      const paramValue = JSON.parse(currParam.ParameterValue) as Array<PrintTemplateType>;
 
+      if (paramValue) {
+        this.PrintTemplateTypeSettings = paramValue.find(p => p.PrintType === ENUM_PrintType.provisionalInvoice);
+      }
+    }
+  }
+  public printReceipt() {
+    this.loading = true;
+    //Open 'Browser Print' if printer not found or selected printing type is Browser.
+    if (!this.selectedPrinter || this.selectedPrinter.PrintingType === ENUM_PrintingType.browser) {
+      // this.browserPrintContentObj = this.printContent;
+      // this.openBrowserPrintWindow = false;
+      // this.changeDetector.detectChanges();
+      // this.openBrowserPrintWindow = true;
+      this.GenerateDynamicInvoicePrintBrowser(this.printContent);
+      this.loading = false;
+      //this.router.navigate(['/Billing/SearchPatient']);
 
+    }
+  }
+
+  GenerateDynamicInvoicePrintBrowser(dataToPrint: string) {
+    let iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.contentWindow.document.open();
+    iframe.contentWindow.document.write(dataToPrint);
+    iframe.contentWindow.document.close();
+
+    setTimeout(function () {
+      document.body.removeChild(iframe);
+    }, 500);
+  }
   public print() {
 
     //Open 'Browser Print' if printer not found or selected printing type is Browser.

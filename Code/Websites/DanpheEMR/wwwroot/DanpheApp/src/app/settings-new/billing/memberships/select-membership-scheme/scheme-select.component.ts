@@ -76,12 +76,11 @@ export class SchemeSelectComponent {
 
   public tempServiceBillingContext: string = "";
 
-
   constructor(public settingsBLService: SettingsBLService,
     public coreService: CoreService, public changeDetector: ChangeDetectorRef, private billingService: BillingService) {
     let label = this.coreService.Parameters.find(p => p.ParameterGroupName == "Billing" && p.ParameterName == "MembershipSchemeSettings").ParameterValue;
     this.labelsInfo = JSON.parse(label);
-    this.InitializeSubscriptions()
+    this.InitializeSubscriptions();
   }
 
   public InitializeSubscriptions() {
@@ -131,7 +130,8 @@ export class SchemeSelectComponent {
           else {
             //assign default selected values to the dropdown.
             //check if we can remove this hard-code value. suggestion: use IsDefault field in table and so on.
-            let defaultMemb = this.membershipList.find(a => a.SchemeName.toLowerCase() == "general");
+            // let defaultMemb = this.membershipList.find(a => a.SchemeName.toLowerCase() == "general");
+            let defaultMemb = this.membershipList.find(a => a.IsSystemDefault);
             if (defaultMemb) {
               this.selMembershipId = defaultMemb.SchemeId;
               this.selectedCommunityName = defaultMemb.CommunityName;
@@ -252,7 +252,9 @@ export class SchemeSelectComponent {
   MembershipTypeChange() {
     if (this.selMembershipId && this.filteredMembershipList && this.filteredMembershipList.length > 0) {
       const selectedSchemeObj = this.filteredMembershipList.find(a => a.SchemeId === +this.selMembershipId);
-      this.selMembershipId = selectedSchemeObj.SchemeId;
+      if (selectedSchemeObj && selectedSchemeObj.SchemeId) {
+        this.selMembershipId = selectedSchemeObj.SchemeId;
+      }
       //this.changeDetector.detectChanges();
 
     }
@@ -271,7 +273,7 @@ export class SchemeSelectComponent {
         this.isMembershipValid = true;
       }
     }
-    if (this.isMembershipValid) {
+    if (this.isMembershipValid && membershipToEmit && membershipToEmit.CommunityName) {
       let communityName = membershipToEmit.CommunityName;
       let obj = this.distinctCommunityList.find(a => a == communityName);
       this.selectedCommunityName = obj;
@@ -321,7 +323,8 @@ export class SchemeSelectComponent {
           else {
             //assign default selected values to the dropdown.
             //check if we can remove this hard-code value. suggestion: use IsDefault field in table and so on.
-            let defaultMemb = this.membershipList.find(a => a.SchemeName.toLowerCase() == "general");
+            // let defaultMemb = this.membershipList.find(a => a.SchemeName.toLowerCase() == "general");
+            let defaultMemb = this.membershipList.find(a => a.IsSystemDefault);
             if (defaultMemb) {
               this.selMembershipId = defaultMemb.SchemeId;
               this.selectedCommunityName = defaultMemb.CommunityName;

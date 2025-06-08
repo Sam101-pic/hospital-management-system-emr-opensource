@@ -1,11 +1,13 @@
 import { ChangeDetectorRef, Component } from '@angular/core';
 import * as moment from 'moment/moment';
 import { CoreService } from '../../../core/shared/core.service';
+import { SecurityService } from '../../../security/shared/security.service';
 import { CommonFunctions } from '../../../shared/common.functions';
 import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { Hospital_DTO } from '../../settings/shared/dto/hospitals.dto';
 import { AccountingService } from '../../shared/accounting.service';
 import { AccountingReportsBLService } from "../shared/accounting-reports.bl.service";
 
@@ -36,20 +38,35 @@ export class DailyTransactionReportComponent {
   public fiscalYearId: number = null;
   btndisabled = false;
   public dateRange: string = "";
+  public HospitalList: Array<Hospital_DTO> = new Array<Hospital_DTO>();
+  public SelectedHospital: number = 0;
+  public HospitalId: number = 0;
+  public ActiveHospital: number = 0;
   constructor(
     _dlService: DLService,
     public msgBoxServ: MessageboxService,
     public accReportBLService: AccountingReportsBLService,
     public coreservice: CoreService,
     public accountingService: AccountingService,
+    public securityService: SecurityService,
     public changeDetector: ChangeDetectorRef) {
     this.dailyTxnGridColumns = GridColumnSettings.AccDailyTxnReport;
     this.GetFiscalYearList();
     this.showExport();
     //this.LoadCalendarTypes();     
     this.calType = this.coreservice.DatePreference;
-  }
+    this.CheckAndAssignHospital();
 
+  }
+  CheckAndAssignHospital() {
+    this.ActiveHospital = this.securityService.AccHospitalInfo.ActiveHospitalId;
+    this.HospitalList = this.accountingService.accCacheData.Hospitals ? this.accountingService.accCacheData.Hospitals : [];
+    if (this.HospitalList.length === 1) {
+      this.SelectedHospital = this.HospitalList[0].HospitalId;
+    } else {
+      this.SelectedHospital = this.ActiveHospital;
+    }
+  }
 
   //loads CalendarTypes from Paramter Table (database) and assign the require CalendarTypes to local variable.
   LoadCalendarTypes() {
@@ -84,8 +101,9 @@ export class DailyTransactionReportComponent {
   }
   loadData() {
     this.btndisabled = true;
+    this.HospitalId = this.SelectedHospital;
     if (this.checkDateValidation()) {
-      this.accReportBLService.GetDailyTxnReport(this.fromDate, this.toDate)
+      this.accReportBLService.GetDailyTxnReport(this.fromDate, this.toDate, this.HospitalId)
         .subscribe(res => {
           if (res.Status == 'OK' && res.Results.length) {
             this.btndisabled = false;
@@ -367,5 +385,9 @@ export class DailyTransactionReportComponent {
     else {
       this.showExportbtn = false;
     }
+  }
+
+  OnHospitalChange() {
+    this.dailyTxnList = [];
   }
 }

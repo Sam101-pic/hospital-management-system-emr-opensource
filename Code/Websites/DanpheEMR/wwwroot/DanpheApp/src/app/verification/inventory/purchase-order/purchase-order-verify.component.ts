@@ -9,6 +9,9 @@ import { SecurityService } from "../../../security/shared/security.service";
 import { VerificationActor } from '../requisition-details/inventory-requisition-details.component';
 import { PurchaseOrder } from '../../../inventory/shared/purchase-order.model';
 import { PurchaseOrderItems } from '../../../inventory/shared/purchase-order-items.model';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+
 import { GeneralFieldLabels } from '../../../shared/DTOs/general-field-label.dto';
 @Component({
   templateUrl: './purchase-order-verify.html'
@@ -22,14 +25,12 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
   public loading: boolean = false;
   public headerDetail: { header1, header2, header3, header4, hospitalName; address; email; PANno; tel; DDA };
   public nextVerifiersPermission: string = "";
-  public CopyOfOrderedItemsQuantity: Array<{ OrderedItemId; Quantity; }> = [];
+  public CopyOfOrderedItemsQuantity: Array<{ OrderedItemId; Quantity; StandardRate }> = [];
   public CopyOfOrderedItemsStandardRate: Array<{ OrderedItemId; StandardRate; }> = [];
   public CopyOfOrderedItemsPOItemSpecification: Array<{ OrderedItemId; POItemSpecification; }> = [];
-  showQuotationRatesPopUp: boolean;
-  PoUplodadedViewFiles: boolean;
-  // PurchaseOrderId: number;
-
-  public GeneralFieldLabel = new GeneralFieldLabels();
+  showQuotationRatesPopUp: boolean = false;
+    PoUplodadedViewFiles: boolean = false;
+    public GeneralFieldLabel = new GeneralFieldLabels();
   constructor(
     public verificationService: VerificationService,
     public verificationBLService: VerificationBLService,
@@ -55,23 +56,24 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
   private GetInventoryPurchaseOrderDetails() {
     this.verificationBLService
       .GetInventoryPurchaseOrderDetails(this.PurchaseOrder.PurchaseOrderId)
-      .subscribe(res => {
-        if (res.Status == "OK") {
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.PurchaseOrderVM = res.Results;
           this.CopyOrderedItemsQuantity();
         }
         else {
-          this.messageBoxService.showMessage("Failed", [
-            "Something went wrong.",
-            "Loading PO Failed."
-          ]);
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Something went wrong.", "Loading PO Failed."]);
+          console.log(res.ErrorMessage)
         }
-      });
+      },
+        err => {
+          console.log(err)
+        });
   }
 
   private CopyOrderedItemsQuantity() {
     this.PurchaseOrderVM.OrderedItemList.forEach(item => {
-      var CopyItem = { OrderedItemId: item.PurchaseOrderItemId, Quantity: item.Quantity };
+      let CopyItem = { OrderedItemId: item.PurchaseOrderItemId, Quantity: item.Quantity, StandardRate: item.StandardRate };
       this.CopyOfOrderedItemsQuantity.push(CopyItem);
     });
   }
@@ -81,11 +83,11 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
     }
     else if (this.PurchaseOrder.IsVerificationAllowed == false && this.PurchaseOrder.POStatus == "pending") {
       this.isVerificationAllowed = false;
-      this.messageBoxService.showMessage("notice-message", ["You have verified this Order already."])
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["You have verified this Order already."])
     }
     else {
       this.isVerificationAllowed = false;
-      this.messageBoxService.showMessage("notice-message", ["Verifying this Order is not allowed."]);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Verifying this Order is not allowed."]);
     }
   }
   EditItem(index) {
@@ -93,6 +95,8 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
       if (this.PurchaseOrderVM.OrderedItemList[index].IsEdited == true) {
         this.PurchaseOrderVM.OrderedItemList[index].IsEdited = false;
         this.PurchaseOrderVM.OrderedItemList[index].Quantity = this.CopyOfOrderedItemsQuantity[index].Quantity;
+        this.PurchaseOrderVM.OrderedItemList[index].StandardRate = this.CopyOfOrderedItemsQuantity[index].StandardRate;
+        this.CalculationForPO();
       } else {
         this.PurchaseOrderVM.OrderedItemList[index].IsEdited = true;
         var timer = setTimeout(() => {
@@ -105,7 +109,7 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
         }, 500);
       }
     } else {
-      this.messageBoxService.showMessage("Failed", ["Editing this PO is forbidden."])
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["Editing this PO is forbidden."])
     }
   }
   CancelItem(index) {
@@ -117,18 +121,19 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
           this.PurchaseOrderVM.OrderedItemList[index].IsEdited = false;
         }
         else {
-          this.messageBoxService.showMessage("Failed", ["You can not cancel the last item. Use Reject All instead."])
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["You can not cancel the last item. Use Reject All instead."])
         }
       }
       else if (this.PurchaseOrderVM.OrderedItemList[index].CancelledBy != null) {
-        this.messageBoxService.showMessage("Failed", ["You can not undo this item cancellation."])
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["You can not undo this item cancellation."])
       }
       else {
         this.PurchaseOrderVM.OrderedItemList[index].POItemStatus = "active";
         this.PurchaseOrderVM.OrderedItemList[index].IsActive = true;
       }
+      this.CalculationForPO();
     } else {
-      this.messageBoxService.showMessage("Failed", ["Cancelling this item is forbidden."])
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Cancelling this item is forbidden."])
     }
   }
   CheckForCancelItemsCondition(): boolean {
@@ -141,40 +146,50 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
     }
   }
   GetInventoryBillingHeaderParameter() {
-    var paramValue = this.coreService.Parameters.find(a => a.ParameterName == "Inventory Receipt Header").ParameterValue;
-    if (paramValue) this.headerDetail = JSON.parse(paramValue);
-    else
-      this.messageBoxService.showMessage("error", [
-        "Please enter parameter values for BillingHeader"
-      ]);
+    let paramValue = this.coreService.Parameters.find(a => a.ParameterName == "Inventory Receipt Header").ParameterValue;
+    if (paramValue) {
+      this.headerDetail = JSON.parse(paramValue);
+    }
+    else {
+      console.log('Inventory Receipt Header parameter not found');
+    }
   }
 
   RouteBack() {
     this.router.navigate([this.routeFromService.RouteFrom]);
   }
   ApprovePurchaseOrder() {
-    if (this.CheckForValidItemQuantity()) {
+    if (this.CheckForItemValidity()) {
       this.loading = true;
       this.PurchaseOrder.PurchaseOrderItems = this.PurchaseOrderVM.OrderedItemList;
       this.verificationBLService.ApprovePurchaseOrder(this.PurchaseOrder, this.VerificationRemarks)
-        .subscribe(res => {
-          if (res.Status == "OK") {
-            this.messageBoxService.showMessage("Success", ["Purchase Order " + this.PurchaseOrder.PurchaseOrderId + " is approved successfully."])
+        .finally(() => this.loading = false)
+        .subscribe((res: DanpheHTTPResponse) => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Purchase Order " + this.PurchaseOrder.PurchaseOrderId + " is approved successfully."])
             this.RouteBack();
           }
           else {
-            this.messageBoxService.showMessage("Failed", ["Something went wrong..."]);
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Something went wrong..."]);
+            console.log(res.ErrorMessage);
           }
-          this.loading = false;
         }, err => {
-          this.messageBoxService.showMessage("Error", ["Something went wrong..."]);
-          this.loading = false;
-        })
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Something went wrong..."]);
+          console.log(err);
+        });
     }
   }
-  private CheckForValidItemQuantity(): boolean {
+  private CheckForItemValidity(): boolean {
     if (this.PurchaseOrderVM.OrderedItemList.some(RI => RI.Quantity < 1)) {
-      this.messageBoxService.showMessage("Failed", ["One of the quantity is edited less that 1.", "Use item cancel button instead."]);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["One of the quantity is edited less that 1.", "Use item cancel button instead."]);
+      return false;
+    }
+    if (this.PurchaseOrderVM.OrderedItemList.some(RI => RI.StandardRate == null || RI.StandardRate <= 0)) {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["One of the item has to provide standard rate"]);
+      return false;
+    }
+    if (this.VerificationRemarks.trim() === '') {
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Remarks is mandatory."]);
       return false;
     }
     return true;
@@ -182,22 +197,23 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
 
   RejectPurchaseOrder() {
     if (!this.VerificationRemarks || this.VerificationRemarks.trim() == '') {
-      this.messageBoxService.showMessage("failed", ["Remarks is Compulsory for Cancellation"]);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Remarks is Compulsory for Cancellation"]);
     } else {
       this.loading = true;
-      this.verificationBLService.RejectPurchaseOrder(this.PurchaseOrder.PurchaseOrderId, this.PurchaseOrder.CurrentVerificationLevel, this.PurchaseOrder.CurrentVerificationLevelCount + 1, this.PurchaseOrder.MaxVerificationLevel, this.VerificationRemarks)
-        .subscribe(res => {
-          if (res.Status == "OK") {
-            this.messageBoxService.showMessage("Success", ["Purchase Order " + this.PurchaseOrder.PurchaseOrderId + " is rejeceted successfully."])
+      this.verificationBLService.RejectPurchaseOrder(this.PurchaseOrder.PurchaseOrderId, this.PurchaseOrder.CurrentVerificationLevel, this.PurchaseOrder.CurrentVerificationLevelCount + 1, this.PurchaseOrder.MaxVerificationLevel, this.VerificationRemarks.trim())
+        .finally(() => this.loading = false)
+        .subscribe((res: DanpheHTTPResponse) => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Purchase Order " + this.PurchaseOrder.PurchaseOrderId + " is rejeceted successfully."])
             this.RouteBack();
           }
           else {
-            this.messageBoxService.showMessage("Failed", ["Something went wrong..."]);
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Something went wrong..."]);
+            console.log(res.ErrorMessage);
           }
-          this.loading = false;
         }, err => {
-          this.messageBoxService.showMessage("Error", ["Something went wrong..."]);
-          this.loading = false;
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Something went wrong..."]);
+          console.log(err);
         });
     }
   }
@@ -224,32 +240,31 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
     this.PurchaseOrder.VAT = 0;
     this.PurchaseOrder.TotalAmount = 0;
 
-    for (var i = 0; i < this.PurchaseOrderVM.OrderedItemList.length; i++) {
+    for (let i = 0; i < this.PurchaseOrderVM.OrderedItemList.length; i++) {
       try {
-        this.PurchaseOrder.SubTotal += (this.PurchaseOrderVM.OrderedItemList[i].StandardRate * this.PurchaseOrderVM.OrderedItemList[i].Quantity);
-        this.PurchaseOrderVM.OrderedItemList[i].VATAmount = this.PurchaseOrderVM.OrderedItemList[i].StandardRate * this.PurchaseOrderVM.OrderedItemList[i].Quantity * this.PurchaseOrderVM.OrderedItemList[i].VatPercentage / 100;
-        this.PurchaseOrder.VAT += this.PurchaseOrderVM.OrderedItemList[i].VATAmount;
-        this.PurchaseOrderVM.OrderedItemList[i].TotalAmount = (this.PurchaseOrderVM.OrderedItemList[i].StandardRate * this.PurchaseOrderVM.OrderedItemList[i].Quantity) + this.PurchaseOrderVM.OrderedItemList[i].VATAmount;
-        this.PurchaseOrder.TotalAmount += this.PurchaseOrderVM.OrderedItemList[i].TotalAmount;
+        if (this.PurchaseOrderVM.OrderedItemList[i].POItemStatus !== 'cancelled') {
+          this.PurchaseOrder.SubTotal += (this.PurchaseOrderVM.OrderedItemList[i].StandardRate * this.PurchaseOrderVM.OrderedItemList[i].Quantity);
+          this.PurchaseOrderVM.OrderedItemList[i].VATAmount = this.PurchaseOrderVM.OrderedItemList[i].StandardRate * this.PurchaseOrderVM.OrderedItemList[i].Quantity * this.PurchaseOrderVM.OrderedItemList[i].VatPercentage / 100;
+          this.PurchaseOrder.VAT += this.PurchaseOrderVM.OrderedItemList[i].VATAmount;
+          this.PurchaseOrderVM.OrderedItemList[i].TotalAmount = (this.PurchaseOrderVM.OrderedItemList[i].StandardRate * this.PurchaseOrderVM.OrderedItemList[i].Quantity) + this.PurchaseOrderVM.OrderedItemList[i].VATAmount;
+          this.PurchaseOrder.TotalAmount += this.PurchaseOrderVM.OrderedItemList[i].TotalAmount;
+        }
       }
       catch (ex) {
         console.log("Some value is missing.");
       }
     }
-    // this.PurchaseOrder.TotalAmount += this.PurchaseOrder.Insurance + this.PurchaseOrder.FreightAndPacking - this.PurchaseOrder.Discount;
   }
   Print() {
-    //this is used to print the receipt
-
-    let popupWinindow;
+    let popUpWindow;
     var printContents = document.getElementById("printpage").innerHTML;
-    popupWinindow = window.open(
+    popUpWindow = window.open(
       "",
       "_blank",
       "width=600,height=700,scrollbars=no,menubar=no,toolbar=no,location=no,status=no,titlebar=no"
     );
-    popupWinindow.document.open();
-    popupWinindow.document.write(
+    popUpWindow.document.open();
+    popUpWindow.document.write(
       `<html>
       <head>
         <style>
@@ -285,7 +300,7 @@ export class PurchaseOrderVerifyComponent implements OnInit, OnDestroy {
       printContents +
       "</html>"
     );
-    popupWinindow.document.close();
+    popUpWindow.document.close();
   }
 }
 export class InventoryPurchaseOrderVM {

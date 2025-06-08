@@ -107,7 +107,7 @@ div.col-md-12 {
 
 /*
 .table > tbody > tr > td, .table > tbody > tr > th, .table > tfoot > tr > td, .table > tfoot > tr > th, .table > thead > tr > td, .table > thead > tr > th {
-    padding: 1px !important; for table td padding 
+    padding: 1px !important; for table td padding
 }
 */
 
@@ -372,6 +372,7 @@ input[type="number"] {
   width: fit-content;
   display: flex;
 }
+
 .price-category {
   margin-left: 15px;
 }
@@ -391,9 +392,11 @@ input[type="number"] {
   position: sticky;
   top: 0;
 }
+
 .patient-link {
   font-size: 12px;
 }
+
 .shortcut-key a {
   background-color: transparent;
   color: #0773bc;
@@ -401,6 +404,7 @@ input[type="number"] {
   /* border: none !important; */
   text-decoration: underline;
 }
+
 .shortcut-key a {
   /* border: 1px solid #0773bc !important; */
   width: 30px;
@@ -410,15 +414,19 @@ input[type="number"] {
   align-items: center;
   justify-content: center;
 }
+
 .shortcut-key a img {
   width: 20px;
 }
+
 .sale-price-category .col-md-8 {
   width: 58.33333%;
 }
+
 .sale-price-category .col-md-4 {
   width: 41.66667%;
 }
+
 .table-form #btn-add {
   border-radius: 4px !important;
   font-size: 16px;
@@ -432,6 +440,7 @@ input[type="number"] {
   align-content: center;
   flex-wrap: wrap;
 }
+
 .table-wrap table thead th {
   position: sticky;
   background-color: #eee;
@@ -439,11 +448,13 @@ input[type="number"] {
   padding: 10px;
   border: none;
 }
+
 .table thead tr th {
   font-size: 0.9em;
   border: none !important;
   padding: 10px;
 }
+
 .table-wrap .btn-danger {
   width: 23px;
   height: 23px;
@@ -453,6 +464,7 @@ input[type="number"] {
   align-items: center;
   justify-content: center;
 }
+
 .table-wrap {
   height: 300px;
   overflow-y: auto;
@@ -461,10 +473,12 @@ input[type="number"] {
   background-color: #ffffff;
   border-radius: 10px;
 }
+
 .accountinfo td {
   color: #6e7388;
   padding: 0;
 }
+
 .error-message-alert {
   font-size: 12px;
   padding: 5px 15px;
@@ -476,6 +490,7 @@ input[type="number"] {
   align-items: center;
   gap: 0 10px;
 }
+
 .error-message-alert span {
   position: relative;
   display: flex;
@@ -483,6 +498,7 @@ input[type="number"] {
   gap: 0 3px;
   /* display: block; */
 }
+
 .error-message-alert span:before {
   content: "";
   width: 5px;
@@ -491,6 +507,7 @@ input[type="number"] {
   display: block;
   background-color: crimson;
 }
+
 /* .error-message-alert i {
   position: absolute;
   top: 0;
@@ -499,11 +516,86 @@ input[type="number"] {
 .table {
   margin-bottom: 10px;
 }
+
 @media screen and (max-width: 1440px) {
   .patient_info .row {
     margin: 0 -5px;
   }
+
   .patient_info div[class*="col-"] {
     padding: 0 5px;
   }
+}
+
+.package-item-quantity-remaining {
+  background-color: #ecbebe !important;
+}
+
+.package-item-nearly-expire {
+  background-color: #f0d277 !important;
+}
+
+.narcotics-item {
+  background-color: #add8e6 !important;
+}
+
+#id_pharmacy_sales_danpheLoading h3 {
+  text-align: center;
+  margin: 10px 20px 0 0;
+  font-size: 18px;
+  margin-bottom: 10px;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.progress-bar {
+  position: relative;
+  height: 8px;
+  width: 200px;
+  background: #ffffff;
+  border-radius: 25px !important;
+  overflow: hidden;
+}
+
+.progress-fill {
+  position: absolute;
+  height: 10px;
+  width: 0%;
+  animation: progress-forward 3s infinite;
+  background: rgb(11, 219, 122);
+  border-radius: 15px;
+}
+
+@keyframes progress-forward {
+  0% {
+    width: 0%;
+  }
+
+  25% {
+    width: 50%;
+  }
+
+  50% {
+    width: 75%;
+  }
+
+  75% {
+    width: 85%;
+  }
+
+  100% {
+    width: 100%;
+  }
+}
+.hide-row {
+  display: none;
+}
+.edit-invoice-btn {
+  width: 26px;
+  height: 23px;
+  font-size: 14px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

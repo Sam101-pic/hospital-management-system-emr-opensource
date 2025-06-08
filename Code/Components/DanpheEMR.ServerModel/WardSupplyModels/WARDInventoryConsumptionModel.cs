@@ -29,6 +29,10 @@ namespace DanpheEMR.ServerModel
         public double ConsumeQuantity { get; set; }
 
         public int? ConsumptionReceiptId { get; set; }
-        public int StockId { get; set; }
+        public int? ConsumptionTypeId { get; set; }
+        public decimal? CostPrice { get; set; }
+        public decimal? MRP { get; set; }
+        public string BatchNo { get; set; }
+        public DateTime? ExpiryDate { get; set; }
     }
 }

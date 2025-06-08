@@ -123,7 +123,7 @@ export const AppRoutingConstant = [
   },
   {
     path: "OperationTheatre",
-    loadChildren: "./ot-module/ot.module#OperationTheatreModule",
+    loadChildren: "./ot/ot.module#OperationTheatreModule",
   },
   {
     path: "Dispensary",
@@ -181,6 +181,23 @@ export const AppRoutingConstant = [
   { path: "UnAuthorized", component: UnAuthorizedAccessComponent },
   { path: "Utilities", loadChildren: "./utilities/utilities.module#UtilitiesModule", canActivate: [AuthGuardService], data: { currentRoute: 'Utilities' } },
   { path: "MktReferral", loadChildren: "./mktreferral/mktreferral.module#MktreferralModule" },
+  {
+    path: "Clinical", loadChildren: "./clinical-new/clinical-new.module#ClinicalNewModule", data: { currentRoute: "Clinical" },
+  },
+  {
+    path: "Dashboard",
+    // component: DanpheDashboardComponent,
+    loadChildren: "./danphe-dashboard/danphe-dashboard.module#DanpheDashboardModule",
+    canActivate: [AuthGuardService],
+  },
+
+
+  {
+    path: "ClinicalSettings",
+    loadChildren: "./clinical-settings/clinical-settings.module#ClinicalSettingsModule",
+    canActivate: [AuthGuardService],
+  },
+
 
   { path: "**", component: PageNotFound },
 ];

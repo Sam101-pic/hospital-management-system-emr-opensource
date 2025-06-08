@@ -57,6 +57,19 @@
 
                 <div class=" col-md-12">
                     <div class="col-md-6 col-xs-12">
+                        <div class="form-group">
+                            <label class="control-label col-md-4">Salutation<b style="float:right;">:</b></label>
+                            <div class="col-md-4">
+                                <select id="id_er_patientregistration_salutation" class="form-control" [(ngModel)]="ERPatient.Salutation"
+                                        [ngModelOptions]="{standalone: true}"
+                                        (change)="SetFocusById('erPatFirstName')">
+                                    <option value="" disabled selected>--select--</option>
+                                    <option *ngFor="let salutation of SalutationList" [value]="salutation.SalutationName">{{ salutation.SalutationName
+                                        }}
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
 
                         <div class="form-group">
                             <label class="control-label col-md-4">
@@ -112,8 +125,10 @@
                             <label class="control-label col-md-4">Last Name<b class="color-red"> *</b><b style="float:right;">:</b></label>
                             <div class="col-md-8">
                                 <input style="display: block;" class="form-control" type="text" formControlName="LastName"
+                                       (input)="ClearEthnicGroup()"
                                        [(ngModel)]="ERPatient.LastName" required value="{{ERPatient.LastName| CapitalFirstLetter}}"
-                                       placeholder="Last Name" id="erPatLastName" (keyup.enter)="SetFocusById('erPatGender')"
+                                       placeholder="Last Name" id="erPatLastName"
+                                       (keyup.enter)="ERPatient.EthnicGroup ? SetFocusById('erPatGender') : SetFocusById('id_select_ethnic_group')"
                                        (focusout)="OnLastNameChanged($event)" />
                                 <span class="error-msg" *ngIf="ERPatient.IsDirty('LastName')"
                                       [hidden]="ERPatient.IsValid('LastName','required')">Last
@@ -130,7 +145,7 @@
                                    style="float: right;">:</b></label>
                             <div class="col-md-8">
                                 <select-ethnic-group [lastName]="patientLastName"
-                                                     [patient-ethnic-group]="patientEthnicGroup"
+                                                     [patient-ethnic-group]="ERPatient.EthnicGroup" (change)="SetFocusById('erPatGender')"
                                                      (on-ethnic-group-change)="OnEthnicGroupChangeCallBack($event)">
                                 </select-ethnic-group>
                             </div>
@@ -143,11 +158,12 @@
                             <div class="col-md-8">
                                 <div class="input-group">
                                     <select class="form-control" [(ngModel)]="ERPatient.Gender" formControlName="Gender"
+                                            [disabled]="addNewUnknownERPatient || selectionFromExistingPatient || ERPatient.IsExistingPatient || ocmcSelected"
                                             (change)="SetFocusById('erPatAge')" id="erPatGender">
-                                        <option value="null" selected disabled>--select--</option>
+                                        <option value="null">--select--</option>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
-                                        <option value="Other">Other</option>
+                                        <option value="Others">Other</option>
                                     </select>
                                 </div>
                                 <span class="error-msg" *ngIf="ERPatient.IsDirty('Gender')"
@@ -155,9 +171,19 @@
                                     is required</span>
                             </div>
                         </div>
-
                         <div class="form-group">
-                            <label class="control-label col-md-4">Age<b style="float:right;">:</b></label>
+                            <label class="control-label col-md-4">Have DOB?<b style="float:right;">:</b></label>
+                            <div>
+                                <label class="mt-checkbox mt-checkbox-outline pl-0">
+                                    <input name="IsDobAvailable" type="checkbox" value="" (change)="HaveDOB()"
+                                           [disabled]="selectionFromExistingPatient || ERPatient.IsExistingPatient || ocmcSelected">
+                                    <span style="margin:0;"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-group" *ngIf="!ShowDOB">
+                            <label class="control-label col-md-4">Age
+                                <sup>*</sup><b style="float:right;">:</b></label>
                             <div class="col-md-8">
                                 <div class="col-md-3" style="padding-left:0px;padding-right: 0px;">
                                     <input class="form-control" type="number" min="0" max="150" formControlName="Age" onclick="this.select()"
@@ -168,28 +194,29 @@
                                 <div class="col-md-9" style="padding-right: 0px;">
                                     <div class="input-group">
                                         <!-- <div class="icheck-inline txt-black">
-                      <label class="mt-radio mt-radio-outline">
-                        <input name="AgeUnit" type="radio" value="Y"
-                               [(ngModel)]="ERPatient.AgeUnit"
-                               [ngModelOptions]="{standalone: true}" (click)="CalculateDob(3);">
-                        <span></span>Yrs
-                      </label>
-                      <label class="mt-radio mt-radio-outline" style="margin-left: 5px;">
-                        <input name="AgeUnit" type="radio" value="M"
-                               [(ngModel)]="ERPatient.AgeUnit"
-                               [ngModelOptions]="{standalone: true}" (click)="CalculateDob(2);">
-                        <span></span>Mnths
-                      </label>
-                      <label class="mt-radio mt-radio-outline" style="margin-left: 5px;">
-                        <input name="AgeUnit" type="radio" value="D"
-                               [(ngModel)]="ERPatient.AgeUnit"
-                               [ngModelOptions]="{standalone: true}" (click)="CalculateDob(1);">
-                        <span></span>Days
-                      </label>
-                    </div> -->
+                                      <label class="mt-radio mt-radio-outline">
+                                        <input name="AgeUnit" type="radio" value="Y"
+                                               [(ngModel)]="ERPatient.AgeUnit"
+                                               [ngModelOptions]="{standalone: true}" (click)="CalculateDob(3);">
+                                        <span></span>Yrs
+                                      </label>
+                                      <label class="mt-radio mt-radio-outline" style="margin-left: 5px;">
+                                        <input name="AgeUnit" type="radio" value="M"
+                                               [(ngModel)]="ERPatient.AgeUnit"
+                                               [ngModelOptions]="{standalone: true}" (click)="CalculateDob(2);">
+                                        <span></span>Mnths
+                                      </label>
+                                      <label class="mt-radio mt-radio-outline" style="margin-left: 5px;">
+                                        <input name="AgeUnit" type="radio" value="D"
+                                               [(ngModel)]="ERPatient.AgeUnit"
+                                               [ngModelOptions]="{standalone: true}" (click)="CalculateDob(1);">
+                                        <span></span>Days
+                                        </label>
+                                        </div> -->
 
                                         <select class="form-control" [(ngModel)]="ERPatient.AgeUnit" [ngModelOptions]="{standalone: true}"
-                                                (ngModelChange)="CalculateDob();" id="erPatAgeUnit">
+                                                (ngModelChange)="CalculateDob();" id="erPatAgeUnit"
+                                                [disabled]="selectionFromExistingPatient || ERPatient.IsExistingPatient || ocmcSelected">
                                             <option value="Y">Years</option>
                                             <option value="M">Months</option>
                                             <option value="D">Days</option>
@@ -202,13 +229,13 @@
                             </div>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" *ngIf="ShowDOB">
                             <label class="control-label col-md-4 left" style="padding-top: 1px;">
                                 Date Of Birth<b style="float:right;">:</b>
                             </label>
                             <div *ngIf="ERPatient && ERPatient.DateOfBirth" class="col-md-8">
                                 <danphe-date-picker [(ngModel)]="ERPatient.DateOfBirth" ngDefaultControl [CalendarTypes]="calType"
-                                                    [ngModelOptions]="{standalone: true}" [year-settings]="'DateOfBirth'">
+                                                    formControlName="DateOfBirth" (ngModelChange)="CalculateAge()" [year-settings]="'DateOfBirth'">
                                 </danphe-date-picker>
                             </div>
                         </div>
@@ -243,11 +270,13 @@
                                 <b style="float:right;">:</b></label>
                             <div class="col-md-8">
                                 <municipality-select *ngIf="ERPatient" [municipalityId]='ERPatient.MunicipalityId'
-                                                     [subDivisionId]='selDistrict? selDistrict.Key : ERPatient.CountrySubDivisionId'
-                                                     (valueChange)="UpdateMunicipality($event)"></municipality-select>
+                                                     [subDivisionId]=' ERPatient.CountrySubDivisionId'
+                                                     (valueChange)="UpdateMunicipality($event)"
+                                                     (keyup.enter)="SetFocusById('WardNo')"></municipality-select>
                             </div>
                         </div>
-                        <div class="form-group" *ngIf="ERPatient.MunicipalityId">
+
+                        <div class="form-group" *ngIf="showMunicipality">
                             <label class="control-label col-md-4">Ward Number<b style="float:right;">:</b></label>
                             <div class="col-md-8">
                                 <input class="form-control" min="0" type="number" [(ngModel)]="ERPatient.WardNo"
@@ -287,15 +316,29 @@
                     <div class="col-md-6 col-xs-12">
 
                         <div class="form-group">
-                            <label class="control-label col-md-4">Contact number<b style="float:right;">:</b></label>
+                            <label class="control-label col-md-4">Contact number<b class="color-red"> *</b><b style="float:right;">:</b></label>
                             <div class="col-md-8">
                                 <input class="form-control" type="tel" [(ngModel)]="ERPatient.ContactNo" formControlName="PhoneNumber"
                                        placeholder="phone number" id="erPatPhone" (keyup.enter)="SetFocusById('register')" />
-                                <span class="error-msg" *ngIf="ERPatient.IsDirty('PhoneNumber')"
-                                      [hidden]="ERPatient.IsValid('PhoneNumber','pattern')">
-                                    Primary Phone is not
-                                    proper
+                                <span
+                                      class="error-msg"
+                                      *ngIf="ERPatient.IsDirty('PhoneNumber') && !ERPatient.IsValid('PhoneNumber','required')">
+                                    Phone Number is required
                                 </span>
+                                <span
+                                      class="error-msg"
+                                      *ngIf="ERPatient.IsDirty('PhoneNumber') && !ERPatient.IsValid('PhoneNumber','pattern')">
+                                    Phone Number must be a valid 10-digit number
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="control-label col-md-4">Email<b style="float:right;">:</b></label>
+                            <div class="col-md-8">
+                                <input class="form-control" type="email" [(ngModel)]="ERPatient.Email" formControlName="Email"
+                                       placeholder="Email"
+                                       id="erPatEmail" />
                             </div>
                         </div>
 

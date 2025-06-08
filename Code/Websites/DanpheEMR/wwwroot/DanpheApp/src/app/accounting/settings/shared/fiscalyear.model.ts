@@ -29,7 +29,7 @@ export class FiscalYearModel {
     public nEndDate: string = null;
     public Remark: string = "";
     public showreopen: boolean = true;
-
+    public HospitalId: number = 0;
 
     public EnglishFiscalYearName: string = null;
     public NepaliFiscalYearName: string = null;

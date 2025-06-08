@@ -4,6 +4,8 @@ using DanpheEMR.ServerModel;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -88,7 +90,7 @@ namespace DanpheEMR.Utilities
             string retValue = null;
 
             ParameterModel param = coreDbContext.Parameters.Where(a => a.ParameterGroupName == paramGroup && a.ParameterName == paramName).FirstOrDefault();
-            if(param != null)
+            if (param != null)
             {
                 string paramValueStr = param.ParameterValue;
                 var data = DanpheJSONConvert.DeserializeObject<JObject>(paramValueStr);
@@ -175,6 +177,75 @@ namespace DanpheEMR.Utilities
 
             return retValue;
         }
+
+        private static DataTable ToDataTable<T>(List<T> data)
+        {
+            var dataTable = new DataTable();
+
+            var properties = typeof(T).GetProperties();
+
+            foreach (var prop in properties)
+            {
+                var type = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                dataTable.Columns.Add(prop.Name, type);
+            }
+
+            foreach (var item in data)
+            {
+                var row = dataTable.NewRow();
+                foreach (var prop in properties)
+                {
+                    row[prop.Name] = prop.GetValue(item) ?? DBNull.Value;
+                }
+                dataTable.Rows.Add(row);
+            }
+
+            return dataTable;
+        }
+
+        /// <summary>
+        /// This method bulk insert the data into targeted table.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="tableName"></param>
+        /// <param name="data"></param>
+        /// <param name="connString"></param>
+        /// <exception cref="Exception"></exception>
+        public static void BulkInsert<T>(string tableName, List<T> data, string connString)
+        {
+            using (var connection = new SqlConnection(connString))
+            {
+                connection.Open();
+                using (var transaction = connection.BeginTransaction())
+                {
+                    try
+                    {
+                        using (var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction))
+                        {
+                            bulkCopy.DestinationTableName = tableName;
+
+                            var properties = typeof(T).GetProperties();
+                            foreach (var prop in properties)
+                            {
+                                bulkCopy.ColumnMappings.Add(prop.Name, prop.Name);
+                            }
+
+                            // Convert data to DataTable and write to server
+                            bulkCopy.WriteToServer(ToDataTable(data));
+                        }
+                        // Commit the transaction if everything is successful
+                        transaction.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        transaction.Rollback();
+                        throw new Exception("Bulk insert failed. Transaction has been rolled back.", ex);
+                    }
+                }
+            }
+        }
+
+
 
 
     }

@@ -219,7 +219,7 @@ namespace DanpheEMR.Controllers
             }
             var RequisitionId = dispatch.DispatchItems[0].RequisitionId;
             var requisition = inventoryDb.Requisitions.Include(r => r.RequisitionItems).Where(r => r.RequisitionId == RequisitionId).FirstOrDefault();
-            bool IsRequisitionComplete = requisition.RequisitionItems.All(rItem => rItem.RequisitionItemStatus == "complete");
+            bool IsRequisitionComplete = requisition.RequisitionItems.All(rItem => rItem.RequisitionItemStatus == "complete" || rItem.PendingQuantity == 0 || rItem.PendingQuantity == rItem.CancelQuantity);
             requisition.RequisitionStatus = IsRequisitionComplete ? "complete" : "partial";
             requisition.ModifiedBy = currentUser.EmployeeId;
             requisition.ModifiedOn = currentDate;
@@ -264,11 +264,12 @@ namespace DanpheEMR.Controllers
                     foreach (var writeoffItem in writeOffItemsFromClient)
                     {
 
-                        var stockList = db.StoreStocks.Include(s => s.StockMaster).Where(s => s.ItemId == writeoffItem.ItemId && s.AvailableQuantity > 0 && s.StockMaster.BatchNo == writeoffItem.BatchNO && s.IsActive == true && s.StoreId == writeoffItem.StoreId).ToList();
+                        var stockList = db.StoreStocks.Include(s => s.StockMaster).Where(s => s.ItemId == writeoffItem.ItemId && s.AvailableQuantity > 0 && s.IsActive == true && s.StoreId == writeoffItem.StoreId && s.StockId == writeoffItem.StockId).ToList();
                         //If no stock found, stop the process
-                        if (stockList == null) throw new Exception($"Stock is not available for ItemId = {writeoffItem.ItemId}, BatchNo ={writeoffItem.BatchNO}");
+                        string ItemName = db.Items.Where(i => i.ItemId == writeoffItem.ItemId).FirstOrDefault().ItemName;
+                        if (stockList == null) throw new Exception($"Stock is not available for Item = {ItemName}");
                         //If total available quantity is less than the required/dispatched quantity, then stop the process
-                        if (stockList.Sum(s => s.AvailableQuantity) < writeoffItem.WriteOffQuantity) throw new Exception($"Stock is not available for ItemId = {writeoffItem.ItemId}, BatchNo ={writeoffItem.BatchNO}");
+                        if (stockList.Sum(s => s.AvailableQuantity) < writeoffItem.WriteOffQuantity) throw new Exception($"Stock is not available for Item = {ItemName}");
 
                         //Run the fifo logic in stocklist based on Created On
                         double totalRemainingQty = writeoffItem.WriteOffQuantity.Value;
@@ -845,6 +846,7 @@ namespace DanpheEMR.Controllers
             return dispatchDetails;
         }
         #endregion
+
         #region Update Purchase Request and Purchase Request Items
         //Update  records
         public static void UpdatePurchaseRequestWithItems(InventoryDbContext inventoryDbContext, PurchaseRequestModel requisition, int? VerificationId, RbacUser currentUser)
@@ -861,6 +863,7 @@ namespace DanpheEMR.Controllers
                     inventoryDbContext.Entry(PRItems).Property(x => x.RequestItemStatus).IsModified = true;
                     inventoryDbContext.Entry(PRItems).Property(x => x.ModifiedOn).IsModified = true;
                     inventoryDbContext.Entry(PRItems).Property(x => x.ModifiedBy).IsModified = true;
+                    inventoryDbContext.Entry(PRItems).Property(x => x.PendingQuantity).IsModified = true;
                     if (VerificationId > 0)
                     {
                         inventoryDbContext.Entry(PRItems).Property(x => x.RequestItemStatus).IsModified = true;
@@ -1043,14 +1046,14 @@ namespace DanpheEMR.Controllers
                         else
                         {
                             stockList = inventoryDb.StoreStocks.Include(s => s.StockMaster)
-                                                                           .Where(s => s.StoreId == dispatchItem.SourceStoreId && s.ItemId == dispatchItem.ItemId && s.AvailableQuantity > 0 && s.StockMaster.BatchNo == dispatchItem.BatchNo && s.IsActive == true).OrderBy(s => s.StoreStockId)
+                                                                           .Where(s => s.StoreId == dispatchItem.SourceStoreId && s.ItemId == dispatchItem.ItemId && s.AvailableQuantity > 0 && s.StockMaster.BatchNo == dispatchItem.BatchNo && s.CostPrice == (decimal)dispatchItem.CostPrice && s.IsActive == true).OrderBy(s => s.StoreStockId)
                                                                            .ToList();
                         }
 
                         //If no stock found, stop the process
-                        if (stockList == null) throw new Exception($"Stock is not available for ItemId = {dispatchItem.ItemId}, BatchNo ={dispatchItem.BatchNo}");
+                        if (stockList == null) throw new Exception($"Stock is not available for ItemId = {dispatchItem.ItemId}, BatchNo ={dispatchItem.BatchNo}, CostPrice = {dispatchItem.CostPrice}");
                         //If total available quantity is less than the required/dispatched quantity, then stop the process
-                        if (stockList.Sum(s => s.AvailableQuantity) < dispatchItem.DispatchedQuantity) throw new Exception($"Stock is not available for ItemId = {dispatchItem.ItemId}, BatchNo ={dispatchItem.BatchNo}");
+                        if (stockList.Sum(s => s.AvailableQuantity) < dispatchItem.DispatchedQuantity) throw new Exception($"Stock is not available for ItemId = {dispatchItem.ItemId}, BatchNo ={dispatchItem.BatchNo},CostPrice = {dispatchItem.CostPrice}");
 
                         var totalRemainingQty = dispatchItem.DispatchedQuantity;
                         foreach (var mainStoreStock in stockList)
@@ -1235,7 +1238,8 @@ namespace DanpheEMR.Controllers
                     MatIssueDate = dItem.MatIssueDate,
                     MatIssueTo = dItem.MatIssueTo,
                     ItemCategory = dItem.ItemCategory,
-                    Specification = dItem.Specification
+                    Specification = dItem.Specification,
+                    IsActive = true
                 };
                 inventoryDb.RequisitionItems.Add(reqItem);
                 inventoryDb.SaveChanges();
@@ -1484,6 +1488,7 @@ namespace DanpheEMR.Controllers
                                  GRStatus = gr.GRStatus,
                                  CurrentVerificationLevelCount = (verifLJ == null) ? 0 : verifLJ.CurrentVerificationLevelCount,
                                  VerificationId = gr.VerificationId,
+                                 VendorBillDate = gr.VendorBillDate,
                                  OtherChargesList = (from grOtherCharges in inventoryDb.GRCharges
                                                      join chargeMaster in inventoryDb.OtherCharges on grOtherCharges.ChargeId equals chargeMaster.ChargeId
                                                      where grOtherCharges.GoodsReceiptID == GoodsReceiptId

@@ -33,6 +33,8 @@ namespace DanpheEMR.Services.Inventory.DTO.InventoryReports
         public decimal StockManageInValue { get; set; }
         public decimal ClosingQty { get; set; }
         public decimal ClosingValue { get; set; }
+        public decimal WriteOffQty { get; set; }
+        public decimal WriteOffValue { get; set; }
         public static List<INV_RPT_InventorySummaryReport_DTO> MapDataTableToListObject(DataTable invSummary)
         {
             string invSummaryData = JsonConvert.SerializeObject(invSummary);

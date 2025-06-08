@@ -8,7 +8,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <from-to-date-select (on-change)="OnFromToDateChange($event)"
-                        [date-settings-name]="'billing-reports'">
+                                         [date-settings-name]="'billing-reports'">
                     </from-to-date-select>
                 </div>
                 <div class="col-md-2 col-xs-12">
@@ -30,7 +30,7 @@
                         <label class="control-label col-md-3">PaymentMode<b style="float:right;">:</b></label>
                         <div class="col-md-6">
                             <select id="id_digital_payment_mode" [(ngModel)]="PaymentMode" class="form-control"
-                                [ngModelOptions]="{standalone: true}" (change) = "PaymentModeChange($event)">
+                                    [ngModelOptions]="{standalone: true}" (change)="PaymentModeChange($event)">
                                 <option value="All" selected>All</option>
                                 <option *ngFor="let modes of PaymentModes" value="{{modes.PaymentSubCategoryName}}">
                                     {{modes.PaymentSubCategoryName}}
@@ -44,7 +44,7 @@
                         <label class="control-label col-md-3">Type<b style="float:right;">:</b></label>
                         <div class="col-md-6">
                             <select id="id_digital_payment_type" [(ngModel)]="Type" class="form-control"
-                                [ngModelOptions]="{standalone: true}" (change) = "TypeChanged($event)">
+                                    [ngModelOptions]="{standalone: true}" (change)="TypeChanged($event)">
                                 <option value="All" selected>All</option>
                                 <option *ngFor="let type of Types" value="{{type.TypeName}}">
                                     {{type.TypeName}}
@@ -59,10 +59,10 @@
                         <div class="col-md-7">
 
                             <input danphe-auto-complete class="form-control" [(ngModel)]="selUser" [source]="userList"
-                                [list-formatter]="UserListFormatter" placeholder="Enter User Name"
-                                display-property-name="EmployeeName" value-property-name="EmployeeId"
-                                onclick="this.select();" [ngModelOptions]="{standalone: true}"
-                                (focusout)="userChanged()" />
+                                   [list-formatter]="UserListFormatter" placeholder="Enter User Name"
+                                   display-property-name="EmployeeName" value-property-name="EmployeeId"
+                                   onclick="this.select();" [ngModelOptions]="{standalone: true}"
+                                   (focusout)="userChanged()" />
                         </div>
                     </div>
                 </div>
@@ -71,11 +71,11 @@
     </div>
 
     <div class="row">
-        <div class="col-lg-12 col-sm-12" *ngIf="showReport">
+        <div class="col-lg-12 col-sm-12">
             <danphe-grid [grid-colDefaults]="DigitalPaymentReportColumns" [grid-data]="reportData"
-                [grid-exportOptions]="gridExportOptions" [grid-showExport]="true"
-                [NepaliDateInGridParams]="NepaliDateInGridSettings" [report-for]="'billing'"
-                [grid-date-range]="dateRange" [grid-footer-content]="footerContent"> </danphe-grid>
+                         [grid-exportOptions]="gridExportOptions" [grid-showExport]="true"
+                         [NepaliDateInGridParams]="NepaliDateInGridSettings" [report-for]="'billing'"
+                         [grid-date-range]="dateRange" [grid-footer-content]="footerContent"> </danphe-grid>
         </div>
     </div>
     <div class="row" style="padding-bottom: 20px;">
@@ -84,7 +84,7 @@
                 <div id="id_digital_payment_report_summary">
                     <div style="padding-top:7px;">
                         <h4 style="font-weight:bold">
-                           Summary
+                            Summary
                         </h4>
                         <div>
                             <table class="tbl-summ" border="1" style="width:100%; float: left;">
@@ -117,7 +117,7 @@
                                         Cash Collection
                                     </th>
                                 </tr>
-                                <tr *ngFor = "let summ of summaryData">
+                                <tr *ngFor="let summ of summaryData">
                                     <td>
                                         {{ summ.PaymentModes }}
                                     </td>
@@ -163,7 +163,7 @@
                 </div>
                 <div class="row col-md-10" style="text-align:center">
                     <button class="blue btn" type="button" (click)="Print('id_digital_payment_report_summary')"> <i
-                            class="fa fa-print"></i>
+                           class="fa fa-print"></i>
                         Print </button>
                 </div>
             </div>

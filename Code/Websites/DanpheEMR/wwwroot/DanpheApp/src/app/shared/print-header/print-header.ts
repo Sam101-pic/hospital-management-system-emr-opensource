@@ -1,10 +1,12 @@
-import { Component, Input } from "@angular/core"
+import { Component, Input } from "@angular/core";
 import { CoreService } from "../../core/shared/core.service";
 import { MessageboxService } from "../messagebox/messagebox.service";
+import { ENUM_MessageBox_Status } from "../shared-enums";
+
 import { GeneralFieldLabels } from "../DTOs/general-field-label.dto";
 @Component({
-    selector: "print-header",
-    templateUrl: "./print-header.html",
+  selector: "print-header",
+  templateUrl: "./print-header.html",
 
 })
 
@@ -13,16 +15,17 @@ export class PrintHeaderComponent {
   public headerDetail: any;
 
   @Input("unit-name") unitname: string = "PHARMACY UNIT";
-  @Input("show-pan-number") showPANNo : boolean = true;
-  @Input("show-phone-number") showPhoneNo : boolean = true;
+  @Input("show-pan-number") showPANNo: boolean = true;
+  @Input("show-phone-number") showPhoneNo: boolean = true;
 
   @Input("report-for")
-  public reportFor:string = '';
-  public isLabReport:boolean = false; 
-  public isBillingReport:boolean = false;
-  public isSystemAdminReport : boolean = false;
-  public isMRReport : boolean = false;
-  public isADTReport : boolean = false;
+  public reportFor: string = '';
+  public isLabReport: boolean = false;
+  public isBillingReport: boolean = false;
+  public isSystemAdminReport: boolean = false;
+  public isMRReport: boolean = false;
+  public isADTReport: boolean = false;
+  IsOTReport: boolean = false;
 
   public GeneralFieldLabel = new GeneralFieldLabels();
 
@@ -32,12 +35,12 @@ export class PrintHeaderComponent {
       this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
     // this.GetHeaderParameter();
   }
-  ngOnInit(){
+  ngOnInit() {
     this.GetHeaderParameter();
   }
   //Get customer Header Parameter from Core Service (Database) assign to local variable
   GetHeaderParameter() {
-    if(this.reportFor == "billing"){
+    if (this.reportFor == "billing") {
       this.isBillingReport = true;
       var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader").ParameterValue;
       if (paramValue)
@@ -45,7 +48,7 @@ export class PrintHeaderComponent {
       else
         this.msgBoxServ.showMessage("error", ["Please enter parameter values for BillingHeader"]);
     }
-    else if(this.reportFor == "lab"){
+    else if (this.reportFor == "lab") {
       this.isLabReport = true;
       var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader").ParameterValue;
       if (paramValue)
@@ -53,7 +56,7 @@ export class PrintHeaderComponent {
       else
         this.msgBoxServ.showMessage("error", ["Please enter parameter values for BillingHeader"]);
     }
-    else if(this.reportFor == "adt"){
+    else if (this.reportFor == "adt") {
       this.isADTReport = true;
       var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader").ParameterValue;
       if (paramValue)
@@ -62,7 +65,7 @@ export class PrintHeaderComponent {
         this.msgBoxServ.showMessage("error", ["Please enter parameter values for BillingHeader"]);
     }
     //This is For MR Report.
-    else if(this.reportFor == "MRReport"){
+    else if (this.reportFor == "MRReport") {
       this.isMRReport = true;
       var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader").ParameterValue;
       if (paramValue)
@@ -71,7 +74,16 @@ export class PrintHeaderComponent {
         this.msgBoxServ.showMessage("error", ["Please enter parameter values for MR-Report Header"]);
     }
 
-    else if(this.reportFor == "systemadmin"){
+    else if (this.reportFor === "ot") {
+      this.IsOTReport = true;
+      var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName === "Common" && a.ParameterName === "CustomerHeader").ParameterValue;
+      if (paramValue)
+        this.headerDetail = JSON.parse(paramValue);
+      else
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please enter parameter values for OT Report Header"]);
+    }
+
+    else if (this.reportFor == "systemadmin") {
       this.isSystemAdminReport = true;
       var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader").ParameterValue;
       if (paramValue)
@@ -80,12 +92,12 @@ export class PrintHeaderComponent {
         this.msgBoxServ.showMessage("error", ["Please enter parameter values for BillingHeader"]);
     }
 
-    else{
-    var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "Pharmacy" && a.ParameterName == "Pharmacy Receipt Header").ParameterValue;
-    if (paramValue)
-      this.headerDetail = JSON.parse(paramValue);
-    else
-      this.msgBoxServ.showMessage("error", ["Please enter parameter values for Pharmacy Receipt Header"]);
+    else {
+      var paramValue = this.coreService.Parameters.find(a => a.ParameterGroupName == "Pharmacy" && a.ParameterName == "Pharmacy Receipt Header").ParameterValue;
+      if (paramValue)
+        this.headerDetail = JSON.parse(paramValue);
+      else
+        this.msgBoxServ.showMessage("error", ["Please enter parameter values for Pharmacy Receipt Header"]);
     }
   }
 

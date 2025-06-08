@@ -6,6 +6,7 @@ import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../s
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { IGridFilterParameter } from "../../../shared/danphe-grid/grid-filter-parameter.interface";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
 import { PharmacyService } from "../../shared/pharmacy.service";
 import { PHRMGoodsReceiptModel } from "../../shared/phrm-goods-receipt.model";
@@ -23,10 +24,11 @@ export class PHRMGoodsReceiptListComponent {
       newGoodsReceiptList: Array<PHRMGoodsReceiptModel> = new Array<PHRMGoodsReceiptModel>();
       supplierList: Array<PHRMSupplierModel> = new Array<PHRMSupplierModel>();
       goodsreceiptsGridColumns: Array<any> = null;
-      fromDate: string;
-      toDate: string;
-      fromDay: number = null;
-      toDay: number = null;
+      fromDate: string = moment().format('YYYY-MM-DD ');
+      toDate: string = moment().format('YYYY-MM-DD ');
+
+      fromDay: number = 0;
+      toDay: number = 0;
       supplierId: number = null;
       totalAmount: number = null;
       subTotal: number = null;
@@ -34,9 +36,7 @@ export class PHRMGoodsReceiptListComponent {
       vatTotal: number;
       currentSupplier: PHRMSupplierModel = new PHRMSupplierModel();
       showNepaliReceipt: boolean;
-      //for show and hide item level discount features
       IsitemlevlDis: boolean = false;
-      //for show and hide packing features
       IsPkgitem: boolean = false;
       showPopUp: boolean = false;
       dateRange: string = null;
@@ -49,6 +49,7 @@ export class PHRMGoodsReceiptListComponent {
       showGoodReceiptAddEditPage: boolean = false;
       FilterParameters: IGridFilterParameter[] = [];
       public footerContent = '';
+      EnableAdjustmentEdit: boolean = false;
 
       constructor(public coreService: CoreService,
             public pharmacyBLService: PharmacyBLService,
@@ -64,18 +65,24 @@ export class PHRMGoodsReceiptListComponent {
             this.showitemlvldiscount();
             this.showpacking();
             this.CheckReceiptSettings();
+            this.fromDay = 0;
+            this.toDay = 10;
+            this.EnablePharmacyGoodReceiptAdjustment();
       }
       onDateChange($event) {
-            this.fromDate = $event.fromDate;
-            this.toDate = $event.toDate;
-            if (this.fromDate != null && this.toDate != null) {
-                  if (moment(this.fromDate).isBefore(this.toDate) || moment(this.fromDate).isSame(this.toDate)) {
-                        this.getDateFilteredGoodsReceiptList();
-                  } else {
-                        this.msgBoxServ.showMessage('failed', ['Please enter valid From date and To date']);
-                  }
+            if ($event) {
+                  this.fromDate = $event.fromDate;
+                  this.toDate = $event.toDate;
             }
       }
+      LoadGoodReceipts() {
+            if (!this.fromDate && !this.toDate) {
+                  this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please enter valid From date and To date']);
+                  return
+            }
+            this.GetDateFilteredGoodsReceiptList();
+      }
+
 
       CheckReceiptSettings() {
             //check for english or nepali receipt style
@@ -133,7 +140,7 @@ export class PHRMGoodsReceiptListComponent {
             let html = data["SupplierName"];
             return html;
       }
-      public getDateFilteredGoodsReceiptList() {
+      public GetDateFilteredGoodsReceiptList() {
             this.FilterParameters = [
                   { DisplayName: "Supplier: ", Value: this.currentSupplier.SupplierName },
                   { DisplayName: "DateRange:", Value: "<b>From:</b>&nbsp;" + this.fromDate + "&nbsp;<b>To</b>&nbsp;" + this.toDate }
@@ -159,6 +166,7 @@ export class PHRMGoodsReceiptListComponent {
                               this.subTotal = this.goodsReceiptList.filter(s => s.IsCancel == false).map(c => c.SubTotal).reduce((sum, current) => sum + current);
                               this.discountTotal = this.goodsReceiptList.filter(s => s.IsCancel == false).map(c => c.DiscountAmount).reduce((sum, current) => sum + current);
                               this.vatTotal = this.goodsReceiptList.filter(s => s.IsCancel == false).map(c => c.VATAmount).reduce((sum, current) => sum + current);
+                              this.FilterGoodReceipts();
                               const tableContent = `
                                                 <table class="table table-striped table-hover table-responsive">
                                                       <tr>
@@ -203,32 +211,25 @@ export class PHRMGoodsReceiptListComponent {
             }
       }
       SupplierChange($event) {
-            this.supplierId = $event.SupplierId;
+            if ($event && $event.SupplierId > 0) {
+                  this.supplierId = $event.SupplierId;
+            }
+            else {
+                  this.supplierId = null;
+            }
       }
-      public filterlist() {
+      public FilterGoodReceipts() {
             this.supplierId = this.currentSupplier.SupplierId;
-
             this.filterGoodsReceiptList = [];
             if (this.fromDay && this.toDay) {
-                  var fromDate = moment().add(this.fromDay, 'days').format('YYYY-MM-DD');
-                  var toDate = moment().add(-this.toDay, 'days').format('YYYY-MM-DD');
-
-                  this.goodsReceiptList.forEach(list => {
-                        let selPharmDate = moment(list.CreatedOn).format('YYYY-MM-DD');
-                        let isGreterThanFrom = selPharmDate <= moment(fromDate).format('YYYY-MM-DD');
-                        let isSmallerThanTo = selPharmDate >= moment(toDate).format('YYYY-MM-DD')
-
-
-                        if (isGreterThanFrom && isSmallerThanTo && list.SupplierId == this.supplierId) {
-
-                              var date2 = new Date(list.GoodReceiptDate);
-                              var date1 = new Date(moment().format('YYYY-MM-DD'));
-                              var timeDiff = Math.abs(date2.getTime() - date1.getTime());
-                              list.AgingDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-                              this.filterGoodsReceiptList.push(list);
-                        }
+                  this.goodsReceiptList.forEach(gr => {
+                        let date2 = new Date(gr.GoodReceiptDate);
+                        let date1 = new Date(moment().format('YYYY-MM-DD'));
+                        var timeDiff = Math.abs(date2.getTime() - date1.getTime());
+                        gr.AgingDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
                   });
+                  this.goodsReceiptList = this.goodsReceiptList.filter(gr => gr.AgingDays >= this.fromDay && gr.AgingDays <= this.toDay);
+
             }
             if (this.filterGoodsReceiptList.length == 0) {
                   this.filterGoodsReceiptList = this.goodsReceiptList;
@@ -267,7 +268,7 @@ export class PHRMGoodsReceiptListComponent {
       grCancelEventHandler($event) {
             let selectedGR = this.goodsReceiptList.find(a => a.GoodReceiptId == $event.goodsReceiptId);
             if (selectedGR != null) { selectedGR.IsCancel = true; }
-            this.filterlist();
+            this.FilterGoodReceipts();
       }
       popUpCloseEventHandler() {
             this.showPopUp = false;
@@ -287,7 +288,21 @@ export class PHRMGoodsReceiptListComponent {
 
       CloseGoodReceiptItemAddEditPage() {
             this.showGoodReceiptAddEditPage = false;
-            this.getDateFilteredGoodsReceiptList();
+            this.GetDateFilteredGoodsReceiptList();
+      }
+      ngAfterViewChecked() {
+            this.footerContent = document.getElementById("phrm-gr-print_summary").innerHTML;
+      }
+      EnablePharmacyGoodReceiptAdjustment() {
+            let adjust = this.coreService.Parameters.find((p) => p.ParameterName == "EnableEditPHRMGRAdjustment" && p.ParameterGroupName == "Pharmacy");
+            if (adjust && adjust.ParameterValue) {
+                  if (adjust.ParameterValue == "true") {
+                        this.EnableAdjustmentEdit = true;
+                  } else {
+                        this.EnableAdjustmentEdit = false;
+                  }
+
+            }
       }
 }
 

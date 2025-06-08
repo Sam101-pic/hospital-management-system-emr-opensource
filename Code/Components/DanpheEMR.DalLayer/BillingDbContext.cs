@@ -5,9 +5,14 @@ using DanpheEMR.ServerModel.AdmissionModels.Config;
 using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.BillingModels.Config;
 using DanpheEMR.ServerModel.BillingModels.DischargeStatementModels;
+using DanpheEMR.ServerModel.CommonModels;
+using DanpheEMR.ServerModel.FonePayLog;
 using DanpheEMR.ServerModel.MedicareModels;
 using DanpheEMR.ServerModel.PatientModels;
+using DanpheEMR.ServerModel.PharmacyModels;
+using DanpheEMR.ServerModel.StickerModels;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Data.Entity;
 using System.Data.SqlClient;
@@ -111,6 +116,13 @@ namespace DanpheEMR.DalLayer
         public DbSet<BillingPackageServiceItemModel> BillingPackageServiceItems { get; set; }
         public DbSet<CurrencyModel> Currencies { get; set; }
         public DbSet<DischargeStatementModel> DischargeStatements { get; set; }
+        public DbSet<RegistrationStickerModel> RegistrationSticker { get; set; }
+        public DbSet<FonePayTransactionLogModel> FonePayTransactionLogs { get; set; }
+        public DbSet<PHRMInvoiceReturnItemsModel> PHRMInvoiceReturnItemsModel { get; set; }
+        public DbSet<PrintTemplateSettingsNewModel> PrintTemplateSettings { get; set; }
+        public DbSet<InsuranceMasterItemsModel> InsuranceMasterItems { get; set; }
+
+        public DbSet<DynamicReportGroup> DynamicReportGroups { get; set; }
 
 
         public object ReportingItemsModel { get; set; }
@@ -236,15 +248,30 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<BillingCancellationModel>().ToTable("BIL_TXN_ProvisionalItemReturn");
             modelBuilder.Entity<BillingPackageServiceItemModel>().ToTable("BIL_CFG_PackageServiceItems");
             modelBuilder.Entity<CurrencyModel>().ToTable("MST_Currency");
+            modelBuilder.Entity<RegistrationStickerModel>().ToTable("CFG_RegistrationStickerSettings");
+            modelBuilder.Entity<FonePayTransactionLogModel>().ToTable("LOG_FonePayTransactions");
+            modelBuilder.Entity<PHRMInvoiceReturnItemsModel>().ToTable("PHRM_TXN_InvoiceReturnItems");
+            modelBuilder.Entity<PrintTemplateSettingsNewModel>().ToTable("MST_PrintTemplateSettings");
+            modelBuilder.Entity<InsuranceMasterItemsModel>().ToTable("INSURANCE_MST_PRICELIST");
+
+            modelBuilder.Entity<BillingFiscalYear>()
+                .Property(e => e.FiscalYearId)
+                .HasDatabaseGeneratedOption(DatabaseGeneratedOption.None);
+
+            modelBuilder.Entity<DynamicReportGroup>().ToTable("BIL_MST_DynamicReportGroup");
 
         }
 
         //Sud: 14sept'18 -- 
-        public DataTable GetItemsForBillingReceipt(int patientId, int? billingTxnId, string billStatus)
+        public DataTable GetItemsForBillingReceipt(int patientId, int? billingTxnId, int patientVisitId, string billStatus)
         {
-            List<SqlParameter> paramList = new List<SqlParameter>() {  new SqlParameter("@PatientId", patientId),
-                            new SqlParameter("@BillTxnId", billingTxnId.HasValue ? billingTxnId.Value : (int?)null),
-                            new SqlParameter("@BillStatus",billStatus) };
+            List<SqlParameter> paramList = new List<SqlParameter>() 
+            {  
+                new SqlParameter("@PatientId", patientId),
+                new SqlParameter("@PatientVisitId", patientVisitId),
+                new SqlParameter("@BillTxnId", billingTxnId.HasValue ? billingTxnId.Value : (int?)null),
+                new SqlParameter("@BillStatus",billStatus) 
+            };
             DataTable discountReportData = DALFunctions.GetDataTableFromStoredProc("SP_BIL_GetItems_ForIPBillingReceipt", paramList, this);
             return discountReportData;
         }

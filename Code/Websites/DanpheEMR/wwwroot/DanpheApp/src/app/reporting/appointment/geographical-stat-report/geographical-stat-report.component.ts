@@ -7,6 +7,7 @@ import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { DLService } from '../../../shared/dl.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_GeographicalReportType, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { RPT_SchemeDTO } from '../../shared/dto/scheme.dto';
 import { DynamicReport } from '../../shared/dynamic-report.model';
 import { ReportingService } from '../../shared/reporting-service';
 
@@ -39,23 +40,22 @@ export class RPT_ADT_GeographicalStatReportComponent implements OnInit {
   public GeoStatType: string = "District";
   showMunicipality: any;
   public selectedDistrictId: number = 0;
-  public GeneralFieldLabel = new GeneralFieldLabels();
-
+  Schemes = new Array<RPT_SchemeDTO>();
+  SelectedScheme = new RPT_SchemeDTO();
+  GeneralFieldLabel = new GeneralFieldLabels();
+  IsFreeVisit: boolean = false;
 
   constructor(public dlService: DLService,
     public msgBoxServ: MessageboxService,
     public coreService: CoreService,
-    public reportServ: ReportingService) {
-
+    private _reportingService: ReportingService) {
     this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
-
-
     this.geographicalstatreport.fromDate = moment().format('YYYY-MM-DD');
     this.geographicalstatreport.toDate = moment().format('YYYY-MM-DD');
-    this.DistrictWiseReportColumn = this.reportServ.reportGridCols.RPT_ADT_DistrictWiseReportColumn;
-    this.MunicipalityWiseReportColumn = this.reportServ.reportGridCols.RPT_ADT_MunicipalityWiseReportColumn;
+    this.DistrictWiseReportColumn = this._reportingService.reportGridCols.RPT_ADT_DistrictWiseReportColumn;
+    this.MunicipalityWiseReportColumn = this._reportingService.reportGridCols.RPT_ADT_MunicipalityWiseReportColumn;
     this.showMunicipality = this.coreService.ShowMunicipality().ShowMunicipality;
-
+    this.Schemes = this._reportingService.SchemeList;
   }
 
   ngOnInit() {
@@ -71,8 +71,9 @@ export class RPT_ADT_GeographicalStatReportComponent implements OnInit {
 
       this.dlService.Read("/Reporting/GeographicalStatReport?FromDate="
         + this.geographicalstatreport.fromDate + "&ToDate=" + this.geographicalstatreport.toDate +
-        "&CountrySubDivisionName=" + this.CountrySubDivisionName + "&MunicipalityName=" + this.MunicipalityName
-        + "&GeoStatType=" + geoStatTypeToSend
+        "&CountrySubDivisionId=" + this.selectedDistrictId + "&MunicipalityId=" + this.MunicipalityId
+        + "&GeoStatType=" + geoStatTypeToSend + "&SchemeId=" + this.geographicalstatreport.SchemeId
+        + "&IsFreeVisit=" + this.IsFreeVisit
       )
         .map((res: DanpheHTTPResponse) => res)
         .subscribe((res: DanpheHTTPResponse) => this.Success(res),
@@ -140,7 +141,7 @@ export class RPT_ADT_GeographicalStatReportComponent implements OnInit {
       });
   }
   AssignSelectedDistrict(event) {
-    if (event) {
+    if (event && event.CountrySubDivisionId) {
       this.countrySubDivision = event;
       this.selectedDistrictId = this.countrySubDivision.CountrySubDivisionId;
       this.CountrySubDivisionName = this.countrySubDivision.CountrySubDivisionName;
@@ -148,6 +149,8 @@ export class RPT_ADT_GeographicalStatReportComponent implements OnInit {
       this.FilteredMunicipalitiesList = FilteredByDisMunicipalitiesList[0].Municipalities;
     } else {
       this.CountrySubDivisionName = '';
+      this.selectedDistrictId = 0;
+      this.FilteredMunicipalitiesList = [];
     }
     // this.GetMunicipality();
   }
@@ -180,13 +183,15 @@ export class RPT_ADT_GeographicalStatReportComponent implements OnInit {
         }
       });
   }
-  AssignSelectedMunicipality(event) {
-    if (event) {
-      this.MunicipalityName = event.MunicipalityName;
-      this.filteredMunicipalityWiseReportData = this.MunicipalityWiseReportData.find(x => x.MunicipalityName == event.MunicipalityName);
+  AssignSelectedMunicipality(municipality) {
+    if (municipality && municipality.MunicipalityId) {
+      this.MunicipalityName = municipality.MunicipalityName;
+      this.MunicipalityId = municipality.MunicipalityId;
+      this.filteredMunicipalityWiseReportData = this.MunicipalityWiseReportData.find(x => x.MunicipalityName == municipality.MunicipalityName);
     }
     else {
       this.MunicipalityName = '';
+      this.MunicipalityId = 0;
       this.filteredMunicipalityWiseReportData = [];
     }
   }
@@ -196,5 +201,23 @@ export class RPT_ADT_GeographicalStatReportComponent implements OnInit {
     if (this.municipality) {
       this.GeoStatType = 'Municipality';
     }
+  }
+
+  SchemeFormatter(data: any): string {
+    let html = data["SchemeName"];
+    return html;
+  }
+
+  OnSchemeChange(): void {
+    if (this.SelectedScheme && typeof (this.SelectedScheme) === "object" && this.SelectedScheme.SchemeId) {
+      this.geographicalstatreport.SchemeId = this.SelectedScheme.SchemeId;
+    }
+    else {
+      this.SelectedScheme = new RPT_SchemeDTO();
+      this.geographicalstatreport.SchemeId = null;
+    }
+  }
+  IsFreeVisitClicked() {
+    this.IsFreeVisit = !this.IsFreeVisit;
   }
 }

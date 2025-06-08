@@ -1,5 +1,6 @@
 ﻿using DanpheEMR.ServerModel.SSFModels;
 using Newtonsoft.Json;
+using Serilog;
 using System;
 using System.Net.Http;
 using System.Text;
@@ -19,11 +20,17 @@ namespace DanpheEMR.Sync.SSF
             client.BaseAddress = new Uri(ssfCred.SSFurl);
             var jsonContent = JsonConvert.SerializeObject(claimBooking);
             StringContent content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Log.Information($"Claim Booking Object is prepared to submit real time claim booking details, with requst \n {claimBooking}");
+
             var response = client.PostAsync($"BookingService", content).Result;
             SSF_RealTimeBookingServiceResponse realTimeBookingServiceResponse = new SSF_RealTimeBookingServiceResponse();
             if (response.IsSuccessStatusCode)
             {
+
                 var message = response.Content.ReadAsStringAsync();
+                Log.Information($"Real Time Claim Booking is successful");
+                Log.Information($"Real Time Claim Booking Response is received from SSF Server, with response \n {message} ");
                 realTimeBookingServiceResponse.ResponseData = message.Result;
                 realTimeBookingServiceResponse.BookingStatus = true;
                 return realTimeBookingServiceResponse;
@@ -33,6 +40,7 @@ namespace DanpheEMR.Sync.SSF
                 if (response.Content.Headers.ContentType?.MediaType != "text/html")
                 {
                     var errorString = response.Content.ReadAsStringAsync();
+                    Log.Error($"Real Time Claim Booking for request Failed that had payload as \n {claimBooking}, \n  with error message, \n {errorString}");
                     realTimeBookingServiceResponse.ResponseData = errorString.Result;
                     realTimeBookingServiceResponse.BookingStatus = false;
                     return realTimeBookingServiceResponse;
@@ -40,6 +48,7 @@ namespace DanpheEMR.Sync.SSF
                 else
                 {
                     var errorString = response.Content.ReadAsStringAsync();
+                    Log.Error($"Real Time Claim Booking for request Failed that had payload as \n {claimBooking}, \n  with error message, \n {errorString}");
                     realTimeBookingServiceResponse.ResponseData = errorString.Result;
                     realTimeBookingServiceResponse.BookingStatus = false;
                     return realTimeBookingServiceResponse;

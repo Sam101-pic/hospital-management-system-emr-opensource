@@ -25,7 +25,6 @@ using DanpheEMR.ServerModel.InventoryModels;
 using DanpheEMR.ServerModel.AccountingModels;
 using System.Net.Http.Headers;
 using DanpheEMR.ServerModel.AccountingModels.DTOs;
-
 namespace DanpheEMR.AccTransfer
 {
     public class AccountingTransferData
@@ -98,7 +97,7 @@ namespace DanpheEMR.AccTransfer
             var ledgerList = (from led in accountingDBContext.Ledgers
                               join ledgrp in accountingDBContext.LedgerGroups
                                on led.LedgerGroupId equals ledgrp.LedgerGroupId
-                              where led.IsActive == true
+                              where led.IsActive == true && led.HospitalId == currHospitalId
 
                               select new
                               {
@@ -127,13 +126,13 @@ namespace DanpheEMR.AccTransfer
                 LedgerType = p.LedgerType
             }).ToList();
 
-            SubLedgerList = accountingDBContext.SubLedger.AsNoTracking().ToList();
+            SubLedgerList = accountingDBContext.SubLedger.Where(sl => sl.HospitalId == currHospitalId).AsNoTracking().ToList();
 
             // Get billing credit organization                     
             var billingCreditOrganizations = (from ledM in accountingDBContext.LedgerMappings
                                               join credOrg in accountingDBContext.BillCreditOrganizations on ledM.ReferenceId equals credOrg.OrganizationId
                                               join led in accountingDBContext.Ledgers on ledM.LedgerId equals led.LedgerId
-                                              where ledM.LedgerType == "creditorganization" && led.IsActive == true
+                                              where ledM.LedgerType == "creditorganization" && led.IsActive == true && led.HospitalId == currHospitalId
                                               select new
                                               {
                                                   credOrg.OrganizationId,
@@ -154,16 +153,16 @@ namespace DanpheEMR.AccTransfer
 
             // Get Pharmacy credit organization                     
             var PHRM_CreditOrganizations = (from ledM in accountingDBContext.LedgerMappings
-                                              join credOrg in accountingDBContext.PHRMCreditOrganization on ledM.ReferenceId equals credOrg.OrganizationId
-                                              join led in accountingDBContext.Ledgers on ledM.LedgerId equals led.LedgerId
-                                              where ledM.LedgerType == "PHRMCreditOrganization" && led.IsActive == true
-                                              select new
-                                              {
-                                                  credOrg.OrganizationId,
-                                                  ledM.LedgerId,
-                                                  ledM.LedgerType,
-                                                  LedgerName = credOrg.OrganizationName
-                                              }).ToList();
+                                            join credOrg in accountingDBContext.PHRMCreditOrganization on ledM.ReferenceId equals credOrg.OrganizationId
+                                            join led in accountingDBContext.Ledgers on ledM.LedgerId equals led.LedgerId
+                                            where ledM.LedgerType == "PHRMCreditOrganization" && led.IsActive == true && led.HospitalId == currHospitalId
+                                            select new
+                                            {
+                                                credOrg.OrganizationId,
+                                                ledM.LedgerId,
+                                                ledM.LedgerType,
+                                                LedgerName = credOrg.OrganizationName
+                                            }).ToList();
 
             PHRMCreditOrganizations = PHRM_CreditOrganizations.Select(p => new LedgerMappingModel()
             {
@@ -176,7 +175,7 @@ namespace DanpheEMR.AccTransfer
             var InvSubCategories = (from ledM in accountingDBContext.LedgerMappings
                                     join led in accountingDBContext.Ledgers
                                     on ledM.LedgerId equals led.LedgerId
-                                    where ledM.LedgerType == "inventorysubcategory" && led.IsActive == true
+                                    where ledM.LedgerType == "inventorysubcategory" && led.IsActive == true && led.HospitalId == currHospitalId
                                     select new
                                     {
                                         ledM.ReferenceId,
@@ -195,16 +194,16 @@ namespace DanpheEMR.AccTransfer
 
             // Get Inventory Other Charge                     
             var INV_OtherCharge = (from ledM in accountingDBContext.LedgerMappings
-                                            join invCharge in accountingDBContext.InvCharges on ledM.ReferenceId equals invCharge.ChargeId
-                                            join led in accountingDBContext.Ledgers on ledM.LedgerId equals led.LedgerId
-                                            where ledM.LedgerType == "INVOtherCharge" && led.IsActive == true
-                                            select new
-                                            {
-                                                invCharge.ChargeId,
-                                                ledM.LedgerId,
-                                                ledM.LedgerType,
-                                                LedgerName = invCharge.ChargeName
-                                            }).ToList();
+                                   join invCharge in accountingDBContext.InvCharges on ledM.ReferenceId equals invCharge.ChargeId
+                                   join led in accountingDBContext.Ledgers on ledM.LedgerId equals led.LedgerId
+                                   where ledM.LedgerType == "INVOtherCharge" && led.IsActive == true && led.HospitalId == currHospitalId
+                                   select new
+                                   {
+                                       invCharge.ChargeId,
+                                       ledM.LedgerId,
+                                       ledM.LedgerType,
+                                       LedgerName = invCharge.ChargeName
+                                   }).ToList();
 
             INVOtherChargeList = INV_OtherCharge.Select(p => new LedgerMappingModel()
             {
@@ -218,7 +217,7 @@ namespace DanpheEMR.AccTransfer
             var consultantLedgers = (from ledM in accountingDBContext.LedgerMappings
                                      join emp in accountingDBContext.Emmployees on ledM.ReferenceId equals emp.EmployeeId
                                      join led in accountingDBContext.Ledgers on ledM.LedgerId equals led.LedgerId
-                                     where ledM.LedgerType == "consultant" && led.IsActive == true
+                                     where ledM.LedgerType == "consultant" && led.IsActive == true && led.HospitalId == currHospitalId
                                      select new
                                      {
                                          emp.EmployeeId,
@@ -262,21 +261,23 @@ namespace DanpheEMR.AccTransfer
             }).ToList();
             //get vouchers list
             var vouchers = (from voucher in accountingDBContext.Vouchers
-                            where voucher.IsActive == true
+                            where voucher.IsActive == true && voucher.HospitalId == currHospitalId
                             select voucher).ToList();
             voucherList = vouchers;
             //get voucher heads
             var voucherHeads = (from voucher in accountingDBContext.VoucherHeads
-                                where voucher.IsActive == true
+                                where voucher.IsActive == true && voucher.HospitalId == currHospitalId
                                 select voucher).ToList();
             voucherHeadList = voucherHeads;
             // get fiscal years data
             var fiscalyearList = (from fsc in accountingDBContext.FiscalYears
+                                  join map in accountingDBContext.MapFiscalYears
+                                  on fsc.FiscalYearId equals map.FiscalYearId where map.HospitalId == currHospitalId
                                   select fsc).ToList();
             FiscalYearList = fiscalyearList;
 
             var activeHosp = accountingDBContext.Hospitals
-                .Where(a => a.IsActive == true)
+                .Where(a => a.IsActive == true && a.HospitalId == currHospitalId)
                 .FirstOrDefault();
             if (activeHosp.HospitalId > 0)
             {
@@ -292,15 +293,16 @@ namespace DanpheEMR.AccTransfer
             //    SectionList = (secList != null) ? JsonConvert.DeserializeObject<List<AccSectionModel>>(JsonConvert.SerializeObject(secList)) : SectionList; ;
             //}
 
-            SectionList = accountingDBContext.Section.Where(s => s.IsActive == true).ToList();
+            SectionList = accountingDBContext.Section.Where(s => s.IsActive == true && s.HospitalId == currHospitalId).ToList();
             //get Account transfer rules
             var ruleList = (from hosprulemap in accountingDBContext.HospitalTransferRuleMappings
                             where hosprulemap.HospitalId == activeHosp.HospitalId && hosprulemap.IsActive == true
                             select hosprulemap.TransferRuleId).ToList();
-            var ledgerGroups = accountingDBContext.LedgerGroups.AsEnumerable().ToList();
-            var mapdetails = accountingDBContext.MappingDetail.AsEnumerable().ToList();
-            var AccTransferRules = (from grp in accountingDBContext.GroupMapping.AsEnumerable()
+            var ledgerGroups = accountingDBContext.LedgerGroups.Where(a => a.HospitalId == currHospitalId).AsEnumerable().ToList();
+            var mapdetails = accountingDBContext.MappingDetail.Where(a => a.HospitalId == currHospitalId).AsEnumerable().ToList();
+            var AccTransferRules = (from grp in accountingDBContext.GroupMapping.Where(g => g.HospitalId == currHospitalId).AsEnumerable()
                                     join ruleid in ruleList.AsEnumerable() on grp.GroupMappingId equals ruleid
+                                    where grp.HospitalId == currHospitalId
                                     select new
                                     {
                                         grp.GroupMappingId,
@@ -342,7 +344,7 @@ namespace DanpheEMR.AccTransfer
             var supplier = (from m in accountingDBContext.LedgerMappings
                             join s in accountingDBContext.PHRMSupplier on m.ReferenceId equals s.SupplierId
                             join led in accountingDBContext.Ledgers on m.LedgerId equals led.LedgerId
-                            where m.LedgerType == "pharmacysupplier" && led.IsActive == true
+                            where m.LedgerType == "pharmacysupplier" && led.IsActive == true && led.HospitalId == currHospitalId
                             select new
                             {
                                 m.LedgerId,
@@ -362,7 +364,7 @@ namespace DanpheEMR.AccTransfer
             var vendor = (from m in accountingDBContext.LedgerMappings
                           join v in accountingDBContext.InvVendors on m.ReferenceId equals v.VendorId
                           join led in accountingDBContext.Ledgers on m.LedgerId equals led.LedgerId
-                          where m.LedgerType == "inventoryvendor" && led.IsActive == true
+                          where m.LedgerType == "inventoryvendor" && led.IsActive == true && led.HospitalId == currHospitalId
                           select new
                           {
                               v.VendorId,
@@ -382,7 +384,7 @@ namespace DanpheEMR.AccTransfer
 
             var billingIncomeLedger = (from m in accountingDBContext.AccountBillLedgerMapping
                                        join led in accountingDBContext.Ledgers on m.LedgerId equals led.LedgerId
-                                       where led.IsActive == true
+                                       where led.IsActive == true && led.HospitalId == currHospitalId
                                        select new
                                        {
                                            m.ItemId,
@@ -516,7 +518,7 @@ namespace DanpheEMR.AccTransfer
             {
                 PaymentSubCategoryName = a.PaymentSubCategoryName,
                 TransactionType = a.TransactionType,
-                TotalAmount =(decimal) a.TotalAmount,
+                TotalAmount = (decimal)a.TotalAmount,
                 LedgerId = a.LedgerId,
                 OrganizationId = a.OrganizationId is DBNull ? null : a.OrganizationId
             }).ToList();
@@ -553,9 +555,9 @@ namespace DanpheEMR.AccTransfer
             {
                 //string ledgerName ;
                 var ledger = LedgerList.Find(a => a.Name == name);
-                if(ledger != null)
+                if (ledger != null)
                 {
-                    return ledger.LedgerName;                   
+                    return ledger.LedgerName;
 
                 }
                 else
@@ -632,6 +634,30 @@ namespace DanpheEMR.AccTransfer
                 if (LedgerId > 0)
                 {
                     var subLedger = SubLedgerList.Where(a => a.LedgerId == LedgerId && a.IsDefault == true).FirstOrDefault();
+                    if (subLedger != null)
+                    {
+                        return subLedger.SubLedgerId;
+                    }
+                    else
+                    {
+                        return 0;
+                    }
+                }
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public static int GetDefaultSubLedgerId(int LedgerId, int HospitalId)
+        {
+            try
+            {
+                if (LedgerId > 0)
+                {
+                    var subLedger = SubLedgerList.Where(a => a.LedgerId == LedgerId && a.IsDefault == true && a.HospitalId == HospitalId).FirstOrDefault();
                     if (subLedger != null)
                     {
                         return subLedger.SubLedgerId;
@@ -774,6 +800,17 @@ namespace DanpheEMR.AccTransfer
             {
                 //var conn = accountingDBContext.Database.Connection;
                 //conn.Open();
+                List<TransactionLinkRefDTO> TransactionRefs = new List<TransactionLinkRefDTO>();
+
+                if (txndata.Count > 0)
+                {
+                    List<SqlParameter> parameters = new List<SqlParameter>()
+                                {
+                                    new SqlParameter("@TransactionDate", txndata[0].TransactionDate),
+                                };
+                    DataTable TxnRefs_DataTable = DALFunctions.GetDataTableFromStoredProc("ACC_TXNREF_GetAlreadySyncedTxnDetail", parameters, accountingDBContext);
+                    TransactionRefs = JsonConvert.DeserializeObject<List<TransactionLinkRefDTO>>(JsonConvert.SerializeObject(TxnRefs_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                }
 
                 using (var dbContextTransaction = accountingDBContext.Database.BeginTransaction())
                 {
@@ -787,14 +824,28 @@ namespace DanpheEMR.AccTransfer
                         string refBillingSyncIds = "";
                         if (Transaction.Count > 0)
                         {
+                            Transaction.ForEach(txn =>
+                            {
+                                txn.TransactionItems.ForEach(item =>
+                                {
+                                    var refs = TransactionRefs.Where(a => a.TransactionType == item.TransactionType).Select(a => a.ReferenceIds).ToList();
+                                    var referenceIds = String.Join(",", refs).Split(',').Distinct().ToList();
+                                    if (item.TransactionLinks.Any(a => referenceIds.Contains(a.ReferenceId)))
+                                    {
+                                        throw new Exception("Some Transactions has already been synced to accounting please reload the transaction and try again.");
+                                    }
+                                });
+                            });
+
                             var isGroupbyData = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "IsAllowGroupby").FirstOrDefault().ParameterValue;
                             var EnableVoucherVerificationParam = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "EnableVoucherVerification").FirstOrDefault();
+                            var isVoucherVerificationEnabled = Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue);
                             //here transaction list from billing or may be from inventory
                             //1-sectionId for inventory 2-sectionid for billing
                             var sectionId = Transaction[0].SectionId;
                             var IsingalVoucher = Convert.ToBoolean(InvetoryIntegrationParameters["IsSingalVoucher"].ToString());
                             var distinctVoucherIdAndDate = (from txn in Transaction
-                                                            where txn.TransactionType !="DepositDeduct" && txn.TransactionType != "DiscountReturn"
+                                                            where txn.TransactionType != "DepositDeduct" && txn.TransactionType != "DiscountReturn"
                                                             group txn by new { txn.VoucherId, txn.TransactionDate } into x
                                                             select new
                                                             {
@@ -822,12 +873,12 @@ namespace DanpheEMR.AccTransfer
                                 Transaction.ForEach(txn =>
                                 {
                                     txn.IsReverseTxnAllow = true;
-                                   if(txn.TransactionType != "DepositDeduct" && txn.TransactionType != "DiscountReturn") // ignoring Deposit Deduct and DiscountReturn transaction - Bikash,14thMarch
-                                   {
+                                    if (txn.TransactionType != "DepositDeduct" && txn.TransactionType != "DiscountReturn") // ignoring Deposit Deduct and DiscountReturn transaction - Bikash,14thMarch
+                                    {
                                         txn.IsCustomVoucher = IsCustomVoucher;
                                         txn.TUId = Tuid;
                                         txn.IsActive = true;
-                                        if (EnableVoucherVerificationParam != null && Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue))
+                                        if (EnableVoucherVerificationParam != null && isVoucherVerificationEnabled)
                                         {
                                             txn.Status = ENUM_ACC_VoucherStatus.Draft;
                                         }
@@ -840,7 +891,7 @@ namespace DanpheEMR.AccTransfer
                                             txn.VerificationRemarks = "Voucher Verification is disabled. Thus, auto verifying the voucher.";
                                         }
                                         txn.VoucherNumber = voucherNumberList.Find(s => s.VoucherId == txn.VoucherId && s.TransactionDate == txn.TransactionDate).VoucherNumber.ToString();
-                                        TransactionModel txntemp = ProcessTransactions(txn, currHospitalId);
+                                        TransactionModel txntemp = ProcessTransactions(txn, currHospitalId, isVoucherVerificationEnabled);
                                         txntemp.HospitalId = currHospitalId;
                                         for (int i = 0; i < txntemp.TransactionItems.Count; i++)
                                         {
@@ -874,7 +925,7 @@ namespace DanpheEMR.AccTransfer
                                                 }
                                             }
                                         }
-                                   }
+                                    }
                                 });
                                 accountingDBContext.SaveChanges();
                                 List<string> TransactionType = new List<string>();
@@ -916,7 +967,7 @@ namespace DanpheEMR.AccTransfer
                                     txn.IsCustomVoucher = IsCustomVoucher;
                                     txn.TUId = Tuid;
                                     txn.IsActive = true;
-                                    if (EnableVoucherVerificationParam != null && Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue))
+                                    if (EnableVoucherVerificationParam != null && isVoucherVerificationEnabled)
                                     {
                                         txn.Status = ENUM_ACC_VoucherStatus.Draft;
                                     }
@@ -936,7 +987,7 @@ namespace DanpheEMR.AccTransfer
                                         var IdGroupBy = (isGroupbyData != "") ? Convert.ToBoolean(isGroupbyData) : true;
                                         txn.IsGroupTxn = (IdGroupBy) ? IdGroupBy : false;
                                     }
-                                    TransactionModel txntemp = ProcessTransactions(txn, currHospitalId);
+                                    TransactionModel txntemp = ProcessTransactions(txn, currHospitalId, isVoucherVerificationEnabled);
                                     txntemp.HospitalId = currHospitalId;
 
                                     for (int i = 0; i < txntemp.TransactionItems.Count; i++)
@@ -1010,7 +1061,7 @@ namespace DanpheEMR.AccTransfer
                                     txn.IsCustomVoucher = IsCustomVoucher;
                                     txn.TUId = Tuid;
                                     txn.IsActive = true;
-                                    if (EnableVoucherVerificationParam != null && Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue))
+                                    if (EnableVoucherVerificationParam != null && isVoucherVerificationEnabled)
                                     {
                                         txn.Status = ENUM_ACC_VoucherStatus.Draft;
                                     }
@@ -1023,7 +1074,7 @@ namespace DanpheEMR.AccTransfer
                                         txn.VerificationRemarks = "Voucher Verification is disabled. Thus, auto verifying the voucher.";
                                     }
                                     txn.VoucherNumber = voucherNumberList.Find(s => s.VoucherId == txn.VoucherId && s.TransactionDate == txn.TransactionDate).VoucherNumber.ToString();
-                                    TransactionModel txntemp = ProcessTransactions(txn, currHospitalId);
+                                    TransactionModel txntemp = ProcessTransactions(txn, currHospitalId, isVoucherVerificationEnabled);
                                     txntemp.HospitalId = currHospitalId;
                                     for (int i = 0; i < txntemp.TransactionItems.Count; i++)
                                     {
@@ -1096,7 +1147,7 @@ namespace DanpheEMR.AccTransfer
                                     txn.IsCustomVoucher = IsCustomVoucher;
                                     txn.TUId = Tuid;
                                     txn.IsActive = true;
-                                    if (EnableVoucherVerificationParam != null && Convert.ToBoolean(EnableVoucherVerificationParam.ParameterValue))
+                                    if (EnableVoucherVerificationParam != null && isVoucherVerificationEnabled)
                                     {
                                         txn.Status = ENUM_ACC_VoucherStatus.Draft;
                                     }
@@ -1109,7 +1160,7 @@ namespace DanpheEMR.AccTransfer
                                         txn.VerificationRemarks = "Voucher Verification is disabled. Thus, auto verifying the voucher.";
                                     }
                                     txn.VoucherNumber = voucherNumberList.Find(s => s.VoucherId == txn.VoucherId && s.TransactionDate == txn.TransactionDate).VoucherNumber.ToString();
-                                    TransactionModel txntemp = ProcessTransactions(txn, currHospitalId);
+                                    TransactionModel txntemp = ProcessTransactions(txn, currHospitalId, isVoucherVerificationEnabled);
                                     for (int i = 0; i < txntemp.TransactionItems.Count; i++)
                                     {
                                         txntemp.TransactionItems[i].HospitalId = currHospitalId;
@@ -1216,6 +1267,7 @@ namespace DanpheEMR.AccTransfer
             try
             {
                 var Tuid = (from txn in accountingDBContext.Transactions
+                            where txn.HospitalId == currHospitalId
                             select txn.TUId).ToList().DefaultIfEmpty(0).Max();
                 if (Tuid != null)
                 {
@@ -1244,17 +1296,19 @@ namespace DanpheEMR.AccTransfer
                                       select txn.VoucherSerialNo).DefaultIfEmpty(0).Max();
 
                 var voucherCode = (from v in accountingDBContext.Vouchers
-                                   where v.VoucherId == voucherId
+                                   where v.VoucherId == voucherId && v.HospitalId == currHospitalId
                                    select v.VoucherCode).FirstOrDefault();
 
                 var sectionCode = (from s in SectionList.AsEnumerable()
                                    where s.SectionId == SectionId && s.HospitalId == currHospitalId
                                    select s.SectionCode).FirstOrDefault();
+                var hospitalCode = accountingDBContext.Hospitals.Where(h => h.HospitalId == currHospitalId).Select(h => h.HospitalShortName).FirstOrDefault();
+
                 if (IsSingleVoucher)
                 {
                     if (sameDayMaxVNo > 0)
                     {
-                        return sectionCode + '-' + voucherCode + '-' + sameDayMaxVNo;
+                        return $"{hospitalCode}-{sectionCode}-{voucherCode}-{sameDayMaxVNo}"; //sectionCode + '-' + voucherCode + '-' + sameDayMaxVNo;
                     }
                     else
                     {
@@ -1266,11 +1320,11 @@ namespace DanpheEMR.AccTransfer
                         if (lastDayMaxVNo > 0)
                         {
                             int? newNo = lastDayMaxVNo + 1;
-                            return sectionCode + '-' + voucherCode + '-' + newNo;
+                            return $"{hospitalCode}-{sectionCode}-{voucherCode}-{newNo}";//sectionCode + '-' + voucherCode + '-' + newNo;
                         }
                         else
                         {
-                            return sectionCode + "-" + voucherCode + "-1";
+                            return $"{hospitalCode}-{sectionCode}-{voucherCode}-1";//sectionCode + "-" + voucherCode + "-1";
                         }
                     }
                 }
@@ -1283,19 +1337,21 @@ namespace DanpheEMR.AccTransfer
                     if (lastDayMaxVcNo > 0)
                     {
                         int? newNo1 = lastDayMaxVcNo + 1;
-                        return sectionCode + '-' + voucherCode + '-' + newNo1;
+                        return $"{hospitalCode}-{sectionCode}-{voucherCode}-{newNo1}";//sectionCode + '-' + voucherCode + '-' + newNo1;
                     }
                     else
                     {
-                        return sectionCode + "-" + voucherCode + "-1";
+                        return $"{hospitalCode}-{sectionCode}-{voucherCode}-1";//sectionCode + "-" + voucherCode + "-1";
                     }
                 }
             }
         }
 
         //Process Transaction
-        private static TransactionModel ProcessTransactions(TransactionModel transaction, int currHospitalId)
+        private static TransactionModel ProcessTransactions(TransactionModel transaction, int currHospitalId, bool isVoucherVerificationEnabled)
         {
+            var subLedgerParam = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "SubLedgerAndCostCenter").FirstOrDefault().ParameterValue;
+            var parmValue = JsonConvert.DeserializeObject<SubLedgerCostCenterConfig_DTO>(subLedgerParam);
 
             transaction.CreatedBy = EmployeeId;
             transaction.CreatedOn = DateTime.Now;
@@ -1304,7 +1360,7 @@ namespace DanpheEMR.AccTransfer
                 txnItem.CreatedOn = DateTime.Now;
                 txnItem.CreatedBy = EmployeeId;
                 txnItem.IsActive = true;
-                if (txnItem.SubLedgers != null)
+                if (txnItem.SubLedgers != null && parmValue.EnableSubLedger)
                 {
                     txnItem.SubLedgers.ForEach(subLedgerItems =>
                     {
@@ -1319,6 +1375,12 @@ namespace DanpheEMR.AccTransfer
                         subLedgerItems.CrAmount = txnItem.DrCr ? 0 : txnItem.Amount;
                         subLedgerItems.FiscalYearId = transaction.FiscalyearId;
                         subLedgerItems.CostCenterId = txnItem.CostCenterId;
+                        subLedgerItems.IsActive = true;
+                        subLedgerItems.Description = txnItem.Description;
+                        if (!isVoucherVerificationEnabled)
+                        {
+                            subLedgerItems.IsVerified = true;
+                        }
                     });
                 }
             });
@@ -1359,7 +1421,7 @@ namespace DanpheEMR.AccTransfer
                     {
                         var supplier = (from m in accountingDBContext.LedgerMappings
                                         join s in accountingDBContext.PHRMSupplier on m.ReferenceId equals s.SupplierId
-                                        where m.LedgerType == "pharmacysupplier"
+                                        where m.LedgerType == "pharmacysupplier" && m.HospitalId == currHospitalId
                                         select new
                                         {
                                             m.LedgerId,
@@ -1378,7 +1440,7 @@ namespace DanpheEMR.AccTransfer
                         }).ToList();
                         var vendor = (from m in accountingDBContext.LedgerMappings
                                       join v in accountingDBContext.InvVendors on m.ReferenceId equals v.VendorId
-                                      where m.LedgerType == "inventoryvendor"
+                                      where m.LedgerType == "inventoryvendor" && m.HospitalId == currHospitalId
                                       select new
                                       {
                                           v.VendorId,
@@ -1397,7 +1459,7 @@ namespace DanpheEMR.AccTransfer
                         }).ToList();
                         var billingCreditOrganizations = (from ledM in accountingDBContext.LedgerMappings
                                                           join credOrg in accountingDBContext.BillCreditOrganizations on ledM.ReferenceId equals credOrg.OrganizationId
-                                                          where ledM.LedgerType == "creditorganization"
+                                                          where ledM.LedgerType == "creditorganization" && ledM.HospitalId == currHospitalId
                                                           select new
                                                           {
                                                               credOrg.OrganizationId,
@@ -1418,7 +1480,7 @@ namespace DanpheEMR.AccTransfer
 
                         var consultantLedgers = (from ledM in accountingDBContext.LedgerMappings
                                                  join emp in accountingDBContext.Emmployees on ledM.ReferenceId equals emp.EmployeeId
-                                                 where ledM.LedgerType == "consultant"
+                                                 where ledM.LedgerType == "consultant" && ledM.HospitalId == currHospitalId
                                                  select new
                                                  {
                                                      emp.EmployeeId,
@@ -1442,7 +1504,7 @@ namespace DanpheEMR.AccTransfer
                     var ledgerList = (from led in accountingDBContext.Ledgers
                                       join ledgrp in accountingDBContext.LedgerGroups
                                        on led.LedgerGroupId equals ledgrp.LedgerGroupId
-                                      where led.IsActive == true
+                                      where led.IsActive == true && led.HospitalId == currHospitalId
                                       select new
                                       {
                                           led.LedgerId,
@@ -2164,7 +2226,7 @@ namespace DanpheEMR.AccTransfer
                         Billingledgergroupuniquename = data.LedgergroupUniqueName;
                     }
                 }
-                var ledgergroupId = accountingDBContext.LedgerGroups.Where(lg => lg.Name == Billingledgergroupuniquename).FirstOrDefault().LedgerGroupId;
+                var ledgergroupId = accountingDBContext.LedgerGroups.Where(lg => lg.Name == Billingledgergroupuniquename && lg.HospitalId == currHospitalId).FirstOrDefault().LedgerGroupId;
                 // START:VIKAS:31 dec 2020: Get unique ledger group id from the parameters
 
                 ClearUnavailableLedgerList();
@@ -2331,77 +2393,47 @@ namespace DanpheEMR.AccTransfer
                 List<AccountingSync_DTO> OPDSaleReturn = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(OPDSaleReturn_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(OPDSaleReturn);
 
-                // 4.IPD Cash Sale : CR
-                DataTable IPDSale_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_IPD_GetInpatientSales", spParam, accountingDBContext);
-                List<AccountingSync_DTO> IPDSale = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(IPDSale_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                BillingTxnSyncList.AddRange(IPDSale);
-
-                // 5.IPD Cash Sale Return : DR
-                DataTable IPDSaleReturn_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_IPD_GetInpatientSalesReturn", spParam, accountingDBContext);
-                List<AccountingSync_DTO> IPDSaleReturn = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(IPDSaleReturn_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                BillingTxnSyncList.AddRange(IPDSaleReturn);
-
-                // 6. Discount : DR
+                // 4. Discount : DR
                 DataTable BillingDiscount_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_GetDiscounts", spParam, accountingDBContext);
                 List<AccountingSync_DTO> BillingDiscount = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(BillingDiscount_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(BillingDiscount);
 
-                // 7. Discount Return : CR
+                // 5. Discount Return : CR
                 DataTable BillingDiscountReturn_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_GetDiscountReturn", spParam, accountingDBContext);
                 List<AccountingSync_DTO> BillingDiscountReturn = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(BillingDiscountReturn_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(BillingDiscountReturn);
 
-                // 8. Credit Sale : DR
+                // 6. Credit Sale : DR
                 DataTable CreditSale_Organization_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_GetCreditOrganizationSales", spParam, accountingDBContext);
                 List<AccountingSync_DTO> CreditSale_Organization = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(CreditSale_Organization_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(CreditSale_Organization);
 
-                // 9. Credit Sale Return : CR
+                // 7. Credit Sale Return : CR
                 DataTable CreditSaleReturn_Organization_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_GetCreditOrganizationSalesReturn", spParam, accountingDBContext);
                 List<AccountingSync_DTO> CreditSaleReturn_Organization = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(CreditSaleReturn_Organization_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(CreditSaleReturn_Organization);
 
-                // 10. Credit Sale Internal (Medicare) : DR
-                DataTable CreditSaleInternal_Organization_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_GetInternalCreditOrganizationSales", spParam, accountingDBContext);
-                List<AccountingSync_DTO> CreditSaleInternal = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(CreditSaleInternal_Organization_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                BillingTxnSyncList.AddRange(CreditSaleInternal);
-
-                // 11. Credit Sale Return Internal (Medicare) : CR
-                DataTable CreditSaleReturnInternal_Organization_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_GetInternalCreditOrganizationSalesReturn", spParam, accountingDBContext);
-                List<AccountingSync_DTO> CreditSaleReturnInternal = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(CreditSaleReturnInternal_Organization_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                BillingTxnSyncList.AddRange(CreditSaleReturnInternal);
-
-                // 12. IPD Deposit : DR
-                DataTable IPDDeposit_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_IPD_GetInpatientDeposits", spParam, accountingDBContext);
-                List<AccountingSync_DTO> IPDDeposit = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(IPDDeposit_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                BillingTxnSyncList.AddRange(IPDDeposit);
-
-                // 13. IPD Deposit Adjustment : CR
-                DataTable IPDDepositAdjustment_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_IPD_GetInpatientDepositReturns", spParam, accountingDBContext);
-                List<AccountingSync_DTO> IPDDepositAdjustment = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(IPDDepositAdjustment_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                BillingTxnSyncList.AddRange(IPDDepositAdjustment);
-
-                // 14. OPD Deposit : DR
+                // 8. OPD Deposit : DR
                 DataTable OPDDeposit_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_OPD_GetOutpatientDeposits", spParam, accountingDBContext);
                 List<AccountingSync_DTO> OPDDeposit = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(OPDDeposit_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(OPDDeposit);
 
-                // 15. OPD Deposit Adjustment : CR
+                // 9. OPD Deposit Adjustment : CR
                 DataTable OPDDepositAdjustment_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_OPD_GetOutpatientDepositReturns", spParam, accountingDBContext);
                 List<AccountingSync_DTO> OPDDepositAdjustment = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(OPDDepositAdjustment_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(OPDDepositAdjustment);
 
-                // 15. Billing Settlement : CR
+                // 10. Billing Settlement : CR
                 DataTable BillingSettlement_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_GetSettlementTransactions", spParam, accountingDBContext);
                 List<AccountingSync_DTO> BillingSettlement = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(BillingSettlement_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(BillingSettlement);
 
-                // 15. Billing Settlement Discount : DR
+                // 11. Billing Settlement Discount : DR
                 DataTable BillingSettlementDiscount_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_GetSettlementDiscountTransactions", spParam, accountingDBContext);
                 List<AccountingSync_DTO> BillingSettlementDiscount = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(BillingSettlementDiscount_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(BillingSettlementDiscount);
 
-                // 16. Billing Scheme Refund : DR
+                // 12. Billing Scheme Refund : DR
                 DataTable SchemeRefund_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_BIL_GetSchemeRefundTransactions", spParam, accountingDBContext);
                 List<AccountingSync_DTO> SchemeRefund = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(SchemeRefund_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 BillingTxnSyncList.AddRange(SchemeRefund);
@@ -2415,7 +2447,7 @@ namespace DanpheEMR.AccTransfer
                 BillingTxnSyncList = new List<AccountingSync_DTO>();
                 return false;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 BillingTxnSyncList = new List<AccountingSync_DTO>();
                 throw ex;
@@ -2426,6 +2458,8 @@ namespace DanpheEMR.AccTransfer
         {
             try
             {
+                var vatParam = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "VatRegisteredHospital").FirstOrDefault().ParameterValue;
+                var isVatRegistered = bool.Parse(vatParam);
                 List<SqlParameter> spParam = new List<SqlParameter>();
                 spParam.Add(new SqlParameter("@TransactionDate", SelectedDate.Date));
                 spParam.Add(new SqlParameter("@HospitalId", currHospitalId));
@@ -2437,45 +2471,16 @@ namespace DanpheEMR.AccTransfer
                 List<AccountingSync_DTO> Userwise_Collection = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(Userwise_Collection_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 PharmacyTxnSyncList.AddRange(Userwise_Collection);
 
-                // 2.PHRM-OPD Cash Sale : CR
+                // 2.PHRM Cash Sale : CR
                 DataTable PHRMOPDCashSale_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_OPD_CASH_GetOutpatientCashSales", spParam, accountingDBContext);
                 List<AccountingSync_DTO> PHRMOPDCashSale = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMOPDCashSale_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 PharmacyTxnSyncList.AddRange(PHRMOPDCashSale);
 
-                // 3.PHRM-OPD Credit Sale  : CR
-                DataTable PHRMOPDCreditSale_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_OPD_CREDIT_GetOutpatientCreditSales", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PHRMOPDCreditSale = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMOPDCreditSale_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PHRMOPDCreditSale);
 
-                // 5.PHRM-OPD Cash Sale Return : DR
+                // 5.PHRM Cash Sale Return : DR
                 DataTable PHRMOPDCashSaleReturn_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_OPD_CASH_GetOutpatientCashSaleReturn", spParam, accountingDBContext);
                 List<AccountingSync_DTO> PHRMOPDCashSaleReturn = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMOPDCashSaleReturn_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 PharmacyTxnSyncList.AddRange(PHRMOPDCashSaleReturn);
-
-                // 3.PHRM-OPD Credit Sale Return  : DR
-                DataTable PHRMOPDCreditSaleReturn_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_OPD_CREDIT_GetOutpatientCreditSaleReturn", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PHRMOPDCreditSaleReturn = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMOPDCreditSaleReturn_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PHRMOPDCreditSaleReturn);
-
-                // 4.PHRM-IPD Cash Sale : CR
-                DataTable PHRMIPDCASHSale_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_IPD_CASH_GetInpatientCashSales", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PHRMIPDCASHSale = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMIPDCASHSale_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PHRMIPDCASHSale);
-
-                // 2.PHRM-IPD Credit Sale  : CR
-                DataTable PHRMIPDCreditSale_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_IPD_CREDIT_GetInpatientCreditSales", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PHRMIPDCreditSale = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMIPDCreditSale_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PHRMIPDCreditSale);
-
-                // 5.PHRM-IPD Cash Sale Return : DR
-                DataTable PHRMIPDCashSaleReturn_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_IPD_CASH_GetInpatientCashSaleReturn", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PHRMIPDCashSaleReturn = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMIPDCashSaleReturn_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PHRMIPDCashSaleReturn);
-
-                // 3.PHRM-IPD Credit Sale Return  : DR
-                DataTable PHRMIPDCreditSaleReturn_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_IPD_CREDIT_GetInpatientCreditSaleReturn", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PHRMIPDCreditSaleReturn = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMIPDCreditSaleReturn_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PHRMIPDCreditSaleReturn);
 
                 // 6. Discount : DR
                 DataTable PharmacyDiscount_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetDiscounts", spParam, accountingDBContext);
@@ -2497,20 +2502,10 @@ namespace DanpheEMR.AccTransfer
                 List<AccountingSync_DTO> PHRMOPDCreditSaleReturnOrganization = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMOPDCreditSaleReturnOrganization_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 PharmacyTxnSyncList.AddRange(PHRMOPDCreditSaleReturnOrganization);
 
-                // 10. PHRM OPD Credit Sale Internal (Medicare) : DR
-                DataTable PHRMOPDCreditSaleInternal_Organization_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetInternalCreditOrganizationSales", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PHRMOPDCreditSaleInternal_Organization = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMOPDCreditSaleInternal_Organization_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PHRMOPDCreditSaleInternal_Organization);
-
-                // 11. Credit Sale Return Internal (Medicare) : CR
-                DataTable PHRMCreditSaleReturnInternal_Organization_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_CREDIT_GetInternalCreditOrganizationSalesReturn", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PHRMCreditSaleReturnInternal = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMCreditSaleReturnInternal_Organization_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PHRMCreditSaleReturnInternal);
-
-                // 13. PHRM IPD Deposit Adjustment : DR
-                DataTable PHRMIPDDepositAdjustment_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_IPD_GetOutpatientDepositReturns", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PHRMIPDDepositAdjustment = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PHRMIPDDepositAdjustment_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PHRMIPDDepositAdjustment);
+                // 8. OPD Deposit : DR
+                DataTable Deposit_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetDeposits", spParam, accountingDBContext);
+                List<AccountingSync_DTO> OPDDeposit = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(Deposit_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                PharmacyTxnSyncList.AddRange(OPDDeposit);
 
                 // 15. PHRM OPD Deposit Adjustment : DR
                 DataTable PHRMOPDDepositAdjustment_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_OPD_GetOutpatientDepositReturns", spParam, accountingDBContext);
@@ -2527,41 +2522,89 @@ namespace DanpheEMR.AccTransfer
                 List<AccountingSync_DTO> PharmacySettlementDiscount = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacySettlementDiscount_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 PharmacyTxnSyncList.AddRange(PharmacySettlementDiscount);
 
+                #region Pharmacy Credit Purchase
+                // 1. Pharmacy Credit Good Receipt Purchase Entry : DR
+                DataTable PharmacyCreditGoodReceiptPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCreditGoodReceiptPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> PharmacyCreditGoodReceiptPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCreditGoodReceiptPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                PharmacyTxnSyncList.AddRange(PharmacyCreditGoodReceiptPurchase);
 
+                // 2. Pharmacy Credit Good Receipt VAT Entry : DR
+                if (isVatRegistered)
+                {
+                    DataTable PharmacyCreditGoodReceiptVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCreditGoodReceiptVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> PharmacyCreditGoodReceiptVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCreditGoodReceiptVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    PharmacyTxnSyncList.AddRange(PharmacyCreditGoodReceiptVAT);
+                }
 
-                //B. Purchase Voucher
+                // 2. Pharmacy Credit Good Receipt Vendor Entry : CR
+                DataTable PharmacyCreditGoodReceiptVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCreditGoodReceiptVendorTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> PharmacyCreditGoodReceiptVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCreditGoodReceiptVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                PharmacyTxnSyncList.AddRange(PharmacyCreditGoodReceiptVendor);
+                #endregion
 
-                // 1. Pharmacy  Good Receipt Purchase Entry : DR
-                DataTable PharmacyGoodReceiptPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetGoodReceiptPurchaseTransactions", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PharmacyGoodReceiptPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyGoodReceiptPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PharmacyGoodReceiptPurchase);
+                #region Pharmacy Cash Purchase
+                // 1. Pharmacy Cash Good Receipt Purchase Entry : DR
+                DataTable PharmacyCashGoodReceiptPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCashGoodReceiptPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> PharmacyCashGoodReceiptPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCashGoodReceiptPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                PharmacyTxnSyncList.AddRange(PharmacyCashGoodReceiptPurchase);
 
-                // 2. Pharmacy  Good Receipt VAT Entry : DR
-                DataTable PharmacyGoodReceiptVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetGoodReceiptVATTransactions", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PharmacyGoodReceiptVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyGoodReceiptVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PharmacyGoodReceiptVAT);
+                // 2. Pharmacy Cash Good Receipt VAT Entry : DR
+                if (isVatRegistered)
+                {
+                    DataTable PharmacyCashGoodReceiptVat_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCashGoodReceiptVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> PharmacyCashGoodReceiptVat = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCashGoodReceiptVat_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    PharmacyTxnSyncList.AddRange(PharmacyCashGoodReceiptVat);
+                }
 
-                // 2. Pharmacy  Good Receipt Supplier Entry : CR
-                DataTable PharmacyGoodReceiptSupplier_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetGoodReceiptSupplierTransactions", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PharmacyGoodReceiptSupplier = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyGoodReceiptSupplier_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PharmacyGoodReceiptSupplier);
+                // 2. Pharmacy Cash Good Receipt Vendor Entry : CR
+                DataTable PharmacyCashGoodReceiptVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCashGoodReceiptVendorTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> PharmacyCashGoodReceiptVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCashGoodReceiptVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                PharmacyTxnSyncList.AddRange(PharmacyCashGoodReceiptVendor);
+                #endregion
 
+                #region Pharmacy Credit Purchase Return To Vendor
 
-                //C. Credit Purchase Return Voucher
-                //1.Pharmacy  Good Receipt Return Purchase Entry : CR
-                DataTable PharmacyGoodReceiptReturnPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetGoodReceiptReturnPurchaseTransactions", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PharmacyGoodReceiptReturnPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyGoodReceiptReturnPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PharmacyGoodReceiptReturnPurchase);
+                //1. Pharmacy Credit Return to Vendor Purchase Entry : CR
+                DataTable PharmacyCreditReturnPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCreditReturnToVendorPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> PharmacyCreditReturnPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCreditReturnPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                PharmacyTxnSyncList.AddRange(PharmacyCreditReturnPurchase);
 
-                // 2. Pharmacy  Good Receipt Return VAT Entry : CR
-                DataTable PharmacyGoodReceiptReturnVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetGoodReceiptReturnVATTransactions", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PharmacyGoodReceiptReturnVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyGoodReceiptReturnVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PharmacyGoodReceiptReturnVAT);
+                // 2. Pharmacy Credit Return to Vendor VAT Entry : CR
+                if (isVatRegistered)
+                {
+                    DataTable PharmacyCreditReturnVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCreditReturnToVendorVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> PharmacyCreditReturnVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCreditReturnVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    PharmacyTxnSyncList.AddRange(PharmacyCreditReturnVAT);
+                }
 
-                // 2. Pharmacy  Good Receipt Return Supplier Entry : DR
-                DataTable PharmacyGoodReceiptReturnSupplier_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetGoodReceiptReturnSupplierTransactions", spParam, accountingDBContext);
-                List<AccountingSync_DTO> PharmacyGoodReceiptReturnSupplier = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyGoodReceiptReturnSupplier_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                PharmacyTxnSyncList.AddRange(PharmacyGoodReceiptReturnSupplier);
+                // 2. Pharmacy Credit Return to Vendor Vendor Entry : DR
+                DataTable PharmacyCreditReturnVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCreditReturnToVendorPartyTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> PharmacyCreditReturnVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCreditReturnVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                PharmacyTxnSyncList.AddRange(PharmacyCreditReturnVendor);
+
+                #endregion
+
+                #region Pharmacy Cash Purchase Return To Vendor
+
+                //1. Pharmacy Cash Return Purchase Entry : CR
+                DataTable PharmacyCashReturnPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCashReturnToVendorPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> PharmacyCashReturnPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCashReturnPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                PharmacyTxnSyncList.AddRange(PharmacyCashReturnPurchase);
+
+                // 2.Pharmacy Cash Good Receipt Return VAT Entry : CR
+                if (isVatRegistered)
+                {
+                    DataTable PharmacyCashReturnVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCashReturnToVendorVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> PharmacyCashReturnVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCashReturnVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    PharmacyTxnSyncList.AddRange(PharmacyCashReturnVAT);
+                }
+
+                // 2.Pharmacy Cash Good Receipt Return Vendor Entry : DR
+                DataTable PharmacyCashReturnVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_PHRM_GetCashReturnToVendorPartyTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> PharmacyCashReturnVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(PharmacyCashReturnVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                PharmacyTxnSyncList.AddRange(PharmacyCashReturnVendor);
+
+                #endregion
 
                 // D. Consumable Dispatch To SubStore
                 //1.Pharmacy Consumable Dispatch (SubStore Entry) : DR
@@ -2608,7 +2651,7 @@ namespace DanpheEMR.AccTransfer
                 PharmacyTxnSyncList = new List<AccountingSync_DTO>();
                 return false;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 PharmacyTxnSyncList = new List<AccountingSync_DTO>();
                 throw ex;
@@ -2625,48 +2668,176 @@ namespace DanpheEMR.AccTransfer
                 spParam.Add(new SqlParameter("@TransactionDate", SelectedDate.Date));
                 spParam.Add(new SqlParameter("@HospitalId", currHospitalId));
 
-                //A. Purchase Voucher
 
-                // 1. Inventory Good Receipt Purchase Entry : DR
-                DataTable InventoryGoodReceiptPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetGoodReceiptPurchaseTransactions", spParam, accountingDBContext);
+                #region Consumable Credit Purchase
+                // 1. Inventory Consumable Credit Purchase Entry : DR
+                DataTable InventoryGoodReceiptPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCreditGoodReceiptPurchaseTransactions", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryGoodReceiptPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryGoodReceiptPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 InventoryTxnSyncList.AddRange(InventoryGoodReceiptPurchase);
 
-                // 2. Inventory Good Receipt VAT Entry : DR
-                if(isVatRegistered)
+                // 2. Inventory  Consumable Credit Good Receipt VAT Entry : DR
+                if (isVatRegistered)
                 {
-                    DataTable InventoryGoodReceiptVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetGoodReceiptVATTransactions", spParam, accountingDBContext);
+                    DataTable InventoryGoodReceiptVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCreditGoodReceiptVATTransactions", spParam, accountingDBContext);
                     List<AccountingSync_DTO> InventoryGoodReceiptVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryGoodReceiptVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                     InventoryTxnSyncList.AddRange(InventoryGoodReceiptVAT);
                 }
 
-                // 2. Inventory Good Receipt Vendor Entry : CR
-                DataTable InventoryGoodReceiptVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetGoodReceiptVendorTransactions", spParam, accountingDBContext);
+                // 2. Inventory  Consumable Credit Good Receipt Vendor Entry : CR
+                DataTable InventoryGoodReceiptVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCreditGoodReceiptVendorTransactions", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryGoodReceiptVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryGoodReceiptVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 InventoryTxnSyncList.AddRange(InventoryGoodReceiptVendor);
+                #endregion
 
+                #region Consumable Cash Purchase
+                // 1. Inventory Consumable Credit Purchase Entry : DR
+                DataTable InvConsumableCashPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCashGoodReceiptPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvConsumableCashPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvConsumableCashPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvConsumableCashPurchase);
 
-                //B. Purchase Return Voucher
-                //1.Inventory Good Receipt Return Purchase Entry : CR
-                DataTable InventoryGoodReceiptReturnPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetGoodReceiptReturnPurchaseTransactions", spParam, accountingDBContext);
-                List<AccountingSync_DTO> InventoryGoodReceiptReturnPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryGoodReceiptReturnPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                InventoryTxnSyncList.AddRange(InventoryGoodReceiptReturnPurchase);
+                // 2. Inventory  Consumable Credit Good Receipt VAT Entry : DR
+                if (isVatRegistered)
+                {
+                    DataTable InvConsumableCashVat_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCashGoodReceiptVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> InvConsumableCashVat = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvConsumableCashVat_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    InventoryTxnSyncList.AddRange(InvConsumableCashVat);
+                }
+
+                // 2. Inventory  Consumable Credit Good Receipt Vendor Entry : CR
+                DataTable InvConsumableCashVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCashGoodReceiptVendorTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvConsumableCashVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvConsumableCashVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvConsumableCashVendor);
+                #endregion
+
+                #region Fixed Asset Credit Purchase
+                // 1. Inventory Fixed Asset Credit Purchase Entry : DR
+                DataTable InvFixedAssetCreditPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCreditGoodReceiptPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvFixedAssetCreditPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCreditPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvFixedAssetCreditPurchase);
+
+                // 2. Inventory Fixed Asset Credit Good Receipt VAT Entry : DR
+                if (isVatRegistered)
+                {
+                    DataTable InvFixedAssetCreditVat_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCreditGoodReceiptVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> InvFixedAssetCreditVat = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCreditVat_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    InventoryTxnSyncList.AddRange(InvFixedAssetCreditVat);
+                }
+
+                // 2. Inventory Fixed Asset Credit Good Receipt Vendor Entry : CR
+                DataTable InvFixedAssetCreditVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCreditGoodReceiptVendorTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvFixedAssetCreditVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCreditVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvFixedAssetCreditVendor);
+                #endregion
+
+                #region Fixed Asset Cash Purchase
+                // 1. Inventory Consumable Credit Purchase Entry : DR
+                DataTable InvFixedAssetCashPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCashGoodReceiptPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvFixedAssetCashPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCashPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvFixedAssetCashPurchase);
+
+                // 2. Inventory  Consumable Credit Good Receipt VAT Entry : DR
+                if (isVatRegistered)
+                {
+                    DataTable InvFixedAssetCashVat_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCashGoodReceiptVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> InvFixedAssetCashVat = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCashVat_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    InventoryTxnSyncList.AddRange(InvFixedAssetCashVat);
+                }
+
+                // 2. Inventory  Consumable Credit Good Receipt Vendor Entry : CR
+                DataTable InvFixedAssetCashVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCashGoodReceiptVendorTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvFixedAssetCashVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCashVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvFixedAssetCashVendor);
+                #endregion
+
+                #region Consumable Credit Purchase Return To Vendor
+
+                //1.Inventory Consumable Credit Return Purchase Entry : CR
+                DataTable InvConsumableCreditReturnPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCreditReturnToVendorPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvConsumableCreditReturnPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvConsumableCreditReturnPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvConsumableCreditReturnPurchase);
 
                 // 2.Inventory Good Receipt Return VAT Entry : CR
                 if (isVatRegistered)
                 {
-                    DataTable InventoryGoodReceiptReturnVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetGoodReceiptReturnVATTransactions", spParam, accountingDBContext);
-                    List<AccountingSync_DTO> InventoryGoodReceiptReturnVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryGoodReceiptReturnVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                    InventoryTxnSyncList.AddRange(InventoryGoodReceiptReturnVAT);
+                    DataTable InvConsumableCreditReturnVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCreditReturnToVendorVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> InvConsumableCreditReturnVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvConsumableCreditReturnVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    InventoryTxnSyncList.AddRange(InvConsumableCreditReturnVAT);
                 }
 
                 // 2.Inventory Good Receipt Return Vendor Entry : DR
-                DataTable InventoryGoodReceiptReturnVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetGoodReceiptReturnVendorTransactions", spParam, accountingDBContext);
-                List<AccountingSync_DTO> InventoryGoodReceiptReturnVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryGoodReceiptReturnVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
-                InventoryTxnSyncList.AddRange(InventoryGoodReceiptReturnVendor);
+                DataTable InvConsumableCreditReturnVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCreditReturnToVendorPartyTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvConsumableCreditReturnVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvConsumableCreditReturnVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvConsumableCreditReturnVendor);
 
+                #endregion
 
-                // C. Consumable Dispatch To SubStore
+                #region Consumable Cash Purchase Return To Vendor
+
+                //1.Inventory Consumable Credit Return Purchase Entry : CR
+                DataTable InvConsumableCashReturnPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCashReturnToVendorPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvConsumableCashReturnPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvConsumableCashReturnPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvConsumableCashReturnPurchase);
+
+                // 2.Inventory Good Receipt Return VAT Entry : CR
+                if (isVatRegistered)
+                {
+                    DataTable InvConsumableCashReturnVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCashReturnToVendorVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> InvConsumableCashReturnVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvConsumableCashReturnVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    InventoryTxnSyncList.AddRange(InvConsumableCashReturnVAT);
+                }
+
+                // 2.Inventory Good Receipt Return Vendor Entry : DR
+                DataTable InvConsumableCashReturnVendor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableCashReturnToVendorPartyTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvConsumableCashReturnVendor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvConsumableCashReturnVendor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvConsumableCashReturnVendor);
+
+                #endregion
+
+                #region Fixed Asset Credit Purchase Return To Vendor
+
+                //1.Inventory Fixed Asset Credit Return Purchase Entry : CR
+                DataTable InvFixedAssetCreditReturnPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCreditReturnToVendorPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvFixedAssetCreditReturnPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCreditReturnPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvFixedAssetCreditReturnPurchase);
+
+                // 2.Inventory Fixed Asset Credit Return VAT Entry : CR
+                if (isVatRegistered)
+                {
+                    DataTable InvFixedAssetCreditReturnVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCreditReturnToVendorVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> InvFixedAssetCreditReturnVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCreditReturnVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    InventoryTxnSyncList.AddRange(InvFixedAssetCreditReturnVAT);
+                }
+
+                // 2.Inventory Fixed Asset Credit Return Vendor Entry : DR
+                DataTable InvFixedAssetCreditReturnVednor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCreditReturnToVendorPartyTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvFixedAssetCreditReturnVednor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCreditReturnVednor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvFixedAssetCreditReturnVednor);
+
+                #endregion
+
+                #region Fixed Asset Cash Purchase Return To Vendor
+
+                //1.Inventory Fixed Asset Cash Return Purchase Entry : CR
+                DataTable InvFixedAssetCashReturnPurchase_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCashReturnToVendorPurchaseTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvFixedAssetCashReturnPurchase = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCashReturnPurchase_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvFixedAssetCashReturnPurchase);
+
+                // 2.Inventory Fixed Asset Cash Return VAT Entry : CR
+                if (isVatRegistered)
+                {
+                    DataTable InvFixedAssetCashReturnVAT_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCashReturnToVendorVATTransactions", spParam, accountingDBContext);
+                    List<AccountingSync_DTO> InvFixedAssetCashReturnVAT = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCashReturnVAT_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                    InventoryTxnSyncList.AddRange(InvFixedAssetCashReturnVAT);
+                }
+
+                // 2.Inventory Fixed Asset Cash Return Vendor Entry : DR
+                DataTable InvFixedAssetCashReturnVednor_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetFixedAssetCashReturnToVendorPartyTransactions", spParam, accountingDBContext);
+                List<AccountingSync_DTO> InvFixedAssetCashReturnVednor = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InvFixedAssetCashReturnVednor_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
+                InventoryTxnSyncList.AddRange(InvFixedAssetCashReturnVednor);
+
+                #endregion
+
+                #region Consumable Dispatch
                 //1.Inventory Consumable Dispatch (SubStore Entry) : DR
                 DataTable InventoryDispatchSubStore_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableDispatchSubStoreTransaction", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryDispatchSubStore = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryDispatchSubStore_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
@@ -2676,8 +2847,9 @@ namespace DanpheEMR.AccTransfer
                 DataTable InventoryDispatchCentralStore_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableDispatchCentralStoreTransaction", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryDispatchCentralStore = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryDispatchCentralStore_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 InventoryTxnSyncList.AddRange(InventoryDispatchCentralStore);
+                #endregion
 
-                // D. Consumable Dispatch Return From SubStore
+                #region Consumable Dispatch Return
                 //1.Inventory Consumable Dispatch Return (SubStore Entry) : CR
                 DataTable InventoryDispatchReturnSubStore_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableDispatchReturnSubStoreTransaction", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryDispatchReturnSubStore = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryDispatchReturnSubStore_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
@@ -2687,32 +2859,40 @@ namespace DanpheEMR.AccTransfer
                 DataTable InventoryDispatchReturnCentralStore_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumableDispatchReturnCentralStoreTransaction", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryDispatchReturnCentralStore = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryDispatchReturnCentralStore_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 InventoryTxnSyncList.AddRange(InventoryDispatchReturnCentralStore);
+                #endregion
 
-                // E. Write OFF 
-                //1.Inventory WriteOff --CentralStore Entry : CR, --Expenses Department : DR
+                #region Write OFF
+                // Inventory WriteOff --CentralStore Entry : CR, --Expenses Department : DR
                 DataTable InventoryWriteOffCentralStore_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetInventoryWriteOffTransactions", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryWriteOffCentralStore = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryWriteOffCentralStore_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 InventoryTxnSyncList.AddRange(InventoryWriteOffCentralStore);
+                #endregion
 
-                // F.Inventory Stock Manage IN (Expense Entry) --CentralStore Entry : DR, --Expenses Department : CR
+                #region Stock Manage IN
+                // Inventory Stock Manage IN (Expense Entry) --CentralStore Entry : DR, --Expenses Department : CR
                 DataTable InventoryStockManageIn_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetInventoryStockManageInTransactions", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryStockManageIn = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryStockManageIn_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 InventoryTxnSyncList.AddRange(InventoryStockManageIn);
+                #endregion
 
-                // G.Inventory Stock Manage OUT (Expense Entry) --CentralStore Entry : CR, --Expenses Department : DR
+                #region Stock Manage OUT
+                // Inventory Stock Manage OUT (Expense Entry) --CentralStore Entry : CR, --Expenses Department : DR
                 DataTable InventoryStockManageOut_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetInventoryStockManageOutTransactions", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryStockManageOut = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryStockManageOut_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 InventoryTxnSyncList.AddRange(InventoryStockManageOut);
+                #endregion
 
-                // H.Inventory Consumption --CentralStore Entry : CR
+                #region Consumption
+                // 1.Inventory Consumption --CentralStore Entry : CR
                 DataTable InventoryConsumptionCentrlStore_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumptionCentralStoreTransaction", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryConsumptionCentralStore = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryConsumptionCentrlStore_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 InventoryTxnSyncList.AddRange(InventoryConsumptionCentralStore);
 
-                // I.Inventory Consumption --Expenses SubCategory/subStore : DR
+                // 2.Inventory Consumption --Expenses SubCategory/subStore : DR
                 DataTable InventoryConsumptionSubStore_DataTable = DALFunctions.GetDataTableFromStoredProc("SP_ACC_POST_INV_GetConsumptionSubStoreTransaction", spParam, accountingDBContext);
                 List<AccountingSync_DTO> InventoryConsumptionSubStore = JsonConvert.DeserializeObject<List<AccountingSync_DTO>>(JsonConvert.SerializeObject(InventoryConsumptionSubStore_DataTable, new IsoDateTimeConverter() { DateTimeFormat = "yyyy-MM-dd" }));
                 InventoryTxnSyncList.AddRange(InventoryConsumptionSubStore);
+                #endregion
 
                 if (InventoryTxnSyncList.Count > 0 && InventoryTxnSyncList.All(txn => txn.LedgerId > 0))
                 {
@@ -2721,7 +2901,7 @@ namespace DanpheEMR.AccTransfer
                 InventoryTxnSyncList = new List<AccountingSync_DTO>();
                 return false;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 InventoryTxnSyncList = new List<AccountingSync_DTO>();
                 throw ex;
@@ -2732,7 +2912,7 @@ namespace DanpheEMR.AccTransfer
         {
             try
             {
-                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true).FirstOrDefault();
+                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true && a.HospitalId == currHospitalId).FirstOrDefault();
                 var DiscountReturnTxnData = billingSyncList.FindAll(a => a.TransactionType == "DiscountReturn");
 
                 var accTxnFromBilling = new List<TransactionModel>();
@@ -2765,7 +2945,7 @@ namespace DanpheEMR.AccTransfer
                                     transaction.TransactionItems = new List<TransactionItemModel>();
                                     transferRule.ForEach(ruleRow =>
                                     {
-                                        
+
                                         if (ruleRow.Description == "DepositAddCashInHand" || ruleRow.Name == "ACA_BANK")
                                         {
                                             var accTxnItems = new TransactionItemModel();
@@ -2875,7 +3055,7 @@ namespace DanpheEMR.AccTransfer
                                             //        accTxnItems.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
                                             transaction.TransactionItems.Add(accTxnItems);
                                         }
-                                        
+
 
                                     });
                                 }
@@ -2987,7 +3167,7 @@ namespace DanpheEMR.AccTransfer
                                             //  accTxnItems.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
                                             transaction.TransactionItems.Add(accTxnItems);
                                         }
-                                       
+
                                     });
                                 }
                                 break;
@@ -3050,9 +3230,9 @@ namespace DanpheEMR.AccTransfer
                                             //            txnItemPM.LedgerId = (int)pm.LedgerId;
                                             //            transaction.TransactionItems.Add(txnItemPM);
                                             //        }
-                                                    
+
                                             //    });
-                                               
+
                                             //}
                                             //else
                                             //{
@@ -3120,7 +3300,7 @@ namespace DanpheEMR.AccTransfer
                                             transaction.TransactionType = record.TransactionType;
                                             accTxnItems.LedgerId = (ledId > 0) ? ledId : 0;
                                             transaction.TransactionItems.Add(accTxnItems);
-                                        }                                        
+                                        }
 
                                     });
                                 }
@@ -3171,7 +3351,7 @@ namespace DanpheEMR.AccTransfer
                                             {
                                                 ledId = GetLedgerIdFromBilCreditOrganization(record.CreditOrganizationId, ruleRow.LedgerGroupId, currHospitalId);
                                                 var sub_Ledger = BillingCreditOrganizations.Find(a => a.ReferenceId == record.CreditOrganizationId);
-                                                subLed.SubLedgerId = sub_Ledger != null ?(int)sub_Ledger.SubLedgerId : 0;
+                                                subLed.SubLedgerId = sub_Ledger != null ? (int)sub_Ledger.SubLedgerId : 0;
                                             }
                                             subLed.LedgerId = ledId;
                                             subLedgers.Add(subLed);
@@ -3325,13 +3505,13 @@ namespace DanpheEMR.AccTransfer
                                             //            txnItemPM.DrCr = ruleRow.DrCr;
                                             //            txnItemPM.LedgerId = (int)pm.LedgerId;
                                             //            transaction.TransactionItems.Add(txnItemPM);
-                                                    
+
                                             //    });
-                                                
+
                                             //}
                                             //else
                                             //{ // Single Payment Mode
-                                                
+
                                             //    accTxnItems.Amount = (record.SalesAmount - record.DiscountAmount) + record.TaxAmount;
                                             //    var ledName = (record.PaymentMode == "cash") ? GetLedgerName("ACA_CASH_IN_HAND_CASH", currHospitalId) : GetLedgerName("ACA_BANK_HAMS_BANK", currHospitalId);
                                             //    ledId = GetLedgerId(ledName, ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
@@ -3401,7 +3581,7 @@ namespace DanpheEMR.AccTransfer
                                             //    accTxnItems.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
                                             transaction.TransactionItems.Add(accTxnItems);
                                         }
-                                                                              
+
                                     });
                                 }
                                 break;
@@ -3443,7 +3623,7 @@ namespace DanpheEMR.AccTransfer
                                             //            txnItemPM.LedgerId = (int)pm.LedgerId;
                                             //            transaction.TransactionItems.Add(txnItemPM);
                                             //        }
-                                                        
+
                                             //    });
                                             //}
                                             //else
@@ -3533,7 +3713,7 @@ namespace DanpheEMR.AccTransfer
                                             //      accTxnItems.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
                                             transaction.TransactionItems.Add(accTxnItems);
                                         }
-                                        
+
                                     });
                                 }
                                 break;
@@ -3638,57 +3818,57 @@ namespace DanpheEMR.AccTransfer
                                 }
                                 break;
                             }
-                        //case "DiscountReturn":
-                        //    {
-                        //        var transferRule = RuleMappingList.Find(a => a.Description == record.TransactionType).MappingDetail;
-                        //        if (transferRule.Count > 0)
-                        //        {
-                        //            transaction.TransactionItems = new List<TransactionItemModel>();
-                        //            transferRule.ForEach(ruleRow =>
-                        //            {
-                        //                var accTxnItems = new TransactionItemModel();
-                        //                int ledId = 0;
-                        //                if (ruleRow.Description == "DiscountReturnCashInHand" || ruleRow.Name == "ACA_BANK")
-                        //                {
-                        //                    accTxnItems.Amount = record.TotalAmount;
-                        //                    var ledName = (record.PaymentMode == "cash") ? GetLedgerName("ACA_CASH_IN_HAND_CASH", currHospitalId) : GetLedgerName("ACA_BANK_HAMS_BANK", currHospitalId);
-                        //                    ledId = GetLedgerId(ledName, ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
-                        //                    accTxnItems.TransactionItemDetails = new List<TransactionItemDetailModel>();
-                        //                    transaction.BillSyncs.ForEach(r =>
-                        //                    {
-                        //                        var accTxnItemDetail = new TransactionItemDetailModel();
-                        //                        //  accTxnItemDetail.PatientId = r.PatientId;
-                        //                        accTxnItemDetail.ReferenceId = r.CreatedBy;
-                        //                        accTxnItemDetail.ReferenceType = "User";
-                        //                        accTxnItemDetail.Amount = r.TotalAmount;
-                        //                        accTxnItemDetail.Description = "DiscountReturn->Cash -> Created By";
-                        //                        accTxnItems.TransactionItemDetails.Add(accTxnItemDetail);
-                        //                    });
-                        //                    accTxnItems.IsTxnDetails = true;
-                        //                }
-                        //                else if (ruleRow.Description == "DiscountReturnAdministrativeExpenses")
-                        //                {
-                        //                    accTxnItems.Amount = record.TotalAmount;
-                        //                    //nbb-charak changes
-                        //                    if (ACCHospital[0].HospitalShortName.ToLower() == "charak")
-                        //                    {
-                        //                        ledId = GetLedgerId(GetLedgerName("EIE_ADMINISTRATION_EXPENSES_TRADE_DISCOUNT", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
-                        //                    }
-                        //                    else
-                        //                    {
-                        //                        ledId = GetLedgerId(GetLedgerName("EIE_ADMINISTRATION_EXPENSES_CASH_DISCOUNT", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
-                        //                    }
+                            //case "DiscountReturn":
+                            //    {
+                            //        var transferRule = RuleMappingList.Find(a => a.Description == record.TransactionType).MappingDetail;
+                            //        if (transferRule.Count > 0)
+                            //        {
+                            //            transaction.TransactionItems = new List<TransactionItemModel>();
+                            //            transferRule.ForEach(ruleRow =>
+                            //            {
+                            //                var accTxnItems = new TransactionItemModel();
+                            //                int ledId = 0;
+                            //                if (ruleRow.Description == "DiscountReturnCashInHand" || ruleRow.Name == "ACA_BANK")
+                            //                {
+                            //                    accTxnItems.Amount = record.TotalAmount;
+                            //                    var ledName = (record.PaymentMode == "cash") ? GetLedgerName("ACA_CASH_IN_HAND_CASH", currHospitalId) : GetLedgerName("ACA_BANK_HAMS_BANK", currHospitalId);
+                            //                    ledId = GetLedgerId(ledName, ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
+                            //                    accTxnItems.TransactionItemDetails = new List<TransactionItemDetailModel>();
+                            //                    transaction.BillSyncs.ForEach(r =>
+                            //                    {
+                            //                        var accTxnItemDetail = new TransactionItemDetailModel();
+                            //                        //  accTxnItemDetail.PatientId = r.PatientId;
+                            //                        accTxnItemDetail.ReferenceId = r.CreatedBy;
+                            //                        accTxnItemDetail.ReferenceType = "User";
+                            //                        accTxnItemDetail.Amount = r.TotalAmount;
+                            //                        accTxnItemDetail.Description = "DiscountReturn->Cash -> Created By";
+                            //                        accTxnItems.TransactionItemDetails.Add(accTxnItemDetail);
+                            //                    });
+                            //                    accTxnItems.IsTxnDetails = true;
+                            //                }
+                            //                else if (ruleRow.Description == "DiscountReturnAdministrativeExpenses")
+                            //                {
+                            //                    accTxnItems.Amount = record.TotalAmount;
+                            //                    //nbb-charak changes
+                            //                    if (ACCHospital[0].HospitalShortName.ToLower() == "charak")
+                            //                    {
+                            //                        ledId = GetLedgerId(GetLedgerName("EIE_ADMINISTRATION_EXPENSES_TRADE_DISCOUNT", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
+                            //                    }
+                            //                    else
+                            //                    {
+                            //                        ledId = GetLedgerId(GetLedgerName("EIE_ADMINISTRATION_EXPENSES_CASH_DISCOUNT", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
+                            //                    }
 
-                        //                }
-                        //                accTxnItems.DrCr = ruleRow.DrCr;
-                        //                accTxnItems.LedgerId = (ledId > 0) ? ledId : 0;
-                        //                transaction.TransactionType = record.TransactionType;
-                        //                //      accTxnItems.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
-                        //                transaction.TransactionItems.Add(accTxnItems);
-                        //            });
-                        //        }
-                        //        break;
-                        //    }
+                            //                }
+                            //                accTxnItems.DrCr = ruleRow.DrCr;
+                            //                accTxnItems.LedgerId = (ledId > 0) ? ledId : 0;
+                            //                transaction.TransactionType = record.TransactionType;
+                            //                //      accTxnItems.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
+                            //                transaction.TransactionItems.Add(accTxnItems);
+                            //            });
+                            //        }
+                            //        break;
+                            //    }
                     }
 
                     if (CheckValidTxn(transaction, currHospitalId))
@@ -3702,8 +3882,8 @@ namespace DanpheEMR.AccTransfer
                 }
                 var Temp = accTxnFromBilling.Select(tx =>
                 {
-                    if(tx.TransactionItems != null)
-                           tx.TransactionItems = tx.TransactionItems.OrderByDescending(o => o.DrCr).ToList();
+                    if (tx.TransactionItems != null)
+                        tx.TransactionItems = tx.TransactionItems.OrderByDescending(o => o.DrCr).ToList();
 
                     return tx;
 
@@ -3717,14 +3897,14 @@ namespace DanpheEMR.AccTransfer
             {
                 throw ex;
             }
-        #endregion
+            #endregion
         }
 
         private static List<TransactionModel> MapBillingIncomeVoucher(int fiscalYearId, int currHospitalId)
         {
             try
             {
-                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true).FirstOrDefault();
+                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true && a.HospitalId == currHospitalId).FirstOrDefault();
                 var BillingRuleMapping = RuleMappingList.Where(rule => rule.Section == 2).ToList();
                 var accTxnFromBilling = new List<TransactionModel>();
                 var subLedgerParam = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "SubLedgerAndCostCenter").FirstOrDefault().ParameterValue;
@@ -3732,12 +3912,12 @@ namespace DanpheEMR.AccTransfer
                 BillingRuleMapping.ForEach(txnRule =>
                 {
                     var syncTxnList = BillingTxnSyncList.Where(sync => sync.BaseTransactionType == txnRule.Description).ToList();
-                    if(syncTxnList.Count > 0)
+                    if (syncTxnList.Count > 0)
                     {
                         var txn = syncTxnList[0];
                         var transaction = new TransactionModel();
                         transaction.FiscalyearId = fiscalYearId;
-                        transaction.Remarks = "Billing_IncomeVoucher" + txn.TransactionDate;
+                        transaction.Remarks = "Billing_IncomeVoucher On " + txn.TransactionDate.Date.ToString("yyyy-MM-dd") +".";
                         transaction.SectionId = 2;
                         transaction.TransactionDate = txn.TransactionDate;
                         transaction.VoucherId = (int)txnRule.VoucherId;
@@ -3754,7 +3934,7 @@ namespace DanpheEMR.AccTransfer
                             {
                                 var subLedgerTxns = new List<SubLedgerTransactionModel>();
                                 var subLedTxn = new SubLedgerTransactionModel();
-                                subLedTxn.SubLedgerId = record.SubLedgerId > 0 ? record.SubLedgerId : GetDefaultSubLedgerId(record.LedgerId);
+                                subLedTxn.SubLedgerId = record.SubLedgerId > 0 ? record.SubLedgerId : GetDefaultSubLedgerId(record.LedgerId,currHospitalId);
                                 subLedTxn.LedgerId = record.LedgerId;
                                 subLedgerTxns.Add(subLedTxn);
                                 accTxnItems.SubLedgers = subLedgerTxns;
@@ -3798,7 +3978,7 @@ namespace DanpheEMR.AccTransfer
         {
             try
             {
-                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true).FirstOrDefault();
+                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true && a.HospitalId == currHospitalId).FirstOrDefault();
                 var PharmacyRuleMapping = RuleMappingList.Where(rule => rule.Section == 3).ToList();
                 var accTxnFromPharmacy = new List<TransactionModel>();
                 var subLedgerParam = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "SubLedgerAndCostCenter").FirstOrDefault().ParameterValue;
@@ -3813,7 +3993,7 @@ namespace DanpheEMR.AccTransfer
                         var txn = transactionList[0];
                         var transaction = new TransactionModel();
                         transaction.FiscalyearId = fiscalYearId;
-                        transaction.Remarks = txnRule.Description + " on " + txn.TransactionDate;
+                        transaction.Remarks = txnRule.Description + " On " +  txn.TransactionDate.Date.ToString("yyyy-MM-dd")+".";
                         transaction.SectionId = 3;
                         transaction.TransactionDate = txn.TransactionDate;
                         transaction.VoucherId = (int)txnRule.VoucherId;
@@ -3828,7 +4008,7 @@ namespace DanpheEMR.AccTransfer
                             {
                                 var subLedgerTxns = new List<SubLedgerTransactionModel>();
                                 var subLedTxn = new SubLedgerTransactionModel();
-                                subLedTxn.SubLedgerId = record.SubLedgerId > 0 ? record.SubLedgerId : GetDefaultSubLedgerId(record.LedgerId);
+                                subLedTxn.SubLedgerId = record.SubLedgerId > 0 ? record.SubLedgerId : GetDefaultSubLedgerId(record.LedgerId,currHospitalId);
                                 subLedTxn.LedgerId = record.LedgerId;
                                 subLedgerTxns.Add(subLedTxn);
                                 accTxnItems.SubLedgers = subLedgerTxns;
@@ -3838,6 +4018,8 @@ namespace DanpheEMR.AccTransfer
                             accTxnItems.DrCr = record.DrCr;
                             accTxnItems.LedgerId = record.LedgerId;
                             accTxnItems.Description = record.Description;
+                            accTxnItems.VendorBillNo = txn.VendorBillNo;
+                            accTxnItems.GoodReceiptId = txn.GoodReceiptId;
 
                             accTxnItems.TransactionLinks = new List<TransactionLinkModel>();
                             TransactionLinkModel txnLink = new TransactionLinkModel();
@@ -3871,7 +4053,7 @@ namespace DanpheEMR.AccTransfer
         {
             try
             {
-                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true).FirstOrDefault();
+                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true && a.HospitalId == currHospitalId).FirstOrDefault();
                 var InventoryRuleMapping = RuleMappingList.Where(rule => rule.Section == 1).ToList();
                 var accTxnFromPharmacy = new List<TransactionModel>();
                 var subLedgerParam = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "SubLedgerAndCostCenter").FirstOrDefault().ParameterValue;
@@ -3886,7 +4068,7 @@ namespace DanpheEMR.AccTransfer
                         var txn = transactionList[0];
                         var transaction = new TransactionModel();
                         transaction.FiscalyearId = fiscalYearId;
-                        transaction.Remarks = txnRule.Description + " on " + txn.TransactionDate;
+                        transaction.Remarks = txnRule.Description + " On " + txn.TransactionDate.Date.ToString("yyyy-MM-dd")+".";
                         transaction.SectionId = 1;
                         transaction.TransactionDate = txn.TransactionDate;
                         transaction.VoucherId = (int)txnRule.VoucherId;
@@ -3901,7 +4083,7 @@ namespace DanpheEMR.AccTransfer
                             {
                                 var subLedgerTxns = new List<SubLedgerTransactionModel>();
                                 var subLedTxn = new SubLedgerTransactionModel();
-                                subLedTxn.SubLedgerId = record.SubLedgerId > 0 ? record.SubLedgerId : GetDefaultSubLedgerId(record.LedgerId);
+                                subLedTxn.SubLedgerId = record.SubLedgerId > 0 ? record.SubLedgerId : GetDefaultSubLedgerId(record.LedgerId,currHospitalId);
                                 subLedTxn.LedgerId = record.LedgerId;
                                 subLedgerTxns.Add(subLedTxn);
                                 accTxnItems.SubLedgers = subLedgerTxns;
@@ -3911,6 +4093,8 @@ namespace DanpheEMR.AccTransfer
                             accTxnItems.DrCr = record.DrCr;
                             accTxnItems.LedgerId = record.LedgerId;
                             accTxnItems.Description = record.Description;
+                            accTxnItems.VendorBillNo = txn.VendorBillNo;
+                            accTxnItems.GoodReceiptId = txn.GoodReceiptId;
 
                             accTxnItems.TransactionLinks = new List<TransactionLinkModel>();
                             TransactionLinkModel txnLink = new TransactionLinkModel();
@@ -4170,7 +4354,7 @@ namespace DanpheEMR.AccTransfer
                 else
                 {
                     var invOtherCharge = (from c in accountingDBContext.InvCharges
-                                     select c).ToList();
+                                          select c).ToList();
                     var ledGrp = LedgergroupList.Find(y => y.LedgerGroupId == ledgerGroupId);
                     var tempLed = new LedgerModel();
                     tempLed.PrimaryGroup = ledGrp.PrimaryGroup;
@@ -4241,7 +4425,7 @@ namespace DanpheEMR.AccTransfer
                                                  TDSAmount = x.Select(a => (decimal)a.gr.TDSAmount).Sum(),
                                                  VATAmount = x.Select(a => (decimal)a.gr.VATAmount).Sum(),
                                                  DiscountAmount = x.Select(a => (decimal)a.gr.DiscountAmount).Sum(),
-                                                 CcCharge = x.Select(a => (decimal) a.gr.CcAmount).Sum(),
+                                                 CcCharge = x.Select(a => (decimal)a.gr.CcAmount).Sum(),
                                                  ItemDetails = x.GroupBy(a => new { a.gr.ItemId }).Select(a => new { a.Key.ItemId, TotalAmount = a.Select(b => (decimal)b.gr.TotalAmount).Sum() }).ToList(),
                                                  Remarks = "Inventory " + (x.Select(a => a.gr.PaymentMode).FirstOrDefault()) + " good receipt voucher for Bill No: " + (x.Select(a => a.gr.BillNo).FirstOrDefault()) + " and Goods Receipt No. : " + (x.Select(a => a.gr.GoodsReceiptNo).FirstOrDefault()) + " on GoodsReceipt date: " + (x.Select(a => a.gr.CreatedOn).FirstOrDefault()),
                                                  ReferenceIds = x.Select(a => (int)a.gr.GoodsReceiptItemId).Distinct().ToList(), //we are using GoodsReceiptItemId as a referenceId
@@ -4285,7 +4469,7 @@ namespace DanpheEMR.AccTransfer
                     }
                 }
                 else
-                {                    
+                {
                     var goodsReceiptItems = (from gr in goodreceiptdata.AsEnumerable()
                                              group new { gr } by new
                                              {
@@ -4310,7 +4494,7 @@ namespace DanpheEMR.AccTransfer
                                                  TDSAmount = x.Select(a => (decimal)a.gr.TDSAmount).Sum(),
                                                  VATAmount = x.Select(a => (decimal)a.gr.VATAmount).Sum(),
                                                  DiscountAmount = x.Select(a => (decimal)a.gr.DiscountAmount).Sum(),
-                                                 CcCharge = x.Select(a => (decimal) a.gr.CcAmount).Sum(),
+                                                 CcCharge = x.Select(a => (decimal)a.gr.CcAmount).Sum(),
                                                  ItemDetails = x.GroupBy(a => new { a.gr.ItemId }).Select(a => new { a.Key.ItemId, TotalAmount = a.Select(b => (decimal)b.gr.TotalAmount).Sum() }).ToList(),
                                                  Remarks = "Inventory " + (x.Select(a => a.gr.PaymentMode).FirstOrDefault()) + " good receipt voucher for Bill No: " + (x.Select(a => a.gr.BillNo).FirstOrDefault()) + " and Goods ReceiptNo. : " + (x.Select(a => a.gr.GoodsReceiptNo).FirstOrDefault()) + " on GoodsReceipt date: " + (x.Select(a => a.gr.CreatedOn).FirstOrDefault()),
                                                  ReferenceIds = x.Select(a => (int)a.gr.GoodsReceiptItemId).Distinct().ToList(), //we are using GoodsReceiptItemId as a referenceId
@@ -4424,7 +4608,7 @@ namespace DanpheEMR.AccTransfer
                                           //TransactionType = x.Key.PaymentMode == "Cash" ? "INVReturnToVendorCashGR" : "INVReturnToVendorCreditGR",
                                           TotalAmount = x.Select(a => (decimal)a.ret.TotalAmount).Sum(),
                                           VATAmount = x.Select(b => (decimal)b.ret.VATAmount).Sum(),
-                                          DiscountAmount = x.Select(c => (decimal) c.ret.DiscountAmount).Sum(),
+                                          DiscountAmount = x.Select(c => (decimal)c.ret.DiscountAmount).Sum(),
                                           Remarks = "Inventory Transaction entries to Accounting for Return to vendor Items on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
                                           ReferenceIds = x.Select(a => (int)a.ret.ReturnToVendorItemId).Distinct().ToList(),
                                       }).ToList();
@@ -4504,18 +4688,18 @@ namespace DanpheEMR.AccTransfer
                 //TransactionType-> INVDispatchToDeptReturn
                 var returnToDept = (from wtxn in INV_ReturnToDepartment
                                     group new { wtxn } by new
-                                      {
-                                          CreatedOn = Convert.ToDateTime(wtxn.CreatedOn).Date,
-                                          TransactionType = wtxn.TransactionType
-                                      } into x
-                                      select new
-                                      {
-                                          CreatedOn = x.Key.CreatedOn,
-                                          TransactionType = x.Key.TransactionType,//INVDispatchToDeptReturn
-                                          TotalAmount = x.Select(a => (decimal)a.wtxn.Price * (int)a.wtxn.Quantity).Sum(),
-                                          Remarks = "Transaction of INV Return To Department Items on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
-                                          ReferenceIds = x.Select(a => (int)a.wtxn.TransactionId).Distinct().ToList(),
-                                      }).ToList();
+                                    {
+                                        CreatedOn = Convert.ToDateTime(wtxn.CreatedOn).Date,
+                                        TransactionType = wtxn.TransactionType
+                                    } into x
+                                    select new
+                                    {
+                                        CreatedOn = x.Key.CreatedOn,
+                                        TransactionType = x.Key.TransactionType,//INVDispatchToDeptReturn
+                                        TotalAmount = x.Select(a => (decimal)a.wtxn.Price * (int)a.wtxn.Quantity).Sum(),
+                                        Remarks = "Transaction of INV Return To Department Items on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
+                                        ReferenceIds = x.Select(a => (int)a.wtxn.TransactionId).Distinct().ToList(),
+                                    }).ToList();
                 if (returnToDept.Count > 0)
                 {
                     var returnDept = new List<GoodsReceiptModel>();
@@ -4596,7 +4780,8 @@ namespace DanpheEMR.AccTransfer
                     consumption.VoucherName = (consumption.VoucherId != 0) ? voucherList.Find(c => c.VoucherId == consumption.VoucherId).VoucherName : null;
                     consumption.GoodsReceiptItem = new List<GoodsReceiptItemsModel>();
                     consumption.ReferenceIds = new List<int>();
-                    ConsumedGoodsItems.ForEach(cItm => {
+                    ConsumedGoodsItems.ForEach(cItm =>
+                    {
                         consumption.ReferenceIds.AddRange(cItm.ReferenceIds);
                         consumption.TotalAmount = consumption.TotalAmount + cItm.TotalAmount;
                     });
@@ -4642,7 +4827,8 @@ namespace DanpheEMR.AccTransfer
                     stkManageOut.GoodsReceiptItem = new List<GoodsReceiptItemsModel>();
                     stkManageOut.ReferenceIds = new List<int>();
                     stkManageOut.ReferenceIdsOne = new List<int>();
-                    invStockManageOutItems.ForEach(sItm => {
+                    invStockManageOutItems.ForEach(sItm =>
+                    {
                         stkManageOut.ReferenceIds.AddRange(sItm.ReferenceIds);
                         //stkManageOut.ReferenceIdsOne.AddRange(sItm.ReferenceIdsOne);
                         stkManageOut.TotalAmount = stkManageOut.TotalAmount + sItm.TotalAmount;
@@ -4664,21 +4850,21 @@ namespace DanpheEMR.AccTransfer
                 //Table- INVStockManageIN
                 var invStockManageIN = DataTableToList.ToDynamic(dataset.Tables[8]);
                 var invStockManageInItems = (from stkMIn in invStockManageIN.AsEnumerable()
-                                              group new { stkMIn } by new
-                                              {
-                                                  CreatedOn = Convert.ToDateTime(stkMIn.CreatedOn).Date,
-                                                  SubCategoryId = stkMIn.SubCategoryId
-                                              } into x
-                                              select new
-                                              {
-                                                  x.Key.CreatedOn,
-                                                  x.Key.SubCategoryId,
-                                                  TransactionType = "INVStockManageIn",
-                                                  TotalAmount = x.Select(a => (decimal)a.stkMIn.TotalAmount).Sum(),
-                                                  Remarks = "Inventory stock manage In from mainstore and substore on Date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
-                                                  ReferenceIds = x.Select(a => (int)a.stkMIn.TransactionId).Distinct().ToList()
-                                                  //ReferenceIdsOne = x.Select(a => (int)a.stkMIn.StockTxnId).Distinct().ToList(),
-                                              }).ToList();
+                                             group new { stkMIn } by new
+                                             {
+                                                 CreatedOn = Convert.ToDateTime(stkMIn.CreatedOn).Date,
+                                                 SubCategoryId = stkMIn.SubCategoryId
+                                             } into x
+                                             select new
+                                             {
+                                                 x.Key.CreatedOn,
+                                                 x.Key.SubCategoryId,
+                                                 TransactionType = "INVStockManageIn",
+                                                 TotalAmount = x.Select(a => (decimal)a.stkMIn.TotalAmount).Sum(),
+                                                 Remarks = "Inventory stock manage In from mainstore and substore on Date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
+                                                 ReferenceIds = x.Select(a => (int)a.stkMIn.TransactionId).Distinct().ToList()
+                                                 //ReferenceIdsOne = x.Select(a => (int)a.stkMIn.StockTxnId).Distinct().ToList(),
+                                             }).ToList();
 
 
                 if (invStockManageInItems.Count > 0)
@@ -4692,7 +4878,8 @@ namespace DanpheEMR.AccTransfer
                     stkManageIn.GoodsReceiptItem = new List<GoodsReceiptItemsModel>();
                     stkManageIn.ReferenceIds = new List<int>();
                     stkManageIn.ReferenceIdsOne = new List<int>();
-                    invStockManageInItems.ForEach(sItm => {
+                    invStockManageInItems.ForEach(sItm =>
+                    {
                         stkManageIn.ReferenceIds.AddRange(sItm.ReferenceIds);
                         //stkManageIn.ReferenceIdsOne.AddRange(sItm.ReferenceIdsOne);
                         stkManageIn.TotalAmount = stkManageIn.TotalAmount + sItm.TotalAmount;
@@ -4731,7 +4918,7 @@ namespace DanpheEMR.AccTransfer
             {
                 var accTxnFromInv = new List<TransactionModel>();
                 unavailableLedgerList = new List<LedgerModel>();
-                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true).FirstOrDefault();
+                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true && a.HospitalId == currHospitalId).FirstOrDefault();
                 for (int i = 0; i < InvGoodRecipt.Count; i++)
                 {
                     var record = InvGoodRecipt[i];
@@ -4757,7 +4944,7 @@ namespace DanpheEMR.AccTransfer
                             {
                                 transaction.VoucherId = RuleMappingList.Find(s => s.Description == "INVWriteOff").VoucherId.Value;
                                 var transferRule = RuleMappingList.Find(a => a.Description == "INVWriteOff").MappingDetail;
-                               // transaction.CostCenterId = CostCenterNotApplicableCostCenterId;
+                                // transaction.CostCenterId = CostCenterNotApplicableCostCenterId;
                                 if (transferRule.Count > 0)
                                 {
                                     transaction.TransactionItems = new List<TransactionItemModel>();
@@ -4977,13 +5164,13 @@ namespace DanpheEMR.AccTransfer
                                                 var txnItemPM = new TransactionItemModel();
                                                 txnItemPM.Amount = oc.Amount;
                                                 txnItemPM.DrCr = ruleRow.DrCr;
-                                                txnItemPM.LedgerId = oc.LedgerId > 0 ? (int)oc.LedgerId : GetLedgerIdFromInvOtherCharge(oc.ChargeId,ruleRow.LedgerGroupId,currHospitalId);
+                                                txnItemPM.LedgerId = oc.LedgerId > 0 ? (int)oc.LedgerId : GetLedgerIdFromInvOtherCharge(oc.ChargeId, ruleRow.LedgerGroupId, currHospitalId);
                                                 transaction.TransactionItems.Add(txnItemPM);
                                             });
                                         }
                                         else if (ruleRow.Description == "INVCashGoodReceiptOtherChargeSupplier")
                                         {
-                                            var OtherCharge = INV_OtherCharegeData.FindAll(a => record.ReferenceIds.Contains(a.GoodsReceiptItemId) && a.VendorId != record.VendorId).GroupBy(a => a.VendorId).Select(a => new { VendorId = a.Key, TotalAmount= a.Sum(b => b.TotalAmount),VendorName = a.Select(c => c.VendorName).FirstOrDefault()}).ToList() ;
+                                            var OtherCharge = INV_OtherCharegeData.FindAll(a => record.ReferenceIds.Contains(a.GoodsReceiptItemId) && a.VendorId != record.VendorId).GroupBy(a => a.VendorId).Select(a => new { VendorId = a.Key, TotalAmount = a.Sum(b => b.TotalAmount), VendorName = a.Select(c => c.VendorName).FirstOrDefault() }).ToList();
                                             OtherCharge.ForEach(oc =>
                                             {
                                                 var txnItemPM = new TransactionItemModel();
@@ -5309,7 +5496,7 @@ namespace DanpheEMR.AccTransfer
                                         transaction.TransactionType = record.TransactionType;
                                         if (ruleRow.Description == "INVReturnToVendorCashGRInventory")
                                         {
-                                            accTxnItems.Amount = (IsVatRegistered == true) ? (record.TotalAmount - record.VATAmount + record.DiscountAmount) :  (record.TotalAmount + record.DiscountAmount);
+                                            accTxnItems.Amount = (IsVatRegistered == true) ? (record.TotalAmount - record.VATAmount + record.DiscountAmount) : (record.TotalAmount + record.DiscountAmount);
                                             ledId = GetLedgerId(GetLedgerName("ACA_INVENTORY_INVENTORY-HOSPITAL", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             // accTxnItems.VendorId = itm.VendorId;
                                             transaction.TransactionType = record.TransactionType;
@@ -5317,7 +5504,7 @@ namespace DanpheEMR.AccTransfer
                                         }
                                         else if (ruleRow.Description == "INVReturnToVendorCashGRDiscountIncome")
                                         {
-                                            accTxnItems.Amount =  record.DiscountAmount;
+                                            accTxnItems.Amount = record.DiscountAmount;
                                             ledId = GetLedgerId(GetLedgerName("RII_DISCOUNT_INCOME_CASH_DISCOUNT_INCOME", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
                                         }
@@ -5388,7 +5575,7 @@ namespace DanpheEMR.AccTransfer
                                         }
                                         else if (ruleRow.Description == "INVReturnToVendorCashGRFixedAssetDiscountIncome")
                                         {
-                                            accTxnItems.Amount =  record.DiscountAmount;
+                                            accTxnItems.Amount = record.DiscountAmount;
                                             ledId = GetLedgerId(GetLedgerName("RII_DISCOUNT_INCOME_CASH_DISCOUNT_INCOME", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
                                         }
@@ -5452,7 +5639,7 @@ namespace DanpheEMR.AccTransfer
                                         transaction.TransactionType = record.TransactionType;
                                         if (ruleRow.Description == "INVReturnToVendorCreditGRInventory")
                                         {
-                                            accTxnItems.Amount = (IsVatRegistered == true) ? (record.TotalAmount - record.VATAmount + record.DiscountAmount) :  (record.TotalAmount + record.DiscountAmount);
+                                            accTxnItems.Amount = (IsVatRegistered == true) ? (record.TotalAmount - record.VATAmount + record.DiscountAmount) : (record.TotalAmount + record.DiscountAmount);
                                             ledId = GetLedgerId(GetLedgerName("ACA_INVENTORY_INVENTORY-HOSPITAL", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
                                             transaction.TransactionType = record.TransactionType;
@@ -5475,13 +5662,13 @@ namespace DanpheEMR.AccTransfer
                                         }
                                         else if (ruleRow.Description == "INVReturnToVendorCreditGRDutiesandTaxes")
                                         {
-                                            accTxnItems.Amount = (IsVatRegistered == true) ?record.VATAmount : 0;
+                                            accTxnItems.Amount = (IsVatRegistered == true) ? record.VATAmount : 0;
                                             ledId = GetLedgerId(GetLedgerName("LCL_DUTIES_AND_TAXES_VAT", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
                                         }
                                         else if (ruleRow.Description == "INVReturnToVendorCreditGRDiscountIncome")
                                         {
-                                            accTxnItems.Amount =  record.DiscountAmount;
+                                            accTxnItems.Amount = record.DiscountAmount;
                                             ledId = GetLedgerId(GetLedgerName("RII_DISCOUNT_INCOME_CASH_DISCOUNT_INCOME", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
                                         }
@@ -5544,7 +5731,7 @@ namespace DanpheEMR.AccTransfer
                                         }
                                         else if (ruleRow.Description == "INVReturnToVendorCreditGRFixedAssetDiscountIncome")
                                         {
-                                            accTxnItems.Amount =  record.DiscountAmount;
+                                            accTxnItems.Amount = record.DiscountAmount;
                                             ledId = GetLedgerId(GetLedgerName("RII_DISCOUNT_INCOME_CASH_DISCOUNT_INCOME", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
                                         }
@@ -6036,7 +6223,8 @@ namespace DanpheEMR.AccTransfer
                                             //accTxnItems.LedgerId = (ledId > 0) ? ledId : 0;
                                             //transaction.TransactionItems.Add(accTxnItems);
 
-                                            record.GoodsReceiptItem.ForEach(gritm => {
+                                            record.GoodsReceiptItem.ForEach(gritm =>
+                                            {
                                                 var accTxnItems = new TransactionItemModel();
                                                 accTxnItems.IsTxnDetails = false;
                                                 var ledId = 0;
@@ -6083,7 +6271,8 @@ namespace DanpheEMR.AccTransfer
                                         // DR: 
                                         if (ruleRow.Description == "INVStockManageOutSubCatetgory")
                                         {
-                                            record.GoodsReceiptItem.ForEach(gritm => {
+                                            record.GoodsReceiptItem.ForEach(gritm =>
+                                            {
                                                 var accTxnItems = new TransactionItemModel();
                                                 accTxnItems.IsTxnDetails = false;
                                                 var ledId = 0;
@@ -6129,7 +6318,8 @@ namespace DanpheEMR.AccTransfer
                                     {
                                         if (ruleRow.Description == "INVStockManageInSubCatetgory")
                                         {
-                                            record.GoodsReceiptItem.ForEach(gritm => {
+                                            record.GoodsReceiptItem.ForEach(gritm =>
+                                            {
                                                 var accTxnItems = new TransactionItemModel();
                                                 accTxnItems.IsTxnDetails = false;
                                                 var ledId = 0;
@@ -6250,7 +6440,7 @@ namespace DanpheEMR.AccTransfer
             {
                 DataSet dataset = PhrmTxnItemsDateWise(SelectedDate, currHospitalId);
                 var PHRMItem = new List<PHRMGoodsReceiptModel>();
-               
+
                 var PHRMInvoiceTransaction = DataTableToList.ToDynamic(dataset.Tables[0]);
                 //var PHRMInvoiceTransactionItems = DataTableToList.ToDynamic(dataset.Tables[1]);//12 July
                 var PHRMInvoiceReturnModel = DataTableToList.ToDynamic(dataset.Tables[1]);
@@ -6276,8 +6466,8 @@ namespace DanpheEMR.AccTransfer
                                    {
                                        x.Key.CreatedOn,
                                        //x.Key.PatientId,
-                                       TransactionType ="PHRMCashInvoice",
-                                       Type ="Cash Invoice Sale",
+                                       TransactionType = "PHRMCashInvoice",
+                                       Type = "Cash Invoice Sale",
                                        SalesAmount = x.Select(a => (decimal)a.invo.SubTotal).Sum(),
                                        TotalAmount = x.Select(a => (decimal)a.invo.TotalAmount).Sum(),
                                        VATAmount = x.Select(a => (decimal)a.invo.VATAmount).Sum(),
@@ -6309,7 +6499,7 @@ namespace DanpheEMR.AccTransfer
                         Remarks = p.Remarks,
                         Type = p.Type,
                         GrVATAmount = p.GrAmount.Select(a => a.GrVatAmount).Sum(),
-                        GrCOGSAmount = p.GrAmount.Select(a => a.GrCOGSAmount).Sum(),                        
+                        GrCOGSAmount = p.GrAmount.Select(a => a.GrCOGSAmount).Sum(),
                         BillSyncs = p.BillSyncs.Select(x => new SyncBillingAccountingModel()
                         {
                             PatientId = x.PatientId,
@@ -6317,7 +6507,7 @@ namespace DanpheEMR.AccTransfer
                         }).ToList()
                     }).ToList();
                     invItem.ForEach(a =>
-                    {                        
+                    {
                         a.VoucherId = (RuleMappingList.Where(r => r.Description == a.TransactionType).ToList().Count > 0) ? RuleMappingList.Find(c => c.Description == a.TransactionType).VoucherId.Value : 0;
                         a.VoucherName = (a.VoucherId != 0) ? voucherList.Find(c => c.VoucherId == a.VoucherId).VoucherName : null;
 
@@ -6332,37 +6522,37 @@ namespace DanpheEMR.AccTransfer
                 }
 
                 var CreditInvoice = (from invo in PHRMInvoiceTransaction.AsEnumerable()
-                                       where invo.PaymentMode == "credit"
-                                       //&& (Convert.ToDateTime(invo.CreateOn).Date >= FromDate && Convert.ToDateTime(invo.CreateOn).Date <= ToDate)
-                                   group new { invo } by new
-                                   {
-                                       CreatedOn = Convert.ToDateTime(invo.CreateOn).Date,
-                                       CreditOrganizationId = invo.OrganizationId
-                                       //PatientId = invo.PatientId,
-                                   } into x
-                                   select new
-                                   {
-                                       x.Key.CreatedOn,
-                                       //x.Key.PatientId,
-                                       TransactionType = "PHRMCreditInvoice",
-                                       Type ="Credit invoice",
-                                       SalesAmount = x.Select(a => (decimal)a.invo.SubTotal).Sum(),
-                                       TotalAmount = x.Select(a => (decimal)a.invo.TotalAmount).Sum(),
-                                       VATAmount = x.Select(a => (decimal)a.invo.VATAmount).Sum(),
-                                       DiscountAmount = x.Select(b => (decimal)b.invo.DiscountAmount).Sum(),
-                                       OrganizationId = x.Key.CreditOrganizationId,
-                                       BillSyncs = x.GroupBy(a => new { a.invo.PatientId }).Select(a => new { a.Key.PatientId, TotalAmount = a.Select(b => (decimal)b.invo.TotalAmount).Sum() }).ToList(),
-                                       Remarks = "Transaction of Credit Invoice Items on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
-                                       ReferenceIds = x.Select(a => (int)a.invo.InvoiceId).Distinct().ToList(),
-                                       GrAmount = (from gr in grvatdisamount
-                                                   join itm in x.Select(a => a.invo.InvoiceId).Distinct().ToList() on gr.InvoiceId equals itm
-                                                   select new
-                                                   {
-                                                       GrVatAmount = (decimal)gr.GrVATAmount,
-                                                       //GrDisAmount = (decimal)gr.GrDiscountAmount,
-                                                       GrCOGSAmount = (decimal)gr.GrCOGSAmount
-                                                   }).ToList(),
-                                   }).ToList();
+                                     where invo.PaymentMode == "credit"
+                                     //&& (Convert.ToDateTime(invo.CreateOn).Date >= FromDate && Convert.ToDateTime(invo.CreateOn).Date <= ToDate)
+                                     group new { invo } by new
+                                     {
+                                         CreatedOn = Convert.ToDateTime(invo.CreateOn).Date,
+                                         CreditOrganizationId = invo.OrganizationId
+                                         //PatientId = invo.PatientId,
+                                     } into x
+                                     select new
+                                     {
+                                         x.Key.CreatedOn,
+                                         //x.Key.PatientId,
+                                         TransactionType = "PHRMCreditInvoice",
+                                         Type = "Credit invoice",
+                                         SalesAmount = x.Select(a => (decimal)a.invo.SubTotal).Sum(),
+                                         TotalAmount = x.Select(a => (decimal)a.invo.TotalAmount).Sum(),
+                                         VATAmount = x.Select(a => (decimal)a.invo.VATAmount).Sum(),
+                                         DiscountAmount = x.Select(b => (decimal)b.invo.DiscountAmount).Sum(),
+                                         OrganizationId = x.Key.CreditOrganizationId,
+                                         BillSyncs = x.GroupBy(a => new { a.invo.PatientId }).Select(a => new { a.Key.PatientId, TotalAmount = a.Select(b => (decimal)b.invo.TotalAmount).Sum() }).ToList(),
+                                         Remarks = "Transaction of Credit Invoice Items on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
+                                         ReferenceIds = x.Select(a => (int)a.invo.InvoiceId).Distinct().ToList(),
+                                         GrAmount = (from gr in grvatdisamount
+                                                     join itm in x.Select(a => a.invo.InvoiceId).Distinct().ToList() on gr.InvoiceId equals itm
+                                                     select new
+                                                     {
+                                                         GrVatAmount = (decimal)gr.GrVATAmount,
+                                                         //GrDisAmount = (decimal)gr.GrDiscountAmount,
+                                                         GrCOGSAmount = (decimal)gr.GrCOGSAmount
+                                                     }).ToList(),
+                                     }).ToList();
                 if (CreditInvoice.Count > 0)
                 {
                     var invItem = new List<PHRMGoodsReceiptModel>();
@@ -6433,29 +6623,29 @@ namespace DanpheEMR.AccTransfer
                 //                                             GrCOGSAmount = (decimal)gr.GrCOGSAmount
                 //                                         }).ToList(),
                 //                         }).ToList();
-                var CashInvoiceReturn = (from  invReturn in PHRMInvoiceReturnModel.AsEnumerable()
+                var CashInvoiceReturn = (from invReturn in PHRMInvoiceReturnModel.AsEnumerable()
                                          where invReturn.PaymentMode == "cash"
-                                         group new { invReturn} by new
+                                         group new { invReturn } by new
                                          {
                                              CreatedOn = Convert.ToDateTime(invReturn.CreatedOn).Date,
                                          } into x
                                          select new
                                          {
                                              x.Key.CreatedOn,
-                                             TransactionType ="PHRMCashInvoiceReturn",
-                                             Type ="Cash Invoice Return",
+                                             TransactionType = "PHRMCashInvoiceReturn",
+                                             Type = "Cash Invoice Return",
                                              SalesAmount = x.Select(a => (decimal)a.invReturn.SubTotal).Sum(),
                                              TotalAmount = x.Select(a => (decimal)a.invReturn.TotalAmount).Sum(),
                                              VATAmount = x.Select(c => (decimal)c.invReturn.VATAmount).Sum(),
                                              DiscountAmount = x.Select(b => (decimal)b.invReturn.DiscountAmount).Sum(),
                                              Remarks = "Transaction of Cash Invoice return Items on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
-                                             ReferenceIds = x.Select(e =>(int) e.invReturn.InvoiceReturnId).Distinct().ToList(),
+                                             ReferenceIds = x.Select(e => (int)e.invReturn.InvoiceReturnId).Distinct().ToList(),
                                              GrAmount = (from gr in grvatdisamount
-                                                         //join itm in x.Select(a => a.invReturn.InvoiceId).Distinct().ToList() on gr.InvoiceId equals itm
+                                                             //join itm in x.Select(a => a.invReturn.InvoiceId).Distinct().ToList() on gr.InvoiceId equals itm
                                                          select new
                                                          {
                                                              GrVatAmount = 0, //(decimal)gr.GrVATAmount,                                                             
-                                                             GrCOGSAmount =0 //(decimal)gr.GrCOGSAmount
+                                                             GrCOGSAmount = 0 //(decimal)gr.GrCOGSAmount
                                                          }).ToList(),
                                          }).ToList();
                 if (CashInvoiceReturn.Count > 0)
@@ -6473,7 +6663,7 @@ namespace DanpheEMR.AccTransfer
                         Remarks = p.Remarks,
                         Type = p.Type,
                         GrVATAmount = p.GrAmount.Select(a => a.GrVatAmount).Sum(),
-                        GrCOGSAmount = p.GrAmount.Select(a => a.GrCOGSAmount).Sum(),                        
+                        GrCOGSAmount = p.GrAmount.Select(a => a.GrCOGSAmount).Sum(),
                     }).ToList();
                     invRTItem.ForEach(a =>
                     {
@@ -6494,31 +6684,31 @@ namespace DanpheEMR.AccTransfer
                                            from invReturn in PHRMInvoiceReturnModel.AsEnumerable()
                                            where invReturn.PaymentMode == "credit"
                                            group new { invReturn } by new
-                                         {
-                                             CreatedOn = Convert.ToDateTime(invReturn.CreatedOn).Date,
-                                             OrganizationId = invReturn.OrganizationId
-                                         } into x
-                                         select new
-                                         {
-                                             x.Key.CreatedOn,
-                                             TransactionType ="PHRMCreditInvoiceReturn",
-                                             Type ="Credit Invoice Return",
-                                             SalesAmount = x.Select(a => (decimal)a.invReturn.SubTotal).Sum(),
-                                             TotalAmount = x.Select(a => (decimal)a.invReturn.TotalAmount).Sum(),
-                                             OrganizationId = x.Key.OrganizationId,
-                                             VATAmount = x.Select(c => (decimal)c.invReturn.VATAmount).Sum(),
-                                             DiscountAmount = x.Select(b => (decimal)b.invReturn.DiscountAmount).Sum(),
-                                             Remarks = "Transaction of Credit Invoice return Items on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
-                                             BillSyncs = x.GroupBy(a => new { a.invReturn.PatientId }).Select(a => new { a.Key.PatientId, TotalAmount = a.Select(b => (decimal)b.invReturn.TotalAmount).Sum() }).ToList(),
-                                             ReferenceIds = x.Select(a =>(int) a.invReturn.InvoiceReturnId).Distinct().ToList(),
-                                             GrAmount = (from gr in grvatdisamount
-                                                             //join itm in x.Select(a => a.invReturn.InvoiceId).Distinct().ToList() on gr.InvoiceId equals itm
-                                                         select new
-                                                         {
-                                                             GrVatAmount = 0, //(decimal)gr.GrVATAmount,                                                             
-                                                             GrCOGSAmount = 0 //(decimal)gr.GrCOGSAmount
-                                                         }).ToList(),
-                                         }).ToList();
+                                           {
+                                               CreatedOn = Convert.ToDateTime(invReturn.CreatedOn).Date,
+                                               OrganizationId = invReturn.OrganizationId
+                                           } into x
+                                           select new
+                                           {
+                                               x.Key.CreatedOn,
+                                               TransactionType = "PHRMCreditInvoiceReturn",
+                                               Type = "Credit Invoice Return",
+                                               SalesAmount = x.Select(a => (decimal)a.invReturn.SubTotal).Sum(),
+                                               TotalAmount = x.Select(a => (decimal)a.invReturn.TotalAmount).Sum(),
+                                               OrganizationId = x.Key.OrganizationId,
+                                               VATAmount = x.Select(c => (decimal)c.invReturn.VATAmount).Sum(),
+                                               DiscountAmount = x.Select(b => (decimal)b.invReturn.DiscountAmount).Sum(),
+                                               Remarks = "Transaction of Credit Invoice return Items on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
+                                               BillSyncs = x.GroupBy(a => new { a.invReturn.PatientId }).Select(a => new { a.Key.PatientId, TotalAmount = a.Select(b => (decimal)b.invReturn.TotalAmount).Sum() }).ToList(),
+                                               ReferenceIds = x.Select(a => (int)a.invReturn.InvoiceReturnId).Distinct().ToList(),
+                                               GrAmount = (from gr in grvatdisamount
+                                                               //join itm in x.Select(a => a.invReturn.InvoiceId).Distinct().ToList() on gr.InvoiceId equals itm
+                                                           select new
+                                                           {
+                                                               GrVatAmount = 0, //(decimal)gr.GrVATAmount,                                                             
+                                                               GrCOGSAmount = 0 //(decimal)gr.GrCOGSAmount
+                                                           }).ToList(),
+                                           }).ToList();
                 if (CreditInvoiceReturn.Count > 0)
                 {
                     var invRTItem = new List<PHRMGoodsReceiptModel>();
@@ -6575,7 +6765,7 @@ namespace DanpheEMR.AccTransfer
                                              DiscountAmount = x.Select(a => (decimal)a.gr.DiscountAmount).Sum(),
                                              Remarks = "Transaction of Goods Receipt Items on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
                                              ReferenceIds = x.Select(a => (int)a.gr.GoodReceiptId).Distinct().ToList(),
-                                            // BillSyncs = x.GroupBy(a => new { a.gr.SupplierId }).Select(a => new { a.Key.SupplierId, TotalAmount = a.Select(b => (decimal)b.gr.TotalAmount).Sum() }).ToList(),
+                                             // BillSyncs = x.GroupBy(a => new { a.gr.SupplierId }).Select(a => new { a.Key.SupplierId, TotalAmount = a.Select(b => (decimal)b.gr.TotalAmount).Sum() }).ToList(),
                                              x.Key.SupplierId,
                                              SupplierName = (from s in pharmacyDbContext.PHRMSupplier where s.SupplierId == x.Key.SupplierId select (string)s.SupplierName).FirstOrDefault()
                                          }).ToList();
@@ -6734,7 +6924,7 @@ namespace DanpheEMR.AccTransfer
                     }
                 }
                 //PHRMDispatchToDept
-                 var dispatchToDept = (from stxn in PHRMStockTransactionModel.AsEnumerable()
+                var dispatchToDept = (from stxn in PHRMStockTransactionModel.AsEnumerable()
                                       where DBNull.Equals(stxn.TransactionType, "wardsupply")
                                       group new { stxn } by new
                                       {
@@ -6823,22 +7013,22 @@ namespace DanpheEMR.AccTransfer
 
                 //PHRMDeposit
                 var depositPHRM = (from deposit in PHRMDeposit.AsEnumerable()
-                                         group new { deposit } by new
-                                         {
-                                             CreatedOn = Convert.ToDateTime(deposit.CreatedOn).Date,
-                                             DepositType = deposit.DepositType
-                                         } into x
-                                         where x.Key.DepositType != "depositdeduct"
+                                   group new { deposit } by new
+                                   {
+                                       CreatedOn = Convert.ToDateTime(deposit.CreatedOn).Date,
+                                       DepositType = deposit.DepositType
+                                   } into x
+                                   where x.Key.DepositType != "depositdeduct"
                                    select new
-                                         {
-                                             CreatedOn = x.Key.CreatedOn,
-                                             TransactionType = x.Key.DepositType == "deposit"? "PHRMDepositAdd" : "PHRMDepositReturn",
-                                             Type = "Deposit",
-                                             TotalAmount = x.Select(a => (decimal)a.deposit.DepositAmount).Sum(),
-                                             BillSyncs = x.GroupBy(a => new { a.deposit.PatientId }).Select(a => new { a.Key.PatientId, TotalAmount = a.Select(b => (decimal)b.deposit.DepositAmount).Sum() }).ToList(),
-                                             Remarks = x.Key.DepositType == "deposit" ? "Transaction of Deposit Add on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date) : "Transaction of Deposit Return on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
+                                   {
+                                       CreatedOn = x.Key.CreatedOn,
+                                       TransactionType = x.Key.DepositType == "deposit" ? "PHRMDepositAdd" : "PHRMDepositReturn",
+                                       Type = "Deposit",
+                                       TotalAmount = x.Select(a => (decimal)a.deposit.DepositAmount).Sum(),
+                                       BillSyncs = x.GroupBy(a => new { a.deposit.PatientId }).Select(a => new { a.Key.PatientId, TotalAmount = a.Select(b => (decimal)b.deposit.DepositAmount).Sum() }).ToList(),
+                                       Remarks = x.Key.DepositType == "deposit" ? "Transaction of Deposit Add on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date) : "Transaction of Deposit Return on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
                                        ReferenceIds = x.Select(a => (int)a.deposit.DepositId).Distinct().ToList(),
-                                         }).ToList();
+                                   }).ToList();
                 if (depositPHRM.Count > 0)
                 {
                     var depositTxn = depositPHRM.Select(p => new PHRMGoodsReceiptModel()
@@ -6872,21 +7062,21 @@ namespace DanpheEMR.AccTransfer
 
                 // Stock Adjustment-In
                 var StockIn = (from stock in PHRMStokcAdjustment.AsEnumerable()
-                               where stock.InQty >0
-                                group new { stock } by new
-                                {
-                                    CreatedOn = Convert.ToDateTime(stock.TransactionDate).Date
+                               where stock.InQty > 0
+                               group new { stock } by new
+                               {
+                                   CreatedOn = Convert.ToDateTime(stock.TransactionDate).Date
 
-                                } into x
-                                select new
-                                {
-                                    x.Key.CreatedOn,
-                                    TransactionType = "PHRMAdjustmentIn",
-                                    Type = "Adjustment",
-                                    TotalAmount = x.Select(a => (decimal)a.stock.CostPrice * (decimal) a.stock.InQty).Sum(),
-                                    Remarks = "Transaction of Stock Adjustmetn In on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
-                                    ReferenceIds = x.Select(a => (int)a.stock.StockTransactionId).Distinct().ToList(),
-                                }).ToList();
+                               } into x
+                               select new
+                               {
+                                   x.Key.CreatedOn,
+                                   TransactionType = "PHRMAdjustmentIn",
+                                   Type = "Adjustment",
+                                   TotalAmount = x.Select(a => (decimal)a.stock.CostPrice * (decimal)a.stock.InQty).Sum(),
+                                   Remarks = "Transaction of Stock Adjustmetn In on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
+                                   ReferenceIds = x.Select(a => (int)a.stock.StockTransactionId).Distinct().ToList(),
+                               }).ToList();
                 if (StockIn.Count > 0)
                 {
 
@@ -6914,24 +7104,24 @@ namespace DanpheEMR.AccTransfer
                         }
                     }
                 }
-                
+
                 // Stock Adjustment-Out
                 var StockOut = (from stock in PHRMStokcAdjustment.AsEnumerable()
-                               where stock.OutQty > 0
-                               group new { stock } by new
-                               {
-                                   CreatedOn = Convert.ToDateTime(stock.TransactionDate).Date
+                                where stock.OutQty > 0
+                                group new { stock } by new
+                                {
+                                    CreatedOn = Convert.ToDateTime(stock.TransactionDate).Date
 
-                               } into x
-                               select new
-                               {
-                                   x.Key.CreatedOn,
-                                   TransactionType = "PHRMAdjustmentOut",
-                                   Type = "Adjustment",
-                                   TotalAmount = x.Select(a => (decimal)a.stock.CostPrice * (decimal)a.stock.OutQty).Sum(),
-                                   Remarks = "Transaction of Stock Adjustmetn Out on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
-                                   ReferenceIds = x.Select(a => (int)a.stock.StockTransactionId).Distinct().ToList(),
-                               }).ToList();
+                                } into x
+                                select new
+                                {
+                                    x.Key.CreatedOn,
+                                    TransactionType = "PHRMAdjustmentOut",
+                                    Type = "Adjustment",
+                                    TotalAmount = x.Select(a => (decimal)a.stock.CostPrice * (decimal)a.stock.OutQty).Sum(),
+                                    Remarks = "Transaction of Stock Adjustmetn Out on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
+                                    ReferenceIds = x.Select(a => (int)a.stock.StockTransactionId).Distinct().ToList(),
+                                }).ToList();
                 if (StockOut.Count > 0)
                 {
 
@@ -6961,23 +7151,23 @@ namespace DanpheEMR.AccTransfer
                 }
                 //PHRMSettlement
                 var creditBillPaid = (from settlment in PHRMSettlement.AsEnumerable()
-                                   group new { settlment } by new
-                                   {
-                                       CreatedOn = Convert.ToDateTime(settlment.SettlementDate).Date,
-                                       OrganizationId = settlment.OrganizationId
-                                   } into x
-                                   select new
-                                   {
-                                       CreatedOn = x.Key.CreatedOn,
-                                       TransactionType ="PHRMCreditBillPaid",
-                                       Type = "CreditBillPaid",
-                                       TotalAmount = x.Select(a => (decimal)a.settlment.CollectionFromReceivable).Sum(),
-                                       DiscountGiven = x.Select(a => (decimal)a.settlment.DiscountAmount).Sum(),
-                                       OrganizationId = x.Key.OrganizationId,
-                                       Remarks ="Transaction of Credit bill paid on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
-                                       ReferenceIds = x.Select(a => (int)a.settlment.SettlementId).Distinct().ToList(),
-                                       BillSyncs = x.GroupBy(a => new { a.settlment.PatientId }).Select(a => new { a.Key.PatientId, TotalAmount = a.Select(b => (decimal)b.settlment.PaidAmount).Sum() }).ToList(),
-                                   }).ToList();
+                                      group new { settlment } by new
+                                      {
+                                          CreatedOn = Convert.ToDateTime(settlment.SettlementDate).Date,
+                                          OrganizationId = settlment.OrganizationId
+                                      } into x
+                                      select new
+                                      {
+                                          CreatedOn = x.Key.CreatedOn,
+                                          TransactionType = "PHRMCreditBillPaid",
+                                          Type = "CreditBillPaid",
+                                          TotalAmount = x.Select(a => (decimal)a.settlment.CollectionFromReceivable).Sum(),
+                                          DiscountGiven = x.Select(a => (decimal)a.settlment.DiscountAmount).Sum(),
+                                          OrganizationId = x.Key.OrganizationId,
+                                          Remarks = "Transaction of Credit bill paid on date: " + Convert.ToString(Convert.ToDateTime(x.Key.CreatedOn).Date),
+                                          ReferenceIds = x.Select(a => (int)a.settlment.SettlementId).Distinct().ToList(),
+                                          BillSyncs = x.GroupBy(a => new { a.settlment.PatientId }).Select(a => new { a.Key.PatientId, TotalAmount = a.Select(b => (decimal)b.settlment.PaidAmount).Sum() }).ToList(),
+                                      }).ToList();
                 if (creditBillPaid.Count > 0)
                 {
                     var settlementTxn = creditBillPaid.Select(p => new PHRMGoodsReceiptModel()
@@ -7032,7 +7222,7 @@ namespace DanpheEMR.AccTransfer
         {
             try
             {
-                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true).FirstOrDefault();
+                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true && a.HospitalId == currHospitalId).FirstOrDefault();
                 var accTxnFromPhrm = new List<TransactionModel>();
                 for (int i = 0; i < PHRMGoodreceipt.Count; i++)
                 {
@@ -7085,7 +7275,7 @@ namespace DanpheEMR.AccTransfer
                                         }
                                         else if (ruleRow.Description == "PHRMCashInvoice1DutiesandTaxes")
                                         {
-                                            accTxnItems.Amount = (IsVatRegistered == true) ?(decimal) record.VATAmount : 0;
+                                            accTxnItems.Amount = (IsVatRegistered == true) ? (decimal)record.VATAmount : 0;
                                             ledId = GetLedgerId(GetLedgerName("LCL_DUTIES_AND_TAXES_VAT", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
                                             subLed.LedgerId = ledId;
@@ -7274,8 +7464,8 @@ namespace DanpheEMR.AccTransfer
                                         }
                                         else if (ruleRow.Description == "PHRMCreditInvoice1SundryDebtors")
                                         {
-                                            accTxnItems.Amount = (decimal)(record.SalesAmount - record.DiscountAmount + record.VATAmount -(decimal?) CoPaymentCashAmount);
-                                            if(record.CreditOrganizationId == null)
+                                            accTxnItems.Amount = (decimal)(record.SalesAmount - record.DiscountAmount + record.VATAmount - (decimal?)CoPaymentCashAmount);
+                                            if (record.CreditOrganizationId == null)
                                             {
                                                 ledId = GetLedgerId(GetLedgerName("ACA_SUNDRY_DEBTORS_RECEIVABLES", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                                 subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
@@ -7530,7 +7720,7 @@ namespace DanpheEMR.AccTransfer
                                         transaction.TransactionType = record.TransactionType;
                                         if (ruleRow.Description == "PHRMCreditPaidGoodReceiptSundryCreditors")
                                         {
-                                            accTxnItems.Amount = (IsVatRegistered == true) ? (decimal)(record.SalesAmount + record.VATAmount - record.DiscountAmount) : (decimal)(record.SalesAmount- record.DiscountAmount);
+                                            accTxnItems.Amount = (IsVatRegistered == true) ? (decimal)(record.SalesAmount + record.VATAmount - record.DiscountAmount) : (decimal)(record.SalesAmount - record.DiscountAmount);
                                             ledId = GetLedgerIdFromSupplier(record.SupplierId, ruleRow.LedgerGroupId, record.SupplierName, currHospitalId);
                                             var sub_Ledger = supplierLedger.Find(a => a.SupplierId == record.SupplierId);
                                             subLed.SubLedgerId = sub_Ledger != null ? (int)sub_Ledger.SubLedgerId : 0;
@@ -7722,7 +7912,7 @@ namespace DanpheEMR.AccTransfer
                                         else if (ruleRow.Description == "PHRMCreditInvoiceReturn1SundryDebtors")
                                         {
                                             accTxnItems.Amount = (decimal)(record.SalesAmount - record.DiscountAmount + record.VATAmount - (decimal?)ReturnCoPaymentCashAmount);
-                                            if(record.CreditOrganizationId == null)
+                                            if (record.CreditOrganizationId == null)
                                             {
                                                 ledId = GetLedgerId(GetLedgerName("ACA_SUNDRY_DEBTORS_RECEIVABLES", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                                 subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
@@ -8632,16 +8822,21 @@ namespace DanpheEMR.AccTransfer
         {
             try
             {
-                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true).FirstOrDefault();
+                var DefaultCostCenter = accountingDBContext.CostCenters.Where(a => a.IsDefault == true && a.IsActive == true && a.HospitalId == currHospitalId).FirstOrDefault();
                 var accTxnFromINCV = new List<TransactionModel>();
+
+                var subLedgerParam = accountingDBContext.CFGParameters.Where(a => a.ParameterGroupName == "Accounting" && a.ParameterName == "SubLedgerAndCostCenter").FirstOrDefault().ParameterValue;
+                var parmValue = JsonConvert.DeserializeObject<SubLedgerCostCenterConfig_DTO>(subLedgerParam);
+
                 for (int i = 0; i < INCTVConsultantIncentive.Count; i++)
                 {
                     var record = INCTVConsultantIncentive[i];
                     var transaction = new TransactionModel();
                     transaction.FiscalyearId = fiscalYearId;
-                    transaction.Remarks = "";
+                    transaction.Remarks = "Incentive_PaymentVoucher";
                     transaction.SectionId = 5;
                     transaction.TransactionDate = (DateTime)record.TransactionDate;
+
                     //transaction.CostCenterId = CostCenterNotApplicableCostCenterId;
                     transaction.VoucherId = record.VoucherId;
                     var referenceIdArray = record.ReferenceIds;
@@ -8677,19 +8872,23 @@ namespace DanpheEMR.AccTransfer
                                             accTxnItems.Amount = (decimal)(record.TotalAmount + record.TotalTDS);
                                             ledId = GetLedgerId(GetLedgerName("EE_MEDICAL_DIRECT_EXPENSESCOMMISSION_EXPENSES_(TECHNICAL_DISTRIBUTION)", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
+                                            accTxnItems.Description = $"Incentive Payment for {DateTime.Now.Date}";
                                         }
                                         else if (ruleRow.Description == "ConsultantIncentiveCONSULTANTTDS" && ruleRow.DrCr == false)
                                         {
                                             accTxnItems.Amount = (decimal)record.TotalTDS;
                                             ledId = GetLedgerId(GetLedgerName("LCL_DUTIES_AND_TAXES_TDS_PAYABLE", currHospitalId), ruleRow.LedgerGroupId, ruleRow.LedgerReferenceId, currHospitalId);
                                             subLed.SubLedgerId = GetDefaultSubLedgerId(ledId);
+                                            accTxnItems.Description = $"Incentive Payment (TDS Amount) for {DateTime.Now.Date}";
+
                                         }
                                         else if (ruleRow.Description == "ConsultantIncentiveCONSULTANT(CREDITA/C)" && ruleRow.DrCr == false)
                                         {
                                             accTxnItems.Amount = (decimal)record.TotalAmount;
                                             ledId = GetLedgerIdFromConsultant(record.EmployeeId, ruleRow.LedgerGroupId, currHospitalId);
+                                            accTxnItems.Description = $"Incentive Payment To {record.EmployeeName} for {DateTime.Now.Date}";
                                             var sub_Ledger = ConsultantLedger.Find(a => a.EmployeeId == record.EmployeeId);
-                                            subLed.SubLedgerId = sub_Ledger != null ? (int)sub_Ledger.SubLedgerId : 0;
+                                            subLed.SubLedgerId = sub_Ledger != null ? (sub_Ledger.SubLedgerId != null ? (int)sub_Ledger.SubLedgerId : 0) : 0;
                                         }
 
                                         accTxnItems.DrCr = ruleRow.DrCr;
@@ -8699,13 +8898,17 @@ namespace DanpheEMR.AccTransfer
                                             accTxnItems.DrCr = (ruleRow.DrCr == true) ? false : true;
                                             accTxnItems.Amount = Convert.ToDecimal(Decimal.Negate(Convert.ToDecimal(accTxnItems.Amount)));
                                         }
+                                        accTxnItems.TransactionType = record.TransactionType;
+                                        accTxnItems.TransactionLinks = new List<TransactionLinkModel>();
+                                        accTxnItems.TransactionLinks.Add(txnLink);
                                         subLed.LedgerId = ledId;
                                         subLedgers.Add(subLed);
-                                        accTxnItems.SubLedgers = subLedgers;
+                                        if (parmValue.EnableSubLedger)
+                                        {
+                                            accTxnItems.SubLedgers = subLedgers;
+                                        }
                                         transaction.TransactionItems.Add(accTxnItems);
                                     });
-
-
                                 }
                                 break;
                             }
@@ -8846,8 +9049,8 @@ namespace DanpheEMR.AccTransfer
                     new SqlParameter("@TransactionDate", SelectedDate.Date),
                     new SqlParameter("@HospitalId", currHospitalId)
                 };
-            return  DALFunctions.GetDatasetFromStoredProc("SP_ACC_GetPharmacyTransactions", paramList, accountingDBContext);
-             
+            return DALFunctions.GetDatasetFromStoredProc("SP_ACC_GetPharmacyTransactions", paramList, accountingDBContext);
+
         }
         #endregion
 
@@ -8880,7 +9083,12 @@ namespace DanpheEMR.AccTransfer
         /// <returns></returns>
         public static int GetFiscalYearIdByDate(AccountingDbContext accountingdBContext, DateTime? date, int currHospitalId)
         {
-            var fiscalYearId = accountingdBContext.FiscalYears.Where(f => f.StartDate <= date && f.EndDate >= date && f.HospitalId == currHospitalId && f.IsActive == true).Select(fs => fs.FiscalYearId).FirstOrDefault();
+            var fiscalYearId = (
+                from fsc in accountingdBContext.FiscalYears
+                join map in accountingdBContext.MapFiscalYears
+                on fsc.FiscalYearId equals map.FiscalYearId
+                where fsc.StartDate <= date && fsc.EndDate >= date && map.IsActive == true && map.HospitalId == currHospitalId
+                select fsc.FiscalYearId ).FirstOrDefault();
             return fiscalYearId;
         }
         #endregion
@@ -8896,7 +9104,7 @@ namespace DanpheEMR.AccTransfer
                 // Update Ledger method will update OpeningBalance, OpeningBalanceType,etc
                 var currentFiscalYearId = GetFiscalYearIdByDate(accountingDBContext, DateTime.Now.Date, currHospitalId);
                 var FYId = GetFiscalYearIdForOpeningBalance(accountingDBContext, currentFiscalYearId, currHospitalId);
-                var existLed = accountingDBContext.LedgerBalanceHistory.Where(l => l.LedgerId == ledgerModel.LedgerId && l.FiscalYearId == FYId).FirstOrDefault();
+                var existLed = accountingDBContext.LedgerBalanceHistory.Where(l => l.HospitalId == currHospitalId && l.LedgerId == ledgerModel.LedgerId && l.FiscalYearId == FYId).FirstOrDefault();
                 if (existLed != null)
                 {
                     existLed.OpeningBalance = ledgerModel.OpeningBalance;//NageshBB-21Ju'20 for now we are taking as per client opening balance  (ledGroup.PrimaryGroup == "ASSETS" || ledGroup.PrimaryGroup == "LIABILITIES") ?
@@ -8953,9 +9161,9 @@ namespace DanpheEMR.AccTransfer
                 //            where led.HospitalId == currHospitalId
                 //            select led.Code).ToList().Max();
                 var code = "";
-                
+
                 var maxCode = accountingDBContext.Ledgers.AsQueryable()
-                                            .Where(t => t.HospitalId == currHospitalId && t.Code.Length>0)
+                                            .Where(t => t.HospitalId == currHospitalId && t.Code.Length > 0)
                                             .Select(i => i.Code).DefaultIfEmpty().ToList().Max(t => Convert.ToInt32(t));
                 if (maxCode != 0)
                 {
@@ -9033,10 +9241,12 @@ namespace DanpheEMR.AccTransfer
             {
                 int correctFiscalYearId = 0;
                 var fiscalYear = (from fy in accountingDbContext.FiscalYears
-                                  where fy.FiscalYearId == selFiscalYearId && fy.HospitalId == currHospitalId
+                                  join map in accountingDbContext.MapFiscalYears
+                                  on fy.FiscalYearId equals map.FiscalYearId
+                                  where map.FiscalYearId == selFiscalYearId && map.HospitalId == currHospitalId
                                   select fy).FirstOrDefault();
                 //if selFiscalYear is closed current or any then return this closed fiscal year id
-                if (fiscalYear.IsClosed == true)
+                if (fiscalYear!=null && fiscalYear.IsClosed == true)
                 {
                     correctFiscalYearId = fiscalYear.FiscalYearId;
                 }
@@ -9061,15 +9271,18 @@ namespace DanpheEMR.AccTransfer
 
                     //NBB-21 sep 2021-we need to send last opened fiscal year from db 
 
-                 
+
                     var lastOpenedFiscalYear = (from fy in accountingDbContext.FiscalYears
-                                                where fy.HospitalId == currHospitalId && fy.IsClosed == false  && fy.IsActive == true
-                                               select fy).OrderBy(f => f.FiscalYearId).FirstOrDefault();
+                                                join map in accountingDbContext.MapFiscalYears
+                                                on fy.FiscalYearId equals map.FiscalYearId
+                                                where map.IsClosed == false && map.IsActive == true && map.HospitalId == currHospitalId
+                                                select fy).OrderBy(f => f.FiscalYearId).FirstOrDefault();
                     if (lastOpenedFiscalYear != null)
                     {
                         correctFiscalYearId = lastOpenedFiscalYear.FiscalYearId;
                     }
-                    else {
+                    else
+                    {
                         correctFiscalYearId = selFiscalYearId;
                     }
                     //GetFiscalYearIdByDate(accountingDbContext, fiscalYear.StartDate.AddDays(-10), currHospitalId);
@@ -9122,14 +9335,16 @@ namespace DanpheEMR.AccTransfer
         /// <param name="_accDbContext"></param>
         /// <param name="_ledgerModelData"></param>
         /// <returns></returns>
-        public static void AddLedgerForClosedFiscalYears(AccountingDbContext _accDbContext, LedgerModel _ledgerModelData)
+        public static void AddLedgerForClosedFiscalYears(AccountingDbContext _accDbContext, LedgerModel _ledgerModelData, int currentHospitalId)
         {
             try
             {
                 if (_ledgerModelData.LedgerId > 0)
                 {
                     var closedFiscalYears = (from fy in _accDbContext.FiscalYears
-                                             where fy.IsClosed == true && fy.IsActive == true
+                                             join map in _accDbContext.MapFiscalYears
+                                             on fy.FiscalYearId equals map.FiscalYearId
+                                             where map.IsClosed == true && map.IsActive == true && map.HospitalId == currentHospitalId
                                              select new
                                              {
                                                  fy.FiscalYearId,
@@ -9167,11 +9382,11 @@ namespace DanpheEMR.AccTransfer
 
         //AniketJadhav-21 Jul 2021
         #region get autogenerated code for coa
-        public static string GetAutoGeneratedCodeForCOA(AccountingDbContext accountingDbContext, ChartOfAccountModel coa)
+        public static string GetAutoGeneratedCodeForCOA(AccountingDbContext accountingDbContext, ChartOfAccountModel coa, int currentHospitalId)
         {
             try
             {
-                var pg = accountingDbContext.PrimaryGroup.FirstOrDefault(a => a.PrimaryGroupId == coa.PrimaryGroupId).PrimaryGroupName.ToUpper();
+                var pg = accountingDbContext.PrimaryGroup.Where(c => c.HospitalId == currentHospitalId).FirstOrDefault(a => a.PrimaryGroupId == coa.PrimaryGroupId).PrimaryGroupName.ToUpper();
                 var name = coa.ChartOfAccountName.Replace(" ", "").ToUpper().Trim();
                 return pg + "_" + name;
             }
@@ -9236,7 +9451,7 @@ namespace DanpheEMR.AccTransfer
             try
             {
                 var currentFiscalYearId = GetFiscalYearIdByDate(accountingDBContext, DateTime.Now.Date, currHospitalId);
-                var existingSubLedger = await accountingDBContext.SubLedgerBalanceHistory.Where(a => a.SubLedgerId == subLedgerModel.SubLedgerId && a.FiscalYearId == currentFiscalYearId).FirstOrDefaultAsync();
+                var existingSubLedger = await accountingDBContext.SubLedgerBalanceHistory.Where(a => a.SubLedgerId == subLedgerModel.SubLedgerId && a.FiscalYearId == currentFiscalYearId && a.HospitalId == currHospitalId).FirstOrDefaultAsync();
                 if (existingSubLedger != null)
                 {
                     existingSubLedger.OpeningBalance = subLedgerModel.OpeningBalance;

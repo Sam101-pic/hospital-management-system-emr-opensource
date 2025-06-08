@@ -5,8 +5,10 @@ import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import {
   ENUM_DanpheHTTPResponses,
+  ENUM_DanpheHTTPResponseText,
   ENUM_MessageBox_Status,
 } from "../../../shared/shared-enums";
+import { Department } from "../../shared/department.model";
 import { SettingsBLService } from "../../shared/settings.bl.service";
 import { BillServiceItemSchemeSetting_DTO } from "../shared/dto/bill-service-item-scheme-setting.dto";
 import { ServiceItem_DTO } from "../shared/dto/service-item.dto";
@@ -22,6 +24,7 @@ export class BillServiceItemSchemeSettingComponent implements OnInit {
   @Output("callback-close")
   callbackClose: EventEmitter<Object> = new EventEmitter<Object>();
   public serviceDepartmentList: Array<ServiceDepartmentVM> = new Array<ServiceDepartmentVM>();
+  public FilterServiceDepartmentList: Array<ServiceDepartmentVM> = new Array<ServiceDepartmentVM>();
   public serviceItemSettingList: Array<BillServiceItemSchemeSetting_DTO> = new Array<BillServiceItemSchemeSetting_DTO>();
   public FilteredServiceItemSettingList: Array<BillServiceItemSchemeSetting_DTO> = new Array<BillServiceItemSchemeSetting_DTO>();
   public serviceItemList: ServiceItem_DTO[] = [];
@@ -49,6 +52,16 @@ export class BillServiceItemSchemeSettingComponent implements OnInit {
   public selectAll: boolean = false;
   public selectedItem = new BillServiceItemSchemeSetting_DTO();
   public ServiceItemSettingListToFilterByItemName = new Array<BillServiceItemSchemeSetting_DTO>();
+  public selectedPrice: string = 'All';
+  public lessThanPrice: number = 0;
+  public greaterThanPrice: number = 0;
+  public betweenMinPrice: number = 0;
+  public betweenMaxPrice: number = 0;
+  public isFilterApplied: boolean = false;
+  DepartmentList = new Array<Department>();
+  SelectedDepartmentIds: number[] = [];
+  FilteredServiceItemSettingDropDownList = new Array<BillServiceItemSchemeSetting_DTO>();
+  ShowPriceFilter: boolean = false;
 
   constructor(
     public settingsBLService: SettingsBLService,
@@ -56,26 +69,24 @@ export class BillServiceItemSchemeSettingComponent implements OnInit {
     public coreService: CoreService
   ) {
     this.GetServiceDepartments();
-    this.getServiceItemList();
+    this.GetDepartmentList()
   }
   ngOnInit() {
     if (this.SelectedScheme.SchemeId > 0) {
       this.GetServiceItemSchemeSettings(this.SelectedScheme.SchemeId);
+      this.getServiceItemList();
     }
   }
 
   ItemListFormatter(data) {
     return data['ServiceItemName']
   }
-
-  OnItemNameChanged() {
-    if (this.selectedItem && this.selectedItem.ServiceItemId) {
-      const filteredItem = this.ServiceItemSettingListToFilterByItemName.filter(item => item.ServiceItemId === this.selectedItem.ServiceItemId);
-      this.FilteredServiceItemSettingList = filteredItem;
-      console.log(filteredItem);
-    } else {
-      this.FilteredServiceItemSettingList = this.ServiceItemSettingListToFilterByItemName;
-    }
+  GetDepartmentList() {
+    this.settingsBLService.GetDepartments().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+        this.DepartmentList = res.Results;
+      }
+    });
   }
   Close() {
     this.callbackClose.emit();
@@ -87,14 +98,53 @@ export class BillServiceItemSchemeSettingComponent implements OnInit {
     if ($event) {
       this.selectedItem = new BillServiceItemSchemeSetting_DTO();
       this.ServiceDepartmentIds = $event.map((a) => a.ServiceDepartmentId);
-      this.FilteredServiceItemSettingList = this.serviceItemSettingList.filter((itmset) => this.ServiceDepartmentIds.includes(itmset.ServiceDepartmentId));
-      this.ServiceItemSettingListToFilterByItemName = this.FilteredServiceItemSettingList;
-      this.MapServiceItemSetting();
+      this.FilteredServiceItemSettingDropDownList = this.serviceItemSettingList.filter((itmset) => this.ServiceDepartmentIds.includes(itmset.ServiceDepartmentId));
+    }
+    if (this.ServiceDepartmentIds && this.ServiceDepartmentIds.length > 0) {
+      this.FilteredServiceItemSettingDropDownList = this.serviceItemSettingList.filter((itmset) => this.ServiceDepartmentIds.includes(itmset.ServiceDepartmentId));
+    }
+  }
+  AssignDepartment($event) {
+    if ($event) {
+      this.SelectedDepartmentIds = $event.map(a => a.DepartmentId);
+      if (this.SelectedDepartmentIds && this.SelectedDepartmentIds.length > 0) {
+        this.FilterServiceDepartmentList = this.serviceDepartmentList.filter((sd) =>
+          this.SelectedDepartmentIds.includes(sd.DepartmentId)
+        );
+        if (this.SelectedDepartmentIds && this.SelectedDepartmentIds.length > 0) {
+          this.FilteredServiceItemSettingDropDownList = this.serviceItemSettingList.filter((itmset) => this.SelectedDepartmentIds.includes(itmset.DepartmentId));
+        }
+      }
+    }
+  }
+
+  FilterServiceItemList() {
+    this.FilteredServiceItemSettingList = [];
+    this.ShowPriceFilter = false;
+    let serviceItemList = this.serviceItemSettingList;
+    if (this.SelectedDepartmentIds && this.SelectedDepartmentIds.length > 0) {
+      this.FilteredServiceItemSettingList = serviceItemList.filter((itmset) => this.SelectedDepartmentIds.includes(itmset.DepartmentId));
+    }
+    if (this.ServiceDepartmentIds && this.ServiceDepartmentIds.length > 0) {
+      this.FilteredServiceItemSettingList = serviceItemList.filter((itmset) => this.ServiceDepartmentIds.includes(itmset.ServiceDepartmentId));
+    }
+    if (this.selectedItem && this.selectedItem.ServiceItemId) {
+      const filteredItem = this.FilteredServiceItemSettingList.filter(item => item.ServiceItemId === this.selectedItem.ServiceItemId);
+      this.FilteredServiceItemSettingList = filteredItem;
+    }
+    this.FilteredServiceItemSettingDropDownList = this.FilteredServiceItemSettingList;
+    this.MapServiceItemSetting();
+    if (this.FilteredServiceItemSettingList && this.FilteredServiceItemSettingList.length > 0) {
+      this.ShowPriceFilter = !this.ShowPriceFilter;
+    }
+    else {
+      this.ShowPriceFilter = false;
     }
   }
 
   GetServiceDepartments() {
     this.serviceDepartmentList = this.coreService.Masters.ServiceDepartments;
+    this.FilterServiceDepartmentList = this.serviceDepartmentList;
   }
   selectAllServiceItems(event) {
     let isChecked = event.target.checked;
@@ -233,7 +283,7 @@ export class BillServiceItemSchemeSettingComponent implements OnInit {
   }
 
   public getServiceItemList() {
-    this.settingsBLService.GetServiceItemList().subscribe((res) => {
+    this.settingsBLService.GetServiceItemListBySchemeId(this.SelectedScheme.SchemeId).subscribe((res) => {
       if (res.Status === ENUM_DanpheHTTPResponses.OK) {
         this.serviceItemSettingList = [];
         this.serviceItemList = res.Results.filter((item) => item.IsActive);
@@ -245,29 +295,28 @@ export class BillServiceItemSchemeSettingComponent implements OnInit {
           serviceItemSetting.itemIsSelected = item.itemIsSelected;
           serviceItemSetting.ServiceItemCode = item.ItemCode;
           serviceItemSetting.ServiceItemName = item.ItemName;
+          serviceItemSetting.Price = item.Price;
           serviceItemSetting.ServiceDepartmentId = item.ServiceDepartmentId;
+          serviceItemSetting.DepartmentId = item.DepartmentId;
           this.serviceItemSettingList.push(serviceItemSetting);
         });
       } else {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [
-          "Failed to get Service Items, check log for details",
-        ]);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
       }
     });
   }
 
   MapServiceItemSetting() {
-    this.serviceItemSettingList.forEach((itm) => {
+    this.FilteredServiceItemSettingList.forEach((itm) => {
       let matcheddata = this.tempBillServiceItemschemesettingDetails.find(
         (x) => x.ServiceItemId === itm.ServiceItemId
       );
       if (matcheddata) {
         itm.ServiceItemSchemeSettingId = matcheddata.ServiceItemSchemeSettingId;
-        itm.itemIsSelected = matcheddata.itemIsSelected = true;
-        itm.initialSelectionState = matcheddata.itemIsSelected; // Set initialSelectionState to itemIsSelected
+        itm.itemIsSelected = true;
+        itm.initialSelectionState = true; // Set initialSelectionState to itemIsSelected
         itm.SchemeId = matcheddata.SchemeId;
         itm.ServiceItemId = matcheddata.ServiceItemId;
-        itm.ServiceDepartmentId = matcheddata.ServiceDepartmentId;
         itm.RegDiscountPercent = matcheddata.RegDiscountPercent;
         itm.OpBillDiscountPercent = matcheddata.OpBillDiscountPercent;
         itm.IpBillDiscountPercent = matcheddata.IpBillDiscountPercent;
@@ -323,7 +372,7 @@ export class BillServiceItemSchemeSettingComponent implements OnInit {
 
   AddServiceItemSchemeSettings() {
 
-    this.billServiceItemschemesettingDetails = this.serviceItemSettingList.filter(
+    this.billServiceItemschemesettingDetails = this.FilteredServiceItemSettingList.filter(
       (a) => a.itemIsSelected || (a.itemIsSelected === a.initialSelectionState && a.itemIsSelected === true) || a.initialSelectionState === true
     );
     if (this.checkCopayDiscountPercentValidity() && this.CheckDiscountPercentsValidity()) {
@@ -459,4 +508,52 @@ export class BillServiceItemSchemeSettingComponent implements OnInit {
       }
     }
   }
+  onPriceFilterChange($event) {
+    this.isFilterApplied = false;
+    if ($event) {
+      const filteredByDepartment = this.serviceItemSettingList
+        .filter(item => this.ServiceDepartmentIds.includes(item.ServiceDepartmentId));
+      this.FilteredServiceItemSettingList = filteredByDepartment;
+      this.lessThanPrice = 0;
+      this.greaterThanPrice = 0;
+      this.betweenMaxPrice = 0;
+      this.betweenMinPrice = 0;
+
+    }
+  }
+  OnPriceEntered() {
+    const filteredByDepartment = this.serviceItemSettingList
+      .filter(item => this.ServiceDepartmentIds.includes(item.ServiceDepartmentId));
+
+    switch (this.selectedPrice) {
+      case 'LessThan':
+        if (this.lessThanPrice !== null) {
+          this.FilteredServiceItemSettingList = filteredByDepartment
+            .filter(item => item.Price < this.lessThanPrice);
+        }
+        break;
+
+      case 'GreaterThan':
+        if (this.greaterThanPrice !== null) {
+          this.FilteredServiceItemSettingList = filteredByDepartment
+            .filter(item => item.Price > this.greaterThanPrice);
+        }
+        break;
+
+      case 'Between':
+        if (this.betweenMinPrice !== null) {
+          this.FilteredServiceItemSettingList = filteredByDepartment.filter(item => item.Price >= this.betweenMinPrice);
+        } else if (this.betweenMaxPrice !== null) {
+          this.FilteredServiceItemSettingList = filteredByDepartment.filter(item => item.Price <= this.betweenMaxPrice);
+        } if (this.betweenMinPrice !== null && this.betweenMaxPrice !== null) {
+          this.FilteredServiceItemSettingList = filteredByDepartment.filter(item => item.Price >= this.betweenMinPrice && item.Price <= this.betweenMaxPrice);
+        }
+        break;
+      default:
+        this.FilteredServiceItemSettingList = filteredByDepartment;
+        this.isFilterApplied = false;
+        break;
+    }
+  }
+
 }

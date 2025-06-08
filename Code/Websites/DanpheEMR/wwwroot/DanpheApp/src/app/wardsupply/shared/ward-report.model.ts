@@ -1,11 +1,3 @@
-import {
-  NgForm,
-  FormGroup,
-  FormControl,
-  Validators,
-  FormBuilder,
-  ReactiveFormsModule
-} from '@angular/forms'
 
 export class WARDReportsModel {
 
@@ -13,6 +5,7 @@ export class WARDReportsModel {
   public ToDate: string = null;
   public StoreId: number = 0;
   public Status: string = null;
+  public ConsumptionTypeId: number = null;
 
   /// public CompanyValidator: FormGroup = null;
 

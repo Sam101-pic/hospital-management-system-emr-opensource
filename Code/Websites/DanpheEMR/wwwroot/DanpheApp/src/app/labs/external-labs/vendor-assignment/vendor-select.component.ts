@@ -39,7 +39,7 @@ export class VendorSelectComponent {
                 if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
                     if (res.Results && res.Results.length > 0) {
                         let vendors = res.Results;
-                        this.vendorList = vendors.filter(vendor => vendor.IsExternal === true);
+                        this.vendorList = vendors.filter(vendor => vendor.IsExternal === true && vendor.IsActive === true);
                         this.selectedVendorId = this.vendorList[0].LabVendorId;
                     }
                 }

@@ -6,9 +6,11 @@ import { PharmacyCounter } from '../../pharmacy/shared/pharmacy-counter.model';
 import { CreditOrganization } from '../../pharmacy/shared/pharmacy-credit-organizations.model';
 import { PharmacyBLService } from '../../pharmacy/shared/pharmacy.bl.service';
 import { PHRMStoreModel } from '../../pharmacy/shared/phrm-store.model';
+import { SecurityBLService } from '../../security/shared/security.bl.service';
 import { SecurityService } from '../../security/shared/security.service';
 import { DanpheHTTPResponse } from '../../shared/common-models';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses } from '../../shared/shared-enums';
 import { DispensaryService } from '../shared/dispensary.service';
 
 @Component({
@@ -20,23 +22,23 @@ export class DispensaryMainComponent implements OnInit {
   validRoutes: any;
   public primaryNavItems: Array<any> = null;
   public secondaryNavItems: Array<any> = null;
-
   showDispensaryInfo: boolean;
   selectedDispensary: PHRMStoreModel;
   public creditOrganizationsList: Array<CreditOrganization> = new Array<CreditOrganization>();
 
-
-  constructor(private _securityService: SecurityService, private _dispensaryService: DispensaryService, public router: Router, public msgBoxServ: MessageboxService, public pharmacyBLService: PharmacyBLService, private billingService: BillingService, private billingBlService: BillingBLService) {
+  constructor(private _securityService: SecurityService, private _dispensaryService: DispensaryService, public router: Router, public msgBoxServ: MessageboxService, public pharmacyBLService: PharmacyBLService, private billingService: BillingService, private billingBlService: BillingBLService, public securityBLService: SecurityBLService) {
     //get the child routes of Dispensary from valid routes available for this user.
     this.validRoutes = this._securityService.GetChildRoutes("Dispensary");
     this.primaryNavItems = this.validRoutes.filter(a => a.IsSecondaryNavInDropdown == null || a.IsSecondaryNavInDropdown == 0);
     this.secondaryNavItems = this.validRoutes.filter(a => a.IsSecondaryNavInDropdown == 1);
+    this.LoadINVHospitalInfo();
+    this.GetInsurancePackageBillServiceItems();
   }
 
   ngOnInit() {
     this.selectedDispensary = this._dispensaryService.activeDispensary;
-    this.GetCreditOrganizations();
-    this.GetOrganizationList();
+    this.GetPharmacyCreditOrganizations();
+    this.GetBillingCreditOrganizationList();
   }
   UnsetGlobalDispensary() {
     this.selectedDispensary = new PHRMStoreModel();
@@ -61,7 +63,7 @@ export class DispensaryMainComponent implements OnInit {
   CloseInfo() {
     this.showDispensaryInfo = false;
   }
-  GetCreditOrganizations() {
+  GetPharmacyCreditOrganizations() {
     this.pharmacyBLService.GetCreditOrganization()
       .subscribe(res => {
         if (res.Status == "OK") {
@@ -72,11 +74,12 @@ export class DispensaryMainComponent implements OnInit {
   }
 
   //getting credit organization list and set to the global variable.
-  public GetOrganizationList() {
+  public GetBillingCreditOrganizationList() {
     this.billingBlService.GetOrganizationList()
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status == 'OK') {
           console.log("CreditOrganization list are loaded successfully (billing-main).");
+          this._dispensaryService.SetAllBillingCreditOrgList(res.Results);
           this.billingService.SetAllCreditOrgList(res.Results);
         }
         else {
@@ -84,4 +87,30 @@ export class DispensaryMainComponent implements OnInit {
         }
       });
   }
+  // ! this is to load fiscal year list for fiscal-year-calender
+  LoadINVHospitalInfo() {
+    this._securityService.SetModuleName('inventory');
+    if (!(this._securityService.INVHospitalInfo.CurrFiscalYear.FiscalYearId > 0)) {
+      this.securityBLService.GetINVHospitalInfo()
+        .subscribe((res: DanpheHTTPResponse) => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            this._securityService.SetINVHospitalInfo(res.Results);
+          }
+        },
+          err => {
+            alert('Failed to get Fiscal Year Details');
+          });
+    }
+  }
+/**
+ * This method fetch all the Insurance Package Bill Service Items from API
+ */
+  GetInsurancePackageBillServiceItems() {
+    this.pharmacyBLService.GetInsurancePackageBillServiceItems().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+        this._dispensaryService.SetInsurancePackageBillServiceItems(res.Results)
+      }
+    })
+  }
+
 }

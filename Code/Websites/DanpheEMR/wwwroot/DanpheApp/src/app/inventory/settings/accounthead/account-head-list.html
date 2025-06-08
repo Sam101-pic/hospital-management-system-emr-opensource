@@ -1,8 +1,9 @@
 ﻿<div>
     <input type="button" class="btn primary-btn m1" (click)="AddAccountHead()" value="Add AccountHead" />
     <accounthead-add [showAddPage]="showAddPage"
-                   [selectedAccountHead]="selectedAccountHead"
-                   (callback-add)="CallBackAdd($event)"></accounthead-add>
+                     [selectedAccountHead]="selectedAccountHead"
+                     [accountheadList]="accountheadList"
+                     (callback-add)="CallBackAdd($event)"></accounthead-add>
 </div>
 <div class="row">
     <div class="col-md-12 col-xs-12 col-sm-12">
@@ -10,5 +11,3 @@
         </danphe-grid>
     </div>
 </div>
-
-

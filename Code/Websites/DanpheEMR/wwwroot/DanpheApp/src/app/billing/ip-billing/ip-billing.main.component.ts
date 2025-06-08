@@ -52,7 +52,7 @@ export class IpBillMainComponent {
           if (this.allInpatList && this.allInpatList.length > 0) {
             this.allInpatList.forEach(ipInfo => {
               //below column will be added in all rows and also used as fieldName in grid-column-settings.
-              ipInfo["WardBedInfo"] = ipInfo.BedInformation.Ward + "/" + ipInfo.BedInformation.BedCode;
+              ipInfo["WardBedInfo"] = (ipInfo.BedInformation) ? (ipInfo.BedInformation.Ward + "/" + ipInfo.BedInformation.BedCode) : '';
             });
           }
         }

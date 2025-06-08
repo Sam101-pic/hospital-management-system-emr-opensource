@@ -5,6 +5,8 @@ import { BillingTransaction } from '../../billing/shared/billing-transaction.mod
 import { BillItemPriceVM } from '../../billing/shared/billing-view-models';
 import { OpdServiceItemPrice_DTO } from '../../billing/shared/dto/opd-serviceitem-price.dto';
 import { RegistrationScheme_DTO } from '../../billing/shared/dto/registration-scheme.dto';
+import { Patient_DTO } from '../../claim-management/shared/DTOs/patient.dto';
+import { ClinicalAssessmentAndPlan_DTO } from '../../clinical-new/shared/dto/clinicalAssessmentAndPlan.dto';
 import { Visit } from "../shared/visit.model";
 import { Rank_ApfHospital } from '../visit/visit-patient-info.component';
 import { FreeVisitSettings_DTO } from './dto/free-visit-settings.dto';
@@ -121,4 +123,36 @@ export class VisitService {
   public SetAllRank(items: Array<Rank_ApfHospital>) {
     this.RankList = items;
   }
+  public PatientVisitId: number = null
+  public selectedPatientDetails: Patient_DTO = new Patient_DTO();
+
+
+  public SetPatientVisitId(patientVisitId: number) {
+    this.PatientVisitId = patientVisitId;
+  }
+  public SetPatientDetails(selPat: Patient_DTO) {
+    this.selectedPatientDetails = {
+      ...selPat,
+      Name: selPat.ShortName,
+      BedInformation: {
+        Ward: selPat.WardName,
+        BedNumber: selPat.BedNumber,
+      },
+    };
+  }
+  public patientsAssessmentAndPlans: ClinicalAssessmentAndPlan_DTO[] = [];
+
+  public SetPatientsAssessmentAndPlans(AssessmentAndPlansDetails: ClinicalAssessmentAndPlan_DTO[]) {
+    this.patientsAssessmentAndPlans = AssessmentAndPlansDetails;
+
+  }
+  public PatientFromClinical: boolean = false;
+  SetPatientFromClinical(NavigateToDischarge: boolean) {
+    this.PatientFromClinical = NavigateToDischarge;
+
+  }
+  public GetPatientVisitId(): number {
+    return this.PatientVisitId
+  }
+
 }

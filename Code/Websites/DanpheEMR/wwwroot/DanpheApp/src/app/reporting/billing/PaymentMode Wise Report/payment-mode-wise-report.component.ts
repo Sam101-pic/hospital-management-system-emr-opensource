@@ -1,15 +1,15 @@
 import { HttpClient } from "@angular/common/http";
 import { Component } from "@angular/core";
-import { CommonFunctions } from "../../../shared/common.functions";
+import * as moment from "moment";
 import { CoreService } from "../../../core/shared/core.service";
 import { SecurityService } from "../../../security/shared/security.service";
 import { SettingsBLService } from "../../../settings-new/shared/settings.bl.service";
+import { NepaliCalendarService } from "../../../shared/calendar/np/nepali-calendar.service";
+import { CommonFunctions } from "../../../shared/common.functions";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { ReportingService } from "../../shared/reporting-service";
-import * as moment from "moment";
-import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
-import { NepaliCalendarService } from "../../../shared/calendar/np/nepali-calendar.service";
 
 @Component({
     templateUrl: "./payment-mode-wise-report.html"
@@ -32,16 +32,16 @@ export class RPT_BIL_PaymentModeWiseReport {
     public summaryData: Array<any> = new Array<any>();
     public loading: boolean = false;
     public PaymentModes: any[] = [];
-    public Types:any = [
-        {TypeName: 'Cash Sales'},
-        {TypeName: 'Cash Sales Return'},
-        {TypeName: 'Deposit Received'},
-        {TypeName: 'Credit Settlement'},
-        {TypeName: 'Deposit Refund'},
-        {TypeName: 'Cash Discount Given'},
-        {TypeName: 'Cash Discount Received'},
-        {TypeName: 'Maternity Allowance'},
-        {TypeName: 'Maternity Allowance Return'},
+    public Types: any = [
+        { TypeName: 'Cash Sales' },
+        { TypeName: 'Cash Sales Return' },
+        { TypeName: 'Deposit Received' },
+        { TypeName: 'Credit Settlement' },
+        { TypeName: 'Deposit Refund' },
+        { TypeName: 'Cash Discount Given' },
+        { TypeName: 'Cash Discount Received' },
+        { TypeName: 'Maternity Allowance' },
+        { TypeName: 'Maternity Allowance Return' },
     ]
 
     public gridExportOptions: any;
@@ -59,12 +59,16 @@ export class RPT_BIL_PaymentModeWiseReport {
         public settingsBLService: SettingsBLService,
         public securityService: SecurityService,
         public nepCalendarService: NepaliCalendarService) {
+        this._dlService = _dlService;
+        this.DigitalPaymentReportColumns = this.reportServ.reportGridCols.DigitalPaymentReport;
+        this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('Date', false));
         this.GetHeaderParameter();
         this.LoadUser();
         this.LoadPaymentModes();
         this.fromDate = moment().format('YYYY-MM-DD');
         this.toDate = moment().format('YYYY-MM-DD');
         this.currentDate = moment().format('YYYY-MM-DD');
+
     }
 
     ngAfterViewChecked() {
@@ -74,11 +78,11 @@ export class RPT_BIL_PaymentModeWiseReport {
     GetHeaderParameter() {
         var customerHeaderparam = this.coreservice.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader");
         if (customerHeaderparam != null) {
-          var customerHeaderParamValue = customerHeaderparam.ParameterValue;
-          if (customerHeaderParamValue) {
-            var headerDetail = JSON.parse(customerHeaderParamValue);
-    
-            this.Header = `
+            var customerHeaderParamValue = customerHeaderparam.ParameterValue;
+            if (customerHeaderParamValue) {
+                var headerDetail = JSON.parse(customerHeaderParamValue);
+
+                this.Header = `
           <tr>
             <td></td>
             <td></td>
@@ -91,10 +95,10 @@ export class RPT_BIL_PaymentModeWiseReport {
             <td></td>
             <td colspan="4" style="text-align:center;font-size:small;"><strong>${headerDetail.address}</strong></td>
           </tr>`;
-    
-          }
+
+            }
         }
-      }
+    }
 
     LoadUser() {
         this.settingsBLService.GetUserList()
@@ -111,7 +115,7 @@ export class RPT_BIL_PaymentModeWiseReport {
             });
     }
 
-    LoadPaymentModes(){
+    LoadPaymentModes() {
         let paymentModeList = this.coreservice.masterPaymentModes;
         this.PaymentModes = paymentModeList.filter(a => a.PaymentSubCategoryName.toLowerCase() != "deposit" && a.PaymentSubCategoryName.toLowerCase() != 'others' && a.PaymentSubCategoryName.toLowerCase() != 'credit');
     }
@@ -138,6 +142,7 @@ export class RPT_BIL_PaymentModeWiseReport {
     }
 
     Load() {
+        this.showReport = true;
         this.loading = true;
         if (this.fromDate != null && this.toDate != null) {
             this._dlService.Read("/BillingReports/PaymentModeWiseReport?FromDate=" + this.fromDate + "&ToDate=" + this.toDate + "&PaymentMode=" + this.PaymentMode + "&Type=" + this.Type + "&User=" + this.UserId)
@@ -153,13 +158,16 @@ export class RPT_BIL_PaymentModeWiseReport {
     Success(res) {
         this.loading = false;
         if (res.Status == "OK") {
-            this.DigitalPaymentReportColumns = this.reportServ.reportGridCols.DigitalPaymentReport;
             this.reportData = null;
             this.summaryData = null;
-            this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('Date', false));
             let data = JSON.parse(res.Results.JsonData);
             if (data.InvoiceWiseDigitalPayment.length > 0) {
-                this.reportData = data.InvoiceWiseDigitalPayment;
+                this.reportData = data.InvoiceWiseDigitalPayment.map(a => {
+                    return {
+                        ...a,
+                        Date: a.Date.split('T')[0],
+                    }
+                });
                 this.summaryData = data.ReportSummary;
                 this.CalculateSummary(this.summaryData);
                 this.showReport = true;
@@ -199,18 +207,18 @@ export class RPT_BIL_PaymentModeWiseReport {
         let printedDate_string: string = "";
         let calendarType: string = "BS";
         if (this.datePreference == "en") {
-          fromDate_string = moment(this.fromDate).format("YYYY-MM-DD");
-          toDate_string = moment(this.toDate).format("YYYY-MM-DD");
-          printedDate_string = printedDate;
-          calendarType = "(AD)";
+            fromDate_string = moment(this.fromDate).format("YYYY-MM-DD");
+            toDate_string = moment(this.toDate).format("YYYY-MM-DD");
+            printedDate_string = printedDate;
+            calendarType = "(AD)";
         }
         else {
-          fromDate_string = this.nepCalendarService.ConvertEngToNepaliFormatted(this.fromDate, "YYYY-MM-DD");
-          toDate_string = this.nepCalendarService.ConvertEngToNepaliFormatted(this.toDate, "YYYY-MM-DD");
-          printedDate_string = this.nepCalendarService.ConvertEngToNepaliFormatted(printedDate, "YYYY-MM-DD HH:mm");
-          calendarType = "(BS)";
+            fromDate_string = this.nepCalendarService.ConvertEngToNepaliFormatted(this.fromDate, "YYYY-MM-DD");
+            toDate_string = this.nepCalendarService.ConvertEngToNepaliFormatted(this.toDate, "YYYY-MM-DD");
+            printedDate_string = this.nepCalendarService.ConvertEngToNepaliFormatted(printedDate, "YYYY-MM-DD HH:mm");
+            calendarType = "(BS)";
         }
-    
+
         let popupWinindow;
         var printContents = '<div style="text-align: center">' + this.Header + ' </div>' + '<br>';
         printContents += '<div style="text-align: center">PaymentMode Wise Report(Summary)</div>' + '<br>';
@@ -227,9 +235,9 @@ export class RPT_BIL_PaymentModeWiseReport {
         documentContent += '<body onload="window.print()">' + printContents + '</body></html>'
         popupWinindow.document.write(documentContent);
         popupWinindow.document.close();
-      }
+    }
 
-      public totalSummaryView = {
+    public totalSummaryView = {
         CashSalesAmount: 0,
         CashSalesReturnAmount: 0,
         DepositReceived: 0,
@@ -238,10 +246,10 @@ export class RPT_BIL_PaymentModeWiseReport {
         SettCashDiscount: 0,
         OtherPaymentsGiven: 0,
         CashCollection: 0,
-      }
-    
-      CalculateSummary(summaryData:any){
-        if(summaryData && summaryData.length > 0){
+    }
+
+    CalculateSummary(summaryData: any) {
+        if (summaryData && summaryData.length > 0) {
             this.totalSummaryView.CashSalesAmount = 0
             this.totalSummaryView.CashSalesReturnAmount = 0
             this.totalSummaryView.DepositReceived = 0
@@ -251,14 +259,14 @@ export class RPT_BIL_PaymentModeWiseReport {
             this.totalSummaryView.OtherPaymentsGiven = 0
             this.totalSummaryView.CashCollection = 0
 
-            this.totalSummaryView.CashSalesAmount = summaryData.reduce((acc,amount) => acc + amount.CashSales, 0);
-            this.totalSummaryView.CashSalesReturnAmount = summaryData.reduce((acc,amount) => acc + amount.ReturnCashSales, 0);
-            this.totalSummaryView.DepositReceived = summaryData.reduce((acc,amount) => acc + amount.DepositReceived, 0);
-            this.totalSummaryView.DepositRefund = summaryData.reduce((acc,amount) => acc + amount.DepositRefund, 0);
-            this.totalSummaryView.CollectionFromReceivables = summaryData.reduce((acc,amount) => acc + amount.CollectionFromReceivable,0);
-            this.totalSummaryView.SettCashDiscount = summaryData.reduce((acc,amount) => acc + amount.SettlementDiscount, 0);
-            this.totalSummaryView.OtherPaymentsGiven = summaryData.reduce((acc,amount) => acc + amount.OtherPaymentsGiven, 0);
-            this.totalSummaryView.CashCollection = summaryData.reduce((acc,amount) => acc + amount.CashCollection, 0);
+            this.totalSummaryView.CashSalesAmount = summaryData.reduce((acc, amount) => acc + amount.CashSales, 0);
+            this.totalSummaryView.CashSalesReturnAmount = summaryData.reduce((acc, amount) => acc + amount.ReturnCashSales, 0);
+            this.totalSummaryView.DepositReceived = summaryData.reduce((acc, amount) => acc + amount.DepositReceived, 0);
+            this.totalSummaryView.DepositRefund = summaryData.reduce((acc, amount) => acc + amount.DepositRefund, 0);
+            this.totalSummaryView.CollectionFromReceivables = summaryData.reduce((acc, amount) => acc + amount.CollectionFromReceivable, 0);
+            this.totalSummaryView.SettCashDiscount = summaryData.reduce((acc, amount) => acc + amount.SettlementDiscount, 0);
+            this.totalSummaryView.OtherPaymentsGiven = summaryData.reduce((acc, amount) => acc + amount.OtherPaymentsGiven, 0);
+            this.totalSummaryView.CashCollection = summaryData.reduce((acc, amount) => acc + amount.CashCollection, 0);
         }
-      }
+    }
 }

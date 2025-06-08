@@ -7,4 +7,6 @@ export class AdmissionSlipDetails_DTO {
     public DepartmentName: string = "";
     public DoctorName: string = "";
     public AdmittedOn: string = "";
+    public DateOfBirth: string = "";
+    public Gender: string;
 }

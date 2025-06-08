@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { DanpheHTTPResponse } from '../../shared/common-models';
+import { DischargePatientReferralModel } from '../add-view-summary/Model/discharge-summary-refferal.model';
 
 @Injectable()
 export class DischargeSummaryDLService {
@@ -76,6 +77,15 @@ export class DischargeSummaryDLService {
   }
   public LoadTemplate(TemplateId: number) {
     return this.http.get<DanpheHTTPResponse>(`/api/DynamicTemplate/TemplatePrintHtml?templateId=${TemplateId}`, this.optionJson);
+  }
+  public GetDepartments() {
+    return this.http.get<any>("/api/Appointment/AppointmentApplicableDepartments", this.options);
+  }
+  public PostDischargeReferrel(dischargeReferrel: DischargePatientReferralModel) {
+    return this.http.post<any>("/api/Admission/Referral", dischargeReferrel, this.optionJson);
+  }
+  public GetpatientReferralDetial(patientReferralId: number) {
+    return this.http.get<any>(`/api/Admission/GetDischargeReferral?PatientReferralId=${patientReferralId}`, this.options);
   }
 }
 

@@ -71,7 +71,6 @@ export class SsfService {
       }
     });
   }
-
   LoadSSFEmployer(policyHolderUid: string) {
     this.visitBlService.GetSSFEmployerDetail(policyHolderUid).subscribe((res: DanpheHTTPResponse) => {
       if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
@@ -118,16 +117,18 @@ export class SsfService {
   }
 
   GetSsfPatientDtoMappedFromSsfServerPatientDto(serverDto: SSFPatientDetailFromSsfServer_DTO): SsfPatient_DTO {
-    let retObj: SsfPatient_DTO = new SsfPatient_DTO();
-    retObj.FirstName = serverDto.name;
-    retObj.MiddleName = "";
-    retObj.LastName = serverDto.family;
-    retObj.DateOfBirth = serverDto.birthdate;
-    retObj.Gender = serverDto.gender.charAt(0).toUpperCase() + serverDto.gender.slice(1); //* this logic is to capitalize the first letter;
-    retObj.PolicyHolderUID = serverDto.UUID;
-    retObj.Address = serverDto.Address;
-    retObj.img = serverDto.img;
-    return retObj;
+    if (serverDto && serverDto.UUID) {
+      let retObj: SsfPatient_DTO = new SsfPatient_DTO();
+      retObj.FirstName = serverDto.name;
+      retObj.MiddleName = "";
+      retObj.LastName = serverDto.family;
+      retObj.DateOfBirth = serverDto.birthdate;
+      retObj.Gender = serverDto.gender.charAt(0).toUpperCase() + serverDto.gender.slice(1); //* this logic is to capitalize the first letter;
+      retObj.PolicyHolderUID = serverDto.UUID;
+      retObj.Address = serverDto.Address;
+      retObj.img = serverDto.img;
+      return retObj;
+    }
   }
 
 }

@@ -36,7 +36,7 @@ export class PHRMUpdateExpiryDateandBatchNoComponent implements OnInit {
                             if (res.Status == "OK" && res.Results != null) {
                                 this.msgBoxServ.showMessage("success", ['Item Expiry Date and Batch No. Updated.']);
                                 this.changeDetector.detectChanges();
-                                this.callBackUpdate.emit({ event: 'update', stock: res.Results })
+                                this.callBackUpdate.emit({ event: 'update', stock: res.Results.Result })
                             }
                             else {
                                 this.msgBoxServ.showMessage("failed", ["Something Wrong " + res.ErrorMessage]);

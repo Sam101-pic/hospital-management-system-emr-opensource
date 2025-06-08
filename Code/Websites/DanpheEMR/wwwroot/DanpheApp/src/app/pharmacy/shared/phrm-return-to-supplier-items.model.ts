@@ -1,4 +1,4 @@
-import { FormGroup, Validators, FormBuilder, FormControl } from '@angular/forms'
+import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { PHRMGoodsReceiptItemsModel } from "./phrm-goods-receipt-items.model";
 export class PHRMReturnToSupplierItemModel {
 
@@ -47,6 +47,7 @@ export class PHRMReturnToSupplierItemModel {
     public VATAmount: number = 0;
     public CCAmount: number = 0;
     public StockId: number = null;
+    public GoodReceiptDate: string = ''
     constructor() {
         var _formBuilder = new FormBuilder();
         this.ReturnToSupplierItemValidator = _formBuilder.group({

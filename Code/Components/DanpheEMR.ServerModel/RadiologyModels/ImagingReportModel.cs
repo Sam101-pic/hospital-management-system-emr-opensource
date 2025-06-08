@@ -39,6 +39,7 @@ namespace DanpheEMR.ServerModel
         public string Indication { get; set; }
         public string RadiologyNo { get; set; }
         public int? PerformerId { get; set; }
+        public long? PatientFileId { get; set; }
         public string PerformerName { get; set; }
 
         public virtual ImagingRequisitionModel ImagingRequisition { get; set; }
@@ -47,6 +48,13 @@ namespace DanpheEMR.ServerModel
         public string PerformerNameInBilling { get; set; }
         [NotMapped]
         public int? PerformerIdInBilling { get; set; }
+        public int PrintCount { get; set; }
+        public int? ReferredById {  get; set; }
+        public string ReferredByName { get; set; }
+        public string ReportTemplateIdsCSV { get; set; }
+        [NotMapped]
+        public List<FooterText> FooterTextsList { get; set; }
+        public int? SelectedFooterTemplateId { get; set; }
     }
 
     public class ImagingReportViewModel
@@ -70,14 +78,21 @@ namespace DanpheEMR.ServerModel
         //public string DoctorSignatureJSON { get; set; }
         public string Signatories { get; set; }
         public DateTime? DateOfBirth { get; set; }
+        public DateTime? ScannedOn { get; set; }
         public string Gender { get; set; }
         public string PatientStudyId { get; set; }
         public string PrescriberName { get; set; } // Dev :15June'22 Changed ProviderName to PrescriberName
-        public string Muncipality { get; set; }
-        public string CountrySubDivision { get; set; }
+        public string CountryName { get; set; }
+
+        public string MunicipalityName { get; set; }
+        public string CountrySubDivisionName { get; set; }
+        public Int16? WardNumber { get; set; }
+
         public int? PrescriberId { get; set; } // Dev :15June'22 Changed ProviderId to PrescriberId
         public int? PerformerId { get; set; } // Dev :15June'22 Changed ReportingDoctorId to PerformerId
         public string PerformerName { get; set; } // Dev :15June'22 Changed ReportingDoctorName to PerformerName
+        public int? ReferredById { get; set; } //Bikesh: 22July'24 Added referredbyId to view referrer in imaging report list
+        public string ReferredByName { get; set; }//Bikesh: 22July'24 Added ReferrerName to view referrer in imaging report list
         public string Indication { get; set; }
         public string RadiologyNo { get; set; }
 
@@ -89,6 +104,19 @@ namespace DanpheEMR.ServerModel
         public bool? IsActive { get; set; }
 
         public string PatientNameLocal { get; set; }
+        public int PrintCount { get; set; }
+        public long? PatientFileId { get; set; }
+        public string ReportTemplateIdsCSV { get; set; }
+        [NotMapped]
+        public List<FooterText> FooterTextsList { get; set; }
+        public int? SelectedFooterTemplateId { get; set; }
 
+    }
+    public class FooterText
+    {
+
+        public int? SelectedFooterTemplateId { get; set; }
+        public string Text { get; set; }
+        public bool IsChecked { get; set; }
     }
 }

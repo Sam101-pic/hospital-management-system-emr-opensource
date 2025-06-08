@@ -8,6 +8,7 @@ import { EmergencyPatientCases } from './emergency-patient-cases.model';
 
 export class EmergencyPatientModel {
   public ERPatientNumber: number = 0;
+  public Salutation: string = '';
   public ERPatientId: number = 0;
   public PatientId: number = null;
   public PatientVisitId: number = null;
@@ -24,6 +25,8 @@ export class EmergencyPatientModel {
   public Age: string = null;
   public AgeSex: string = null;
   public ContactNo: string = "";
+
+  public Email: string = null;
   public CareOfPersonContactNumber: string = "";
   public Address: string = null;
   public WardNo: number = null;
@@ -89,15 +92,19 @@ export class EmergencyPatientModel {
   public ClaimCode: string = null;
   public SchemeName: string = null;
   public PriceCategoryName: string = null;
+  public VisitCode: string = null;
 
   constructor() {
     var _formBuilder = new FormBuilder();
     this.ERPatientValidator = _formBuilder.group({
+      'Salutation': [''],
       'FirstName': ['', Validators.compose([Validators.required, Validators.maxLength(40)])],
       'LastName': ['', Validators.compose([Validators.required, Validators.maxLength(40)])],
       'Gender': ['', Validators.required],
-      'PhoneNumber': ['', Validators.compose([Validators.pattern('^[0-9]{1,10}$')])],
+      'PhoneNumber': ['', Validators.compose([Validators.required, Validators.pattern('^[0-9]{1,10}$')])],
       'Age': ['', Validators.compose([Validators.required])],
+      'DateOfBirth': [''],
+      'Email': ['', Validators.pattern('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')]
       //'MainCase': ['', Validators.required]
     });
 

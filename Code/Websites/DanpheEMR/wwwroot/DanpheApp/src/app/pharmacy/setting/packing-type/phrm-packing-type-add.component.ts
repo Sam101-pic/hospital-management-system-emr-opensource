@@ -148,6 +148,7 @@ export class PHRMPackingTypeAddComponent implements OnInit {
         this.CurrentPackingType = new PHRMPackingTypeModel();
         this.update = false;
         this.showPackingTypeAddPage = false;
+        this.callbackAdd.emit();
     }
     AddUpdateResponseEmitter(packingType) {
         this.callbackAdd.emit({ packingType: packingType });

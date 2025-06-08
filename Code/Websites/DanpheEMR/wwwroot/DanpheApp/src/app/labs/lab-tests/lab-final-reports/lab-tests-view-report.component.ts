@@ -42,7 +42,7 @@ import {
   DanpheCache,
   MasterType,
 } from "../../../shared/danphe-cache-service-utility/cache-services";
-import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { LabTestComponent } from "../../shared/lab-component.model";
 import {
   LabResult_TemplatesVM,
@@ -97,14 +97,9 @@ export class LabTestsViewReportComponent {
 
   public IsTeleMedicineEnabled: boolean = false;
   public doctorsList: Array<any> = [];
-  public doctorSelected: any;
-
   public requisitionIdList: Array<number> = new Array<number>();
   public defaultSigEmpIdList: Array<number>;
-  public enableDrEdit: boolean = false;
   public oldName: string = null;
-  public showInterpretation: boolean = false;
-
   public showChangeSample: boolean = false;
   public showConfirmationBox: boolean = false;
   public sampleCode = { RunNumber: 0, SampleCreatedOn: null, SampleCode: 0 };
@@ -122,6 +117,7 @@ export class LabTestsViewReportComponent {
   public showReportDispatcherSignatory: boolean = false;
 
   public verificationEnabled: boolean = false;
+  public PreVerificationEnabled: boolean = false;
   @Input() public verificationRequired: boolean = false;
 
   public hospitalCode: string = "";
@@ -133,7 +129,6 @@ export class LabTestsViewReportComponent {
   public hasInsurance: boolean = false;
   public showBarCode: boolean = false;
   public showHideHighLowNormalFlag: boolean = false;
-  public showFooterText: boolean = true;
 
   @Input("printReportFromGrid")
   public printDirectlyFromGrid: boolean = true;
@@ -142,7 +137,6 @@ export class LabTestsViewReportComponent {
   public showDigitalSignature: boolean = false;
 
   public showVerifierSignature: boolean = false;
-  public reportBg: boolean = false;
   public preliminaryText: string = null;
   public preliminarySignature: string = null;
   public verifierSignatureList: Array<any> = [];
@@ -162,6 +156,14 @@ export class LabTestsViewReportComponent {
   public isCovidTest: boolean = false;
   public CovidTestName: string = "";
   public IsSignatureValid: boolean = false;
+  public LabReportDisplayParameter = { "ShowChangeReferredBy": false, "ShowChangeLabNumber": false, "ShowCollectionSite": true, "ShowSpecimen": false, "ShowWard": false, "ShowVerificationDate": false, "ShowPassportNo": false, "ShowProfilePic": false, "ShowChangePrescriberName": true, "ShowPolicyNumber": false };
+  @Input("showReportFromClaimScrubbing")
+  showReportFromClaimScrubbing: boolean = false;
+  @Input("ShowPrintButtonFromClaimScrubbing")
+  showPrintButtonFromClaimScrubbing = false;
+  public LabSignatoryParameter = {
+    "EnableSignatoriesEdit": false
+  };
   constructor(
     public labBLService: LabsBLService,
     public labService: LabService,
@@ -173,6 +175,7 @@ export class LabTestsViewReportComponent {
     public router: Router,
     public securityService: SecurityService
   ) {
+    this.GetLabReportDisplayParam();
     this.CurrentDateTime = moment().format("YYYY-MM-DD HH:mm");
     this.GetDoctorsList();
     this.CreatedByUser = this.securityService.GetLoggedInUser().Employee;
@@ -188,6 +191,7 @@ export class LabTestsViewReportComponent {
       this.showBarCode = Boolean(JSON.parse(this.allValues.LabBarCodeInReport));
       if (!_.isEmpty(this.allValues.LabReportVerificationB4Print)) {
         this.verificationEnabled = Boolean(JSON.parse(this.allValues.LabReportVerificationB4Print.EnableVerificationStep));
+        this.PreVerificationEnabled = Boolean(JSON.parse(this.allValues.LabReportVerificationB4Print.EnablePreVerification));
         this.preliminaryText = this.allValues.LabReportVerificationB4Print.PreliminaryReportText;
         this.preliminarySignature = this.allValues.LabReportVerificationB4Print.PreliminaryReportSignature;
         this.showVerifierSignature = Boolean(JSON.parse(this.allValues.LabReportVerificationB4Print.ShowVerifierSignature));
@@ -314,7 +318,7 @@ export class LabTestsViewReportComponent {
                 _templateReport.VerifiedByList.push(test.VerifiedBy);
               }
               test["Print"] = true;
-              test["PrintInterpretation"] = false;
+              test["PrintInterpretation"] = true;
               this.requisitionIdList.push(test.RequisitionId);
               if (test.Components.length) {
                 test.Components.forEach((component) => {
@@ -390,6 +394,7 @@ export class LabTestsViewReportComponent {
   public ParseSignatories(_signatories) {
     if (_signatories) {
       var type = typeof _signatories;
+      let signs = _signatories;
       if (type == "object") {
         if (this.showReportDispatcherSignatory) {
           _signatories.forEach((item, index) => {
@@ -398,18 +403,21 @@ export class LabTestsViewReportComponent {
             }
           });
         }
-        signs.forEach((item, index) => {
-          if (
-            this.templateReport.VerifiedByList &&
-            this.templateReport.VerifiedByList.includes(item.EmployeeId)
-          ) {
-            signs.splice(index, 1);
-          }
-        });
+        if (this.showVerifierSignature) {
+          signs.forEach((item, index) => {
+            if (
+              this.templateReport.VerifiedByList &&
+              this.templateReport.VerifiedByList.includes(item.EmployeeId)
+            ) {
+              signs.splice(index, 1);
+            }
+          });
+        }
         _signatories = JSON.stringify(_signatories);
         this.signatories = _signatories;
       } else {
-        var signs = JSON.parse(_signatories);
+        if (_signatories)
+          signs = JSON.parse(_signatories);
         if (this.showReportDispatcherSignatory) {
           signs.forEach((item, index) => {
             if (item.EmployeeId == this.CreatedByUser.EmployeeId) {
@@ -430,6 +438,10 @@ export class LabTestsViewReportComponent {
 
       this.showSignatoriesEdit = false;
       this.verifierSignatureList = [];
+      let signatory = [];
+      if (this.signatories) {
+        signatory = JSON.parse(this.signatories);
+      }
       this.templateReport.VerifiedByList.forEach((ver) => {
         var empl = this.allEmployeeList.find((e) => e.EmployeeId == ver);
         if (empl) {
@@ -437,10 +449,12 @@ export class LabTestsViewReportComponent {
             EmployeeId: empl.EmployeeId,
             Signature: empl.LabSignature,
             DisplaySequence: empl.DisplaySequence,
-            Show: true,
+            Show: false,
             SignatoryImageName: empl.SignatoryImageName,
           };
-          this.verifierSignatureList.push(singleEmp);
+          let dup = signatory.find(a => a.EmployeeId == singleEmp.EmployeeId);
+          if (!dup)
+            this.verifierSignatureList.push(singleEmp);
         }
       });
 
@@ -481,6 +495,12 @@ export class LabTestsViewReportComponent {
           }
         }
       }
+
+      signArr.sort((a, b) => {
+        if (a.DisplaySequence > b.DisplaySequence) return 1;
+        if (a.DisplaySequence < b.DisplaySequence) return -1;
+        return 0;
+      });
 
       this.signatories = JSON.stringify(signArr);
       this.templateReport.Signatories = signArr;
@@ -584,11 +604,15 @@ export class LabTestsViewReportComponent {
       //this.templateReport.Lookups.ReportingDate = labReport.ReportingDate = moment(new Date(Math.max.apply(null, reportDates))).format('YYYY-MM-DD HH:mm');
 
       //Post LabSignatories with default User As well
-      if (this.showLoggedInUserSignatory) {
-        var currUser = { EmployeeId: 0, Signature: "" };
+      if (this.showLoggedInUserSignatory || !this.LabSignatoryParameter.EnableSignatoriesEdit) {
+        var currUser = { EmployeeId: 0, Signature: "", SignatoryImageName: "", Show: false, DisplaySequence: 1000 };
         currUser.EmployeeId = this.CreatedByUser.EmployeeId;
         currUser.Signature = this.CreatedByUser.LabSignature;
-        var signObj = JSON.parse(this.signatories);
+        currUser.SignatoryImageName = this.CreatedByUser.SignatoryImageName;
+        currUser.DisplaySequence = this.CreatedByUser.DisplaySequence;
+        let signObj = [];
+        if (this.signatories)
+          signObj = JSON.parse(this.signatories);
         if (
           this.CreatedByUser.LabSignature &&
           this.CreatedByUser.LabSignature.trim() != ""
@@ -650,18 +674,24 @@ export class LabTestsViewReportComponent {
       labReport.Comments = this.templateReport.Comments;
 
       //Update LabSignatories with default User As well
-      if (this.showLoggedInUserSignatory) {
-        var signList = JSON.parse(this.signatories);
-        var createdby = this.templateReport.ReportCreatedBy;
-        var indx = signList.find((x) => x.EmployeeId == createdby);
+      if (this.showLoggedInUserSignatory || !this.LabSignatoryParameter.EnableSignatoriesEdit) {
+        var currUser = { EmployeeId: 0, Signature: "", SignatoryImageName: "", Show: false, DisplaySequence: 1000 };
+        currUser.EmployeeId = this.CreatedByUser.EmployeeId;
+        currUser.Signature = this.CreatedByUser.LabSignature;
+        currUser.SignatoryImageName = this.CreatedByUser.SignatoryImageName;
+        currUser.DisplaySequence = this.CreatedByUser.DisplaySequence;
+        let signObj = [];
 
-        if (!indx) {
-          var currUser = { EmployeeId: 0, Signature: "" };
-          currUser.EmployeeId = this.CreatedByUser.EmployeeId;
-          currUser.Signature = this.CreatedByUser.LabSignature;
-          signList.push(currUser);
+        if (this.signatories)
+          signObj = JSON.parse(this.signatories);
+        var dupSign = signObj.find(
+          (itm) => itm.EmployeeId == currUser.EmployeeId
+        );
+        //if currentLoggedInUser is not in the List then add It
+        if (!dupSign) {
+          signObj.push(currUser);
         }
-        this.signatories = JSON.stringify(signList);
+        this.signatories = JSON.stringify(signObj);
       }
 
       labReport.Signatories = this.signatories;
@@ -683,7 +713,7 @@ export class LabTestsViewReportComponent {
   }
   CheckSignatoriesValidation() {
     //signatories component binds "[]" if empty so length >2 is checked.
-    if (this.signatories && this.signatories.length > 2) {
+    if (this.signatories && this.signatories.length > 2 || !this.LabSignatoryParameter.EnableSignatoriesEdit) {
       return true;
     } else {
       this.messageBoxService.showMessage("failed", ["Select Lab Signatories."]);
@@ -691,18 +721,23 @@ export class LabTestsViewReportComponent {
     }
   }
   SubmitLabReport() {
-    if (this.IsSignatureValid) {
-      this.loading = true;
-      if (this.loading) {
-        if (this.templateReport.ReportId) {
-          this.UpdateLabReport();
-        } else {
-          this.PostLabReport();
-        }
-      }
+    let sign = [];
+    try {
+      if (this.signatories)
+        sign = JSON.parse(this.signatories);
     }
-    else {
+    catch {
       this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [`Please select valid signature`]);
+      return;
+    }
+    this.loading = true;
+    if (this.loading) {
+      if (this.templateReport.ReportId) {
+        this.UpdateLabReport();
+      } else {
+        this.PostLabReport();
+        this.coreService.FocusInputById('btnVerify');
+      }
     }
   }
 
@@ -745,6 +780,8 @@ export class LabTestsViewReportComponent {
             this.templateReport.IsPrinted = true;
             this.templateReport.PrintedOn = res.Results.PrintedOn;
             this.templateReport.PrintedBy = res.Results.PrintedBy;
+            let emp = this.allEmployeeList.find(a => a.EmployeeId === res.Results.PrintedBy);
+            this.templateReport.PrintedByName = emp ? emp.FullName : "";
             this.templateReport.PrintCount = res.Results.PrintCount;
             this.updatePrintStatus.emit(reqIdList);
             this.print(reqIdList);
@@ -1287,11 +1324,16 @@ export class LabTestsViewReportComponent {
         );
       this.signatories = JSON.stringify(this.templateReport.Signatories);
 
-      if (this.showLoggedInUserSignatory) {
-        var currUser = { EmployeeId: 0, Signature: "" };
+      if (this.showLoggedInUserSignatory || !this.LabSignatoryParameter.EnableSignatoriesEdit) {
+        var currUser = { EmployeeId: 0, Signature: "", SignatoryImageName: "", Show: false, DisplaySequence: 1000 };
         currUser.EmployeeId = this.CreatedByUser.EmployeeId;
         currUser.Signature = this.CreatedByUser.LabSignature;
-        var signObj = JSON.parse(this.signatories);
+        currUser.SignatoryImageName = this.CreatedByUser.SignatoryImageName;
+        currUser.DisplaySequence = this.CreatedByUser.DisplaySequence;
+        let signObj = [];
+
+        if (this.signatories)
+          signObj = JSON.parse(this.signatories);
         var dupSign = signObj.find(
           (itm) => itm.EmployeeId == currUser.EmployeeId
         );
@@ -1308,19 +1350,21 @@ export class LabTestsViewReportComponent {
       labReport.PrescriberName = this.templateReport.Lookups.PrescriberName;
       labReport.Comments = this.templateReport.Comments;
       labReport.VerificationEnabled = this.verificationEnabled;
+      labReport.PreVerificationEnabled = this.PreVerificationEnabled;
 
       this.labBLService.VerifyAllLabTests(labReport).subscribe((res) => {
-        if (res.Status == "OK") {
-          if (
-            this.routeAfterVerification &&
-            this.routeAfterVerification.trim() &&
-            this.routeAfterVerification.trim().length > 0
-          ) {
-            let route = "/Lab/" + this.routeAfterVerification;
-            this.loading = false;
-            this.router.navigate([route]);
-            return;
-          }
+        if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+          // if (
+          //   this.routeAfterVerification &&
+          //   this.routeAfterVerification.trim() &&
+          //   this.routeAfterVerification.trim().length > 0
+          // ) {
+          //   let route = "/Lab/" + this.routeAfterVerification;
+          //   this.loading = false;
+          //   this.router.navigate([route]);
+          //   return;
+          // }
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, [`Report is successfully verified...`]);
           this.callbackAddUpdate.emit({ verified: true });
         } else {
           this.messageBoxService.showMessage("failed", [
@@ -1404,5 +1448,18 @@ export class LabTestsViewReportComponent {
     setTimeout(() => {
       this.loading = false;
     }, 500);
+  }
+
+  GetLabReportDisplayParam(): void {
+    let param = this.coreService.Parameters.find(a => a.ParameterGroupName === 'LAB' && a.ParameterName === 'LabReportDisplaySettings');
+    if (param)
+      this.LabReportDisplayParameter = JSON.parse(param.ParameterValue);
+    else
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Please enter parameter values for LabReportDisplaySettings"]);
+
+    let signatoryParam = this.coreService.Parameters.find(a => a.ParameterGroupName === "LAB" && a.ParameterName === "LabSignatorySettings");
+    if (signatoryParam) {
+      this.LabSignatoryParameter = JSON.parse(signatoryParam.ParameterValue);
+    }
   }
 }

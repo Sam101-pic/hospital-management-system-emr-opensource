@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DanpheEMR.ServerModel;
 using System.Data.Entity;
+using DanpheEMR.ServerModel.RadiologyModels;
 namespace DanpheEMR.DalLayer
 {
     public class RadiologyDbContext : DbContext
@@ -24,6 +25,13 @@ namespace DanpheEMR.DalLayer
         public DbSet<FilmTypeModel> FilmType { get; set; }
         public DbSet<CountrySubDivisionModel> CountrySubDivision { get; set; }
         public DbSet<MunicipalityModel> Muncipality { get; set; }
+        public DbSet<CountryModel> Countries { get; set; }
+
+        public DbSet<BillServiceItemModel> BillServiceItems { get; set; }
+        public DbSet<PatientFilesModel> PatientFiles { get; set; }
+        public DbSet<AdminParametersModel> CfgParameters { get; set; }
+        public DbSet<TemplateStyleModel> TemplateStyle { get; set; }
+
 
         //public DbSet<FilmTypeModel> FilmType { get; set; }
         public RadiologyDbContext(string conn) : base(conn)
@@ -34,6 +42,7 @@ namespace DanpheEMR.DalLayer
 
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<CountryModel>().ToTable("MST_Country");
             modelBuilder.Entity<MunicipalityModel>().ToTable("MST_Municipality");
             modelBuilder.Entity<CountrySubDivisionModel>().ToTable("MST_CountrySubDivision");
             modelBuilder.Entity<RadiologyImagingItemModel>().ToTable("RAD_MST_ImagingItem");
@@ -80,6 +89,12 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<ServiceDepartmentModel>().ToTable("BIL_MST_ServiceDepartment");
             modelBuilder.Entity<DepartmentModel>().ToTable("MST_Department");
             modelBuilder.Entity<FilmTypeModel>().ToTable("RAD_MST_FilmType");
+            modelBuilder.Entity<BillServiceItemModel>().ToTable("BIL_MST_ServiceItem");
+            modelBuilder.Entity<PatientFilesModel>().ToTable("PAT_PatientFiles");
+            modelBuilder.Entity<AdminParametersModel>().ToTable("CORE_CFG_Parameters");
+            modelBuilder.Entity<TemplateStyleModel>().ToTable("RAD_MST_TemplateStyle");
+
+
         }
 
 

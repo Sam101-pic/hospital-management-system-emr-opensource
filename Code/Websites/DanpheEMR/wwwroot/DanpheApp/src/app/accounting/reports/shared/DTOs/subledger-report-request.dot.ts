@@ -3,4 +3,5 @@ export class SubLedgerReportRequest_DTO {
     public FromDate: string = "";
     public ToDate: string = "";
     public FiscalYearId: number = 0;
+    HospitalId: any;
 }

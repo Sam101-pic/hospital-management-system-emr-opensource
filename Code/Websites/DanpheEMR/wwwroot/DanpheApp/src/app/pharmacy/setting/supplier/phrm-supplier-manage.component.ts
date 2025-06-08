@@ -2,8 +2,11 @@ import { ChangeDetectorRef, Component, EventEmitter, Input, Output, Renderer2 } 
 import * as moment from "moment";
 import { CoreService } from "../../../core/shared/core.service";
 import { SecurityService } from '../../../security/shared/security.service';
+import { CountrySubdivision } from "../../../settings-new/shared/country-subdivision.model";
+import { Country } from "../../../settings-new/shared/country.model";
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { DanpheCache, MasterType } from "../../../shared/danphe-cache-service-utility/cache-services";
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
@@ -36,6 +39,11 @@ export class PHRMSupplierManageComponent {
   loading: boolean = false;
 
   public GeneralFieldLabel = new GeneralFieldLabels();
+  @Output("popup-close-event") popUpCloseEvent: EventEmitter<any> = new EventEmitter();
+  Countries = new Array<Country>();
+  SubDivision = new Array<CountrySubdivision>();
+  SelectedSubDivision = new CountrySubdivision();
+  CountrySubDivisionList = new Array<CountrySubdivision>();
   constructor(public pharmacyBLService: PharmacyBLService,
 
     public coreservice: CoreService,
@@ -46,14 +54,15 @@ export class PHRMSupplierManageComponent {
     this.getSupplierList();
     this.supplierGridColumns = PHRMGridColumns.PHRMSupplierList;
     this.GeneralFieldLabel = coreservice.GetFieldLabelParameter();
-    this.supplierGridColumns[4].headerName = `${this.GeneralFieldLabel.PANNo}`;
-
+    this.GetCountry();
+    this.GetSubDivision();
+    this.GeneralFieldLabel.DistrictState = this.supplierGridColumns[4].headerName;
   }
 
   ngOnInit() {
     this.globalListenFunc = this.renderer2.listen('document', 'keydown', e => {
       if (e.keyCode == this.ESCAPE_KEYCODE) {
-        this.Close()
+        this.Close();
       }
     });
   }
@@ -62,12 +71,47 @@ export class PHRMSupplierManageComponent {
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status == ENUM_DanpheHTTPResponses.OK) {
           this.supplierList = res.Results;
+          if (this.supplierList && this.supplierList.length > 0) {
+            this.supplierList.forEach(supplier => {
+              const country = this.Countries.find(c => c.CountryId === supplier.CountryId);
+              const subDivision = this.SubDivision.find(sd => sd.CountrySubDivisionId === supplier.CountrySubDivisionId);
+              supplier.CountryName = country ? country.CountryName : '';
+              supplier.CountrySubDivisionName = subDivision ? subDivision.CountrySubDivisionName : '';
+            });
+          }
         }
         else {
           alert(ENUM_MessageBox_Status.Failed + res.ErrorMessage);
-          console.log(res.ErrorMessage)
+          console.log(res.ErrorMessage);
         }
       });
+  }
+  GetCountry() {
+    this.Countries = DanpheCache.GetData(MasterType.Country, null);
+  }
+  GetSubDivision() {
+    this.SubDivision = DanpheCache.GetData(MasterType.SubDivision, null);
+  }
+  SubDivisionFormatter(data: any): string {
+    let html = data["CountrySubDivisionName"];
+    return html;
+  }
+  GetCountrySubDivision(countryId: any) {
+    if (countryId) {
+      if (this.update == false) {
+        this.SelectedSubDivision = null;
+      }
+      this.CountrySubDivisionList = this.SubDivision.filter(
+        sub => sub.CountryId === +countryId
+      );
+    } else {
+      this.CountrySubDivisionList = [];
+    }
+  }
+  AssignSubDivision() {
+    if (this.SelectedSubDivision) {
+      this.CurrentSupplier.CountrySubDivisionId = this.SelectedSubDivision.CountrySubDivisionId;
+    }
   }
 
   SupplierGridActions($event: GridEmitModel) {
@@ -94,6 +138,13 @@ export class PHRMSupplierManageComponent {
         this.CurrentSupplier.IsLedgerRequired = this.selectedItem.IsLedgerRequired;
         this.CurrentSupplier.CreatedBy = this.selectedItem.CreatedBy;
         this.CurrentSupplier.CreatedOn = this.selectedItem.CreatedOn;
+        this.CurrentSupplier.CountryId = this.selectedItem.CountryId;
+        if (this.CurrentSupplier.CountryId) {
+          this.CountrySubDivisionList = this.SubDivision.filter(
+            sub => sub.CountryId === this.CurrentSupplier.CountryId
+          );
+        }
+        this.SelectedSubDivision = this.CountrySubDivisionList.find(a => a.CountrySubDivisionId === this.selectedItem.CountrySubDivisionId);
         this.showSupplierAddPage = true;
 
         break;
@@ -121,10 +172,30 @@ export class PHRMSupplierManageComponent {
 
   Add() {
     this.loading = true;
+    this.AssignSubDivision();
     for (var i in this.CurrentSupplier.SupplierValidator.controls) {
       this.CurrentSupplier.SupplierValidator.controls[i].markAsDirty();
       this.CurrentSupplier.SupplierValidator.controls[i].updateValueAndValidity();
     }
+    if (!this.CurrentSupplier.CountryId || this.CurrentSupplier.CountryId === 0) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Country is required."]);
+      return;
+    }
+
+
+    if (this.supplierList && this.supplierList.length) {
+      const isSupplierNameAlreadyExists = this.supplierList.some(a => a.SupplierName.toLowerCase() === this.CurrentSupplier.SupplierName.toLowerCase());
+      const isPANNOAlreadyExists = this.supplierList.some(a => a.PANNumber.toLowerCase() === this.CurrentSupplier.PANNumber.toLowerCase());
+      if (isSupplierNameAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Supplier as the Supplier Name "${this.CurrentSupplier.SupplierName}" already exists! `]);
+        return;
+      }
+      if (isPANNOAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Supplier as the PANNO "${this.CurrentSupplier.PANNumber}" already exists! `]);
+        return;
+      }
+    }
+
     if (this.CurrentSupplier.IsValidCheck(undefined, undefined)) {
       this.CurrentSupplier.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
       this.CurrentSupplier.CreatedOn = moment().format('YYYY-MM-DD');
@@ -134,7 +205,7 @@ export class PHRMSupplierManageComponent {
           (res: DanpheHTTPResponse) => {
             if (res.Status == ENUM_DanpheHTTPResponses.OK) {
               this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Supplier Added."]);
-              this.CallBackAddUpdate(res)
+              this.CallBackAddUpdate(res);
               this.CurrentSupplier = new PHRMSupplierModel();
             }
             else {
@@ -151,11 +222,29 @@ export class PHRMSupplierManageComponent {
   }
 
   Update() {
-    this.loading = true
+    this.loading = true;
+    this.AssignSubDivision();
     for (var i in this.CurrentSupplier.SupplierValidator.controls) {
       this.CurrentSupplier.SupplierValidator.controls[i].markAsDirty();
       this.CurrentSupplier.SupplierValidator.controls[i].updateValueAndValidity();
     }
+    if (!this.CurrentSupplier.CountryId || this.CurrentSupplier.CountryId === 0) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Country is required."]);
+      return;
+    }
+    if (this.supplierList && this.supplierList.length) {
+      const isSupplierNameAlreadyExists = this.supplierList.some(a => a.SupplierName.toLowerCase() === this.CurrentSupplier.SupplierName.toLowerCase() && a.SupplierId !== this.CurrentSupplier.SupplierId);
+      const isPanNOAlreadyExists = this.supplierList.some(a => a.PANNumber.toLowerCase() === this.CurrentSupplier.PANNumber.toLowerCase() && a.SupplierId !== this.CurrentSupplier.SupplierId);
+      if (isSupplierNameAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Supplier as the Supplier Name "${this.CurrentSupplier.SupplierName}" already exists! `]);
+        return;
+      }
+      if (isPanNOAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Supplier as the PANNO "${this.CurrentSupplier.PANNumber}" already exists! `]);
+        return;
+      }
+    }
+
     if (this.CurrentSupplier.IsValidCheck(undefined, undefined)) {
       this.CurrentSupplier.CreatedOn = moment().format('YYYY-MM-DD');
       this.pharmacyBLService.UpdateSupplier(this.CurrentSupplier)
@@ -164,7 +253,7 @@ export class PHRMSupplierManageComponent {
           (res: DanpheHTTPResponse) => {
             if (res.Status == ENUM_DanpheHTTPResponses.OK) {
               this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Supplier Details Updated.']);
-              this.CallBackAddUpdate(res)
+              this.CallBackAddUpdate(res);
               this.CurrentSupplier = new PHRMSupplierModel();
             }
             else {
@@ -187,6 +276,8 @@ export class PHRMSupplierManageComponent {
       supplier.SupplierName = res.Results.SupplierName;
       supplier.ContactNo = res.Results.ContactNo;
       supplier.Description = res.Results.Description;
+      supplier.CountryId = res.Results.CountryId;
+      supplier.CountrySubDivisionId = res.Results.CountrySubDivisionId;
       supplier.City = res.Results.City;
       supplier.PANNumber = res.Results.PANNumber;
       supplier.DDA = res.Results.DDA;
@@ -196,6 +287,8 @@ export class PHRMSupplierManageComponent {
       supplier.IsActive = res.Results.IsActive;
       this.getSupplierList();
       this.CallBackAdd(supplier);
+      this.SelectedSubDivision = null;
+
     }
     else {
       this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['some error ' + res.ErrorMessage]);
@@ -245,6 +338,9 @@ export class PHRMSupplierManageComponent {
     this.selectedItem = null;
     this.update = false;
     this.showSupplierAddPage = false;
+    this.popUpCloseEvent.emit();
+    this.SelectedSubDivision = null;
+
   }
 
   setFocusById(IdToBeFocused) {

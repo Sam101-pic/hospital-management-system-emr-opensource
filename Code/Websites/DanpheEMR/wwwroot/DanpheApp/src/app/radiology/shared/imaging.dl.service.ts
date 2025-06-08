@@ -1,6 +1,7 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
+import { DanpheHTTPResponse } from '../../shared/common-models';
 import { ImagingItemReport } from '../shared/imaging-item-report.model';
 import { ImagingItemRequisition } from './imaging-item-requisition.model';
 
@@ -44,6 +45,9 @@ export class ImagingDLService {
     //get requisition items using reportOrderStatus and billingStatus
     public GetImagingReqsAndReportsByStatus(reqOrderStatus: string, reportOrderStatus: string, typeList: string, fromDate: string, toDate: string) {
         return this.http.get<any>(`/api/radiology/Requisitions?reqOrderStatus=${reqOrderStatus}&reportOrderStatus=${reportOrderStatus}&typeList=${typeList}&fromDate=${fromDate}&toDate=${toDate}`, this.options);
+    }
+    public GetPendingReportsandRequisition(reqOrderStatus: string, reportOrderStatus: string, typeList: string, fromDate: string, toDate: string) {
+        return this.http.get<any>(`/api/radiology/PendingReportsandRequisition?reqOrderStatus=${reqOrderStatus}&reportOrderStatus=${reportOrderStatus}&typeList=${typeList}&fromDate=${fromDate}&toDate=${toDate}`, this.options);
     }
 
     //get requisition items using reportOrderStatus and billingStatus
@@ -153,6 +157,33 @@ export class ImagingDLService {
             throw exception;
         }
     }
+    public UploadRadiologyFile(data: any) {
+        try {
+            return this.http.post<any>("/api/radiology/UploadFile", data);
+        }
+        catch (exception) {
+            throw exception;
+        }
+    }
+    public UpdateRadiologyFile(data: any) {
+        try {
+            return this.http.put<any>("/api/radiology/UploadFile", data);
+        }
+        catch (exception) {
+            throw exception;
+        }
+    }
+    public GetPatientFileDetail(patientDetail: any[]) {
+        try {
+            const patientDetailObject = patientDetail[0];
+            const patientDetailString = encodeURIComponent(JSON.stringify(patientDetailObject));
+            return this.http.get<any>(`/api/radiology/patientFileDetail?patientDetail=${patientDetailString}`, this.options);
+        } catch (exception) {
+            throw exception;
+        }
+    }
+
+
     PostPatientStudy(reportData) {
         try {
             return this.http.post<any>("/api/Radiology/PatientStudy", reportData, this.options);
@@ -227,7 +258,7 @@ export class ImagingDLService {
 
     public PutDoctor(prescriberId: number, prescriberName: string, reqId: number) {
         let data = JSON.stringify(reqId);
-        return this.http.put<any>(`/api/Radiology/Doctor'?prescriberId=${prescriberId}&prescriberName=${prescriberName}`, data, this.options);
+        return this.http.put<any>(`/api/Radiology/Doctor?prescriberId=${prescriberId}&prescriberName=${prescriberName}`, data, this.options);
     }
 
     //end: sud-5Feb'18--For Ward Billing--
@@ -240,4 +271,26 @@ export class ImagingDLService {
             throw exception;
         }
     }
+    // public GetPrintCount(requisitionId: number) {
+    //     return this.http.put<any>("/api/Radiology/PrintCount?requisitionId=" + requisitionId, this.options);
+    // }
+    public GetPrintCount(requisitionId: number) {
+        return this.http.put<any>(`/api/Radiology/PrintCount?requisitionId=${requisitionId}`, this.options);
+    }
+    public UpdateReferrer(referredById: number, referredByName: string, requisitionId: number) {
+        const params = new HttpParams()
+            .set('referredById', referredById.toString())
+            .set('referredByName', referredByName)
+            .set('requisitionId', requisitionId.toString());
+        return this.http.put<DanpheHTTPResponse>('/api/Radiology/Referrer', null, { params, ...this.options });
+    }
+
+    public GetTemplatesStyles() {
+        try {
+            return this.http.get<DanpheHTTPResponse>("/api/RadiologySettings/TemplateStyle");
+        } catch (exception) {
+            throw exception;
+        }
+    }
+
 }

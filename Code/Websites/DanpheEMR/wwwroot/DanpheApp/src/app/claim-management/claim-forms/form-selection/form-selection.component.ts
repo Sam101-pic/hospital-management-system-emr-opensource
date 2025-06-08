@@ -16,7 +16,11 @@ export class FormSelectionComponent implements OnInit {
     {
       "DisplayName": "Medicare Claim Form (Medicare)",
       "RouterLink": "MedicalClaim"
-    }
+    },
+    {
+      "DisplayName": "Final Bill Summary Report (ECHS)",
+      "RouterLink": "FinalBillSummaryReport"
+    },
   ];
   constructor(
     private router: Router

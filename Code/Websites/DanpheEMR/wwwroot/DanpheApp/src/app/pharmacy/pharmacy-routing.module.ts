@@ -69,9 +69,13 @@ import { PHRMGoodsReceiptComponent } from './order/phrm-gr/phrm-goods-receipt.co
 import { PhrmRackAllocationComponent } from './rack/phrm-rack-allocation/phrm-rack-allocation.component';
 import { PhrmRackMainComponent } from './rack/phrm-rack-main/phrm-rack-main.component';
 import { RankMembershipwiseSalesReportComponent } from './report/RankMembershipwiseSalesReport/RankMembershipwiseSalesReport.component';
+import { PHRMBillSummaryReportDetailComponent } from './report/bills-summary/phrm-bills-summary-report-detail.component';
+import { PHRMBillSummaryReportComponent } from './report/bills-summary/phrm-bills-summary-report.component';
 import { DatewisePurchaseReportComponent } from './report/datewise-purchase-report/datewise-purchase-report.component';
+import { DoctorWisePrescriptionSalesReportComponent } from './report/doctorwise-sales-report/doctorwise-prescription-sales-report.component';
 import { ItemWisePurchaseReportComponent } from './report/item-wise-purchase-report/item-wise-purchase-report.component';
 import { ItemWiseWardSupplyReportComponent } from './report/item-wise-wardsupply-report/item-wise-wardsupply-report.component';
+import { NarcoticStockLedgerComponent } from './report/narcotics/phrm-narcotics-stock-ledger.component';
 import { PHRMPaymentModeWiseReportComponent } from './report/payment-mode-wise-report/phrm-paymentmodewise-report.component';
 import { PHRMPurchaseReportComponent } from './report/phrm-purchase-report/phrm-purchase-report.component';
 import { PHRMPurchaseSummaryComponent } from './report/phrm-purchase-report/purchase-summary/phrm-purchase-summary.component';
@@ -81,10 +85,12 @@ import { PHRMSalesReportComponent } from './report/phrm-sales-report/phrm-sales-
 import { PHRMSalesStatementComponent } from './report/phrm-sales-report/sales-statement/phrm-sales-statement.component';
 import { PHRMSalesSummaryComponent } from './report/phrm-sales-report/sales-summary/phrm-sales-summary.component';
 import { PHRMStockReportComponent } from './report/phrm-stock-report/phrm-stock-report.component';
+import { PHRMStockTransferSummaryReportComponent } from './report/phrm-stock-report/phrm-stock-transfer-summary-report/phrm-stock-transfer-summary-report.component';
 import { PHRMStockSummarySecondComponent } from './report/phrm-stock-report/stock-summary-second/phrm-stock-summary-second.component';
 import { StockTransfersReportComponent } from './report/phrm-stock-report/stock-transfers-report/stock-transfers-report.component';
 import { PHRMSupplierReportComponent } from './report/phrm-supplier-report/phrm-supplier-report.component';
 import { SupplierWiseStockReportComponent } from './report/phrm-supplier-report/supplierwise-stock-report/supplierwise-stock-report.component';
+import { ProvisionalSalesReportComponent } from './report/provisional-sales-report/provisional-sales-report.component';
 import { PHRMRackStockDistributionReportComponent } from './report/rack-stock/phrm-rack-stock-distribution-report.component';
 import { ReturnFromCustomerComponent } from './report/return-from-customer/return-from-customer.component';
 import { ReturnOnInvestmentReportComponent } from './report/return-on-investment-report/return-on-investment-report.component';
@@ -93,7 +99,9 @@ import { StockLedgerReportComponent } from './report/stock-ledger-report/stock-l
 import { PHRMStockSummaryReportComponent } from './report/stock-summary/phrm-stock-summary-report.component';
 import { SupplierWisePurchaseReportComponent } from './report/supplierwise-purchase-report/supplierwise-purchase-report.component';
 import { CreditOrganizationListComponent } from './setting/credit-organization/phrm-credit-organizations-list.component';
+import { PHRMPackageManageListComponent } from './setting/medicine-package/phrm-package-manage-list.component';
 import { PHRMPackingTypeListComponent } from './setting/packing-type/phrm-packing-type-list.component';
+import { PHRMReturnToSupplierNewComponent } from './store/return-to-supplier-new/return-to-supplier-new.component';
 import { WriteOffItemComponent } from './store/write-off/write-off-item/write-off-item.component';
 import { WriteOffListComponent } from './store/write-off/write-off-list/write-off-list.component';
 import { DirectDispatchComponent } from './substore-requisition-dispatch/direct-dispatch/direct-dispatch.component';
@@ -171,8 +179,11 @@ import { SupplierLedgerComponent } from './supplier-ledger/supplier-ledger.compo
                   { path: 'SettlementSummaryReport', component: PHRMSettlementSummaryReportComponent },
                   { path: 'ReturnOnInvestmentReport', component: ReturnOnInvestmentReportComponent },
                   { path: 'PHRMPaymentModeWiseReport', component: PHRMPaymentModeWiseReportComponent },
-                  { path: 'RankMembershipwiseSalesReport', component: RankMembershipwiseSalesReportComponent }
-
+                  { path: 'RankMembershipwiseSalesReport', component: RankMembershipwiseSalesReportComponent },
+                  { path: 'DoctorwisePrescribedSalesReport', component: DoctorWisePrescriptionSalesReportComponent },
+                  { path: 'BillSummary', component: PHRMBillSummaryReportComponent },
+                  { path: 'BillSummaryDetail', component: PHRMBillSummaryReportDetailComponent },
+                  { path: 'ProvisionalSales', component: ProvisionalSalesReportComponent }
                 ]
               },
               {
@@ -201,7 +212,9 @@ import { SupplierLedgerComponent } from './supplier-ledger/supplier-ledger.compo
                   { path: 'StockTransfers', component: StockTransfersReportComponent },
                   { path: 'StockLedgerReport', component: StockLedgerReportComponent },
                   { path: 'SupplierWiseStockReport', component: SupplierWiseStockReportComponent },
-                  { path: 'ItemWiseWardSupplyReport', component: ItemWiseWardSupplyReportComponent }
+                  { path: 'ItemWiseWardSupplyReport', component: ItemWiseWardSupplyReportComponent },
+                  { path: 'StockTransferSummaryReport', component: PHRMStockTransferSummaryReportComponent },
+                  { path: 'NarcoticsLedger', component: NarcoticStockLedgerComponent },
                 ]
               },
               {
@@ -241,6 +254,7 @@ import { SupplierLedgerComponent } from './supplier-ledger/supplier-ledger.compo
               { path: 'TermsList/:id', component: TermsListComponent },
               { path: 'InvoiceHeaders/:module', component: InvoiceHeaderListComponent },
               { path: 'Packing', component: PHRMPackingTypeListComponent },
+              { path: 'ManagePharmacyPackages', component: PHRMPackageManageListComponent },
               { path: "**", component: PageNotFound }
             ]
           },
@@ -268,6 +282,7 @@ import { SupplierLedgerComponent } from './supplier-ledger/supplier-ledger.compo
                   { path: 'Add', component: WriteOffItemComponent },
                 ]
               },
+              { path: 'ReturnToSupplier', component: PHRMReturnToSupplierNewComponent },
               { path: "**", component: PageNotFound }
 
             ]

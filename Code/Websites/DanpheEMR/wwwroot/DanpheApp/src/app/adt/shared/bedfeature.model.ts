@@ -20,7 +20,8 @@ export class BedFeature {
 
     public IsSelected: boolean = false;
     public TaxApplicable: boolean = false //added for adding in Bill Item price table: yubraj 11th Oct 2018
-
+    public IsPresentationGrouping: boolean = false;
+    public GroupCode: string = "";
     constructor() {
         this.CreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
         var _formbuilder = new FormBuilder();
@@ -29,7 +30,8 @@ export class BedFeature {
             'BedFeatureName': ['', Validators.compose([Validators.required, Validators.maxLength(50)])],
             'BedFeatureFullName': ['', Validators.compose([Validators.maxLength(100)])],
             'BedPrice': [0, Validators.compose([Validators.required])],
-
+            'IsPresentationGrouping': [''],
+            'GroupCode': ['']
 
         });
     }

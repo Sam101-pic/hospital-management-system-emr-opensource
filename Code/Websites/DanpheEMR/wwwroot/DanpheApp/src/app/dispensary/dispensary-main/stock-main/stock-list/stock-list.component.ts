@@ -9,6 +9,7 @@ import { PHRMStockManageModel } from '../../../../pharmacy/shared/phrm-stock-man
 import { PHRMStoreModel } from '../../../../pharmacy/shared/phrm-store.model';
 import { SecurityService } from '../../../../security/shared/security.service';
 import { DanpheHTTPResponse } from '../../../../shared/common-models';
+import { CommonFunctions } from '../../../../shared/common.functions';
 import { GridEmitModel } from '../../../../shared/danphe-grid/grid-emit.model';
 import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_StockLocations } from '../../../../shared/shared-enums';
@@ -30,7 +31,7 @@ export class StockListComponent implements OnInit {
   public showTransferPage: boolean = false;
   public storeList: Object = new Object();
   public selectedStore: any;
-  public totalstockvalue: any;
+  public TotalStockValue: number = 0;
   public showUpdateMRPPopUpBox: boolean = false;
   public selectedStockForMRPUpdate: IMRPUpdatedStock;
   public currentActiveDispensary: PHRMStoreModel;
@@ -39,7 +40,7 @@ export class StockListComponent implements OnInit {
   stockDetailsListCopy: any[];
   Stores: PHRMStoreModel[] = [];
   selectedStoreId: number = null;
-
+  footer: string = '';
   constructor(private _dispensaryService: DispensaryService,
     public pharmacyBLService: PharmacyBLService, public pharmacyService: PharmacyService,
     public changeDetector: ChangeDetectorRef, public router: Router,
@@ -58,17 +59,18 @@ export class StockListComponent implements OnInit {
   ngOnInit() {
   }
   public getAllItemsStockDetailsList() {
-    this.pharmacyBLService.GetAllItemsStockDetailsList()
+    this.pharmacyBLService.GetAllItemsStockDetailsList(this.selectedStoreId, this.showStockWithZeroQty)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results.length > 0) {
           var dispensaryGridCol = new DispensaryGridColumns(this.securityService, this._dispensaryService);
           this.stockDetailsGridColumns = this.isSelectedDispensaryInsurance ? dispensaryGridCol.InsuranceStockDetailsList : dispensaryGridCol.StockDetailsList;
           this.stockDetailsList = res.Results;
-          this.stockDetailsListCopy = this.stockDetailsList;
-          this.FilterStockList();
           if (this.stockDetailsList.length) {
-            this.totalstockvalue = this.stockDetailsList.map(c => c.CostPrice).reduce((sum, current) => sum + current);
-            this.stockDetailsList.forEach(s => s.ExpiryDate = moment(s.ExpiryDate).format("YYYY-MM-DD"));
+            this.TotalStockValue = this.stockDetailsList.map(c => c.CostPrice * c.AvailableQuantity).reduce((sum, current) => sum + current);
+            this.stockDetailsList.forEach(s => {
+              s.ExpiryDate = moment(s.ExpiryDate).format("YYYY-MM-DD");
+              s.TotalValue = CommonFunctions.parseAmount(s.TotalValue, 4);
+            });
           }
         }
         else {
@@ -93,22 +95,6 @@ export class StockListComponent implements OnInit {
       }, err => {
         this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to get Store List." + err.ErrorMessage]);
       });
-  }
-  //Showing zero quantity item details
-  FilterStockList() {
-    if (this.selectedStoreId) {
-      this.stockDetailsList = this.stockDetailsListCopy.filter(a => a.StoreId === this.selectedStoreId);
-    }
-    else {
-      this.stockDetailsList = this.stockDetailsListCopy;
-    }
-    if (this.showStockWithZeroQty) {
-      this.stockDetailsList = this.stockDetailsList.filter(a => a.AvailableQuantity < 1);
-    }
-    else {
-      this.stockDetailsList = this.stockDetailsList.filter(a => a.AvailableQuantity > 0);
-    }
-
   }
 
   private FocusElementById(id: string) {
@@ -307,5 +293,16 @@ export class StockListComponent implements OnInit {
           this.msgBoxServ.showMessage("Error", ["Stores are not available."]);
         }
       });
+  }
+  ngAfterViewChecked() {
+    if (document.getElementById("disp-stock-list-print"))
+      this.footer = document.getElementById("disp-stock-list-print").innerHTML;
+  }
+  gridExportOptions = {
+    fileName: 'Stock Details List' + moment().format('YYYY-MM-DD') + '.xls',
+  };
+
+  LoadStock() {
+    this.getAllItemsStockDetailsList();
   }
 }

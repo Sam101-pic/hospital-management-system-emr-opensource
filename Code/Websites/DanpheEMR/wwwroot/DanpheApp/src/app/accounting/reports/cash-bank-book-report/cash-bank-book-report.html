@@ -3,29 +3,29 @@
         <h3><i class="fa fa-book"></i>
             <span class="caption-subject">Cash/Bank Book Report</span>
         </h3>
-        <label *ngIf="showParticularcheckBox == true " class="mt-checkbox mt-checkbox-outline" style="font-weight:bold;color:green;margin: 5px;">
-            <input name="showParticular" type="checkbox" value="Show Particular" [(ngModel)]="showParticularColumn"
-                   (click)="showParticularCol()">
-            <span></span> Show-Particular
-
-        </label>
-
     </div>
-    <div class="row" style="background: #bcbcbc; padding-top: 0px;">
-        <div class="col-md-6 col-xs-12">
+    <div class="row" style="background: #bcbcbc; padding-top: 5px;">
+        <div class="col-md-8 col-xs-12">
             <div class="form-group">
-
-                <label class="control-label" style="margin-left: 5px;">Select Fiscal Year<b class="color-red"> *</b><b
+                <label class="control-label col-md-3" style="margin-top: 9px;">Select Fiscal Year<b class="color-red"> *</b><b
                        style="float:right;">:</b></label>
-                <div>
+                <div class="col-md-9">
                     <fiscal-year-calendar [showSingleDatePicker]="false" [showAllFiscalYear]="true" (fiscalYearDate)="selectDate($event)">
                     </fiscal-year-calendar>
                 </div>
             </div>
         </div>
-        <div class="col-md-2 col-xs-12" style="padding: 5px 5px !important;margin-top:8px">
-            <label class="control-label no-padding">Select Group :</label><br>
-            <div>
+        <div class="col-md-4">
+            <label class=" col-md-5" style="margin-top: 20px;">Account Section <b class="color-red"> *</b>:</label><br>
+            <div class="col-md-7">
+                <select [(ngModel)]="SelectedHospital" class="form-control" (focusout)="FilterLedgerGroup()">
+                    <option *ngFor="let h of HospitalList" [ngValue]=h.HospitalId>{{ h.HospitalLongName }}</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-5 col-xs-12" style="padding: 5px 5px !important;margin-top:8px">
+            <label class="control-label col-md-3">Select Group :</label>
+            <div class="col-md-9">
                 <div class="div-relative">
                     <input danphe-auto-complete class="col-md-11 form-control" [(ngModel)]="selectedLedgerGroup" [source]="ledgerGroupList"
                            placeholder="select ledger group" display-property-name="LedgerGroupName" value-property-name="LedgerGroupName"
@@ -35,9 +35,9 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-xs-12" style="padding: 5px 5px !important;">
-            <label class="control-label"> <b>Select Ledger</b> <b class="color-red"> *</b></label>
-            <div style="margin-top: 5px;">
+        <div class="col-md-5 col-xs-12" style="padding: 5px 5px !important;">
+            <label class="control-label col-md-3" style="margin-top: 12px;"> <b>Select Ledger :</b> <b class="color-red"> *</b></label>
+            <div class="col-md-9" style="margin-top: 5px;">
                 <div>
                     <danphe-multiselect [ddl-data]="filteredLedgerList" [pre-selected]="selectedLedgers" [placeholder-text]="'Ledger Name'"
                                         [value-property-name]="'LedgerId'" (selected-items-list)="OnLedgerSelected($event)"
@@ -46,14 +46,11 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-1 col-xs-12" style=" margin-top: 5px;">
-            <div class="form-group mt10">
-                <br>
-                <button type="button" class="btn green btn-success" (click)="GetTxnList()">
-                    <i class="fa fa-refresh"></i>
-                    Load
-                </button>
-            </div>
+        <div class="col-md-2 col-xs-12" style=" margin-top: 15px;">
+            <button type="button" class="btn green btn-success" (click)="GetTxnList()">
+                <i class="fa fa-refresh"></i>
+                Load
+            </button>
         </div>
     </div>
 
@@ -180,7 +177,7 @@
         </div>
     </div>
 
-    <transaction-view *ngIf="viewMode == 'detail'" [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId">
+    <transaction-view *ngIf="viewMode == 'detail'" [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId" [HospitalId]="HospitalId">
     </transaction-view>
 
     <div class="popup-static portlet box portlet-fullscreen inv_modal" *ngIf="ShowDetailPopUp">
@@ -249,7 +246,7 @@
         </div>
         <div class="row">
             <div class="col-md-12">
-                <transaction-view [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId">
+                <transaction-view [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId" [HospitalId]="HospitalId">
                 </transaction-view>
             </div>
         </div>

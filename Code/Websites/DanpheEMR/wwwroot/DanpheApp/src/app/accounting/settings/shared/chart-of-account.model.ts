@@ -13,7 +13,10 @@ export class ChartofAccountModel {
     public ModifiedBy: number = 0;
     public ModifiedOn: string = null;
     public IsActive: boolean = true;
+    public HospitalId: number = 0;
     public COAValidator: FormGroup = null;
+    public IsSystemDefault: boolean = false;
+
     constructor() {
         this.CreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
         var _formBuilder = new FormBuilder();

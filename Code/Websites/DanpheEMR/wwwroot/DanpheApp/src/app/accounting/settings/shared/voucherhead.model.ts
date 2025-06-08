@@ -1,11 +1,8 @@
 ﻿import {
-    NgForm,
-    FormGroup,
-    FormControl,
-    Validators,
     FormBuilder,
-    ReactiveFormsModule
-} from '@angular/forms'
+    FormGroup,
+    Validators
+} from '@angular/forms';
 
 export class VoucherHeadModel {
     public IsSelected: any;
@@ -17,7 +14,9 @@ export class VoucherHeadModel {
     public ModifiedBy: number = 0;
     public ModifiedOn: string = null;
     public IsActive: boolean = true;
-    public IsDefault : boolean = false;
+    public IsDefault: boolean = false;
+    public HospitalId: number = 0;
+
     public VoucherHeadValidator: FormGroup = null;
     constructor() {
 
@@ -34,7 +33,7 @@ export class VoucherHeadModel {
             return this.VoucherHeadValidator.controls[fieldName].dirty;
     }
 
-    public IsValid():boolean{if(this.VoucherHeadValidator.valid){return true;}else{return false;}} public IsValidCheck(fieldName, validator): boolean {
+    public IsValid(): boolean { if (this.VoucherHeadValidator.valid) { return true; } else { return false; } } public IsValidCheck(fieldName, validator): boolean {
         if (fieldName == undefined) {
             return this.VoucherHeadValidator.valid;
 

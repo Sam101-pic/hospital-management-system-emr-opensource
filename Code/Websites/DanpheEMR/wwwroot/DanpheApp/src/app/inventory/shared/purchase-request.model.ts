@@ -1,14 +1,11 @@
 import {
-  NgForm,
-  FormGroup,
-  FormControl,
-  Validators,
   FormBuilder,
-  ReactiveFormsModule
-} from '@angular/forms'
-import { PurchaseRequestItemModel } from './purchase-request-item.model';
+  FormGroup,
+  Validators
+} from '@angular/forms';
 import * as moment from 'moment';
 import { ENUM_GRItemCategory } from '../../shared/shared-enums';
+import { PurchaseRequestItemModel } from './purchase-request-item.model';
 
 export class PurchaseRequestModel {
   public PurchaseRequestId: number = 0;
@@ -53,7 +50,9 @@ export class PurchaseRequestModel {
   constructor() {
 
     var _formBuilder = new FormBuilder();
-    this.PurchaseRequestValidator = _formBuilder.group({});
+    this.PurchaseRequestValidator = _formBuilder.group({
+      'RequestDate': ['', Validators.compose([Validators.required])]
+    });
   }
 
   public IsDirty(fieldName): boolean {
@@ -71,5 +70,4 @@ export class PurchaseRequestModel {
     else
       return !(this.PurchaseRequestValidator.hasError(validator, fieldName));
   }
-
 }

@@ -31,5 +31,9 @@ namespace DanpheEMR.Services.Pharmacy.DTOs.PurchaseOrder
         public DateTime? ModifiedOn { get; set; }
         public int GenericId { get; set; }
         public decimal FreeQuantity { get; set; }
+        public Boolean IsPacking { get; set; }
+        public decimal? PackingQty { get; set; }
+        public int? PackingTypeId { get; set; }
+        public decimal? StripRate { get; set; }
     }
 }

@@ -31,7 +31,13 @@ export class BillServiceItemModel {
   public ServiceDepartmentName: string = null;
   public ServiceCategoryName: string = null;
   public DiscountApplicable: boolean = true;
+  public IsIncentiveApplicable: boolean = false;
+  public IsInsurancePackage: boolean = false;
+  PriceDetails = new Array<PriceDetails>();
+
+
   public BilCfgItemsVsPriceCategoryMap: Array<BillServiceItemsPriceCategoryMap> = new Array<BillServiceItemsPriceCategoryMap>();
+  OTCategory: string = "";
 
   constructor() {
 
@@ -86,7 +92,7 @@ export class BillServiceItemModel {
     }
   }
 
-  positiveNumberValdiator(control: FormControl): { [key: string]: boolean } {
+  positiveNumberValdiator(control: FormControl): { [key: string]: boolean; } {
     if (control) {
       if (control.value < 0)
         return { 'invalidNumber': true };
@@ -110,11 +116,18 @@ export class BillServiceItemsPriceCategoryMap {
   public ServiceItemId: number = 0;
   public ServiceDepartmentId: number = 0;
   public IsActive: boolean = false;
+  public IsCappingEnabled: boolean = false;
+  public CappingLimitDays: number = 0;
+  public CappingQuantity: number = 0;
 }
 
 export class ServiceCategories {
   public ServiceCategoryId: number = 0;
   public ServiceCategoryName: string = null;
+}
+export class PriceDetails {
+  public PriceCategoryId: number = 0;
+  public Price: number = 0;
 }
 
 

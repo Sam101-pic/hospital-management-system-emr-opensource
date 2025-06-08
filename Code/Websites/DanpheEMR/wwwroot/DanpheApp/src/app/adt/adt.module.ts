@@ -34,11 +34,17 @@ import { AgGridModule } from 'ag-grid-angular/main';
 import { RegistrationSchemeSharedModule } from '../appointments/shared/registration-scheme/registration-scheme-shared.module';
 import { BillingSharedModule } from '../billing/billing-shared.module';
 import { BillingPrintSharedModule } from '../billing/print-pages/billing-print-shared.module';
+import { ClinicalService } from '../clinical-new/shared/clinical.service';
 import { ClinicalSharedModule } from '../clinical/clinical-shared-module';
 import { DischargeSummaryModule } from '../discharge-summary/discharge-summary.module';
 import { SettingsSharedModule } from '../settings-new/settings-shared.module';
 import { DanpheAutoCompleteModule } from '../shared/danphe-autocomplete/danphe-auto-complete.module';
 import { ADTSharedModule } from './adt-shared.module';
+import { AdtCreateNewBedReservationComponent } from './bed-reservation/add-bed-reservation/add/adt-add-bed-reservation.component';
+import { ADTAddBedReservationComponent } from './bed-reservation/add-bed-reservation/adt-bed-reservation.component';
+import { ADTBedReservationMainComponent } from './bed-reservation/bed-reservation-main.component';
+import { AdtCancelBedReservationComponent } from './bed-reservation/cancel-bed-reservation/cancel-bed-reservation.component';
+import { AdtExchangeBedComponent } from './exchange-bed/adt-exchange-bed.component';
 import { IPWristBandPrintComponent } from './ip-wrist-band/ip-wrist-band-print.component';
 import { PatientBedHistory } from './patient-bed-history/patient-bed-history.component';
 import { AdmissionSelectPatientCanActivateGuard } from './shared/admission-select-patient-canactivate-guard';
@@ -56,7 +62,7 @@ import { AdmissionSelectPatientCanActivateGuard } from './shared/admission-selec
     LabsDLService,
     BillingDLService,
     AdmissionSelectPatientCanActivateGuard,
-    IOAllergyVitalsBLService],
+    IOAllergyVitalsBLService, ClinicalService],
   imports: [ADTRoutingModule,
     CommonModule,
     ReactiveFormsModule,
@@ -83,7 +89,12 @@ import { AdmissionSelectPatientCanActivateGuard } from './shared/admission-selec
     PatientBedHistory,
     AdmissionCancelComponent,
     IPWristBandPrintComponent,
-    ChangeDoctorComponent
+    ChangeDoctorComponent,
+    AdtExchangeBedComponent,
+    ADTBedReservationMainComponent,
+    ADTAddBedReservationComponent,
+    AdtCancelBedReservationComponent,
+    AdtCreateNewBedReservationComponent
     //AdmittedPatientHistory// moved to shared module to use in nursing modulw
   ],
   bootstrap: []//do we need anything here ? <sudarshan:2jan2017>

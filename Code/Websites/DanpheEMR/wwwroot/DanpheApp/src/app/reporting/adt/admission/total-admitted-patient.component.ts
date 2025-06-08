@@ -1,23 +1,21 @@
-import { Component, Directive, ViewChild } from "@angular/core";
+import { HttpClient } from "@angular/common/http";
+import { Component } from "@angular/core";
+import * as moment from "moment/moment";
 import { ReportingService } from "../../../reporting/shared/reporting-service";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { RPT_ADT_TotalAdmittedPatientModel } from "../../shared/total-admitted-patient.model";
-import { DLService } from "../../../shared/dl.service";
-import { HttpClient } from "@angular/common/http";
-import * as moment from "moment/moment";
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 
 @Component({
   templateUrl: "./total-admitted-patient.html",
 })
 export class RPT_ADT_TotalAdmittedPatientComponent {
-  public dateRange : string = '';
+  public dateRange: string = '';
   public fromDate: string = null;
   public toDate: string = null;
   TotalAdmittedPatientColumns: Array<any> = null;
-  TotalAdmittedPatientData: Array<any> = new Array<
-    RPT_ADT_TotalAdmittedPatientModel
-  >();
+  TotalAdmittedPatientData = new Array<RPT_ADT_TotalAdmittedPatientModel>();
   public currenttotalAdmittedPatient: RPT_ADT_TotalAdmittedPatientModel = new RPT_ADT_TotalAdmittedPatientModel();
   dlService: DLService = null;
   http: HttpClient = null;
@@ -58,7 +56,7 @@ export class RPT_ADT_TotalAdmittedPatientComponent {
     } else {
       this.msgBoxServ.showMessage("error", ['Dates Provided is not Proper']);
     }
-    
+
   }
   Error(err) {
     this.msgBoxServ.showMessage("error", [err]);

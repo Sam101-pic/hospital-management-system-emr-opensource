@@ -1,18 +1,18 @@
 
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
-import { SettingsBLService } from '../../shared/settings.bl.service';
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 import { SecurityService } from '../../../security/shared/security.service';
+import { SettingsBLService } from '../../shared/settings.bl.service';
 //Parse, validate, manipulate, and display dates and times in JS.
-import * as moment from 'moment/moment';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { animate, style, transition, trigger } from "@angular/animations";
 import { CoreService } from "../../../core/shared/core.service";
-import * as _ from 'lodash';
-import { CommonFunctions } from "../../../shared/common.functions";
 import { PHRMStoreModel } from "../../../pharmacy/shared/phrm-store.model";
 import { Role } from "../../../security/shared/role.model";
-import { StoreVerificationMapModel } from "../../shared/store-role-map.model";
-import { trigger, transition, style, animate } from "@angular/animations";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { CommonFunctions } from "../../../shared/common.functions";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_Data_Type, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { StoreVerificationMapModel } from "../../shared/store-role-map.model";
+
 
 
 
@@ -42,6 +42,10 @@ export class SubstoreAddComponent {
   public showAddPage: boolean = false;
   @Input("selectedStore")
   public selectedStore: PHRMStoreModel;
+
+  @Input("substore-list")
+  public SubStoreList = new Array<PHRMStoreModel>();
+
 
   @Input("rbac-roles-list")
   public rbacRoleList_Ip: Array<Role> = null;
@@ -76,12 +80,13 @@ export class SubstoreAddComponent {
       this.storeList = this.storeList.filter(store => (store.StoreId != this.selectedStore.StoreId));
       if (this.CurrentStore.MaxVerificationLevel > 0) {
         this.settingsBLService.GetStoreVerifiers(this.CurrentStore.StoreId)
-          .subscribe(res => {
-            if (res.Status == "OK") {
-              this.StoreVerificationMapList = res.Results;
-              this.StoreVerificationMapList = this.AssignRoleToStoreVerifiers(this.StoreVerificationMapList);
-            }
-          })
+          .subscribe(
+            (res: DanpheHTTPResponse) => {
+              if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+                this.StoreVerificationMapList = res.Results;
+                this.StoreVerificationMapList = this.AssignRoleToStoreVerifiers(this.StoreVerificationMapList);
+              }
+            })
       }
       this.setFocusById("StoreName");
 
@@ -108,26 +113,27 @@ export class SubstoreAddComponent {
 
   public GetStore() {
     this.settingsBLService.GetStoreList()
-      .subscribe(res => {
-        if (res.Status == 'OK') {
-          if (res.Results.length) {
-            this.storeList = res.Results;
-            CommonFunctions.SortArrayOfObjects(this.storeList, "Name");//this sorts the substorelist by Name.
-            this.storeList.forEach(store => {
-              //needs review to get parent substore name
-              this.storeList.forEach(parStore => {
-                if (store.ParentStoreId == parStore.StoreId)
-                  store.ParentName = parStore.Name;
+      .subscribe(
+        (res: DanpheHTTPResponse) => {
+          if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+            if (res.Results.length) {
+              this.storeList = res.Results;
+              CommonFunctions.SortArrayOfObjects(this.storeList, "Name");//this sorts the substorelist by Name.
+              this.storeList.forEach(store => {
+                //needs review to get parent substore name
+                this.storeList.forEach(parStore => {
+                  if (store.ParentStoreId == parStore.StoreId)
+                    store.ParentName = parStore.Name;
+                });
               });
-            });
-            this.completeStoreList = this.storeList;
+              this.completeStoreList = this.storeList;
+            }
           }
-        }
-        else {
-          this.showMessageBox("error", "Check log for error message.");
-          this.logError(res.ErrorMessage);
-        }
-      },
+          else {
+            this.showMessageBox("error", "Check log for error message.");
+            this.logError(res.ErrorMessage);
+          }
+        },
         err => {
           this.showMessageBox("error", "Failed to get wards. Check log for error message.");
           this.logError(err.ErrorMessage);
@@ -151,14 +157,29 @@ export class SubstoreAddComponent {
       this.CurrentStore.StoreValidator.controls[i].updateValueAndValidity();
     }
 
+    // Checking if SubStore Name already exists...
+    if (this.SubStoreList && this.SubStoreList.length) {
+      const isAlreadyExists = this.SubStoreList.some(s => s.Name === this.CurrentStore.Name);
+      if (isAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Substore as SubStore with the SubStore Name: "${this.CurrentStore.Name}" already exists!`]);
+        return;
+      }
+    }
+
     if (this.CurrentStore.IsValidCheck(undefined, undefined) && !this.isCodeDuplicate) {
 
       this.CurrentStore.StoreVerificationMapList = this.StoreVerificationMapList;
       this.settingsBLService.AddStore(this.CurrentStore)
         .subscribe(
-          res => {
-            this.CurrentStore = new PHRMStoreModel();
-            this.CallBackAddSubstore(res)
+          (res: DanpheHTTPResponse) => {
+            if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['SubStore Added Successfully']);
+              this.CurrentStore = new PHRMStoreModel();
+              this.CallBackAddSubstore(res);
+            } else {
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Failed to add SubStore!`]);
+            }
+            this.Close();
           },
           err => {
             this.logError(err);
@@ -174,16 +195,31 @@ export class SubstoreAddComponent {
       this.CurrentStore.StoreValidator.controls[i].updateValueAndValidity();
     }
 
+    // Checking if the updated SubStore NAme already exists
+    if (this.SubStoreList && this.SubStoreList.length) {
+      const isAlreadyExists = this.SubStoreList.some(
+        s => s.Name === this.CurrentStore.Name && s.StoreId !== this.CurrentStore.StoreId
+      );
+
+      if (isAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update SubStore as the SubStore with the SubStore Name: "${this.CurrentStore.Name}" already exists!`]);
+        return;
+      }
+    }
     if (this.CurrentStore.IsValidCheck(undefined, undefined) && !this.isCodeDuplicate) {
       this.CurrentStore.StoreVerificationMapList = this.StoreVerificationMapList;
       this.settingsBLService.UpdateStore(this.CurrentStore)
         .subscribe(
-          res => {
-            if (res.Status == "OK" && res.Results) {
-              this.showMessageBox("success", "Substore Updated");
+          (res: DanpheHTTPResponse) => {
+            if (res.Status == ENUM_DanpheHTTPResponses.OK && res.Results) {
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['SubStore Updated Successfully']);
               this.CurrentStore = new PHRMStoreModel();
-              this.CallBackAddSubstore(res)
+              this.CallBackAddSubstore(res);
             }
+            else {
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Failed to update SubStore!`]);
+            }
+            this.Close();
           },
           err => {
             this.logError(err);
@@ -204,8 +240,8 @@ export class SubstoreAddComponent {
 
   //after adding department is succesfully added  then this function is called.
   CallBackAddSubstore(res: DanpheHTTPResponse) {
-    if (res.Status == "OK") {
-      this.showMessageBox("Success", "Task Completed Succesfully.");
+    if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+      // this.showMessageBox("Success", "Task Completed Succesfully.");
       for (let store of this.completeStoreList) {
         if (store.StoreId == res.Results.ParentStoreId) {
           res.Results.ParentName = store.Name;
@@ -222,7 +258,7 @@ export class SubstoreAddComponent {
 
     }
     else {
-      this.showMessageBox("error", "Check log for details");
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Check log for details"]);
       console.log(res.ErrorMessage);
       this.Close();
     }
@@ -257,12 +293,12 @@ export class SubstoreAddComponent {
   }
 
   AssignRoleId($event, index) {
-    if (typeof ($event) == "object") {
+    if (typeof ($event) === ENUM_Data_Type.Object) {
       this.StoreVerificationMapList[index].NewRoleName = "";
       this.StoreVerificationMapList[index].RoleId = $event.RoleId;
       this.StoreVerificationMapList[index].MaxVerificationLevel = this.CurrentStore.MaxVerificationLevel;
     }
-    else if (typeof ($event) == "string") {
+    else if (typeof ($event) === ENUM_Data_Type.String) {
       this.StoreVerificationMapList[index].RoleId = 0;
       this.StoreVerificationMapList[index].NewRoleName = CommonFunctions.CapitalizeFirstLetter($event);
     }
@@ -274,16 +310,16 @@ export class SubstoreAddComponent {
   }
 
   setFocusById(targetId: string, waitingTimeinMS: number = 10) {
-    if(targetId === "verifier0"){
-      if(this.StoreVerificationMapList.length==0){
+    if (targetId === "verifier0") {
+      if (this.StoreVerificationMapList.length == 0) {
         targetId = 'AddDepartment'
       }
     }
-    if(targetId === "verifier" + this.StoreVerificationMapList.length){
+    if (targetId === "verifier" + this.StoreVerificationMapList.length) {
       targetId = 'AddDepartment'
     }
-    if(targetId === 'AddDepartment'){
-      if(this.update){
+    if (targetId === 'AddDepartment') {
+      if (this.update) {
         targetId = 'UpdateDepartment'
       }
     }

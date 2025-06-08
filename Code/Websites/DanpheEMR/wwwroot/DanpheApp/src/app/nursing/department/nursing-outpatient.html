@@ -148,8 +148,10 @@
               </div>
               <div class="col-md-6">
                 <div style="display:flex; justify-content: flex-end; gap: 0 15px; align-items: center;">
-                  <label style="width: 70px; display: inline-block;"
-                         for="department">Department:</label>
+                  <label
+                         style="width: 70px; display: inline-block;" for="department">
+                    Department:
+                  </label>
                   <input class="form-control" danphe-auto-complete
                          [(ngModel)]="selectedDepartment"
                          (ngModelChange)="selectedDepartment"
@@ -162,7 +164,8 @@
                          onClick="this.select()"
                          match-formatted="true"
                          max-num-list="10"
-                         style="width: 210px; position: relative;" />
+                         style="width: 210px; position: relative;"
+                         (ngModelChange)="OnDepartmentChange(selectedDepartment.DepartmentId)" />
                 </div>
               </div>
             </div>
@@ -250,16 +253,19 @@
 
 
         <div>
-          <danphe-grid *ngIf="showAllData" [grid-colDefaults]="nurOPDGridColumnSettings" [grid-data]="opdListPastDays"
+          <danphe-grid
+                       *ngIf="showAllData" [grid-colDefaults]="nurOPDGridColumnSettings" [grid-data]="opdListPastDays"
                        (grid-actions)="NurOPDListGridActions($event)" [NepaliDateInGridParams]="NepaliDateInGridSettings"
-                       [rangeType]="dateRange" (onDateChange)="onGridDateChange($event)" [date-range-options]="'1W,1M,3M'"
+                       [rangeType]="dateRange" (onDateChange)="onGridDateChange($event)" [date-settings-name]="'nursing-opd-list'"
                        [show-CustomDate]="true"> </danphe-grid>
-          <danphe-grid *ngIf="showTriagedData" [grid-colDefaults]="nurOPDGridColumnSettings"
+          <danphe-grid
+                       *ngIf="showTriagedData" [grid-colDefaults]="nurOPDGridColumnSettings"
                        [grid-data]="opdListOnePastDays" (grid-actions)="NurOPDListGridActions($event)"
                        [NepaliDateInGridParams]="NepaliDateInGridSettings" [rangeType]="dateRange"
                        (onDateChange)="onGridDateChange($event)" [date-range-options]="'1W,1M,3M'" [show-CustomDate]="true">
           </danphe-grid>
-          <danphe-grid *ngIf="showNotTriagedData" [grid-colDefaults]="nurOPDGridColumnSettings"
+          <danphe-grid
+                       *ngIf="showNotTriagedData" [grid-colDefaults]="nurOPDGridColumnSettings"
                        [grid-data]="opdListZeroPastDays" (grid-actions)="NurOPDListGridActions($event)"
                        [NepaliDateInGridParams]="NepaliDateInGridSettings" [rangeType]="dateRange"
                        (onDateChange)="onGridDateChange($event)" [date-range-options]="'1W,1M,3M'" [show-CustomDate]="true">
@@ -307,25 +313,29 @@
 </div>
 
 
-<nursing-opd-checkin *ngIf="showNursingCheckin"
+<nursing-opd-checkin
+                     *ngIf="showNursingCheckin"
                      [isCheckinForm]="isCheckinForm"
                      [selected-visit]="selectedVisit"
                      (nursing-opd-checkIn-callback)="NursingOpdActionsInCallback($event)">
 </nursing-opd-checkin>
 
-<nursing-opd-free-referral *ngIf="showChangeDoctor"
+<nursing-opd-free-referral
+                           *ngIf="showChangeDoctor"
                            [selected-visit]="selectedVisit"
                            [is-ChangeDoctor-Form]="isChangeDoctorForm"
                            (nursing-opd-refer-callback)="NursingOpdActionsInCallback($event)">
 </nursing-opd-free-referral>
 
-<exchange-doctor-department *ngIf="showExchangeDoctorPopUp"
+<exchange-doctor-department
+                            *ngIf="showExchangeDoctorPopUp"
                             [selected-visit]="selectedVisit"
                             [is-exchange-doctor-form]="isExchangeDoctorForm"
                             (nursing-opd-exchange-callback)="NursingOpdActionsInCallback($event)">
 </exchange-doctor-department>
 
-<nursing-opd-chekout *ngIf="showNursingCheckout"
+<nursing-opd-chekout
+                     *ngIf="showNursingCheckout"
                      [selected-visit]="selectedVisit"
                      [is-NursingCheckout-Form]="isNursingCheckoutForm"
                      (nursing-opd-refer-callback)="NursingOpdCheckoutActionsInCallback($event)">

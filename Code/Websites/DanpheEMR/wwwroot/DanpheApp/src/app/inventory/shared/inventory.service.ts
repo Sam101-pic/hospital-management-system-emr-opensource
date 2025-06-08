@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
+import { InventoryWardItem_DTO } from '../../wardsupply/inventory-wardsupply/requisition/shared/inventory-wardd-item.dto';
 import { ItemModel } from '../settings/shared/item.model';
 import { VendorsModel } from '../settings/shared/vendors.model';
 import { InventoryFiscalYearModel } from './inventory-fiscal-year.model';
-import { InventoryWardItem_DTO } from '../../wardsupply/inventory-wardsupply/requisition/shared/inventory-wardd-item.dto';
 
 @Injectable()
 export class InventoryService {
@@ -44,7 +44,7 @@ export class InventoryService {
   allFiscalYearList: InventoryFiscalYearModel[] = [];
 
   InventoryWardItemList: InventoryWardItem_DTO[] = [];
-
+  PurchaseOrderStatus: string = null;
   public LoadAllVendorList(vendorList: Array<VendorsModel>) {
     this.allVendorList = vendorList;
   }

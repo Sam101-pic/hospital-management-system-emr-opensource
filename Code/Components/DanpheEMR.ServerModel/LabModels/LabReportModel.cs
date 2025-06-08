@@ -37,8 +37,12 @@ namespace DanpheEMR.ServerModel
         [NotMapped]
         public bool? VerificationEnabled { get; set; }
         [NotMapped]
+        public bool PreVerificationEnabled { get; set; }
+        [NotMapped]
         public string CovidFileUrl { get; set; }
-
+        public DateTime CreatedDay { get; set; } = DateTime.Now.Date;
+        [NotMapped]
+        public string ReferredByName { get; set; } //Bibek 12Dec'24 Added ReferredBy name in report of lab
     }
-    
+
 }

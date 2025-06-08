@@ -20,6 +20,7 @@ namespace DanpheEMR.ServerModel
         public string MachineName { get; set; }
         public string MachineCode { get; set; }
         public string ModelName { get; set; }
+        public bool IsMachineOrderRequired { get; set; }
     }
 
     public class LISMasterData
@@ -75,6 +76,10 @@ namespace DanpheEMR.ServerModel
         public bool IsAbnormal { get; set; }
         public DateTime CreatedOn { get; set; }
         public LabTestJSONComponentModel Component { get; set; }
+        public int DisplaySequence { get; set; }
+        public string GroupName { get; set; }
+        public bool IsGroupValid { get; set; }
+        public string ErrorMessage { get; set; }
     }
 
     public class MachineResultsFormatted

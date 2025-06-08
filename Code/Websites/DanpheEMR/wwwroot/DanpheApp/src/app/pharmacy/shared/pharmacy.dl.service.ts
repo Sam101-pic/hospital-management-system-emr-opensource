@@ -1,9 +1,14 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { FreeVisit_DTO } from '../../billing/shared/dto/free-visit.dto';
 import { PHRMDepositModel } from '../../dispensary/dispensary-main/patient-main/patient-deposit-add/phrm-deposit.model';
+import { PrescriptionItemQuantityUpdate_DTO } from '../../dispensary/dispensary-main/sales-main/new-sales/new-sales.component';
+import { InvoiceItemSalePriceUpdate_DTO } from '../../dispensary/dispensary-main/sales-main/provisional-bills/dtos/invoice-item-saleprice-update.dto';
 import { InvoiceDetailToBeReturn } from '../../dispensary/dispensary-main/sales-main/sales-return/model/invoice-detail-tobe-return.model';
+import { DanpheHTTPResponse } from '../../shared/common-models';
 import { PHRMPatientConsumptionItem } from '../patient-consumption/shared/phrm-patient-consumption-item.model';
 import { PHRMPatientConsumption } from '../patient-consumption/shared/phrm-patient-consumption.model';
+import { PHRMPackageModel } from './pharmacy-package.model';
 import { PHRMPurchaseOrder } from './phrm-purchase-order.model';
 
 
@@ -145,6 +150,9 @@ export class PharmacyDLService {
   }
   public GetGenericList() {
     return this.http.get<any>("/api/PharmacySettings/Generics");
+  }
+  public GetGenericListWithoutPriceCategory() {
+    return this.http.get<any>("/api/PharmacySettings/GenericWithoutPriceCategory");
   }
 
   //GET:patient List from Patient controller
@@ -310,7 +318,19 @@ export class PharmacyDLService {
 
   ////Get Narcotics Stock Details List(sales)
   public GetNarcoticsStockDetailsList() {
-    return this.http.get<any>("/api/PharmacyStock/NarcoticsStock");
+    return this.http.get<DanpheHTTPResponse>("/api/PharmacyStock/NarcoticsStock");
+  }
+  public GetNarcoticsLedger(GenericId, SupplierId, CompanyId, fromDate, toDate) {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacyStock/NarcoticsStockLedger?genericId=${GenericId}&supplierId=${SupplierId}&companyId=${CompanyId}&fromDate=${fromDate}&toDate=${toDate}`, this.optionJson);
+  }
+  public GetAllGenericItemsList() {
+    return this.http.get<DanpheHTTPResponse>("/api/PharmacyStock/GenericList");
+  }
+  public GetAllCompanyList() {
+    return this.http.get<DanpheHTTPResponse>("/api/PharmacyStock/CompanyList");
+  }
+  public GetAllSupplier() {
+    return this.http.get<DanpheHTTPResponse>("/api/PharmacyStock/SupplierList");
   }
   public GetSalesDetailsList() {
     return this.http.get<any>("/api/PharmacyStock/StockDetails");
@@ -393,20 +413,28 @@ export class PharmacyDLService {
   }
 
   ////Get:  Get Daily Sales Summary Report Data test
-  public GetDailySalesSummaryReport(FromDate, ToDate, itemId, storeId, counterId, userId) {
+  public GetDailySalesSummaryReport(FromDate, ToDate, itemId, storeId, counterId, userId, genericId, salesType) {
     try {
-      return this.http.get<any>(`/api/PharmacyReport/PHRMDailySalesReport?FromDate=${FromDate}&ToDate=${ToDate}&itemId=${itemId}&storeId=${storeId}&CounterId=${counterId}&UserId=${userId}`, this.options);
+      return this.http.get<any>(`/api/PharmacyReport/PHRMDailySalesReport?fromDate=${FromDate}&toDate=${ToDate}&itemId=${itemId}&storeId=${storeId}&counterId=${counterId}&userId=${userId}&genericId=${genericId}&salesType=${salesType}`, this.options);
     }
     catch (ex) { throw ex; }
 
   }
-  //GET:  Get Item Wise Purchase Report Data
-  public GetItemWisePurchaseReport(FromDate, ToDate, itemId, invoiceNo?, grNo?, supplierId?) {
+
+  public GetItemWiseSalesSummaryReport(FromDate, ToDate, itemId, storeId, counterId, userId, genericId) {
     try {
-      return this.http.get<any>("/api/PharmacyReport/PHRMItemWisePurchaseReport?FromDate=" + FromDate + "&ToDate=" + ToDate + "&itemId=" + itemId + "&invoiceNo=" + invoiceNo + "&grNo=" + grNo + "&supplierId=" + supplierId, this.options);
+      return this.http.get<any>(`/api/PharmacyReport/PHRMItemWiseSalesSummaryReport?fromDate=${FromDate}&toDate=${ToDate}&itemId=${itemId}&storeId=${storeId}&counterId=${counterId}&userId=${userId}&genericId=${genericId}`, this.options);
     }
     catch (ex) { throw ex; }
 
+  }
+
+  //GET:  Get Item Wise Purchase Report Data
+  public GetItemWisePurchaseReport(FromDate, ToDate, itemId, invoiceNo?, grNo?, supplierId?, genericId?) {
+    try {
+      return this.http.get<any>(`/api/PharmacyReport/PHRMItemWisePurchaseReport?FromDate=${FromDate}&ToDate=${ToDate}&itemId=${itemId}&invoiceNo=${invoiceNo}&grNo=${grNo}&supplierId=${supplierId}&genericId=${genericId}`, this.options);
+    }
+    catch (ex) { throw ex; }
   }
   //GET:  Get Stock Transfers Report Data
   public getStockTransfersReport(FromDate, ToDate, itemId, sourceStoreId, targetStoreId, notReceivedStocks) {
@@ -484,9 +512,9 @@ export class PharmacyDLService {
   }
 
   ////GET: Get User Report
-  public GetPHRMUserwiseCollectionReport(phrmReports) {
+  public GetPHRMUserWiseCollectionReport(phrmReports) {
     return this.http.get<any>("/api/PharmacyReport/PHRMUserwiseCollectionReport?FromDate="
-      + phrmReports.FromDate + "&ToDate=" + phrmReports.ToDate + "&CounterId=" + phrmReports.CounterId + "&CreatedBy=" + phrmReports.CreatedBy + "&StoreId=" + phrmReports.StoreId, this.options)
+      + phrmReports.FromDate + "&ToDate=" + phrmReports.ToDate + "&CounterId=" + phrmReports.CounterId + "&EmployeeId=" + phrmReports.EmployeeId + "&StoreId=" + phrmReports.StoreId, this.options)
   }
 
   ////GET: Get Cash Collection Summary Report
@@ -515,9 +543,9 @@ export class PharmacyDLService {
   }
 
   ////GET: Get Return To Supplier Details Report
-  public GetPHRMReturnToSupplierReport(phrmReports) {
+  public GetPHRMReturnToSupplierReport(phrmReports, suppId) {
     return this.http.get<any>("/api/PharmacyReport/PHRMReturnToSupplierReport?FromDate="
-      + phrmReports.FromDate + "&ToDate=" + phrmReports.ToDate, this.options)
+      + phrmReports.FromDate + "&ToDate=" + phrmReports.ToDate + "&SuppId=" + suppId, this.options)
   }
   ////GET: Get Transer To Store Report
   public GetPHRMTransferToStoreReport(phrmReports) {
@@ -606,7 +634,7 @@ export class PharmacyDLService {
   //GET: Prescription Items list by PatientId && ProviderId for sale purpose
   public GetPrescriptionItems(PatientId: number, PrescriberId: number, PrescriptionId: number) {
     try {
-      return this.http.get<any>(`/api/PharmacySales/PrescriptionItems?patientId=${PatientId}&prescriberId=${PrescriberId}&prescriptionId=${PrescriptionId}`, this.options);
+      return this.http.get<DanpheHTTPResponse>(`/api/PharmacySales/PrescriptionItems?patientId=${PatientId}&prescriberId=${PrescriberId}&prescriptionId=${PrescriptionId}`, this.options);
     }
     catch (ex) {
       throw ex;
@@ -688,14 +716,14 @@ export class PharmacyDLService {
     return this.http.get<any>("/api/Billing/BillingFiscalYears");
   }
 
-  public GetCreditOrganization() {
+  public GetPharmacyCreditOrganizations() {
     return this.http.get<any>("/api/PharmacySettings/CreditOrganizations");
   }
   //
   //GET: Patient - Patient Details by Patient Id (one patient details)
   public GetPatientByPatId(patientId: number) {
     try {
-      return this.http.get<any>("/api/PharmacySales/PatientInfo?patientId=" + patientId, this.options);
+      return this.http.get<DanpheHTTPResponse>("/api/PharmacySales/PatientInfo?patientId=" + patientId, this.optionJson);
     }
     catch (ex) {
       throw ex;
@@ -719,10 +747,10 @@ export class PharmacyDLService {
 
   }
   ////Get: Get All Credit Report For In/OUT Patient
-  public GetCreditInOutPatReportList(phrmReports, IsInOutPat, patientName) {
+  public GetCreditInOutPatReportList(phrmReports, VisitType) {
     try {
       return this.http.get<any>("/api/PharmacyReport/PHRMCreditInOutPatReport?FromDate="
-        + phrmReports.FromDate + "&ToDate=" + phrmReports.ToDate + "&IsInOutPat=" + IsInOutPat + "&patientName=" + patientName, this.options);
+        + phrmReports.FromDate + "&ToDate=" + phrmReports.ToDate + "&VisitType=" + VisitType, this.options);
     }
     catch (ex) { throw ex; }
 
@@ -763,10 +791,11 @@ export class PharmacyDLService {
 
   }
   ////Get:  Get Expiry Report Data
-  public GetExpiryReport(itemId, storeId, fromDate, toDate) {
+  public GetExpiryReport(itemId: number, genericId: number, storeId: number, fromDate: string, toDate: string) {
     try {
-      return this.http.get<any>("/api/PharmacyReport/PHRMExpiryStockReport?ItemId=" + itemId + " &StoreId=" + storeId + "&FromDate=" + fromDate + "&ToDate=" + toDate, this.options);
+      return this.http.get<DanpheHTTPResponse>(`/api/PharmacyReport/PHRMExpiryStockReport?ItemId=${itemId}&GenericId=${genericId}&StoreId=${storeId}&FromDate=${fromDate}&ToDate=${toDate}`, this.options);
     }
+
     catch (ex) { throw ex; }
 
   }
@@ -778,11 +807,10 @@ export class PharmacyDLService {
     catch (ex) { throw ex; }
 
   }
-  ////Get:  Get Batch Stock Report Data
-  public GetPharmacyBillingReport(phrmReports, invoiceNumber) {
+
+  public GetPharmacyBillingReport(phrmReports, invoiceNumber, patientId, StoreId, VisitType, transactionType, SchemeId) {
     try {
-      return this.http.get<any>("/api/PharmacyReport/PHRMBillingReport?FromDate="
-        + phrmReports.FromDate + "&ToDate=" + phrmReports.ToDate + "&InvoiceNumber=" + invoiceNumber, this.options);
+      return this.http.get<any>(`/api/PharmacyReport/PHRMBillingReport?FromDate=${phrmReports.FromDate}&ToDate=${phrmReports.ToDate}&InvoiceNumber=${invoiceNumber}&PatientId=${patientId}&StoreId=${StoreId}&VisitType=${VisitType}&TransactionType=${transactionType}&SchemeId=${SchemeId}`, this.options);
     }
     catch (ex) { throw ex; }
 
@@ -855,7 +883,7 @@ export class PharmacyDLService {
   ////Get:  Get  Stock Summary Report Data
   public GetStockSummaryReport(phrmReports) {
     try {
-      return this.http.get<any>(`/api/PharmacyReport/PHRMStockSummaryReport?FromDate=${phrmReports.FromDate}&ToDate=${phrmReports.ToDate}&FiscalYearId=${phrmReports.FiscalYearId}&StoreId=${phrmReports.StoreId}`, this.options);
+      return this.http.get<any>(`/api/PharmacyReport/PHRMStockSummaryReport?FromDate=${phrmReports.FromDate}&ToDate=${phrmReports.ToDate}&FiscalYearId=${phrmReports.FiscalYearId}&StoreId=${phrmReports.StoreId}&ItemId=${phrmReports.ItemId}&GenericId=${phrmReports.GenericId}`, this.options);
     }
     catch (ex) { throw ex; }
   }
@@ -888,8 +916,8 @@ export class PharmacyDLService {
   // GET: Stock Details with 0, null or > 0 Quantity
   //this stock details with all unique (by ItemId,ExpiryDate,BatchNo)  records with sum of Quantity
   //items with 0 quantity or more than 0 showing in list
-  public GetAllItemsStockDetailsList() {
-    return this.http.get<any>("/api/PharmacyStock/AllStockDetails");
+  public GetAllItemsStockDetailsList(StoreId: number, ShowZeroQuantity: boolean) {
+    return this.http.get<any>(`/api/PharmacyStock/AllStockDetails?StoreId=${StoreId}&ShowZeroQuantity=${ShowZeroQuantity}`);
   }
 
   //Get ward stock details
@@ -1293,7 +1321,10 @@ export class PharmacyDLService {
   ///Abhishek: 4Sept'18 -- for credit billing
 
   public GetAllCreditSummary(fromDate, toDate, dispensaryId) {
-    return this.http.get<any>("/api/PharmacySales/PatientsProvisionalInfo?fromDate=" + fromDate + "&toDate=" + toDate + "&dispensaryId=" + dispensaryId);
+    return this.http.get<any>(`/api/PharmacySales/PatientsProvisionalInfo?fromDate=${fromDate}&toDate=${toDate}&dispensaryId=${dispensaryId}`);
+  }
+  public GetPatientsProvisionalInfoByPatientId(dispensaryId: number, patientId: number) {
+    return this.http.get<any>(`/api/PharmacySales/PatientsProvisionalInfoByPatientId?dispensaryId=${dispensaryId}&patientId=${patientId}`);
   }
   //
   public GetAllProvisionalReturn(fromDate, toDate, dispensaryId) {
@@ -1529,9 +1560,9 @@ export class PharmacyDLService {
     }
   }
 
-  public PostMultipleInvoiceItemReturnFromCustomer(InvoiceToBeReturn: InvoiceDetailToBeReturn) {
+  public PostMultipleInvoiceItemReturnFromCustomer(InvoicesToBeReturn: InvoiceDetailToBeReturn[]) {
     try {
-      return this.http.post("/api/PharmacySalesReturn/ReturnMultipleInvoiceItemsFromCustomer", InvoiceToBeReturn, this.optionJson);
+      return this.http.post("/api/PharmacySalesReturn/ReturnMultipleInvoiceItemsFromCustomer", InvoicesToBeReturn, this.optionJson);
     }
     catch (ex) {
       throw ex
@@ -1692,8 +1723,8 @@ export class PharmacyDLService {
     }
   }
 
-  public GetProvisionalReturnReceipt(ReturnReceiptNo: number) {
-    return this.http.get(`/api/PharmacySales/ProvisionalReturnInfo?returnReceiptNo=${ReturnReceiptNo}`, this.options);
+  public GetProvisionalReturnReceipt(ReturnReceiptNo: number, FiscalYearId: number) {
+    return this.http.get(`/api/PharmacySales/ProvisionalReturnInfo?returnReceiptNo=${ReturnReceiptNo}&fiscalYearId=${FiscalYearId}`, this.options);
   }
   public GetProvisionalReturns(FromDate: string, ToDate: string, StoreId: number) {
     return this.http.get(`/api/PharmacySalesReturn/ProvisionalReturns?fromDate=${FromDate}&toDate=${ToDate}&storeId=${StoreId}`, this.options);
@@ -1707,5 +1738,167 @@ export class PharmacyDLService {
       throw ex;
     }
   }
+  public GetGenericWisePurchaseSummaryReport(FromDate: string, ToDate: string, GenericId: number, SupplierId: number) {
+    return this.http.get(`/api/PharmacyReport/GenericWisePurchaseSummaryReport?fromDate=${FromDate}&toDate=${ToDate}&genericId=${GenericId}&supplierId=${SupplierId}`);
+  }
 
+  public GetStockTransferSummaryReport(FromDate: string, ToDate: string, GenericId: number, SourceStoreId: number, TargetStoreId: number) {
+    return this.http.get(`/api/PharmacyReport/StockTransferSummaryReport?fromDate=${FromDate}&toDate=${ToDate}&genericId=${GenericId}&sourceStoreId=${SourceStoreId}&targetStoreId=${TargetStoreId}`);
+  }
+
+  public AddNewOutDoorPatientAndCreateFreeVisit(freeVisit: FreeVisit_DTO) {
+    let data = JSON.stringify(freeVisit);
+    return this.http.post<DanpheHTTPResponse>(`/api/Visit/CreateFreeVisit`, data, this.options);
+  }
+
+  //Get : all the main store stock of available quantity greater than 0
+  public GetStoreStocksToDispatch(showAllStock: boolean = false) {
+    return this.http.get<any>(`/api/PharmacyStock/StoreStocksToDispatch?ShowAllStock=${showAllStock}`);
+  }
+
+  public GetActivePharmacyPackages() {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacySettings/PackagesForSale`);
+  }
+
+  public GetActivePharmacyPackageItems() {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacySettings/PackageItemForSale`);
+  }
+  public GetMedicinePackage() {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacySettings/Packages`);
+  }
+  public GerItemListWithGenericId() {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacySettings/ItemsWithGenericId`);
+  }
+  public PostPharmacyPackageBilling(packageBilling: PHRMPackageModel) {
+    try {
+      return this.http.post("/api/PharmacySettings/Package", packageBilling, this.optionJson);
+    }
+    catch (ex) {
+      throw ex
+    }
+  }
+  public ActivateDeactivatePackage(pharmacyPackageId: number, flag: boolean) {
+    try {
+      return this.http.put<any>(`/api/PharmacySettings/ActivateDeactivatePackage?pharmacyPackageId=${pharmacyPackageId}&flag=${flag}`, this.options);
+    }
+    catch (ex) {
+      throw ex;
+    }
+  }
+  public GetPackageById(pharmacyPackageId: number) {
+    return this.http.get(`/api/PharmacySettings/PackageInfoByPharmacyPackageId?pharmacyPackageId=${pharmacyPackageId}`, this.options);
+  }
+  public UpdatePackage(packageBilling: PHRMPackageModel) {
+    try {
+      return this.http.put("/api/PharmacySettings/Package", packageBilling, this.optionJson);
+    }
+    catch (ex) {
+      throw ex
+    }
+  }
+
+  GetDepositHead() {
+    return this.http.get<DanpheHTTPResponse>("/api/BillingDeposit/GetDepositHead", this.options);
+  }
+
+  GetDeposits(fromDate: string, toDate: string, dispensaryId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacySales/PharmacyDeposits?fromDate=${fromDate}&toDate=${toDate}&dispensaryId=${dispensaryId}`, this.options);
+  }
+
+  public GetPatientProvisionalEstimationBill(patientId: number, storeId: number, PatientVisitId?: number) {
+    return this.http.get<any>(`/api/PharmacySales/PharmacyProvisionalEstimationBillInfo?patientId=${patientId}&dispensaryId=${storeId}&patientVisitId=${PatientVisitId}`);
+  }
+  public GetPhrmDepositBalanceReport() {
+    return this.http.get<any>(`/api/PharmacyReport/PharmacyDepositBalanceReport`);
+  }
+  public GetPatientInfoSettlement() {
+    return this.http.get<any>(`/api/PharmacySettlement/PatientInfoForSettlement`);
+  }
+  ////Get:  Get doctor wise sales report
+  public GetDoctorwiseSalesReport(fromDate, toDate, prescriberId, itemId) {
+    try {
+      return this.http.get<any>(`/api/PharmacyReport/PHRMDoctorwiseSalesReport?FromDate=${fromDate}&ToDate=${toDate}&PrescriberId=${prescriberId}&ItemId=${itemId}`, this.options);
+    }
+    catch (ex) { throw ex; }
+  }
+
+  GetPreviousSaleQuantityWithInCappingDays(patientId: number, cappingDaysLimit: number, itemId: number) {
+    try {
+      return this.http.get<any>(`/api/PharmacySales/PreviousSalesQuantityWithInCappingDaysLimit?patientId=${patientId}&cappingDaysLimit=${cappingDaysLimit}&itemId=${itemId}`, this.options);
+    }
+    catch (ex) { throw ex; }
+  }
+
+  public IsClaimed_HIB(latestClaimCode: number) {
+    return this.http.get<any>(`/api/HIB/CheckIfClaimSubmitted?claimCode=${latestClaimCode}`, this.options);
+  }
+  public IsClaimed_ECHS(latestClaimCode: number) {
+    return this.http.get<any>(`/api/ClaimManagement/IsECHSClaimAlreadySubmitted?claimCode=${latestClaimCode}`, this.options);
+  }
+  GetVisitWiseBillsSummaryReport(patientId: number, visitType: string, ShowDischargeStatementBillReport: boolean) {
+    try {
+      return this.http.get<any>(`/api/PharmacyReport/VisitWiseBillSummaryReport?PatientId=${patientId}&VisitType=${visitType}&ShowDischargeStatementBillReport=${ShowDischargeStatementBillReport}`, this.options);
+    }
+    catch (ex) { throw ex; }
+  }
+  GetVisitWiseBillsDetailSummaryReport(PaymentMode: string, PatientVisitId: number) {
+    try {
+      return this.http.get<any>(`/api/PharmacyReport/VisitWiseBillSummaryDetailReport?PaymentMode=${PaymentMode}&PatientVisitId=${PatientVisitId}`, this.options);
+    }
+    catch (ex) { throw ex; }
+  }
+
+  UpdateInvoiceItemsSalePrice(invoiceItems: InvoiceItemSalePriceUpdate_DTO[]) {
+    return this.http.put('/api/PharmacySales/UpdateSalePrice', invoiceItems, this.optionJson);
+  }
+
+  GetInsurancePackageBillServiceItems() {
+    return this.http.get('/api/PharmacySales/InsurnacePackageBillServiceItems');
+  }
+
+  GetMasterItemPriceCategories(ItemId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacySettings/MasterItemPriceCategories?ItemId=${ItemId}`);
+  }
+
+  GetProvisionalSalesReport(PatientId: number, VisitType: string, StoreId?: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacyReport/ProvisionalSalesReport?PatientId=${PatientId}&VisitType=${VisitType}&StoreId=${StoreId}`);
+  }
+
+
+  GetPatientsWithProvisional() {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacyReport/PatientsWithProvisional`);
+  }
+
+  GetProvisionalSalesDetailReport(PatientId: number, VisitType: string, SchemeId: number, StoreId?: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacyReport/ProvisionalSalesDetailReport?PatientId=${PatientId}&VisitType=${VisitType}&SchemeId=${SchemeId}&StoreId=${StoreId}`);
+  }
+
+  GetPatientPrescriptionAvailability(PatientId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacyPrescription/PatientPrescriptionAvailability?PatientId=${PatientId}`)
+  }
+
+  GetPatientPrescription(PatientId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacyPrescription/PatientPrescriptions?PatientId=${PatientId}`)
+  }
+  GetPatientPrescriptionItems(PrescriptionId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacyPrescription/PatientPrescriptionItems?PrescriptionId=${PrescriptionId}`)
+  }
+
+  UpdatePrescriptionItemQuantity(prescriptionItems: PrescriptionItemQuantityUpdate_DTO[]) {
+    return this.http.put<DanpheHTTPResponse>(`/api/PharmacyPrescription/PrescriptionItems`, prescriptionItems, this.optionJson);
+  }
+  DiscardPrescriptionItem(prescriptionItemId: number) {
+    return this.http.put<DanpheHTTPResponse>(`/api/PharmacyPrescription/DiscardPrescriptionItem?PrescriptionItemId=${prescriptionItemId}`, this.optionJson);
+  }
+  DiscardPrescription(prescriptionId: number) {
+    return this.http.put<DanpheHTTPResponse>(`/api/PharmacyPrescription/DiscardPrescription?PrescriptionId=${prescriptionId}`, this.optionJson);
+  }
+
+  GetSupplierWiseAvailableStock() {
+    return this.http.get<DanpheHTTPResponse>(`/api/PharmacyStock/SupplierWiseAvailableStock`, this.options);
+  }
+
+  SaveReturnToSupplier(returnToSupplier: Object) {
+    return this.http.post<DanpheHTTPResponse>(`/api/PharmacyPurchaseReturn/ReturnToSupplier`, returnToSupplier, this.optionJson);
+  }
 }

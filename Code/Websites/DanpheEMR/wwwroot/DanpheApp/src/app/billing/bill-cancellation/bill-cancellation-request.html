@@ -16,7 +16,7 @@
     <div class="col-lg-12 col-sm-12">
       <danphe-grid [grid-colDefaults]="ProvisionalItemsGridColumns" [grid-data]="provisionalItemList"
                    [show-CustomDate]="true" (grid-actions)="CancelGridActions($event)" [rangeType]="dateRange"
-                   (onDateChange)="onGridDateChange($event)" [date-range-options]="'1W,1M,3M'"
+                   (onDateChange)="onGridDateChange($event)" [date-settings-name]="'billing-reports'"
                    [NepaliDateInGridParams]="NepaliDateInGridSettings"> </danphe-grid>
     </div>
   </div>

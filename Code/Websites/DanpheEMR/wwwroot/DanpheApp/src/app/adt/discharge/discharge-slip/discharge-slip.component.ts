@@ -65,6 +65,10 @@ export class DischargeSlipComponent implements OnInit {
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
             this.dischargeSlipDetails = res.Results;
+            if (this.dischargeSlipDetails && this.dischargeSlipDetails.DateOfBirth) {
+              let currentAge = this.coreService.CalculateAge(this.dischargeSlipDetails.DateOfBirth);
+              this.dischargeSlipDetails.AgeGender = this.coreService.FormateAgeSex(currentAge, this.dischargeSlipDetails.Gender)
+            }
             this.showDischargeSlip = true;
           }
           else {

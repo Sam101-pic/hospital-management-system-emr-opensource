@@ -381,7 +381,8 @@ namespace DanpheEMR.Services.DispensaryTransfer
                                         SalePrice = stkGrouped.Key.SalePrice,
                                         CostPrice = stkGrouped.Key.CostPrice,
                                         AvailableQuantity = stkGrouped.Sum(s => s.stk.AvailableQuantity),
-                                        IsInsuranceApplicable = stkGrouped.FirstOrDefault().itm.IsInsuranceApplicable,
+                                        /* This is not needed as everything is handled through Scheme 
+                                        IsInsuranceApplicable = stkGrouped.FirstOrDefault().itm.IsInsuranceApplicable */
                                         FromRack = (from M in db.PHRMRackItem.Where(R => R.ItemId == stkGrouped.Key.ItemId && R.StoreId == stkGrouped.Key.StoreId)
                                                     join R in db.PHRMRack on M.RackId equals R.RackId select R.RackNo).FirstOrDefault()
                                     }).ToListAsync();

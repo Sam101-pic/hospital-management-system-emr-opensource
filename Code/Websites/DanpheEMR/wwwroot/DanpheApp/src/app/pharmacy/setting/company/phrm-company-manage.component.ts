@@ -112,6 +112,15 @@ export class PHRMCompanyManageComponent implements OnInit {
             this.CurrentCompany.CompanyValidator.controls[i].markAsDirty();
             this.CurrentCompany.CompanyValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.companyList && this.companyList.length) {
+            const isCompanyNameAlreadyExists = this.companyList.some(a => a.CompanyName.toLowerCase() === this.CurrentCompany.CompanyName.toLowerCase());
+            if (isCompanyNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [` Cannot Add Company as the Company Name "${this.CurrentCompany.CompanyName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.CurrentCompany.IsValidCheck(undefined, undefined)) {
             this.CurrentCompany.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
             this.CurrentCompany.CreatedOn = moment().format('YYYY-MM-DD');
@@ -138,6 +147,15 @@ export class PHRMCompanyManageComponent implements OnInit {
             this.CurrentCompany.CompanyValidator.controls[i].markAsDirty();
             this.CurrentCompany.CompanyValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.companyList && this.companyList.length) {
+            const isCompanyNameAlreadyExists = this.companyList.some(a => a.CompanyName.toLowerCase() === this.CurrentCompany.CompanyName.toLowerCase() && a.CompanyId !== this.CurrentCompany.CompanyId);
+            if (isCompanyNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Company as the Company Name "${this.CurrentCompany.CompanyName}" already exists!`]);
+                return;
+            }
+        }
+
         if (this.CurrentCompany.IsValidCheck(undefined, undefined)) {
             this.CurrentCompany.CreatedOn = moment().format('YYYY-MM-DD');
             this.pharmacyBLService.UpdateCompany(this.CurrentCompany)
@@ -218,6 +236,7 @@ export class PHRMCompanyManageComponent implements OnInit {
         this.selectedItem = null;
         this.update = false;
         this.showCompanyAddPage = false;
+        this.callbackAdd.emit();
     }
 
     AddUpdateResponseEmitter(company) {

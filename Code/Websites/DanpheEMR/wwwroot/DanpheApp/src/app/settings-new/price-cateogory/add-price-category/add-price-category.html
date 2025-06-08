@@ -39,13 +39,13 @@
                                         Name<sup>*</sup><b>:</b></label>
                                     <div class="col-md-3">
                                         <input class="form-control" maxlength="100" type="text"
-                                            id="id_priceCategory_PriceCategoryName"
-                                            [(ngModel)]="priceCategory.PriceCategoryName"
-                                            formControlName="PriceCategoryName"
-                                            [attr.disabled]="update==true ? '' : null" placeholder="Price Category Name"
-                                            (keyup.enter)="SetFocusById('PriceCategoryCode')" />
+                                               id="id_priceCategory_PriceCategoryName"
+                                               [(ngModel)]="priceCategory.PriceCategoryName"
+                                               formControlName="PriceCategoryName"
+                                               [attr.disabled]="update==true ? '' : null" placeholder="Price Category Name"
+                                               (keyup.enter)="SetFocusById('PriceCategoryCode')" />
                                         <span class="color-red font-sm" *ngIf="!update"
-                                            [hidden]="!(priceCategory.IsDirty('PriceCategoryName')) || priceCategory.IsValidCheck('PriceCategoryName','required')">Price
+                                              [hidden]="!(priceCategory.IsDirty('PriceCategoryName')) || priceCategory.IsValidCheck('PriceCategoryName','required')">Price
                                             Category Name is Required</span>
                                     </div>
                                     <div class="form-group">
@@ -53,9 +53,9 @@
                                             Code:</label>
                                         <div class="col-md-3">
                                             <input type="text" id="id_priceCategory_PriceCategoryCode"
-                                                (keyup.enter)="SetFocusById('DefaultPayment')" class="form-control"
-                                                placeholder="Price Category Code" [ngModelOptions]="{standalone: true}"
-                                                [(ngModel)]="priceCategory.PriceCategoryCode">
+                                                   (keyup.enter)="SetFocusById('DefaultPayment')" class="form-control"
+                                                   placeholder="Price Category Code" [ngModelOptions]="{standalone: true}"
+                                                   [(ngModel)]="priceCategory.PriceCategoryCode">
                                         </div>
                                     </div>
                                 </div>
@@ -70,11 +70,11 @@
                                                     <div class="icheck-inline">
                                                         <label class="mt-checkbox mt-checkbox-outline">
                                                             <input id="id_priceCategory_applicable_in_registration"
-                                                                type="checkbox"
-                                                                (keyup.enter)="SetFocusById('ShowInAdmission')"
-                                                                [ngModelOptions]="{standalone: true}"
-                                                                name="ReistrationIsActive"
-                                                                [(ngModel)]="priceCategory.ShowInRegistration" />
+                                                                   type="checkbox"
+                                                                   (keyup.enter)="SetFocusById('ShowInAdmission')"
+                                                                   [ngModelOptions]="{standalone: true}"
+                                                                   name="ReistrationIsActive"
+                                                                   [(ngModel)]="priceCategory.ShowInRegistration" />
                                                             <span></span>
                                                             True
                                                         </label>
@@ -92,11 +92,11 @@
                                                     <div class="icheck-inline">
                                                         <label class="mt-checkbox mt-checkbox-outline">
                                                             <input id="id_priceCategory_applicable_in_admission"
-                                                                type="checkbox"
-                                                                (keyup.enter)="SetFocusById('IsDefault')"
-                                                                [ngModelOptions]="{standalone: true}"
-                                                                name="AdmissionIsActive"
-                                                                [(ngModel)]="priceCategory.ShowInAdmission" />
+                                                                   type="checkbox"
+                                                                   (keyup.enter)="SetFocusById('IsDefault')"
+                                                                   [ngModelOptions]="{standalone: true}"
+                                                                   name="AdmissionIsActive"
+                                                                   [(ngModel)]="priceCategory.ShowInAdmission" />
                                                             <span></span>
                                                             True
                                                         </label>
@@ -105,16 +105,32 @@
                                             </div>
                                         </div>
                                         <div class="form-group col-md-12">
-
                                             <label for="IsDefault" class="control-label col-md-8">Is Default ?</label>
                                             <div class="col-md-4">
                                                 <div class="input-group">
                                                     <div class="icheck-inline">
                                                         <label class="mt-checkbox mt-checkbox-outline">
                                                             <input id="id_priceCategory_is_default" type="checkbox"
-                                                                [ngModelOptions]="{standalone: true}"
-                                                                name="chkIsDefault"
-                                                                [(ngModel)]="priceCategory.IsDefault" />
+                                                                   [ngModelOptions]="{standalone: true}"
+                                                                   name="chkIsDefault"
+                                                                   [(ngModel)]="priceCategory.IsDefault" />
+                                                            <span></span>
+                                                            True
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-group col-md-12">
+                                            <label for="IsPharmacyRateDifferent" class="control-label col-md-8">Is Pharmacy Rate Different ?</label>
+                                            <div class="col-md-4">
+                                                <div class="input-group">
+                                                    <div class="icheck-inline">
+                                                        <label class="mt-checkbox mt-checkbox-outline">
+                                                            <input id="id_priceCategory_is_pharmacy_rate_different" type="checkbox"
+                                                                   [ngModelOptions]="{standalone: true}"
+                                                                   name="chkIsPharmacyRateDifferent"
+                                                                   [(ngModel)]="priceCategory.IsPharmacyRateDifferent" />
                                                             <span></span>
                                                             True
                                                         </label>
@@ -132,28 +148,28 @@
                                                 </label>
                                                 <div class="col-md-7">
                                                     <textarea id="id_priceCategory_Description" row="6" col="50"
-                                                        style="resize: none"
-                                                        (keyup.enter)="SetFocusById('DefaultPayment')"
-                                                        class="form-control" placeholder="Description"
-                                                        [ngModelOptions]="{standalone: true}"
-                                                        [(ngModel)]="priceCategory.Description"></textarea>
+                                                              style="resize: none"
+                                                              (keyup.enter)="SetFocusById('DefaultPayment')"
+                                                              class="form-control" placeholder="Description"
+                                                              [ngModelOptions]="{standalone: true}"
+                                                              [(ngModel)]="priceCategory.Description"></textarea>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
- 
+
 
                             </div>
-                            </div>  
+                        </div>
                     </form>
                     <div class="modelbox-footer">
                         <div class="all-buttons text-right">
                             <input type="button" id="add" class="btn green btn-success margin-7-hr"
-                                (click)="AddPriceCategory()" value="Save" *ngIf="!update" />
+                                   (click)="AddPriceCategory()" value="Save" *ngIf="!update" />
                             <input type="button" id="add" class="btn green btn-success margin-7-hr"
-                                (click)="UpdatePriceCategory()" value="Update" *ngIf="update" />
+                                   (click)="UpdatePriceCategory()" value="Update" *ngIf="update" />
 
                         </div>
                     </div>

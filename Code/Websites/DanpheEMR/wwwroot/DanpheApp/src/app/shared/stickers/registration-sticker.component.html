@@ -3,7 +3,7 @@
     <div id="id_registration_sticker"
          style="width: 400px;border: 1px dotted black;font-size: 12px;">
       <div id="id_registration_sticker_printpage" class="registrationstickercontainer">
-        <div class="stkrtopsection">
+        <div class="stkrtopsection" *ngIf="!UseDynamicSticker;else dynamicStickerTemplate">
           <div>
             <div class="row">
               <div class="col-sm-12">
@@ -41,7 +41,7 @@
             <div>
               <span style="display:inline-block;" *ngIf="StickerSettingsAndData.RegistrationStickerSettings.ShowPatContactNo">
                 Contact: ({{StickerSettingsAndData.VisitStickerData.PatientPhoneNumber}})&nbsp;
-                {{StickerSettingsAndData.VisitStickerData.PatientAddress}}
+                {{GetSortedPatientAddress(StickerSettingsAndData.VisitStickerData)}}
               </span>
             </div>
 
@@ -89,19 +89,29 @@
               <span style="float:right;padding-right: 20px;" *ngIf="StickerSettingsAndData.VisitStickerData.VisitDateTime">
                 {{StickerSettingsAndData.RegistrationStickerSettings.VisitDateLabel}}:
                 {{StickerSettingsAndData.VisitStickerData.VisitDateTime | DanpheDateTime:'format':'YYYY-MM-DD'}}
-                {{StickerSettingsAndData.VisitStickerData.VisitDateTime | nepaliDate:'format':'YYYY-MM-DD'}} 
+                {{StickerSettingsAndData.VisitStickerData.VisitDateTime | nepaliDate:'format':'YYYY-MM-DD'}}
                 &nbsp;{{ visitTime}}
               </span>
             </div>
             <div style="clear: both;"></div>
           </div>
         </div>
+        <ng-template #dynamicStickerTemplate>
+          <div id="id_dynamic_registration_sticker">
+            <!--Here Dynamically the Sticker will be rendered-->
+          </div>
+        </ng-template>
       </div>
     </div>
 
-    <div style="margin: 15px 0px 10px 125px;">
+    <div class="sticker-button-container">
       <button class="btn green btn-success" (click)="print()" value="" id="btnPrintRegistrationSticker">
-        <span>Print</span>&nbsp;&nbsp;
+        <span>Print Sticker</span>&nbsp;&nbsp;
+        &nbsp;&nbsp; <i class="glyphicon glyphicon-print"></i>
+      </button>
+      <button *ngIf="DisplayPrintSheetInSticker" [disabled]="!PrintSheetTemplate" class="btn green btn-success" (click)="PrintSheet()" value=""
+              id="btnPrintSheet">
+        <span>Print Sheet</span>&nbsp;&nbsp;
         &nbsp;&nbsp; <i class="glyphicon glyphicon-print"></i>
       </button>
     </div>

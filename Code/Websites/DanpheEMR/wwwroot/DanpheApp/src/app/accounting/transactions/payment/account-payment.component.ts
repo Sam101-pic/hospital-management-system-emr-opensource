@@ -6,7 +6,7 @@ import { DanpheCache, MasterType } from "../../../shared/danphe-cache-service-ut
 import GridColumnSettings from '../../../shared/danphe-grid/grid-column-settings.constant';
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_ACC_ADDLedgerLedgerType, ENUM_ACC_PaymentMode, ENUM_DanpheHTTPResponseText, ENUM_Data_Type, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { ENUM_ACC_ADDLedgerLedgerType, ENUM_ACC_PaymentMode, ENUM_ACC_SectionCodes, ENUM_DanpheHTTPResponseText, ENUM_Data_Type, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { LedgerModel } from "../../settings/shared/ledger.model";
 import { SectionModel } from "../../settings/shared/section.model";
 import { SubLedgerTransactionModel } from "../../settings/shared/sub-ledger.model";
@@ -36,7 +36,6 @@ export class PaymentComponent {
   public Payment: Payment = new Payment();
   public Transaction: TransactionModel = new TransactionModel();
   public MakePayment: MakePayment_DTO = new MakePayment_DTO();
-  public CreateLedgerFlag: boolean = false;
   public VoucherNumber: string = null;
   public FiscalYearId: number = 0;
   public ShowAddLedgerBox: boolean = false;
@@ -79,6 +78,7 @@ export class PaymentComponent {
   public LedgerTypeParamter: any;
   public SubLedgerMaster: Array<SubLedger_DTO> = new Array<SubLedger_DTO>();
   public SubLedgerList: Array<SubLedger_DTO> = new Array<SubLedger_DTO>();
+  public ActiveHospitalId: number = 1;
 
 
 
@@ -90,9 +90,10 @@ export class PaymentComponent {
     public coreService: CoreService) {
     this.Getledgers();
     this.loadCacheList();
-    this.getInventoryVendorlist();
+    //this.getInventoryVendorlist();
     this.Payment.PaymentMode = ENUM_ACC_PaymentMode.NA;
     this.Payment.PaymentValidator.controls["PaymentFrom"].disable();
+    this.ActiveHospitalId = this.securityServ.AccHospitalInfo.ActiveHospitalId > 0 ? this.securityServ.AccHospitalInfo.ActiveHospitalId : this.ActiveHospitalId;
   }
 
 
@@ -130,6 +131,8 @@ export class PaymentComponent {
       this.SectionList = this.SectionList.slice();//mumbai-team-june2021-danphe-accounting-cache-change
       this.FilteredSectionList = this.SectionList.filter(a => a.SectionId != 4);
       this.FilteredSectionList = this.FilteredSectionList.filter(a => a.SectionId != 2);
+      this.SectionId = this.FilteredSectionList.length > 0 ? this.FilteredSectionList[0].SectionId : this.SectionId;
+      this.onSectionChange();
     }
     if (!!this.accountingService.accCacheData.LedgersALL && this.accountingService.accCacheData.LedgersALL.length > 0) {//mumbai-team-june2021-danphe-accounting-cache-change
       this.AllLedgerList = this.accountingService.accCacheData.LedgersALL;//mumbai-team-june2021-danphe-accounting-cache-change
@@ -147,11 +150,11 @@ export class PaymentComponent {
       this.SelectedSupplier = "";
       this.SelectedLedger = "";
       this.GrList = [];
-      if (code === 'INV') {
+      if (code === ENUM_ACC_SectionCodes.Inventory) {
         this.OtherSectionFlag = false;
         this.getInventoryVendorlist();
       }
-      else if (code === 'PH') {
+      else if (code === ENUM_ACC_SectionCodes.Pharmacy) {
         this.OtherSectionFlag = false;
         this.getPharmacySupplierlist();
       }
@@ -205,7 +208,7 @@ export class PaymentComponent {
         this.onChangeVendor(this.SelectedVendor);
       }
       else {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please select vendor"]);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select vendor"]);
       }
     }
     else if (this.PhrmSectionFlag) {
@@ -213,7 +216,7 @@ export class PaymentComponent {
         this.onChangeSupplier(this.SelectedSupplier);
       }
       else {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please select supplier"]);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select supplier"]);
       }
     }
   }
@@ -227,7 +230,9 @@ export class PaymentComponent {
     }
   }
   public loadInvGrList(grId, SectionId, number, Date) {
-    this.accountingBlService.GetGRList(grId, SectionId, number, Date)
+    this.Loading = true;
+    this.accountingBlService.GetGRList(grId, SectionId, number, Date, number)
+      .finally(() => this.Loading = false)
       .subscribe(res => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results.length) {
           this.GrList = res.Results;
@@ -247,7 +252,9 @@ export class PaymentComponent {
     }
   }
   public loadPhrmGrList(grId, SectionId, number, Date) {
-    this.accountingBlService.GetGRList(grId, SectionId, number, Date)
+    this.Loading = true;
+    this.accountingBlService.GetGRList(grId, SectionId, number, Date, number)
+      .finally(() => this.Loading = false)
       .subscribe(res => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results.length) {
           this.GrList = res.Results;
@@ -261,7 +268,7 @@ export class PaymentComponent {
     switch ($event.Action) {
       case "view": {
         this.Payment.GrDate = $event.Data.GRDate;
-        this.Payment.GrDate = moment(this.Payment.GrDate).format('YYYY-MM-DD');
+        this.Payment.GrDate = moment(this.Payment.GrDate).format(ENUM_DateTimeFormat.Year_Month_Day);
         this.Payment.GrNo = $event.Data.GRNo;
         this.Payment.TotalAmount = $event.Data.TotalAmount;
         this.Payment.PaidAmount = $event.Data.PaidAmount;
@@ -436,7 +443,7 @@ export class PaymentComponent {
             this.Payment = new Payment();
             this.Transaction = new TransactionModel();
             this.SelectedLedger = "";
-            this.msgBoxServ.showMessage("error", ["Payment failed"]);
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Payment failed"]);
             this.Payment.PaymentMode = 'NA';
           }
         })

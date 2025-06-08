@@ -19,6 +19,7 @@ namespace DanpheEMR.ViewModel.Pharmacy
         public int? GoodReceiptPrintId { get; set; }
         public string GoodReceiptType { get; set; }
         public string ContactNo { get; set; }
+        public string PANNumber { get;set; }
     }
 
     public class PHRMSupplierGoodReceiptVM

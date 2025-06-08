@@ -82,6 +82,21 @@ namespace DanpheEMR.ServerModel.BillingModels
         public string RegStickerGroupCode { get; set; }//for RegistrationSticker: sud:20March'23
         public bool HasSubScheme { get; set; }
         public bool AllowProvisionalBilling { get; set; }
+        public bool IsBillingCappingApplicable { get; set; }
+        public bool IsPharmacyCappingApplicable { get; set; }
+        public bool IsPharmacySalePriceEditable { get; set; }
+        public bool UseCappingAPI { get; set; }
+        public bool IsReferralCodeApplicable { get; set; }
+        public bool IsOpReferralCodeCompulsory { get; set; }
+        public bool IsIpReferralCodeCompulsory { get; set; }
+        public bool IsErReferralCodeCompulsory { get; set; }
+        public int? IpReferralCodeVisitLimit { get; set; }
+        public int? OpReferralCodeVisitLimit { get; set; }
+        public int? ErReferralCodeVisitLimit { get; set; }
+        public int? IpReferralCodeValidityPeriod { get; set; }
+        public int? OpReferralCodeValidityPeriod { get; set; }
+        public int? ErReferralCodeValidityPeriod { get; set; }
 
+       
     }
 }

@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from "@angular/core";
+import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { EmergencyService } from "../emergency.service";
 
@@ -25,10 +25,10 @@ export class PatientCasesSelectComponent {
     }
 
     ngOnInit() {
-        if(this.allCasesMaster && this.allCasesMaster.length >= 1){
+        if (this.allCasesMaster && this.allCasesMaster.length >= 1) {
             this.allCases();
-        } else {            
-            setTimeout(() => {this.allCasesMaster = this.erService.casesLookUpDetail; this.allCases()},2000);
+        } else {
+            setTimeout(() => { this.allCasesMaster = this.erService.casesLookUpDetail; this.allCases() }, 2000);
         }
     }
 
@@ -43,15 +43,15 @@ export class PatientCasesSelectComponent {
     }
 
     CasesOnChange($event) {
-        this.items.emit({mainDetails: this.selectedMainCase, nestedDetails: $event});
+        this.items.emit({ mainDetails: this.selectedMainCase, nestedDetails: $event, IsMedicoLegalMultiSelect: true });
     }
 
     assignNestedCases(id) {
         this.nestedCases = [];
-        if(id == "0"){
+        if (id == "0") {
             this.selectedMainCase = 0;
             this.items.emit({ mainDetails: this.selectedMainCase, nestedDetails: this.selectedData });
-        }else{
+        } else {
             if (this.allCasesMaster && this.allCasesMaster.length >= 1) {
                 if (this.allCasesMaster.ChildLookUpDetails && this.allCasesMaster.ChildLookUpDetails.length > 1) {
                     this.allCasesMaster.ChildLookUpDetails.forEach(c => {
@@ -59,20 +59,20 @@ export class PatientCasesSelectComponent {
                         this.selectedData.push(val);
                     });
                 }
-    
+
                 var data = this.allCasesMaster.filter(a => a.Id == +id);
                 if (data[0].ChildLookUpDetails && data[0].ChildLookUpDetails.length > 1) {
                     data[0].ChildLookUpDetails.forEach(a => {
                         this.nestedCases.push(a);
                         this.selectedData.push(a);
                     });
-    
+
                 }
-                
+
                 this.selectedMainCase = +id;
                 this.items.emit({ mainDetails: this.selectedMainCase, nestedDetails: this.selectedData });
             }
         }
-       
+
     }
 }

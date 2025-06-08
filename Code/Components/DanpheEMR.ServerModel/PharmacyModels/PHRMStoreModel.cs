@@ -37,6 +37,7 @@ namespace DanpheEMR.ServerModel
         public List<StoreVerificationMapModel> StoreVerificationMapList { get; set; }
         [NotMapped]
         public bool IsDispensary { get => Category == "dispensary"; }
+        public Boolean IsDefault { get; set; }
 
         #region Payment Modes
         public string AvailablePaymentModesJSON { get; private set; }

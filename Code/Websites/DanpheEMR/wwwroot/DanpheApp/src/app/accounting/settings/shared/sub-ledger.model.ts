@@ -38,6 +38,8 @@ export class SubLedgerModel {
   public HospitalId: number = 0;
   public subLedgerValidator: FormGroup = null;
   public IsDefault: boolean = false;
+  public IsSystemDefault: boolean = false;
+
   constructor() {
     this.CreatedOn = moment().format(ENUM_DateFormats.Year_Month_Day);
     var _formBuilder = new FormBuilder();

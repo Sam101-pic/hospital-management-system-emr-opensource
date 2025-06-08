@@ -16,13 +16,39 @@
             </h3>
             <a class="btn btn-danger" (click)="Close()" title="Cancel">X</a>
           </div>
-          <div class="row" style="padding: 15px;"
+          <!-- <div class="row" style="padding: 15px;"
                *ngIf="(SchemePriCeCategory && SchemePriCeCategory.SchemeId && SchemePriCeCategory.PriceCategoryId) || DisplaySchemePriceCategorySelection">
             <scheme-pricecategory-select class="col-md-6" (on-change)="OnSchemePriceCategoryChanged($event)"
                                          [service-billing-context]="serviceBillingContext"
                                          [selected-scheme-priceCategory]="SchemePriCeCategory"
                                          [disable-selection]="DisableSchemePriceSelection">
             </scheme-pricecategory-select>
+          </div> -->
+          <div class="row" style="padding: 15px; margin-left: 10px;">
+            <div class="col-md-4">
+              <price-category-select class="price-select"
+                                     (on-category-change)="OnPriceCategoryChanged($event)" [disable]="DisableSchemePriceSelection"
+                                     [selected-priceCategoryId]="PriceCategoryId">
+              </price-category-select>
+            </div>
+            <div class="col-md-8">
+              <label class="col-md-2">Package Type :</label>
+              <div class="col-md-5">
+                <label for="id_checkbox_itemLoadPackage" class="is-ref mt-checkbox mt-checkbox-outline"><input type="checkbox"
+                         id="id_checkbox_itemLoadPackage" [(ngModel)]="CurrentBillingPackage.IsItemLoadPackage"
+                         [disabled]="isUpdate"
+                         (change)="ItemLoadPackageCheckBoxOnChange()" />
+                  <span></span>Item Load Package</label>
+              </div>
+              <div class="col-md-5">
+                <label for="id_checkbox_healthPackage" class="is-ref mt-checkbox mt-checkbox-outline"><input type="checkbox"
+                         id="id_checkbox_healthPackage" [(ngModel)]="CurrentBillingPackage.IsHealthPackage"
+                         [disabled]="isUpdate"
+                         (change)="HealthPackageCheckBoxOnChange()" />
+                  <span></span>Health Package</label>
+              </div>
+            </div>
+
           </div>
 
           <form [formGroup]="CurrentBillingPackage.BillingPackageValidator" class="form-horizontal hm-form">
@@ -32,15 +58,16 @@
                   <div class="form-group">
                     <label class="control-label col-md-4">Package Name<sup>*</sup><b>:</b></label>
                     <div class="col-md-8">
-                      <input id="PackageName" (keyup.enter)="GoToNextElement('PackageCode')" name="PackageName" max="100" class="form-control"
+                      <input id="PackageName" (keyup.enter)="GoToNextElement('PackageCode')" name="PackageName" maxlength="100" class="form-control"
                              formControlName="BillingPackageName">
                       <span class="color-red font-sm"
-                            [hidden]="CurrentBillingPackage.IsValidCheck('BillingPackageName','required') || !(CurrentBillingPackage.IsDirty('BillingPackageName'))">
-                        Billing Package Name is required.</span>
+                            *ngIf="!CurrentBillingPackage.IsValidCheck('BillingPackageName', 'required') && CurrentBillingPackage.IsDirty('BillingPackageName')">
+                        Billing Package Name is required.
+                      </span>
                       <span class="color-red font-sm"
-                            *ngIf="CurrentBillingPackage.IsDirty('BillingPackageName')"
-                            [hidden]="CurrentBillingPackage.IsValidCheck('BillingPackageName','maxlength')">
-                        Max length 100 characters.</span>
+                            *ngIf="CurrentBillingPackage.IsDirty('BillingPackageName') &&!CurrentBillingPackage.IsValidCheck('BillingPackageName', 'axlength')">
+                        Max length 100 characters.
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -48,25 +75,40 @@
                   <div class="form-group">
                     <label class="control-label col-md-4">Package Code<sup>*</sup><b>:</b></label>
                     <div class="col-md-8">
-                      <input type="text" id="PackageCode" (keyup.enter)="GoToNextElement('Description')" name="PackageCode" max="100"
+                      <input type="text" id="PackageCode" (keyup.enter)="GoToNextElement('Description')" name="PackageCode" maxlength="100"
                              class="form-control"
                              formControlName="PackageCode">
                       <span class="color-red font-sm"
-                            [hidden]="CurrentBillingPackage.IsValidCheck('PackageCode','required') || !(CurrentBillingPackage.IsDirty('PackageCode'))">
-                        Billing Package Code is required.</span>
-                      <span class="color-red font-sm" *ngIf="CurrentBillingPackage.IsDirty('PackageCode')"
-                            [hidden]="CurrentBillingPackage.IsValidCheck('PackageCode','maxlength')">Max length 20 characters.</span>
+                            *ngIf="!CurrentBillingPackage.IsValidCheck('PackageCode', 'required') && CurrentBillingPackage.IsDirty('PackageCode')">
+                        Billing Package Code is required.
+                      </span>
+                      <span class="color-red font-sm"
+                            *ngIf="CurrentBillingPackage.IsDirty('PackageCode') &&!CurrentBillingPackage.IsValidCheck('PackageCode', 'axlength')">
+                        Max length 20 characters.
+                      </span>
                     </div>
                   </div>
                 </div>
                 <div class="col-md-12">
-                  <div class="form-group">
-                    <label class="control-label col-md-2">Description<b>:</b></label>
-                    <div class="col-md-4">
-                      <textarea id="Description" (keyup.enter)="GoToNextElement('id_billing_serviceItemName')" name="Description" max="200"
-                                class="form-control"
-                                formControlName="Description"></textarea>
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label class="control-label col-md-4" style="margin-left: -12px;">Description<b>:</b></label>
+                      <div class="col-md-8">
+                        <textarea id="Description" (keyup.enter)="GoToNextElement('id_billing_serviceItemName')" name="Description" maxlength="200"
+                                  class="form-control"
+                                  formControlName="Description"></textarea>
+                      </div>
                     </div>
+                  </div>
+                  <div class="col-md-6" *ngIf="!CurrentBillingPackage.IsItemLoadPackage">
+                    <label for="id_checkbox_discountEditableInsSales" class="is-ref mt-checkbox mt-checkbox-outline">
+                      <input type="checkbox"
+                             id="id_checkbox_discountEditableInsSales"
+                             [(ngModel)]="CurrentBillingPackage.IsDiscountEditableInSales"
+
+                             [ngModelOptions]="{standalone: true}" (change)="IsDiscountEditableInsSalesCheckBoxOnChange()" />
+                      <span></span>Discount Editable In Sales?
+                    </label>
                   </div>
                 </div>
               </div>
@@ -74,9 +116,10 @@
           </form>
 
           <div class="col-md-12">
-            <div class="icheck-inline col-md-6">
+            <div class="icheck-inline col-md-6" *ngIf="CurrentBillingPackage.IsHealthPackage">
               <label for="id_checkbox_isItemLevelDiscount" class="is-ref mt-checkbox mt-checkbox-outline"><input type="checkbox"
                        id="id_checkbox_isItemLevelDiscount" [(ngModel)]="IsItemLevelDiscount"
+                       [disabled]="CurrentBillingPackage.IsItemLoadPackage"
                        (change)="ItemLevelDiscountCheckBoxOnChange()" />
                 <span></span>Item Level Discount?</label>
             </div>
@@ -177,16 +220,19 @@
                         <td>
                           <div class="form-group">
                             <input danphe-auto-complete autocomplete="off" type="text" class="form-control" id="id_billing_performer"
-                                   [source]="doctorList" display-property-name="FullName"
+                                   [source]="doctorList" display-property-name="FullName" [min-chars]="1"
                                    [list-formatter]="billingInvoiceBlService.PerformerListFormatter" value-property-name=null
                                    match-formatted="true" max-num-list="10" [(ngModel)]="SelectedPerformer"
                                    placeholder="Enter Name" onClick="this.select();" (focusout)="AssignSelectedPerformer()"
-                                   (keyup.enter)="GoToNextElement('id_btn_add_serviceItem')" onClick="this.select();">
+                                   (keyup.enter)="ValidateAndMoveFocus()" onClick="this.select();">
+                            <div *ngIf="!IsPerformerValid" class="error-message">
+                              Performer is mandatory.
+                            </div>
                           </div>
                         </td>
                         <td>
                           <button type="button" id="id_btn_add_serviceItem" class="btn green btn-success "
-                                  (click)="AddInvoiceItems()"
+                                  (click)="AddInvoiceItems()" [disabled]="!IsPerformerValid || !IsDiscountPercentValid"
                                   (keyup.enter)="GoToNextElement('id_billing_serviceItemName')">
                             +
                           </button>
@@ -262,7 +308,7 @@
                                (focusout)="OnDiscountAmountChange()" name="DiscountAmount"
                                (wheel)="coreService.PreventNumberChangeOnScroll($event)"
                                type="number"
-                               [disabled]="IsItemLevelDiscount === true ? true : null">
+                               [disabled]="CurrentBillingPackage.IsItemLoadPackage || IsItemLevelDiscount === true ? true : false">
 
                       </td>
                     </tr>
@@ -271,7 +317,7 @@
                       <td><input [(ngModel)]="totalAmount" disabled class="form-control" name="Total Amount" type="number"></td>
                     </tr>
                     <tr class="dot">
-                      <td colspan="2" class="text-capitalize" style="color: #0773bc;">In Words : <b>{{CurrentBillingPackage.TotalPrice |
+                      <td colspan="2" class="text-capitalize" style="color: #0773bc;">In Words : <b>{{totalAmount |
                           NumberInWords}} </b><span *ngIf="CurrentBillingPackage.TotalPrice">Only.</span></td>
                     </tr>
                   </table>

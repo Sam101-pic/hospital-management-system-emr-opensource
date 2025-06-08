@@ -10,5 +10,6 @@
         public bool IsActive { get; set; }
         public bool ShowInRegistration { get; set; }
         public bool ShowInAdmission { get; set; }
+        public bool? IsPharmacyRateDifferent { get; set; }
     }
 }

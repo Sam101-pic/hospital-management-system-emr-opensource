@@ -8,7 +8,11 @@
     </div>
 </div>
 <!-- ---Other Charges Form START--- -->
-<app-other-charges-form *ngIf="showAddPage" [showAddPage]="showAddPage" (submit-event)="AddToChargesList($event)" (close-add-page)="Close()"></app-other-charges-form>
+<app-other-charges-form *ngIf="showAddPage" [showAddPage]="showAddPage" (submit-event)="AddToChargesList($event)"
+                        (close-add-page)="Close()"></app-other-charges-form>
 <!-- ---END: Other CHarges PopUp-- -->
 
-<app-other-charges-edit *ngIf="showEditPage" [showEditPage]="showEditPage" [ChargeId]="this.ChargeId" (update-event)="UpdateToChargesList($event)" (close-edit-page)="Close()"></app-other-charges-edit>
+<app-other-charges-edit *ngIf="showEditPage" [showEditPage]="showEditPage" [ChargeId]="this.ChargeId"
+                        [otherChargesList]="otherChargesList"
+                        (update-event)="UpdateToChargesList($event)"
+                        (close-edit-page)="Close()"></app-other-charges-edit>

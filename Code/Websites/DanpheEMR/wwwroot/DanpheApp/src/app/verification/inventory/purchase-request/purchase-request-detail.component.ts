@@ -1,16 +1,17 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
-import { VerificationService } from "../../shared/verification.service";
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { Router } from "@angular/router";
-import { RouteFromService } from "../../../shared/routefrom.service";
 import { CoreService } from "../../../core/shared/core.service";
-import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { VerificationBLService } from "../../shared/verification.bl.service";
-import { RequisitionItems } from "../../../inventory/shared/requisition-items.model";
-import { SecurityService } from "../../../security/shared/security.service";
 import { PurchaseRequestItemModel } from '../../../inventory/shared/purchase-request-item.model';
-import { VerificationActor } from '../requisition-details/inventory-requisition-details.component';
 import { PurchaseRequestModel } from '../../../inventory/shared/purchase-request.model';
+import { SecurityService } from "../../../security/shared/security.service";
+import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
+import { RouteFromService } from "../../../shared/routefrom.service";
+import { VerificationBLService } from "../../shared/verification.bl.service";
+import { VerificationService } from "../../shared/verification.service";
+import { VerificationActor } from '../requisition-details/inventory-requisition-details.component';
 import { GeneralFieldLabels } from '../../../shared/DTOs/general-field-label.dto';
+
+
 @Component({
   templateUrl: './purchase-request-detail.html'
 })
@@ -142,6 +143,11 @@ export class VER_INV_PurchaseRequestDetailComponent implements OnInit, OnDestroy
   ApprovePurchaseRequest() {
     if (this.CheckForValidItemQuantity()) {
       this.loading = true;
+      this.PurchaseRequestVM.RequestedItemList.forEach(r => {
+        if (r.IsEdited === true) {
+          r.PendingQuantity = r.RequestedQuantity;
+        }
+      });
       this.PurchaseRequest.PurchaseRequestItems = this.PurchaseRequestVM.RequestedItemList;
       this.verificationBLService.ApprovePurchaseRequest(this.PurchaseRequest, this.VerificationRemarks)
         .subscribe(res => {

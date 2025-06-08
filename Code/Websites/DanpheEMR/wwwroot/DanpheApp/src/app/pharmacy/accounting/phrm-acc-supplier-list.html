@@ -39,17 +39,20 @@
         Filtered By GoodReceiptDate :&nbsp;
       </div>
       <div>
-        <from-to-date-select (on-change)="OnFromToDateChange($event)" [emit-always]="false"> </from-to-date-select>
+        <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                             [date-settings-name]="'common-range-with-today'">
+        </from-to-date-select>
       </div>
       <div>
-        <button class="btn blue" type="button" (click)="GetSuppliersLedgerInfo()">
+        <button class="btn blue" type="button" style="margin-left:10px;" (click)="GetSuppliersLedgerInfo()">
           <i class="fa fa-search"></i>
           Show Details
         </button>
       </div>
     </div>
 
-    <danphe-grid [grid-colDefaults]="goodsreceiptsGridColumns" [grid-data]="newGoodsReceiptList" (grid-actions)="GoodsReceiptGridAction($event)" [grid-exportOptions]="gridExportOptions" [grid-showExport]="true">
+    <danphe-grid [grid-colDefaults]="goodsreceiptsGridColumns" [grid-data]="newGoodsReceiptList" (grid-actions)="GoodsReceiptGridAction($event)"
+                 [grid-exportOptions]="gridExportOptions" [grid-showExport]="true">
     </danphe-grid>
     <div style="float:right">
       <table>
@@ -112,7 +115,7 @@
                     <div class="right" style="text-align:right;">
                       <p>Date :<b> {{currentGRdetails.GoodReceiptDate | date : 'yyyy-MM-dd'}}</b>
                         <i *ngIf="currentGRdetails.GoodReceiptDate">
-                          {{currentGRdetails.GoodReceiptDate | nepaliDate:'format':'YYYY-MM-DD'}} 
+                          {{currentGRdetails.GoodReceiptDate | nepaliDate:'format':'YYYY-MM-DD'}}
                         </i>
                       </p>
                       <p>Invoice No:<b>{{currentGRdetails.InvoiceNo}}</b></p>
@@ -243,7 +246,7 @@
                     <div class="right" style="text-align:right;">
                       <p>Date :<b> {{currentGRdetails.GoodReceiptDate | date : 'yyyy-MM-dd'}}</b>
                         <i *ngIf="currentGRdetails.GoodReceiptDate">
-                          {{currentGRdetails.GoodReceiptDate | nepaliDate:'format':'YYYY-MM-DD'}} 
+                          {{currentGRdetails.GoodReceiptDate | nepaliDate:'format':'YYYY-MM-DD'}}
                         </i>
                       </p>
                       <p>Invoice No:<b>{{currentGRdetails.InvoiceNo}}</b></p>
@@ -343,11 +346,15 @@
           <div class="noPrint">
             <!-- <div class="caption lb-caption">  </div> -->
             <div class="form-body">
-              <div style="display:flex; justify-content:center;align-items: center;margin-bottom: 10px; background-color: rgb(235, 247, 255); font-size: 16px;">
+              <div
+                   style="display:flex; justify-content:center;align-items: center;margin-bottom: 10px; background-color: rgb(235, 247, 255); font-size: 16px;">
                 <div>SupplierName : &nbsp;</div>
                 <div>{{griForCurrentSupplier[0].SupplierName}}</div>
               </div>
-              <danphe-grid [grid-colDefaults]="accsuppliersGridColumns" [grid-data]="griForCurrentSupplier" (grid-actions)="GRSupplierGridAction($event)" [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" [filter-parameters]="FilterParameters" [show-header]="true" [report-for]="'pharmacy'" [report-title]="'Pharmacy GoodReceipt A/C Report'" [grid-footer-content]="footerContent"> </danphe-grid>
+              <danphe-grid [grid-colDefaults]="accsuppliersGridColumns" [grid-data]="griForCurrentSupplier"
+                           (grid-actions)="GRSupplierGridAction($event)" [grid-exportOptions]="gridExportOptions" [grid-showExport]="true"
+                           [filter-parameters]="FilterParameters" [show-header]="true" [report-for]="'pharmacy'"
+                           [report-title]="'Pharmacy GoodReceipt A/C Report'" [grid-footer-content]="footerContent"> </danphe-grid>
               <div style="display: flex;justify-content: space-around;margin-top: 20px;" id="PharmacySupplierAccountSummary">
                 <table class="table table-bordered">
                   <tr>

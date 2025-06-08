@@ -47,7 +47,7 @@ namespace DanpheEMR.Services.Medicare
                                                select new MedicareMemberVsBalanceVM
                                                {
                                                    MedicareMemberId = mem.MedicareMemberId,
-                                                   MedicareTypeId = mem.MedicareTypeId,
+                                                   MedicareTypeId = mem.MedicareTypeId ?? 0,
                                                    FullName = mem.FullName,
                                                    MedicareInstituteCode = mem.MedicareInstituteCode,
                                                    MemberNo = mem.MemberNo,
@@ -83,7 +83,7 @@ namespace DanpheEMR.Services.Medicare
                     medicarePatientDetail = new MedicareMemberVsBalanceVM
                     {
                         MedicareMemberId = medicareMember.MedicareMemberId,
-                        MedicareTypeId = medicareMember.MedicareTypeId,
+                        MedicareTypeId = medicareMember.MedicareTypeId ?? 0,
                         FullName = medicareMember.FullName,
                         MedicareInstituteCode = medicareMember.MedicareInstituteCode,
                         MemberNo = medicareMember.MemberNo,
@@ -131,65 +131,68 @@ namespace DanpheEMR.Services.Medicare
                 }
 
 
-                SubLedgerModel subledger = new SubLedgerModel();
-                var hospitalId = medicareDbContext.Hospital.Select(h => h.HospitalId).FirstOrDefault();
-                if (medicareMemberDto.LedgerId != null)
-                {
-                    subledger.SubLedgerName = medicareMemberDto.FullName;
-                    subledger.LedgerId = medicareMemberDto.LedgerId;
-                    subledger.CreatedBy = currentUser.EmployeeId;
-                    subledger.Description = null;
-                    subledger.IsActive = true;
-                    subledger.CreatedOn = DateTime.Now;
-                    subledger.OpeningBalance = 0;
-                    subledger.DrCr = true;
-                    subledger.HospitalId = hospitalId;
-                    subledger.IsDefault = false;
-                    if (medicareMemberDetail.IsDependent == true)
-                    {
-                        var dependentCount = medicareDbContext.MedicareMembers
-                            .Where(x => x.IsDependent == true &&
-                            x.ParentMedicareMemberId == medicareMemberDetail.ParentMedicareMemberId).Count();
+                /* SubLedgerModel subledger = new SubLedgerModel();
+                 var hospitalId = medicareDbContext.Hospital.Select(h => h.HospitalId).FirstOrDefault();
+                 if (medicareMemberDto.LedgerId != null)
+                 {
+                     subledger.SubLedgerName = medicareMemberDto.FullName;
+                     subledger.LedgerId = medicareMemberDto.LedgerId;
+                     subledger.CreatedBy = currentUser.EmployeeId;
+                     subledger.Description = null;
+                     subledger.IsActive = true;
+                     subledger.CreatedOn = DateTime.Now;
+                     subledger.OpeningBalance = 0;
+                     subledger.DrCr = true;
+                     subledger.HospitalId = hospitalId;
+                     subledger.IsDefault = false;
+                     if (medicareMemberDetail.IsDependent == true)
+                     {
+                         var dependentCount = medicareDbContext.MedicareMembers
+                             .Where(x => x.IsDependent == true &&
+                             x.ParentMedicareMemberId == medicareMemberDetail.ParentMedicareMemberId).Count();
 
-                        subledger.SubLedgerCode = medicareMemberDto.MedicareTypeName + "-" + medicareMemberDetail.MemberNo + "(" + (dependentCount + 1) + ")";
-                    }
-                    else
-                    {
-                        subledger.SubLedgerCode = medicareMemberDto.MedicareTypeName + "-" + medicareMemberDetail.MemberNo;
-                    }
-                    medicareDbContext.SubLedger.Add(subledger);
-                    medicareDbContext.SaveChanges();
-                }
-                else
-                {
-                    throw new Exception("Cannot Map SubLedger");
-                }
+                         subledger.SubLedgerCode = medicareMemberDto.MedicareTypeName + "-" + medicareMemberDetail.MemberNo + "(" + (dependentCount + 1) + ")";
+                     }
+                     else
+                     {
+                         subledger.SubLedgerCode = medicareMemberDto.MedicareTypeName + "-" + medicareMemberDetail.MemberNo;
+                     }
+                     medicareDbContext.SubLedger.Add(subledger);
+                     medicareDbContext.SaveChanges();
+                 }
+                 else
+                 {
+                     throw new Exception("Cannot Map SubLedger");
+                 }
 
-                LedgerMappingModel ledgerMapping = new LedgerMappingModel();
-                ledgerMapping.LedgerId = medicareMemberDto.LedgerId;
-                ledgerMapping.SubLedgerId = subledger.SubLedgerId;
-                ledgerMapping.ReferenceId = medicareMemberDetail.MedicareMemberId;
-                ledgerMapping.HospitalId = hospitalId;
-                ledgerMapping.LedgerType = ENUM_ACC_LedgerType.MedicareTypes;
-                medicareDbContext.LedgerMapping.Add(ledgerMapping);
-                medicareDbContext.SaveChanges();
+                 LedgerMappingModel ledgerMapping = new LedgerMappingModel();
+                 ledgerMapping.LedgerId = medicareMemberDto.LedgerId;
+                 ledgerMapping.SubLedgerId = subledger.SubLedgerId;
+                 ledgerMapping.ReferenceId = medicareMemberDetail.MedicareMemberId;
+                 ledgerMapping.HospitalId = hospitalId;
+                 ledgerMapping.LedgerType = ENUM_ACC_LedgerType.MedicareTypes;
+                 medicareDbContext.LedgerMapping.Add(ledgerMapping);
+                 medicareDbContext.SaveChanges();
 
 
 
-                SubLedgerBalanceHistory subLedgerBalanceHistory = new SubLedgerBalanceHistory();
-                int ficalyearId = medicareDbContext.FiscalYears.Where(f => f.StartDate <= DateTime.Today && f.EndDate >= DateTime.Today).Select(f => f.FiscalYearId).FirstOrDefault();
-                subLedgerBalanceHistory.CreatedBy = currentUser.EmployeeId;
-                subLedgerBalanceHistory.CreatedOn = DateTime.Now;
-                subLedgerBalanceHistory.SubLedgerId = subledger.SubLedgerId;
-                subLedgerBalanceHistory.OpeningBalance = 0;
-                subLedgerBalanceHistory.OpeningDrCr = true;
-                subLedgerBalanceHistory.ClosingBalance = 0;
-                subLedgerBalanceHistory.ClosingDrCr = true;
-                subLedgerBalanceHistory.HospitalId = hospitalId;
-                subLedgerBalanceHistory.FiscalYearId = ficalyearId;
-                medicareDbContext.SubLedgerBalanceHistory.Add(subLedgerBalanceHistory);
-                medicareDbContext.SaveChanges();
+                 SubLedgerBalanceHistory subLedgerBalanceHistory = new SubLedgerBalanceHistory();
+                 int ficalyearId = medicareDbContext.FiscalYears.Where(f => f.StartDate <= DateTime.Today && f.EndDate >= DateTime.Today).Select(f => f.FiscalYearId).FirstOrDefault();
+                 subLedgerBalanceHistory.CreatedBy = currentUser.EmployeeId;
+                 subLedgerBalanceHistory.CreatedOn = DateTime.Now;
+                 subLedgerBalanceHistory.SubLedgerId = subledger.SubLedgerId;
+                 subLedgerBalanceHistory.OpeningBalance = 0;
+                 subLedgerBalanceHistory.OpeningDrCr = true;
+                 subLedgerBalanceHistory.ClosingBalance = 0;
+                 subLedgerBalanceHistory.ClosingDrCr = true;
+                 subLedgerBalanceHistory.HospitalId = hospitalId;
+                 subLedgerBalanceHistory.FiscalYearId = ficalyearId;
+                 medicareDbContext.SubLedgerBalanceHistory.Add(subLedgerBalanceHistory);
+                 medicareDbContext.SaveChanges();   
+                */
+
                 return medicareMemberDetail;
+               
 
             }
             catch (Exception ex)
@@ -203,14 +206,14 @@ namespace DanpheEMR.Services.Medicare
 
         private void AddMedicareMemberBalanceUsingSelectedMedicareType(MedicareDbContext medicareDbContext, MedicareMember medicareMemberDetail, RbacUser currentUser)
         {
-            var medicareType = medicareDbContext.MedicareTypes.FirstOrDefault(a => a.MedicareTypeId == medicareMemberDetail.MedicareTypeId);
+            var medicareType = medicareDbContext.MedicareTypes.FirstOrDefault(a => a.MedicareTypeId == (medicareMemberDetail.MedicareTypeId ?? 0));
             MedicareMemberBalance medicareMemberBalance = new MedicareMemberBalance
             {
                 MedicareMemberId = medicareMemberDetail.MedicareMemberId,
                 HospitalNo = medicareMemberDetail.HospitalNo,
                 PatientId = medicareMemberDetail.PatientId,
-                OpBalance = medicareType.OpCreditAmount,
-                IpBalance = medicareType.IpCreditAmount,
+                OpBalance = medicareType?.OpCreditAmount ?? 0,
+                IpBalance = medicareType?.IpCreditAmount ?? 0,
                 OpUsedAmount = 0,
                 IpUsedAmount = 0,
                 CreatedBy = currentUser.EmployeeId,
@@ -247,7 +250,7 @@ namespace DanpheEMR.Services.Medicare
 
             if (!medicareMember.IsDependent && medicareMember.MedicareTypeId != medicareMemberDto.MedicareTypeId)
             {
-                UpdateMedicareMemberBalance(medicareDbContext, medicareMember.MedicareMemberId, medicareMemberDto.MedicareTypeId, currentUser);
+                UpdateMedicareMemberBalance(medicareDbContext, medicareMember.MedicareMemberId, medicareMemberDto.MedicareTypeId ?? 0, currentUser);
             }
 
             medicareDbContext.Entry(medicareMember).State = System.Data.Entity.EntityState.Modified;

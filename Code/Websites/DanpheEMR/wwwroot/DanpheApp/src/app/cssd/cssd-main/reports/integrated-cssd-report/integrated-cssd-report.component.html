@@ -3,7 +3,7 @@
   <div class="col-md-4">
     <label for="" style="padding-right: 5px;">Disinfection Methods:</label>
     <select name="DisinfectionMethod" id="DisinfectionMethod" [(ngModel)]="selectedDisinfectionMethod"
-      (change)="OnFiltersChange()">
+            (change)="OnFiltersChange()">
       <option value="all" selected>All</option>
       <option value="Chemical Disinfection">Chemical Disinfection</option>
       <option value="Autoclave">Autoclave</option>
@@ -22,7 +22,8 @@
 </div>
 <div class="col-md-12">
   <danphe-grid [grid-colDefaults]="integratedCssdReportGridColumns" [grid-data]="integratedCssdReportGridData"
-    [show-CustomDate]="true" [rangeType]="dateRange" [NepaliDateInGridParams]="NepaliDateInGridSettings"
-    (onDateChange)="onDateChange($event)" [grid-showExport]="true" [grid-exportOptions]="gridExportOptions">
+               [show-CustomDate]="true" [rangeType]="dateRange" [NepaliDateInGridParams]="NepaliDateInGridSettings"
+               (onDateChange)="onDateChange($event)" [grid-showExport]="true" [grid-exportOptions]="gridExportOptions"
+               [date-settings-name]="'common-range-with-today'">
   </danphe-grid>
 </div>

@@ -76,8 +76,8 @@ export class AppointmentBLService {
 
     }
 
-    public GetPatientsListForNewVisit(searchTxt, searchUsingHospitalNo, searchUsingIdCardNo) {
-        return this.patientDLService.GetPatientsListForNewVisit(searchTxt, searchUsingHospitalNo, searchUsingIdCardNo)
+    public GetPatientsListForNewVisit(searchTxt, searchUsingHospitalNo, searchUsingIdCardNo, ShowIPInSearchPatient?) {
+        return this.patientDLService.GetPatientsListForNewVisit(searchTxt, searchUsingHospitalNo, searchUsingIdCardNo, ShowIPInSearchPatient)
             .map(res => { return res })
 
     }
@@ -207,8 +207,8 @@ export class AppointmentBLService {
             .map(res => res);
     }
 
-    public getOnlineAppointmentData(url: string, fromDate: Date, toDate: Date) {
-        return this.appointmentDLService.getOnlineAppointmentData(url, fromDate, toDate).map(res => { return res });
+    public getOnlineAppointmentData<T>(url: string, fromDate: Date, toDate: Date) {
+        return this.appointmentDLService.getOnlineAppointmentData<T>(url, fromDate, toDate).map(res => { return res });
     }
 
     public GetPatientByGUID(GUID: number) {

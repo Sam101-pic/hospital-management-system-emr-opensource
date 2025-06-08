@@ -12,6 +12,10 @@ using DanpheEMR.Utilities;
 using DanpheEMR.ServerModel.InventoryModels;
 using DanpheEMR.AccTransfer;
 using DanpheEMR.Security;
+using DanpheEMR.CommonTypes;
+using DanpheEMR.Enums;
+using DanpheEMR.ServerModel.InventoryModels.DTOs;
+using Org.BouncyCastle.Asn1.Ocsp;
 
 
 
@@ -505,7 +509,8 @@ namespace DanpheEMR.Controllers
                 LedgerMappingModel ledgerMapping = new LedgerMappingModel();
                 if (itemsubcategoryModel.LedgerId > 0)
                 {
-                    var ledgerData = _accountingDBContext.Ledgers.Where(l => l.LedgerId == itemsubcategoryModel.LedgerId).FirstOrDefault();
+                    int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+                    var ledgerData = _accountingDBContext.Ledgers.Where(l => l.LedgerId == itemsubcategoryModel.LedgerId && l.HospitalId==currentHospitalId).FirstOrDefault();
                     if (ledgerData != null)
                     {
                         ledgerData.LedgerReferenceId = itemsubcategoryModel.SubCategoryId;
@@ -896,7 +901,8 @@ namespace DanpheEMR.Controllers
                 //This is not correct solution , well solution is to show activate hospital popup when user get logged in into system.
                 //so, this will help us to make software as multi tenant. if user have 2 or more hospital permission then this popup will come.
                 //if user have only one hsopital permission then automatically activate this hospital
-                var HospId = AccountingTransferData.GetAccPrimaryHospitalId(_accountingDBContext);
+                var HospId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+
 
                 var ledData = _accountingDBContext.LedgerMappings.Where(l => l.LedgerId == itemsubcategoryModel.LedgerId && l.HospitalId == HospId).FirstOrDefault();
                 if (ledData == null)
@@ -1162,6 +1168,122 @@ namespace DanpheEMR.Controllers
             _inventoryDbContext.SaveChanges();
             return chargeModel;
 
+        }
+        [HttpPost]
+        [Route("ConsumptionType")]
+        public IActionResult PostConsumptionType([FromBody] InventoryConsumptionType_DTO inventoryConsumptionTypes)
+        {
+            Func<object> func = () => SaveConsumptionType(inventoryConsumptionTypes);
+            return InvokeHttpPutFunction<object>(func);
+        }
+        private Object SaveConsumptionType(InventoryConsumptionType_DTO inventoryConsumptionTypes)
+        {
+
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            DateTime currentDateTime = DateTime.Now;
+            using (var dbContextTransaction = _inventoryDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    InventoryConsumptionTypeMasterModel consumptionMaster = DanpheJSONConvert.DeserializeObject<InventoryConsumptionTypeMasterModel>(DanpheJSONConvert.SerializeObject(inventoryConsumptionTypes));
+                    consumptionMaster.IsActive = true;
+                    consumptionMaster.CreatedBy = currentUser.EmployeeId;
+                    consumptionMaster.CreatedOn = currentDateTime;
+                    _inventoryDbContext.ConsumptionTypes.Add(consumptionMaster);
+                    _inventoryDbContext.SaveChanges();
+                    dbContextTransaction.Commit();
+                    return consumptionMaster;
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    throw ex;
+                }
+            }
+        }
+
+        [HttpPut]
+        [Route("ConsumptionType")]
+        public IActionResult ConsumptionType([FromBody] InventoryConsumptionType_DTO inventoryConsumptionTypes)
+        {
+            Func<object> func = () => UpdateConsumptionType(inventoryConsumptionTypes);
+            return InvokeHttpPutFunction<object>(func);
+        }
+        private Object UpdateConsumptionType(InventoryConsumptionType_DTO inventoryConsumptionTypes)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            DateTime currentDateTime = DateTime.Now;
+            using (var dbContextTransaction = _inventoryDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    var consumptionMaster = _inventoryDbContext.ConsumptionTypes.Where(a => a.ConsumptionTypeId == inventoryConsumptionTypes.ConsumptionTypeId).FirstOrDefault();
+                    if (consumptionMaster == null)
+                    {
+                        throw new Exception("Consumption Types not found.");
+                    }
+                    consumptionMaster.ConsumptionTypeName = inventoryConsumptionTypes.ConsumptionTypeName;
+                    consumptionMaster.ModifiedBy = currentUser.EmployeeId;
+                    consumptionMaster.ModifiedOn = currentDateTime;
+                    _inventoryDbContext.SaveChanges();
+                    dbContextTransaction.Commit();
+                    return consumptionMaster;
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    throw ex;
+                }
+            }
+        }
+        [HttpGet]
+        [Route("ConsumptionTypes")]
+        public IActionResult GetConsumptionTypes()
+        {
+            Func<object> func = () => _inventoryDbContext.ConsumptionTypes.ToList();
+            return InvokeHttpPutFunction<object>(func);
+        }
+        [HttpGet]
+        [Route("ActiveConsumptionTypes")]
+        public IActionResult GetActiveConsumptionTypes()
+        {
+
+            Func<object> func = () => _inventoryDbContext.ConsumptionTypes.Where(a => a.IsActive).ToList();
+            return InvokeHttpPutFunction<object>(func);
+        }
+        [HttpPut]
+        [Route("ActiveDeactivateConsumptionType")]
+        public IActionResult ActivateDeactivateConsumptionType(int consumptionTypeId, bool activate)
+        {
+            Func<object> func = () => ActiveDeactivateConsumptionType(consumptionTypeId, activate);
+            return InvokeHttpPutFunction<object>(func);
+        }
+        private object ActiveDeactivateConsumptionType(int consumptionTypeId, bool activate)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            DateTime currentDateTime = DateTime.Now;
+            using (var dbContextTransaction = _inventoryDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    var consumptionMaster = _inventoryDbContext.ConsumptionTypes.Where(a => a.ConsumptionTypeId == consumptionTypeId).FirstOrDefault();
+                    if (consumptionMaster == null)
+                    {
+                        throw new Exception("Consumption Types not found.");
+                    }
+                    consumptionMaster.ModifiedBy = currentUser.EmployeeId;
+                    consumptionMaster.ModifiedOn = currentDateTime;
+                    consumptionMaster.IsActive = activate;
+                    _inventoryDbContext.SaveChanges();
+                    dbContextTransaction.Commit();
+                    return consumptionMaster;
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    throw ex;
+                }
+            }
         }
         /*if (reqType == "UpdateOtherCharge")
         {

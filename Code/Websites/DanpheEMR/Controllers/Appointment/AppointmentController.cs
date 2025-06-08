@@ -1005,6 +1005,7 @@ namespace DanpheEMR.Controllers
                                                          where app.PatientId == patientId
                                                          && app.AppointmentDate >= DbFunctions.TruncateTime(requestDate.Date)
                                                          && app.PerformerId == performerId
+                                                         && app.CancelledBy == null
                                                          select app).ToList();
 
             VisitDbContext dbContext = new VisitDbContext(base.connString);
@@ -1112,11 +1113,12 @@ namespace DanpheEMR.Controllers
             //var performerName = ReadQueryStringData("PerformerName");
 
             dbAppointment.AppointmentStatus = status.ToLower();
-            if (status == "checkedin")
+            if (status.ToLower() == "checkedin" && (dbAppointment.PatientId == null || dbAppointment.PatientId == 0))
             {
                 dbAppointment.PatientId = _appointmentDbContext.Visit
                                         .Where(a => a.AppointmentId == appointmentId)
                                         .Select(a => a.PatientId).ToList().FirstOrDefault();
+
             }
 
 

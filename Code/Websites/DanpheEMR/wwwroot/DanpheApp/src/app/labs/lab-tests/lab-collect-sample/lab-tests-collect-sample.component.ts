@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component } from "@angular/core";
+import { ChangeDetectorRef, Component, Input } from "@angular/core";
 import { Router } from '@angular/router';
 import * as moment from 'moment/moment';
 
@@ -6,9 +6,9 @@ import * as _ from 'lodash';
 import { CoreService } from "../../../core/shared/core.service";
 import { PatientService } from '../../../patients/shared/patient.service';
 import { SecurityService } from '../../../security/shared/security.service';
-import { CommonFunctions } from "../../../shared/common.functions";
+import { NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponseText, ENUM_ExternalLab_SampleStatus } from "../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_DateTimeFormat, ENUM_ExternalLab_SampleStatus, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { LabSticker } from "../../shared/lab-sticker.model";
 import { PatientLabSample } from '../../shared/lab-view.models';
 import { LabTestResultService } from '../../shared/lab.service';
@@ -24,6 +24,10 @@ export class LabTestsCollectSampleComponent {
 
   public patientService: PatientService = null;
   public labResultService: LabTestResultService = null;
+
+  @Input("NepaliDateInGridParams")
+  public nepaliDateDetail: NepaliDateInGridParams = null;
+  public NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
 
   public currentUser: number = null;
   // this is a dynamic array coming from server side.
@@ -73,18 +77,23 @@ export class LabTestsCollectSampleComponent {
 
   public labTestToTransfer: any;
   public labTypeName: string = null;
-  public IsLocalDate = true;
+  public IsLocalDate = false;
   public isRunNumberAutoGenerate: boolean = false;
   public patUnderInsurance: boolean = false;
+  PrintSheetConfig = { "ShowEmptyReportSheet": false, "ShowReportTemplateWiseSegregation": false };
+
+  IsEnglishCalendarType: boolean = false;
 
   constructor(public labBLService: LabsBLService,
     public router: Router,
-    _patientservice: PatientService,
-    _labresultservice: LabTestResultService,
+    private _patientservice: PatientService,
+    private _labresultservice: LabTestResultService,
     public securityService: SecurityService,
-    public msgBoxServ: MessageboxService,
+    private _msgBoxServ: MessageboxService,
     public changeDetector: ChangeDetectorRef,
-    public coreService: CoreService) {
+    private _coreService: CoreService) {
+
+    this.IsEnglishCalendarType = this._coreService.IsEnableEnglishCalendarOnly();
     this.patientService = _patientservice;
     this.labResultService = _labresultservice;
     this.currentUser = this.securityService.GetLoggedInUser().EmployeeId;
@@ -94,8 +103,7 @@ export class LabTestsCollectSampleComponent {
     this.RequisitionId = this.patientService.getGlobal().RequisitionId;
     this.wardNumber = this.patientService.getGlobal().WardName;
     this.patUnderInsurance = this.patientService.getGlobal().Ins_HasInsurance;
-
-    var sampleCollectionParam = this.coreService.Parameters.find(a => a.ParameterGroupName.toLowerCase() == 'lab' && a.ParameterName == 'LabSampleCollectionPageSettings');
+    var sampleCollectionParam = this._coreService.Parameters.find(a => a.ParameterGroupName.toLowerCase() == 'lab' && a.ParameterName == 'LabSampleCollectionPageSettings');
     if (sampleCollectionParam) {
       this.sampleCollectionSettings = JSON.parse(sampleCollectionParam.ParameterValue);
       this.showTestChangeParam = this.sampleCollectionSettings.ShowTestChange;
@@ -104,19 +112,21 @@ export class LabTestsCollectSampleComponent {
       this.showSampleDateChange = !this.sampleCollectionSettings.SampleCodeIsAutoGenerate;
       this.allowRunNoChange = !this.sampleCollectionSettings.SampleCodeIsAutoGenerate;
     }
+    this.PrintSheetConfig = this._coreService.ShowEmptyReportSheetPrint();
   }
 
   ngOnInit() {
-    this.coreService.loading = true;
+    this._coreService.loading = true;
+    console.log(this.nepaliDateDetail);
     if (this.patientId != 0) {
       this.ListLabTestOfPatient();
       this.labResultService.CreateNewGlobalLabTestResult();
-      this.sampleCreatedOn = moment().format('YYYY-MM-DD HH:mm');
+      this.sampleCreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
       this.GetLatestSampleCode();
       this.SetInsuranceFlagParam();//sud:16Jul'19
     } else {
       this.router.navigate(['/Lab/Requisition']);
-      this.coreService.loading = false;
+      this._coreService.loading = false;
     }
   }
 
@@ -142,8 +152,8 @@ export class LabTestsCollectSampleComponent {
 
   //sud:16Jul'19--whether or not to show insurance flag in collect sample page. 
   SetInsuranceFlagParam() {
-    let insParam = this.coreService.Parameters.find(p => p.ParameterGroupName.toLowerCase() == "lab" && p.ParameterName.toLowerCase() == "showinsurancefilterinlabpages");
-    if (insParam && insParam.ParameterValue && insParam.ParameterValue.toLowerCase() == "true") {
+    let insParam = this._coreService.Parameters.find(p => p.ParameterGroupName.toLowerCase() === "lab" && p.ParameterName.toLowerCase() === "showinsurancefilterinlabpages");
+    if (insParam && insParam.ParameterValue && insParam.ParameterValue.toLowerCase() === "true") {
       this.showInsuranceFlag = true;
     }
     else {
@@ -163,7 +173,7 @@ export class LabTestsCollectSampleComponent {
       //load this CollectSample page again 
       //after the LabTest is changed(to differentiate change based on normal and cyto / histo template)
       this.labResultService.CreateNewGlobalLabTestResult();
-      this.sampleCreatedOn = moment().format('YYYY-MM-DD HH:mm');
+      this.sampleCreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
       this.GetLatestSampleCode();
     }
     else {
@@ -178,36 +188,36 @@ export class LabTestsCollectSampleComponent {
     this.labBLService.GetLabSamplesWithCodeByPatientId(this.patientId, this.visitType, this.RunNumberType, this.RequisitionId, this.wardNumber, this.patUnderInsurance).
       subscribe(res => this.CallBackPatientTestCSVs(res),
         err => {
-          this.msgBoxServ.showMessage("error", ["failed to get lab test of patient.. please check log for details."]);
+          this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["failed to get lab test of patient.. please check log for details."]);
 
         });
   }
 
   GetLatestSampleCode(): void {
     if (!this.isRunNumberAutoGenerate) {
-      this.sampleCreatedOn = this.sampleCreatedOn ? this.sampleCreatedOn : moment().format('YYYY-MM-DD HH:mm');
+      this.sampleCreatedOn = this.sampleCreatedOn ? this.sampleCreatedOn : moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
       this.labBLService.GetLatestSampleCode(this.visitType, this.sampleCreatedOn, this.RunNumberType, this.patientId, this.patUnderInsurance)
         .subscribe(res => {
-          if (res.Status == 'OK' && res.Results) {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
             this.LatestSampleCode.SampleCode = res.Results.SampleCode;
             this.LatestSampleCode.SampleNumber = res.Results.SampleNumber;
             this.LatestSampleCode.BarCodeNumber = res.Results.BarCodeNumber;
             this.LatestSampleCode.SampleLetter = res.Results.SampleLetter;
             this.LastSampleCodeOfPat = res.Results.ExistingBarCodeNumbersOfPatient;
-            this.coreService.loading = this.loading = false;
+            this._coreService.loading = this.loading = false;
           }
           else {
-            this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
-            this.coreService.loading = this.loading = false;
+            this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [res.ErrorMessage]);
+            this._coreService.loading = this.loading = false;
           }
         },
           err => {
-            this.msgBoxServ.showMessage("error", ["failed to add result.. please check log for details."]);
-            this.coreService.loading = this.loading = false;
+            this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Failed to add result.. please check log for details."]);
+            this._coreService.loading = this.loading = false;
           });
       this.showChangeSampleCreatedOn = false;
     } else {
-      this.coreService.loading = this.loading = false;
+      this._coreService.loading = this.loading = false;
     }
   }
 
@@ -253,23 +263,23 @@ export class LabTestsCollectSampleComponent {
         if (this.fromTransfer) {
           this.router.navigate(['/Lab/Requisition']);
         } else {
-          this.msgBoxServ.showMessage("failed", ["lab bill not paid"]);
+          this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Bill for the selected lab tests is not paid."]);
 
           this.router.navigate(['/Lab/Requisition']);
         }
 
       }
-      if (this.coreService.ShowEmptyReportSheetPrint()) {
+      if (this.PrintSheetConfig.ShowEmptyReportSheet) {
         this.showPrintEmptySheet = true;
       }
     }
     else {
-      this.msgBoxServ.showMessage("error", [res.ErrorMessage]);
+      this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [res.ErrorMessage]);
     }
   }
 
   CheckIfSampleCodeExist() {
-    this.coreService.loading = true;
+    this._coreService.loading = true;
     if (this.loading) {
       if (this.LastSampleCodeOfPat && this.LastSampleCodeOfPat.BarCodeNumber && this.LastSampleCodeOfPat.IsSelected) {
         this.AddSampleCode();
@@ -277,22 +287,22 @@ export class LabTestsCollectSampleComponent {
         if (this.LatestSampleCode.SampleNumber) {
           this.labBLService.GetSampleCodeCompared(this.LatestSampleCode.SampleNumber, this.visitType, this.sampleCreatedOn, this.RunNumberType, this.patUnderInsurance)
             .subscribe(res => {
-              if (res.Status == "OK" && res.Results) {
+              if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
                 if (res.Results.Exist) {
                   this.sampleCodeExistingDetail = res.Results;
                   this.showConfirmationBox = true;
                   this.loading = false;
-                  this.coreService.loading = false;
+                  this._coreService.loading = false;
                 }
                 else {
                   this.AddSampleCode();
                 }
-              } else { this.loading = false; this.coreService.loading = false; }
+              } else { this.loading = false; this._coreService.loading = false; }
             });
         } else {
-          this.msgBoxServ.showMessage("failed", ["Enter valid run number."]);
+          this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Enter valid run number."]);
           this.loading = false;
-          this.coreService.loading = false;
+          this._coreService.loading = false;
         }
       }
 
@@ -342,29 +352,29 @@ export class LabTestsCollectSampleComponent {
     if (selectedTests.length) {
       this.labBLService.PutSampleCode(selectedTests, this.currentUser)
         .subscribe(res => {
-          if (res.Status == 'OK') {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
             this.sampleDetail = res.Results;
             this.requisitionlist = [];
             this.UpdateSampleCodes();
             this.ManagePatientLabInfo(res.Results.SampleCollectedOnDateTime);
-            this.coreService.loading = false;
+            this._coreService.loading = false;
             this.loading = false;
           }
           else {
-            this.msgBoxServ.showMessage("error", ["Some issue in adding sample-code. Please try again."]);
-            this.coreService.loading = false;
+            this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Some issue in adding sample-code. Please try again."]);
+            this._coreService.loading = false;
             this.loading = false;
           }
         },
           err => {
-            this.msgBoxServ.showMessage("error", ["Some error issue in adding sample-code. Please try again."]);
-            this.coreService.loading = false;
+            this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Some error occurred in adding sample-code. Please try again."]);
+            this._coreService.loading = false;
             this.loading = false;
           });
     }
     else {
-      this.msgBoxServ.showMessage("failed", ["Please select test to collect sample."]);
-      this.coreService.loading = false;
+      this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select test to collect sample."]);
+      this._coreService.loading = false;
       this.loading = false;
     }
 
@@ -411,9 +421,11 @@ export class LabTestsCollectSampleComponent {
     let dob = this.patientService.globalPatient.DateOfBirth;
     let gender: string = this.patientService.globalPatient.Gender;
 
-    this.PatientLabInfo.SampleCollectedOnDateTime = moment(sampleCollOnDateTime).format("YYYY-MM-DD HH:mm");;
-    this.PatientLabInfo.AgeSex = CommonFunctions.GetFormattedAgeSex(dob, gender);
-    this.PatientLabInfo.Age = CommonFunctions.GetFormattedAge(dob);
+    this.PatientLabInfo.SampleCollectedOnDateTime = moment(sampleCollOnDateTime).format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
+    this.PatientLabInfo.Age = this._coreService.CalculateAge(dob);
+    if (this.PatientLabInfo && this.PatientLabInfo.Age && gender) {
+      this.PatientLabInfo.AgeSex = this._coreService.FormateAgeSex(this.PatientLabInfo.Age, gender);
+    }
     this.PatientLabInfo.Sex = gender;
     this.PatientLabInfo.PatientName = this.patientService.globalPatient.ShortName;
     //this.PatientLabInfo.RunNumber = $event.Data.SampleCode;
@@ -454,7 +466,7 @@ export class LabTestsCollectSampleComponent {
       test.IsSelected = this.isAllTestSelected;
     });
     if (!this.isAllTestSelected)
-      this.msgBoxServ.showMessage("Warning!", ["Please select test to collect sample."]);
+      this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select at least one test to collect sample."]);
   }
 
   public CheckIfAllSelected() {
@@ -463,7 +475,7 @@ export class LabTestsCollectSampleComponent {
     }
     else if (this.patientTestCSVs.every(a => a.IsSelected == false)) {
       this.isAllTestSelected = false;
-      this.msgBoxServ.showMessage("Warning!", ["Please select test to collect sample."]);
+      this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select at least one test to collect sample."]);
     }
     else {
       this.isAllTestSelected = false;
@@ -478,17 +490,17 @@ export class LabTestsCollectSampleComponent {
   }
 
   public CheckSampleCollectionDate() {
-    let dateDiff = moment(moment(this.sampleCreatedOn).format('YYYY-MM-DD')).diff(moment().format('YYYY-MM-DD'));
+    let dateDiff = moment(moment(this.sampleCreatedOn).format(ENUM_DateTimeFormat.Year_Month_Day)).diff(moment().format(ENUM_DateTimeFormat.Year_Month_Day));
     //if>0 then it is future date.
     if (dateDiff <= 0) {
       this.GetLatestSampleCode();
     }
     else {
-      this.msgBoxServ.showMessage("failed", ["Select valid sample collection date."]);
+      this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Select valid sample collection date."]);
     }
   }
   public CancelDateChange() {
-    this.sampleCreatedOn = moment().format("YYYY-MM-DD HH:mm");
+    this.sampleCreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
     this.showChangeSampleCreatedOn = false;
   }
 
@@ -519,13 +531,13 @@ export class LabTestsCollectSampleComponent {
     if (proceed) {
       this.labBLService.TransfertToLab(this.reqId, this.labTypeName)
         .subscribe(res => {
-          if (res.Status == "OK") {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
             this.patientTestCSVs = [];
             this.ListLabTestOfPatient();
           }
         },
           err => {
-            this.msgBoxServ.showMessage("error", ["Couldn't transfer to other lab. Please try again."]);
+            this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Couldn't transfer to other lab. Please try again."]);
             this.fromTransfer = false;
             console.log(err);
           });
@@ -555,11 +567,11 @@ export class LabTestsCollectSampleComponent {
       }
     });
 
-    this.coreService.loading = true;
+    this._coreService.loading = true;
 
     if (selectedTests.length > 0) {
       this.labBLService.GenerateSampleRunNumber(selectedTests, this.currentUser).subscribe(res => {
-        if (res.Status == 'OK') {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.LatestSampleCode.SampleCode = res.Results.LatestSampleData.SampleCode;
           this.LatestSampleCode.SampleNumber = res.Results.LatestSampleData.SampleNumber;
           this.LatestSampleCode.BarCodeNumber = res.Results.LatestSampleData.BarCodeNumber;
@@ -571,20 +583,20 @@ export class LabTestsCollectSampleComponent {
           this.ManagePatientLabInfo(res.Results.SampleCollectedOnDateTime);
         }
         else {
-          this.msgBoxServ.showMessage("error", ["Some issue in adding sample-code. Please try again." + res.ErrorMessage]);
-          this.coreService.loading = false;
+          this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Some issue in adding sample-code. Please try again." + res.ErrorMessage]);
+          this._coreService.loading = false;
           this.loading = false;
           this.CloseModalBox();
         }
       },
         err => {
-          this.msgBoxServ.showMessage("error", ["Some error issue in adding sample-code. Please try again."]);
-          this.coreService.loading = false;
+          this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Some error issue in adding sample-code. Please try again."]);
+          this._coreService.loading = false;
           this.loading = false;
         });
     } else {
-      this.msgBoxServ.showMessage("failed", ["Please select test to collect sample."]);
-      this.coreService.loading = false;
+      this._msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ["Please select test to collect sample."]);
+      this._coreService.loading = false;
       this.loading = false;
     }
 
@@ -593,5 +605,9 @@ export class LabTestsCollectSampleComponent {
   ChangeRunNumber() {
     this.loading = true;
     this.GetLatestSampleCode();
+  }
+
+  ngOnDestroy(): void {
+    this.patientService.CreateNewGlobal();
   }
 }

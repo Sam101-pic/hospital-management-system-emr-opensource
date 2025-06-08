@@ -1,10 +1,11 @@
+import { Injectable } from '@angular/core';
 import * as _ from 'lodash';
 import { Observable } from 'rxjs';
-import { Injectable } from '@angular/core';
-import { DispensaryEndpoint } from './dispensary.endpoint';
+import { CreditOrganization } from '../../pharmacy/shared/pharmacy-credit-organizations.model';
 import { PHRMStoreModel, StoreBillHeader } from '../../pharmacy/shared/phrm-store.model';
 import { ENUM_DispensaryType } from '../../shared/shared-enums';
-import { CreditOrganization } from '../../pharmacy/shared/pharmacy-credit-organizations.model';
+import { DispensaryEndpoint } from './dispensary.endpoint';
+import { InsurancePackageBillServiceItem_DTO } from './DTOs/insurance-package-bill-service-item.dto';
 
 @Injectable()
 export class DispensaryService {
@@ -14,6 +15,12 @@ export class DispensaryService {
    */
   private dispensaryList: PHRMStoreModel[] = [];
   public AllCreditOrganizationsList = [];
+  public BillingCreditOrganizationList = [];
+  PatientVisitId: number = 0;
+  PatientId: number = 0;
+  PatientCode: string = '';
+  InsurancePackageBillServiceItems: InsurancePackageBillServiceItem_DTO[];
+
   constructor(public dispensaryEndpoint: DispensaryEndpoint) { }
 
   //sanjit: 14 May'20, to implement authorization in Dispensary  Module.
@@ -121,4 +128,26 @@ export class DispensaryService {
   public SetAllCreditOrgList(creditOrgFromServer: Array<CreditOrganization>) {
     this.AllCreditOrganizationsList = creditOrgFromServer;
   }
+
+  public SetAllBillingCreditOrgList(creditOrgFromServer: Array<any>) {
+    this.BillingCreditOrganizationList = creditOrgFromServer;
+  }
+
+  /**
+   * This sets PatientId, PatientVisitId in the service
+   * @param patientId 
+   * @param patientVisitId 
+   */
+  SetPatientIdAndVisitIdForProvisionalView(patientId: number, patientVisitId: number, patientCode: string) {
+    this.PatientVisitId = patientVisitId;
+    this.PatientId = patientId;
+    this.PatientCode = patientCode;
+  }
+  /**
+   * This method set InsurancePackageBillServiceItem into the service for further need.
+   */
+  SetInsurancePackageBillServiceItems(serviceItems: InsurancePackageBillServiceItem_DTO[]) {
+    this.InsurancePackageBillServiceItems = serviceItems;
+  }
+
 }

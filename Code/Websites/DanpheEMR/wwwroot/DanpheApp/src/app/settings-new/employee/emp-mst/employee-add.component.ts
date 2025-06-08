@@ -12,6 +12,7 @@ import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { CommonFunctions } from "../../../shared/common.functions";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { Salutation } from "../../shared/DTOs/Salutation.Model";
 import { OPDServiceDetails_DTO } from "../../shared/DTOs/opd-service-details.dto";
 import { OPDServiceItem_DTO } from "../../shared/DTOs/opd-service-item.dto";
 import { Department } from '../../shared/department.model';
@@ -56,6 +57,7 @@ export class EmployeeAddComponent {
   public selectedOpdInternalReferralServiceItem: OPDServiceItem_DTO = new OPDServiceItem_DTO();
   public isServiceItemsDetailsValid: boolean = false;
   public onApptApplicable: boolean = false;
+  SalutationList: Array<Salutation> = new Array<Salutation>();
 
   public GeneralFieldLabel = new GeneralFieldLabels();
   constructor(
@@ -74,6 +76,7 @@ export class EmployeeAddComponent {
     this.GetEmpRoleList();
     this.GetEmpTypeList();
     this.GetDepartmentList();
+    this.SalutationList = this.coreService.SalutationData.filter(salutation => salutation.IsActive);
   }
   lableChange() {
     let label = this.coreService.GetFieldLabelParameter();
@@ -168,7 +171,7 @@ export class EmployeeAddComponent {
     }
     let currDeptId = this.CurrentEmployee.DepartmentId;
 
-    let currDept = this.deptList.find(dept => dept.DepartmentId === currDeptId);
+    let currDept = this.deptList.find(dept => dept.DepartmentId === Number(currDeptId));
     if (currDept) {
       if (currDept.DepartmentName.toLowerCase() === "lab" || currDept.DepartmentName.toLowerCase() === "pathology" || currDept.DepartmentName.toLowerCase() === "laboratory") {
         this.showLabSignature = true;
@@ -467,7 +470,11 @@ export class EmployeeAddComponent {
           else {
             this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Failed  to get OPD Service Items list"]);
           }
-        });
+        },
+          (error) => {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [error.error.Exception]);
+          }
+        );
     }
     catch (exception) {
     }

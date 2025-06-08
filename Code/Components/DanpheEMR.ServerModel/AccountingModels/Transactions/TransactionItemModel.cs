@@ -38,6 +38,8 @@ namespace DanpheEMR.ServerModel
         public int CostCenterId { get; set; }
         public string TransactionType { get; set; }
         public virtual List<TransactionLinkModel> TransactionLinks { get; set; }
+        public string VendorBillNo { get; set; }
+        public int? GoodReceiptId { get; set; }
 
     }
 }

@@ -7,6 +7,7 @@ import { DLService } from '../../../shared/dl.service';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
 import { DepartmentwiseStatReport_DTO } from '../../shared/depertment-wise-stat-report.dto';
+import { RPT_SchemeDTO } from '../../shared/dto/scheme.dto';
 import { DynamicReport } from '../../shared/dynamic-report.model';
 import { ReportingService } from '../../shared/reporting-service';
 
@@ -30,15 +31,19 @@ export class RPT_APPT_DepartmentwiseStatReportComponent {
     public department: Department = new Department();
     ;
     public deptId: number = null;
+    Schemes = new Array<RPT_SchemeDTO>();
+    SelectedScheme = new RPT_SchemeDTO();
+    IsFreeVisit: boolean = false;
     constructor(
         public dlService: DLService,
-        public reportServ: ReportingService,
-        public msgBoxServ: MessageboxService,
+        public _reportingService: ReportingService,
+        public _messageBoxService: MessageboxService,
     ) {
         this.selectedDepartmentwiseStatParameter.fromDate = moment().format('YYYY-MM-DD');
         this.selectedDepartmentwiseStatParameter.toDate = moment().format('YYYY-MM-DD');
         this.GetDepartments();
-        this.DepartmentWiseStatReportColumns = this.reportServ.reportGridCols.RPT_APPT_DepartmentWiseStatCounts;
+        this.DepartmentWiseStatReportColumns = this._reportingService.reportGridCols.RPT_APPT_DepartmentWiseStatCounts;
+        this.Schemes = this._reportingService.SchemeList;
 
     }
 
@@ -74,41 +79,66 @@ export class RPT_APPT_DepartmentwiseStatReportComponent {
             this.DepartmentWiseStatReportData = [];
 
             this.dlService.Read("/Reporting/DepartmentWiseStatReport?FromDate="
-                + this.selectedDepartmentwiseStatParameter.fromDate + "&ToDate=" + this.selectedDepartmentwiseStatParameter.toDate + "&DepartmentId=" + this.deptId + "&gender=" + this.selGenderName)
+                + this.selectedDepartmentwiseStatParameter.fromDate + "&ToDate=" + this.selectedDepartmentwiseStatParameter.toDate + "&DepartmentId=" + this.deptId + "&gender=" + this.selGenderName
+                + "&SchemeId=" + this.selectedDepartmentwiseStatParameter.SchemeId + "&IsFreeVisit=" + this.IsFreeVisit)
                 .map((res: DanpheHTTPResponse) => res)
                 .subscribe(res => this.Success(res),
                     res => this.Error(res));
         }
         else {
-            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Dates Provided is not Proper']);
+            this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Dates Provided is not Proper']);
         }
 
     }
     Error(err) {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [err]);
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [err]);
     }
 
     Success(res) {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
-            this.DepartmentWiseStatReportData = null;
-            this.DepartmentWiseStatReportData = res.Results;
-            this.SummaryCalculation();
+            if (res.Results.length > 0) {
+                this.DepartmentWiseStatReportData = null;
+                this.DepartmentWiseStatReportData = res.Results;
+                this.SummaryCalculation();
+            }
+            else {
+                this._messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ['Data is Not Available Between Selected dates...Try Different Dates']);
+            }
         }
         else {
-            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+            this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
         }
     }
     SummaryCalculation() {
         if (this.DepartmentWiseStatReportData != null) {
             this.DepartmentWiseStatReportData.forEach(appt => {
-                this.summary.tot_AdultNew += appt.NewMaleAdult + appt.NewFemaleAdult;
-                this.summary.tot_ChildNew += appt.NewFemaleChild + appt.NewMaleChild;
-                this.summary.tot_NewVisitPatients += appt.NewMaleAdult + appt.NewFemaleAdult + appt.NewFemaleChild + appt.NewMaleChild;
-                this.summary.tot_AdultFollowup += appt.FollowupFemaleAdult + appt.FollowupMaleAdult;
-                this.summary.tot_ChildFollowup += appt.FollowupFemaleChild + appt.FollowupMaleAdult;
-                this.summary.tot_FollowupPatients += appt.FollowupFemaleAdult + appt.FollowupMaleAdult + appt.FollowupFemaleChild + appt.FollowupMaleAdult;
+                this.summary.tot_AdultNew += appt.NewMaleAdult + appt.NewFemaleAdult + appt.NewOthersAdult;
+                this.summary.tot_ChildNew += appt.NewFemaleChild + appt.NewMaleChild + appt.NewOthersChild;
+                this.summary.tot_NewVisitPatients += appt.NewMaleAdult + appt.NewFemaleAdult + appt.NewFemaleChild + appt.NewMaleChild + appt.NewOthersAdult + appt.NewOthersChild;
+                this.summary.tot_AdultFollowup += appt.FollowupFemaleAdult + appt.FollowupMaleAdult + appt.FollowupOthersAdult;
+                this.summary.tot_ChildFollowup += appt.FollowupFemaleChild + appt.FollowupMaleChild + appt.FollowupOthersChild;
+                this.summary.tot_FollowupPatients += appt.FollowupFemaleAdult + appt.FollowupMaleAdult + appt.FollowupFemaleChild + appt.FollowupMaleChild + appt.FollowupOthersChild;
                 this.summary.tot_RegisteredVisitPatients += appt.Total;
             });
         }
     }
+
+    SchemeFormatter(data: any): string {
+        let html = data["SchemeName"];
+        return html;
+    }
+
+    OnSchemeChange(): void {
+        if (this.SelectedScheme && typeof (this.SelectedScheme) === "object" && this.SelectedScheme.SchemeId) {
+            this.selectedDepartmentwiseStatParameter.SchemeId = this.SelectedScheme.SchemeId;
+        }
+        else {
+            this.SelectedScheme = new RPT_SchemeDTO();
+            this.selectedDepartmentwiseStatParameter.SchemeId = null;
+        }
+    }
+    IsFreeVisitClicked() {
+        this.IsFreeVisit = !this.IsFreeVisit;
+    }
+
 }

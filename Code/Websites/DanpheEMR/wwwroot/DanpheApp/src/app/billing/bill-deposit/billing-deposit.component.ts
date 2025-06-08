@@ -14,18 +14,20 @@ import { FormBuilder, FormGroup, Validators } from "@angular/forms";
 import { CoreService } from "../../core/shared/core.service";
 import { DanpheHTTPResponse } from "../../shared/common-models";
 import { CommonFunctions } from "../../shared/common.functions";
+import { FewaPayService } from "../../shared/fewa-pay/helpers/fewa-pay.service";
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { BillingMasterBlService } from "../shared/billing-master.bl.service";
 import { EmployeeCashTransaction } from "../shared/billing-transaction.model";
 import { BillingDepositList_DTO } from "../shared/dto/bill-deposit-list.dto";
 import { DepositHead_DTO } from "../shared/dto/deposit-head.dto";
 import { PatientBillingContextVM } from "../shared/patient-billing-context-vm";
-import { ENUM_BillDepositType, ENUM_BillPaymentMode, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_VisitType } from "./../../shared/shared-enums";
+import { ENUM_BillDepositType, ENUM_BillPaymentMode, ENUM_DanpheHTTPResponses, ENUM_FewaPayMessageTypes, ENUM_MessageBox_Status, ENUM_VisitType } from "./../../shared/shared-enums";
 
 @Component({
   selector: 'billing-deposit',
   templateUrl: './billing-deposit.html',
-  styleUrls: ['./billing-deposit.component.css']
+  styleUrls: ['./billing-deposit.component.css'],
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class BillingDepositComponent {
   public deposit: BillingDeposit = new BillingDeposit();
@@ -75,7 +77,11 @@ export class BillingDepositComponent {
   public confirmationMessageForReturnDeposit: string = "Are you sure you want to Return Deposit ?";
   public confirmationMessageForReturnDepositAndPrint: string = "Are you sure you want to Return Deposit and Print Slip ?";
   VisitType: any;
+  public depositorContactError: string = '';
+  public depositorNameError: string = '';
 
+  loadingScreen: boolean = false;
+  temp_showReceipt: boolean = false;
   constructor(public patientService: PatientService,
     public billingService: BillingService,
     public billingBLService: BillingBLService,
@@ -84,7 +90,8 @@ export class BillingDepositComponent {
     public callbackService: CallbackService,
     public coreService: CoreService,
     public formBuilder: FormBuilder, public messageBoxService: MessageboxService,
-    public billingMasterBlService: BillingMasterBlService) {
+    public billingMasterBlService: BillingMasterBlService,
+    private _fewaPayService: FewaPayService) {
 
     if (this.securityService.getLoggedInCounter().CounterId < 1) {
       this.callbackService.CallbackRoute = '/Billing/SearchPatient';
@@ -230,6 +237,7 @@ export class BillingDepositComponent {
     }
   }
 
+
   SubmitBillingDeposit(_showReceipt: boolean) {
     if (this.CheckForRefundPermission()) {
       this.deposit.PaymentMode = ENUM_BillPaymentMode.cash;
@@ -239,6 +247,10 @@ export class BillingDepositComponent {
         if (this.deposit.InAmount > 0 || this.deposit.OutAmount > 0) {
           if (this.deposit.TransactionType === ENUM_BillDepositType.ReturnDeposit && this.deposit.OutAmount > this.deposit.DepositBalance) {
             this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Return Amount should not be greater than Deposit Amount"]);
+            this.loading = false;
+            return;
+          }
+          if (!this.ValidateDepositorNameAndContact()) {
             this.loading = false;
             return;
           }
@@ -266,62 +278,9 @@ export class BillingDepositComponent {
             visitType = ENUM_VisitType.inpatient
           }
           this.deposit.VisitType = visitType;
+          this.temp_showReceipt = _showReceipt;
+          this.HandlePaymentTransaction(_showReceipt);
 
-          this.billingBLService.PostBillingDeposit(this.deposit)
-            .subscribe(
-              res => {
-                if (this.showReceiptInput) {
-                  _showReceipt = true;
-                }
-                if (res.Status === ENUM_DanpheHTTPResponses.OK) {
-                  this.depositRefundUsingDepositReceiptNumber = false;
-                  if (this.deposit.TransactionType === ENUM_BillDepositType.Deposit) {
-                    this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Deposit of " + this.coreService.currencyUnit + this.deposit.InAmount + " added successfully."]);
-                  }
-                  else {
-                    this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, [this.coreService.currencyUnit + this.deposit.OutAmount + " returned successfully."]);
-
-                  }
-
-                  if (_showReceipt) {
-                    this.deposit = res.Results;
-                    this.deposit.PatientName = this.patientService.getGlobal().ShortName;
-                    this.deposit.PatientCode = this.patientService.getGlobal().PatientCode;
-                    this.deposit.Address = this.patientService.getGlobal().Address;
-                    this.deposit.PhoneNumber = this.patientService.getGlobal().PhoneNumber;
-                  }
-                  else {
-                    const defaultDepositHead = this.depositHeadList.find(deposit => deposit.IsDefault);
-                    this.selectedDepositHead = defaultDepositHead;
-                    this.Initialize();
-                    this.deposit.DepositBalance = res.Results.DepositBalance;
-                  }
-                  //this.deposit.DepositType = "Deposit Settlement ";//needs revision: sud:13May'18
-                  if (this.isAddDepositFrmBillTxn)
-                    this.EmitDeposit(true);
-                  this.showReceipt = _showReceipt;
-                  this.loading = false;
-                  this.LoadPatientPastBillSummary(res.Results.PatientId);
-                }
-                else {
-                  if (res.ErrorMessage.match(/Return Deposit Amount is Invalid/g)) {
-                    this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
-                    this.router.navigate(['/Billing/SearchPatient']);
-                    this.loading = false;
-                  }
-                  else {
-                    //! Krishna, this is done to maintain the Actual DepositBalance incase of failure.
-                    if (this.deposit.TransactionType === ENUM_BillDepositType.Deposit) {
-
-                      this.deposit.DepositBalance = this.deposit.DepositBalance - this.deposit.InAmount;
-                    } else {
-                      this.deposit.DepositBalance = this.deposit.DepositBalance + this.deposit.OutAmount;
-                    }
-                    this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Cannot complete the transaction."]);
-                    this.loading = false;
-                  }
-                }
-              });
         } else {
           this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [this.deposit.TransactionType + " Amount must be greater than 0"]);
           this.loading = false;
@@ -336,6 +295,98 @@ export class BillingDepositComponent {
     }
 
   }
+
+
+  /**This method is responsible to check whether FewaPay is applicable or not if not proceed with normal workflow else wait for the message sent by FewaPay Browser extension and decide after message is received*/
+  private HandlePaymentTransaction(_showReceipt: boolean) {
+    if (this._fewaPayService.IsFewaPayApplicable(this.deposit.PaymentDetails)) {
+      this.loadingScreen = true;
+      const transactionReqString = this._fewaPayService.CreateFewaPayTransactionRequest(this.deposit.PaymentDetails, this.deposit.InAmount, this.deposit.Remarks);
+      if (transactionReqString) {
+        window.postMessage({
+          type: ENUM_FewaPayMessageTypes.PaymentInfoRequest,
+          data: transactionReqString,
+        }, "*");
+        console.log('Transaction Request is posted from Danphe.');
+      } else {
+        this.loadingScreen = false;
+        this.loading = false;
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [`Transaction Request cannot be created due to missing mandatory data like paymentDetails, totalAmount and remarks`]);
+      }
+
+    } else {
+      this.SaveBillingDeposit(_showReceipt);
+    }
+  }
+
+  private SaveBillingDeposit(_showReceipt: boolean) {
+    this.billingBLService.PostBillingDeposit(this.deposit)
+      .subscribe(
+        res => {
+          this.loadingScreen = false;
+          if (this.showReceiptInput) {
+            _showReceipt = true;
+          }
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            this.depositRefundUsingDepositReceiptNumber = false;
+            if (this.deposit.TransactionType === ENUM_BillDepositType.Deposit) {
+              this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Deposit of " + this.coreService.currencyUnit + this.deposit.InAmount + " added successfully."]);
+            }
+            else {
+              this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, [this.coreService.currencyUnit + this.deposit.OutAmount + " returned successfully."]);
+
+            }
+
+            if (_showReceipt) {
+              this.deposit = res.Results;
+              this.deposit.PatientName = this.patientService.getGlobal().ShortName;
+              this.deposit.PatientCode = this.patientService.getGlobal().PatientCode;
+              this.deposit.Address = this.patientService.getGlobal().Address;
+              this.deposit.PhoneNumber = this.patientService.getGlobal().PhoneNumber;
+              this.deposit.CountryName = this.patientService.getGlobal().CountryName;
+              this.deposit.MunicipalityName = this.patientService.getGlobal().MunicipalityName;
+              this.deposit.CountrySubDivisionName = this.patientService.getGlobal().CountrySubDivisionName;
+              this.deposit.WardNumber = this.patientService.getGlobal().WardNumber;
+
+            }
+            else {
+              const defaultDepositHead = this.depositHeadList.find(deposit => deposit.IsDefault);
+              this.selectedDepositHead = defaultDepositHead;
+              this.Initialize();
+              this.deposit.DepositBalance = res.Results.DepositBalance;
+            }
+            //this.deposit.DepositType = "Deposit Settlement ";//needs revision: sud:13May'18
+            if (this.isAddDepositFrmBillTxn)
+              this.EmitDeposit(true);
+            this.showReceipt = _showReceipt;
+            this.loading = false;
+            this.LoadPatientPastBillSummary(res.Results.PatientId);
+          }
+          else {
+            if (res.ErrorMessage.match(/Return Deposit Amount is Invalid/g)) {
+              this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
+              this.router.navigate(['/Billing/SearchPatient']);
+              this.loading = false;
+            }
+            else {
+              //! Krishna, this is done to maintain the Actual DepositBalance incase of failure.
+              if (this.deposit.TransactionType === ENUM_BillDepositType.Deposit) {
+
+                this.deposit.DepositBalance = this.deposit.DepositBalance - this.deposit.InAmount;
+              } else {
+                this.deposit.DepositBalance = this.deposit.DepositBalance + this.deposit.OutAmount;
+              }
+              this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Cannot complete the transaction."]);
+              this.loading = false;
+            }
+          }
+        }, err => {
+          this.loadingScreen = false;
+          this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Cannot complete the transaction."]);
+          console.error(err);
+        });
+  }
+
   public EmitDeposit(emitBalance: boolean) {
     let balance = emitBalance ? this.deposit.DepositBalance : 0;
     this.emitDeposit.emit({ depositBalance: balance });
@@ -471,4 +522,41 @@ export class BillingDepositComponent {
     this.loading = true;
     this.SubmitBillingDeposit(true);
   }
+
+  /**
+   * 
+   * @returns this returns boolean value to validate if the entered Details are Valid or Not 
+   */
+  ValidateDepositorNameAndContact(): boolean {
+    const depositorContact = this.deposit.CareOfContact;
+    const depositorName = this.deposit.CareOf;
+    let isValid = true;
+    // Validate name
+    if (!depositorName) {
+      this.depositorNameError = 'Please enter Name';
+      isValid = false;
+    } else {
+      this.depositorNameError = null; // Clear any previous error
+    }
+    // Validate contact number
+    if (depositorContact) {
+      const validPattern = /^(\+\d{1,3}-)?\d{10}$/;
+      if (!validPattern.test(depositorContact)) {
+        this.depositorContactError = 'Please enter a valid phone number';
+        isValid = false;
+      } else {
+        this.depositorContactError = null; // Clear any previous error
+      }
+    } else {
+      this.depositorContactError = null; // Clear any previous error if no value is entered
+    }
+    return isValid;
+  }
+
+  hotKeys(event) {
+    if (event.keyCode === 27) {
+      this.handleCancel();
+    }
+  }
+
 }

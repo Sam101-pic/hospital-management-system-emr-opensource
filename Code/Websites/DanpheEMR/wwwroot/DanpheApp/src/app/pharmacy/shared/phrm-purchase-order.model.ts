@@ -54,6 +54,7 @@ export class PHRMPurchaseOrder {
         this.PurchaseOrderValidator = _formBuilder.group({
             'SupplierId': ['', Validators.compose([Validators.required])],
             'DeliveryDays': ['', Validators.compose([Validators.required, this.positiveNumberValdiator])],
+            'PODate': ['', Validators.compose([Validators.required])]
         });
     }
 
@@ -79,5 +80,4 @@ export class PHRMPurchaseOrder {
                 return { 'invalidNumber': true };
         }
     }
-
 }

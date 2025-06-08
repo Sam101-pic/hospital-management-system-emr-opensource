@@ -86,6 +86,9 @@ export class SchemePriceCategorySelectComponent {
       this.currentSchemePriceCatDto.IsGeneralCreditLimited = scheme.IsGeneralCreditLimited;
       this.currentSchemePriceCatDto.SchemeApiIntegrationName = scheme.ApiIntegrationName;
       this.currentSchemePriceCatDto.AllowProvisionalBilling = scheme.AllowProvisionalBilling;
+      this.currentSchemePriceCatDto.IsPharmacyCappingApplicable = scheme.IsPharmacyCappingApplicable;
+      this.currentSchemePriceCatDto.IsBillingCappingApplicable = scheme.IsBillingCappingApplicable;
+      this.currentSchemePriceCatDto.UseCappingAPI = scheme.UseCappingAPI;
       if (this.trackOldAndNewSchemePriceCategory.old_schemeId !== this.trackOldAndNewSchemePriceCategory.new_schemeId) {
 
         this.trackOldAndNewSchemePriceCategory.old_PriceCategoryId = this.currentSchemePriceCatDto.PriceCategoryId;

@@ -1,12 +1,13 @@
 import { Injectable } from '@angular/core';
 import * as _ from 'lodash';
 import * as moment from 'moment/moment';
-import { DischargeSummary } from '../../adt/shared/discharge-summary.model';
 import { BillingDLService } from '../../billing/shared/billing.dl.service';
 import { CoreService } from "../../core/shared/core.service";
 import { LabsDLService } from '../../labs/shared/labs.dl.service';
 import { ImagingDLService } from '../../radiology/shared/imaging.dl.service';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { DischargePatientReferralModel } from '../add-view-summary/Model/discharge-summary-refferal.model';
+import { TempDischargeTemplate } from '../add/discharge-summary-add.component';
 import { DischargeSummaryDLService } from './discharge-summary.dl.service';
 import { PatientCertificate } from './patient-certificate.model';
 
@@ -93,8 +94,8 @@ export class DischargeSummaryBLService {
     return this.dischargeSummaryDLService.GetDischargeSummary(patientVisitId)
       .map(res => res);
   }
-  public PostDischargeSummary(dischargeSummary: DischargeSummary) {
-    var tempVisitModel = _.omit(dischargeSummary, ['DischargeSummaryValidator']);
+  public PostDischargeSummary(dischargeSummary: TempDischargeTemplate) {
+    var tempVisitModel = _.omit(dischargeSummary, ['TempDischargeSummaryValidator']);
     var tempMedicines: any = tempVisitModel.DischargeSummaryMedications.map(itm => {
       return _.omit(itm, ['DischargeSummaryMedicationValidator']);
     });
@@ -110,13 +111,13 @@ export class DischargeSummaryBLService {
     return this.dischargeSummaryDLService.PostDischargeSummary(tempVisitModel)
       .map(res => res)
   }
-  public UpdateDischargeSummary(dischargeSummary: DischargeSummary) {
+  public UpdateDischargeSummary(dischargeSummary: TempDischargeTemplate) {
     //to fix serializaiton problem in server side
     if (dischargeSummary.CreatedOn)
       dischargeSummary.CreatedOn = moment(dischargeSummary.CreatedOn).format('YYYY-MM-DD HH:mm');
     if (dischargeSummary.ModifiedOn)
       dischargeSummary.ModifiedOn = moment(dischargeSummary.ModifiedOn).format('YYYY-MM-DD HH:mm');
-    var tempVisitModel = _.omit(dischargeSummary, ['DischargeSummaryValidator']);
+    var tempVisitModel = _.omit(dischargeSummary, ['TempDischargeSummaryValidator']);
     var tempMedicines: any = tempVisitModel.DischargeSummaryMedications.map(itm => {
       return _.omit(itm, ['DischargeSummaryMedicationValidator']);
     });
@@ -164,7 +165,17 @@ export class DischargeSummaryBLService {
         return responseData;
       })
   }
-
+  public GetDepartments() {
+    return this.dischargeSummaryDLService.GetDepartments()
+      .map(res => { return res });
+  }
+  public PostDischargeReferrel(patientReferrel: DischargePatientReferralModel) {
+    return this.dischargeSummaryDLService.PostDischargeReferrel(patientReferrel).map(res => res);
+  }
+  public GetPatientReferralDetails(patientReferralId: number) {
+    return this.dischargeSummaryDLService.GetpatientReferralDetial(patientReferralId)
+      .map(res => res);
+  }
 }
 
 

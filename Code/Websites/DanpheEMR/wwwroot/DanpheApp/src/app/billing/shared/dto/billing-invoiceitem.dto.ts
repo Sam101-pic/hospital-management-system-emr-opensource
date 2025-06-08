@@ -6,12 +6,14 @@ export class InvoiceItem_DTO {
   public PerformerName: string = '';
   public PrescriberId: number = null;
   public PrescriberName: string = '';
+  public ReferredById: number = null;
   public ItemCode: string = '';
   public ItemName: string = '';
   public Price: number = 0;
   public Quantity: number = 0;
   public SubTotal: number = 0;
   public IsTaxApplicable: boolean = false;
+  public AllowMultipleQty: boolean = true;
   public IsDiscountApplicable: boolean = false;
   public DiscountPercent: number;
   public IsPriceChangeAllowed: boolean = false;
@@ -41,4 +43,9 @@ export class InvoiceItem_DTO {
   public BillingPackageId: number = null;
   public IsDoctorMandatory: boolean = false;
   public DefaultDoctorList: string = null;
+  public IntegrationName: string = null;
+  public CappingQuantity: number = 0;
+  public PreviouslySalesQuantity: number;
+  public CappingLimitDays: number = 0;
+  public IsCappingEnabled: boolean = false;
 }

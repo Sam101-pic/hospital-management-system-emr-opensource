@@ -18,5 +18,6 @@ namespace DanpheEMR.ServerModel
         public int? BranchId { get; set; }
         public int? CreatedBy { get; set; }
         public DateTime? CreatedOn { get; set; }
+        public bool IsActive { get; set; }
     }
 }

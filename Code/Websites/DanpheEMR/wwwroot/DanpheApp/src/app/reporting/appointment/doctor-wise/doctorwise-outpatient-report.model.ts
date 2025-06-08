@@ -1,9 +1,10 @@
-import { NgForm, FormGroup, FormControl, Validators, FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import * as moment from 'moment/moment';
 
 export class RPT_APPT_DoctorWiseOutPatientReportModel {
     public fromDate: string = "";
     public toDate: string = "";
+    SchemeId: number = null;
     public DoctorwiseOutPatientReportValidator: FormGroup = null;
 
     constructor() {
@@ -46,7 +47,7 @@ export class RPT_APPT_DoctorWiseOutPatientReportModel {
             return this.DoctorwiseOutPatientReportValidator.controls[fieldName].dirty;
     }
 
-    public IsValid():boolean{if(this.DoctorwiseOutPatientReportValidator.valid){return true;}else{return false;}} public IsValidCheck(fieldName, validator): boolean {
+    public IsValid(): boolean { if (this.DoctorwiseOutPatientReportValidator.valid) { return true; } else { return false; } } public IsValidCheck(fieldName, validator): boolean {
         if (fieldName == undefined)
             return this.DoctorwiseOutPatientReportValidator.valid;
         else

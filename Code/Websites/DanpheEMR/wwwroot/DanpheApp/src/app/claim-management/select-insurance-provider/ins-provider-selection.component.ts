@@ -28,6 +28,7 @@ export class InsuranceProviderSelectionComponent {
   }
 
   ngOnInit() {
+    this.claimManagementService.IsNGHISSchemeSelected = null;
   }
   public GetInsuranceApplicableCreditOrganizations(): void {
     try {
@@ -52,9 +53,13 @@ export class InsuranceProviderSelectionComponent {
     this.claimManagementService.setSelectedOrganization(org);
     if (org) {
       const schemeApiIntegrationName = await this.claimManagementService.getRespectiveApiIntegrationName(org.OrganizationId);
+      this.claimManagementService.CurrentApiIntegrationName = schemeApiIntegrationName;
       if (schemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.SSF) {
         this.router.navigate(["/ClaimManagement/SSFClaim"]);
       } else {
+        if (schemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS) {
+          this.claimManagementService.IsNGHISSchemeSelected = true;
+        }
         this.router.navigate(["/ClaimManagement/BillReview"]);
       }
     }

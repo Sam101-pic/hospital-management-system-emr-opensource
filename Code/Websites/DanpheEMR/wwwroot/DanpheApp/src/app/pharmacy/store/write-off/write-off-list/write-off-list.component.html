@@ -1,10 +1,10 @@
-
 <div class="caption lb-caption">
   <button class="btn btn-primary" (click)="AddBreakage()">Add Breakage item<span class="glyphicon glyphicon-trash"></span></button>
 </div>
 <div class="row">
   <div class="col-lg-12 col-sm-12">
-    <danphe-grid [grid-colDefaults]="writeOffListGridColumns" [grid-data]="writeOffList" (grid-actions)="WriteOffGridAction($event)" [NepaliDateInGridParams]="NepaliDateInGridSettings">
+    <danphe-grid [grid-colDefaults]="writeOffListGridColumns" [grid-data]="writeOffList" (grid-actions)="WriteOffGridAction($event)"
+                 [NepaliDateInGridParams]="NepaliDateInGridSettings">
     </danphe-grid>
   </div>
 </div>
@@ -24,14 +24,37 @@
           </div>
           <div id="printpage" class="row printStyle print-border" style="margin-top: 30px;">
             <div style="text-align:center;">
+              <div class="row" style="margin-bottom: 10px;">
+                <div class="logo" style="width: 18%;padding: 0px 15px 0px 15px; float: left; margin-left:10px;"> <img class="img-responsive"
+                       style="max-height:70px;" src="../../../themes/theme-default/images/hospital-logo-phrm.PNG" /> </div>
+                <div style="width: 64%;float: left;padding-bottom:  0px;">
+                  <div class="text-center bill-head" style="text-align: center;font-family:sans-serif; margin-top: 10px;"> <span
+                          style="font-size:15px;"><strong>{{headerDetail.hospitalName}}</strong></span><br />
+                    <span style="font-size:15px;">{{headerDetail.address}}</span><br />
+                    <span style="font-size:13px;">{{GeneralFieldLabel.PANNo}}: {{headerDetail.PANno}} , Tel: {{ headerDetail.tel}}</span><br />
+                    <span style="font-size:14px; margin-right: 30px;"><strong>PHARMACY UNIT</strong></span>
+                  </div>
+                </div>
+                <div style="float: left;">
+                  <div class="qr-code" style="margin-left:20px; top:35px;">
+                    <qr-code [size]="75" [backgroundAlpha]="0"></qr-code>
+                  </div>
+                </div>
+                <div style="clear:left"></div>
+              </div>
               <div class="col-md-12">
                 <p class="text-center btm-pad border-up-down"><b> WRITE-OFF ITEMS DETAILS </b></p>
                 <div class="table-responsive">
                   <div class="left">
                     <p class="no-margin" style="text-align:left;">
-                      <strong>Write-Off Date: {{WriteOffdata.CreatedOn | DanpheDateTime:'format':'YYYY-MM-DD'}}</strong>
+                      <strong>Write-Off Date:</strong>
+                      {{WriteOffdata.CreatedOn | DanpheDateTime: 'format':'YYYY-MM-DD'}}
+                      <span>
+                        <i *ngIf="WriteOffdata.CreatedOn">{{WriteOffdata.CreatedOn | nepaliDate:'format':'YYYY-MM-DD'}}</i>
+                      </span>
                     </p>
-                  </div><br>
+                  </div>
+                  <br>
                   <div class="left">
                     <p class="no-margin" style="text-align:left;">
                       <strong>Write-Off Id: {{WriteOffdata.WriteOffId}}</strong>

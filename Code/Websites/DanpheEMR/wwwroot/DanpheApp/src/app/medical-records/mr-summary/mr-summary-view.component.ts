@@ -1,19 +1,15 @@
-import { Component, ChangeDetectorRef, Input, Output, EventEmitter } from '@angular/core'
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 //Security Service for Loading Child Route from Security Service
-import { SecurityService } from "../../security/shared/security.service";
 import * as moment from 'moment/moment';
-import * as _ from 'lodash';
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { MR_BLService } from '../shared/mr.bl.service';
-import { CoreService } from '../../core/shared/core.service';
-import { HttpClient } from '@angular/common/http';
-import { MedicalRecordsMasterDataVM, OperationTypeModel, DeathTypeModel, DischargeConditionTypeModel, DeliveryTypeModel, DischargeTypeModel } from '../shared/DischargeMasterData.model';
-import { Employee } from '../../employee/shared/employee.model';
-import { MasterType, DanpheCache } from '../../shared/danphe-cache-service-utility/cache-services';
-import { MedicalRecordsSummary, MRSelectTypeName } from '../shared/medical-records.model';
 import { BabyBirthDetails } from '../../adt/shared/baby-birth-details.model';
 import { DeathDetails } from '../../adt/shared/death.detail.model';
+import { CoreService } from '../../core/shared/core.service';
+import { Employee } from '../../employee/shared/employee.model';
+import { DanpheCache, MasterType } from '../../shared/danphe-cache-service-utility/cache-services';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { MedicalRecordsMasterDataVM } from '../shared/DischargeMasterData.model';
+import { MRSelectTypeName, MedicalRecordsSummary } from '../shared/medical-records.model';
+import { MR_BLService } from '../shared/mr.bl.service';
 
 @Component({
   selector: "view-mr-summary",
@@ -38,6 +34,7 @@ export class ViewMedicalRecordComponent {
   public allDataLoaded: boolean = false;
 
   public allTypeName: MRSelectTypeName = new MRSelectTypeName();
+  public ICDLabel: string = '';
 
   constructor(public MedicalRecordsBLService: MR_BLService,
     public msgBoxServ: MessageboxService,
@@ -62,12 +59,18 @@ export class ViewMedicalRecordComponent {
         if (res.Status == 'OK') {
 
           this.RecordSummary = res.Results.MedicalRecordOfPatient;
-          this.OperationDiagnosis= this.RecordSummary.OperationDiagnosis;
+          this.OperationDiagnosis = this.RecordSummary.OperationDiagnosis;
           this.RecordSummary.BirthDetail = new BabyBirthDetails();
           this.allMasterDataForMR.AllOperationType = res.Results.AllOperationType;
           this.allMasterDataForMR.AllDischargeType = res.Results.AllDischargeType;
           this.allMasterDataForMR.AllBirthConditions = res.Results.AllBirthConditions;
           this.allMasterDataForMR.AllGravita = res.Results.AllGravita;
+          if (this.RecordSummary.ICDCodeList.length > 0) {
+            const icdLabel = this.RecordSummary.ICDCodeList[0].IcdVersion;
+            if (icdLabel) {
+              this.ICDLabel = icdLabel;
+            }
+          }
           if (this.RecordSummary.DischargeTypeId) {
             var dis = this.allMasterDataForMR.AllDischargeType.find(d => d.DischargeTypeId == this.RecordSummary.DischargeTypeId);
             if (dis) {

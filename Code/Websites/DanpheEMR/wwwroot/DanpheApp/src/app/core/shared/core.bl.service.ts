@@ -5,6 +5,11 @@ import { CoreDLService } from './core.dl.service';
 @Injectable()
 export class CoreBLService {
   constructor(public coreDLService: CoreDLService) { }
+  public GetSalutationList() {
+    return this.coreDLService.GetSalutationList().map((res) => {
+      return res;
+    });
+  }
 
   public GetParametersList() {
     return this.coreDLService.GetParametersList().map((res) => res);
@@ -39,7 +44,7 @@ export class CoreBLService {
   public GetFiscalYearList() {
     return this.coreDLService.GetFiscalYearList().map((res) => res);
   }
-  public GetsectionList() {
+  public() {
     return this.coreDLService.GetsectionList().map((res) => {
       return res;
     });
@@ -112,5 +117,23 @@ export class CoreBLService {
   public GetBillingSchemesDtoList(serviceBillingContext: string) {
     return this.coreDLService.GetBillingSchemesDtoList(serviceBillingContext)
       .map(res => { return res })
+  }
+  public GetInsuranceMasterItems() {
+    return this.coreDLService.GetInsuranceMasterItems()
+      .map(res => { return res })
+  }
+
+  public GetCurrentFiscalYear() {
+    return this.coreDLService.GetCurrentFiscalYear().map((res) => res);
+  }
+
+  GetActivePharmacyPackages() {
+    return this.coreDLService.GetActivePharmacyPackages().map(res => { return res; });
+  }
+  GetActivePharmacyPackageItems() {
+    return this.coreDLService.GetActivePharmacyPackageItems().map(res => { return res; });
+  }
+  GetCappingResponse(NSHINumber: string) {
+    return this.coreDLService.GetCappingResponse(NSHINumber).map(res => { return res; })
   }
 }

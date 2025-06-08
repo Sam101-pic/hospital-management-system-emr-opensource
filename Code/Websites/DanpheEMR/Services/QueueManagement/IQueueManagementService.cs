@@ -10,7 +10,7 @@ namespace DanpheEMR.Services.QueueManagement
     public interface IQueueManagementService
     {
         dynamic GetDepartment();
-        dynamic GetAppointmentData(int deptId, int doctorId, bool pendingOnly);
+        dynamic GetAppointmentData(int deptId, List<int?> doctorId, bool pendingOnly);
         dynamic updateQueueStatus(string data, int visitId, RbacUser currentUser);
         dynamic GetAllAppointmentApplicableDoctor();
     }

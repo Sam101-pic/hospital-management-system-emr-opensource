@@ -113,7 +113,7 @@ export class PurchaseOrderListComponent implements OnInit {
         }
       case "view":
         {
-          this.RouteToViewDetails($event.Data.PurchaseOrderId)
+          this.RouteToViewDetails($event.Data)
           break;
         }
       case "CopyToPo":
@@ -165,9 +165,10 @@ export class PurchaseOrderListComponent implements OnInit {
     this.inventoryService.POIdforCopy = id;
     this.router.navigate(['/ProcurementMain/PurchaseOrder/PurchaseOrderAdd']);
   }
-  RouteToViewDetails(id) {
+  RouteToViewDetails(purchaseOrder) {
     //pass the purchaseorderID to purchaseorderDetails page
-    this.inventoryService.POId = id;//sud:3Mar'20-Property Rename in InventoryService
+    this.inventoryService.POId = purchaseOrder.PurchaseOrderId;//sud:3Mar'20-Property Rename in InventoryService
+    this.inventoryService.PurchaseOrderStatus = this.poStatusForFilter;
     this.router.navigate(['/ProcurementMain/PurchaseOrder/PurchaseOrderView']);
   }
 

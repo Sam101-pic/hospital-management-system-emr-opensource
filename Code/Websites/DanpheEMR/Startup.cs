@@ -5,46 +5,29 @@ using DanpheEMR.Core.Caching;
 using DanpheEMR.Core.Configuration;
 using DanpheEMR.DalLayer;
 using DanpheEMR.DependencyInjection;
+using DanpheEMR.Filters;
+using DanpheEMR.Middlewares;
+using DanpheEMR.RateLimit.Factory;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
-using DanpheEMR.Services;
-using DanpheEMR.Services.Billing;
-using DanpheEMR.Services.ClaimManagement;
-using DanpheEMR.Services.Dispensary;
-using DanpheEMR.Services.DispensaryTransfer;
-using DanpheEMR.Services.IMU;
-using DanpheEMR.Services.Inventory.InventoryDonation;
-using DanpheEMR.Services.LIS;
-using DanpheEMR.Services.Maternity;
-using DanpheEMR.Services.Medicare;
+using DanpheEMR.Services.Authorization;
 using DanpheEMR.Services.Pharmacy.Mapper.PurchaseOrder;
-using DanpheEMR.Services.Pharmacy.PharmacyPO;
-using DanpheEMR.Services.Pharmacy.Rack;
-using DanpheEMR.Services.Pharmacy.SupplierLedger;
-using DanpheEMR.Services.ProcessConfirmation;
-using DanpheEMR.Services.QueueManagement;
-using DanpheEMR.Services.SSF;
-using DanpheEMR.Services.Utilities;
-using DanpheEMR.Services.Vaccination;
 using DanpheEMR.Utilities;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using DanpheEMR.Utilities.SignalRHubs;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Serialization;
-using Swashbuckle.AspNetCore.Swagger;
 using System;
-using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.IO;
-using System.Linq;
-using System.Text;
 
 namespace DanpheEMR
 {
@@ -104,7 +87,8 @@ namespace DanpheEMR
                 //IMPORTANT-- remove the hardcoded value 20 from below
                 //keep short timeout like max 2-3 hours, 
                 //we've to redirect to login once the session expires.
-                options.IdleTimeout = TimeSpan.FromHours(2);
+                //options.IdleTimeout = TimeSpan.FromHours(2);
+                options.IdleTimeout = TimeSpan.FromMinutes(480); //here 480 minutes = 8 hours
                 options.CookieHttpOnly = true;
 
             });
@@ -114,6 +98,8 @@ namespace DanpheEMR
             //instead add them in that extension method(used just below this comment)
             services.AddDanpheServices(Configuration);
 
+            services.AddHttpContextAccessor();
+
             services.AddAutoMapper(typeof(MappingProfile));
             services.AddAutoMapper(typeof(PurchaseOrderMappingProfile));
 
@@ -121,6 +107,7 @@ namespace DanpheEMR
             services.AddOptions();
 
             services.Configure<MyConfiguration>(Configuration);
+            services.AddSignalR();
 
             //Krishna, 19thMay'23, Moved the registration of Swagger and JWT to an extension method inside ConfigureServices class.
             services.AddSwaggerAndJwtServices(Configuration);
@@ -169,6 +156,9 @@ namespace DanpheEMR
             services.AddSingleton<DanpheCache>(new DanpheCache(connString, cacheExpMins));
             //end: using service configuration for caching class.
 
+            // Register CacheService as Singleton
+            services.AddSingleton<ICacheService, CacheService>();
+
             //used in LabReportExport to differntiate abnormal values based on this parameter
             bool highlightAbnormalLabResult = Convert.ToBoolean(Configuration["highlightAbnormalLabResult"]);
 
@@ -199,6 +189,18 @@ namespace DanpheEMR
             services.AddSingleton<RBAC>(new RBAC(connString, cacheExpMins));
             ///add nepali date as a singleton for one time initialization.
             services.AddSingleton<NepaliDate>(new NepaliDate(connString));
+
+            services.AddRateLimit(Configuration);
+            services.AddScoped<AuthorizationFilter>();
+
+
+            //Add RolePolicyService, we need cache Service in RolePolicyService which is why we are injecting the dependency of it through constructor.
+            services.AddScoped<RolePolicyService>(sp =>
+            {
+                var cacheService = sp.GetRequiredService<ICacheService>();
+                return new RolePolicyService(connString, cacheService);
+            });
+
 
             //add FileUploader as a singleton as well
             string storagePath = CurrentEnvironment.WebRootPath + "\\" + Configuration["FileStorageRelativeLocation"];
@@ -246,15 +248,21 @@ namespace DanpheEMR
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
         {
+            //Log.Logger = new LoggerConfiguration()
+            //                .ReadFrom.Configuration(Configuration)
+            //                .Enrich.FromLogContext()
+            //                .CreateLogger();
+
             loggerFactory.AddConsole(Configuration.GetSection("Logging"));
             loggerFactory.AddDebug();
+
             app.UseDeveloperExceptionPage();
             app.UseMiddleware<RewindMiddleWare>();
             //start--for rbac-testing--sudarshanr--2march-2017
             app.UseSession();
 
             //end--for rbac-testing--sudarshanr
-
+            app.UseMiddleware<ExceptionMiddleware>(); //Krishna, 8thSept'23, Add a Global Exception Handler
 
             app.UseMvc(
                 routes =>
@@ -264,6 +272,11 @@ namespace DanpheEMR
                 }
                 );
             app.UseFileServer();
+
+            app.UseSignalR(option =>
+            {
+                option.MapHub<FonePayHub>("/FonePayTransactionStatus");
+            });
 
             // set a home page
             DefaultFilesOptions defaultoptions = new DefaultFilesOptions();

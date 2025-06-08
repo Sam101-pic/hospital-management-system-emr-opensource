@@ -13,7 +13,10 @@ import { SecurityService } from "../../../security/shared/security.service";
 import { ServiceDepartmentVM } from "../../../shared/common-masters.model";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import { ENUM_BillingStatus, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_VisitType } from "../../../shared/shared-enums";
+import { PackageBillingService } from "../../../shared/package-billing.service";
+import { ENUM_BillingStatus, ENUM_DanpheHTTPResponses, ENUM_IntegrationNames, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_VisitType } from "../../../shared/shared-enums";
+import { BillingPackages_DTO } from "../dto/billing-packages.dto";
+import { SchemePriceCategory_DTO } from "../dto/scheme-pricecategory.dto";
 
 
 @Component({
@@ -23,6 +26,8 @@ import { ENUM_BillingStatus, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, E
 export class WardBillItemRequestComponent {
   //master data
   @Input("billItems") BillItems: Array<any> = [];
+  public pastTests: Array<any> = [];
+
   @Input("patientId") PatientId: number;
   @Input("visitId") VisitId: number;
   @Input("counterId") CounterId: number;
@@ -31,9 +36,12 @@ export class WardBillItemRequestComponent {
   @Input("past-tests") PastTests: Array<any> = [];
   @Input("department") Department: string = null;
   @Input("showPriceCategory") ShowPriceCategory: boolean = true;
-  @Input("scheme-priceCategory") SchemePriceCategory = { SchemeId: null, PriceCategoryId: null };
+  @Input("scheme-priceCategory") SelectedSchemePriceCategory = { SchemeId: null, PriceCategoryId: null };
   @Input("is-provisional-discharge") IsProvisionalDischarge: boolean = false;
+  @Input("scheme-object") SchemePriceCategory = new SchemePriceCategory_DTO();
   @Output("emit-billItemReq") EmitBillItemReq = new EventEmitter<Object>();
+
+
 
   public ShowIpBillRequest: boolean = true;
   public ServiceDepartmentList: Array<ServiceDepartmentVM>;
@@ -54,6 +62,17 @@ export class WardBillItemRequestComponent {
   public BillRequestDoubleEntryWarningTimeHrs: number = 0;
   public PastTestList: any = [];
   public PastTestList_ForDuplicate: any = [];
+  public IsPackageBilling: boolean = false;
+  public ServicePackages: BillingPackages_DTO[] = [];
+  public hasPackageBillingPermission: boolean = false;
+  public SelectedPackage: BillingPackages_DTO = new BillingPackages_DTO();
+  ShowProvisionalSlip: boolean = false;
+  ShowPrintProvisionalSlip: boolean = false;
+  ConfirmationTitle: string = "Confirm !";
+  ConfirmationMessage: string = "Are you sure you want to request selected items?";
+  ProvisionalReceiptInputs = { PatientId: 0, ProvFiscalYrId: 0, ProvReceiptNo: 0, visitType: null };
+  AllRequestedData: Array<BillingTransactionItem> = [];
+  OPDServiceDEP: ServiceDepartmentVM = new ServiceDepartmentVM();
 
   constructor(
     private _labBLService: LabsBLService,
@@ -61,11 +80,14 @@ export class WardBillItemRequestComponent {
     private _securityService: SecurityService,
     private _changeDetectorRef: ChangeDetectorRef,
     private _billingBLService: BillingBLService,
-    public coreService: CoreService
+    public coreService: CoreService,
+    public sharedPackageBilling: PackageBillingService,
   ) {
+    this.hasPackageBillingPermission = this._securityService.HasPermission('btn-emergency-enable-package-billing');
     this.BillingTransaction = new BillingTransaction();
     this.ServiceDepartmentList = this.coreService.Masters.ServiceDepartments;
-    this.ServiceDepartmentList = this.ServiceDepartmentList.filter((a) => a.ServiceDepartmentName !== "OPD");
+    this.OPDServiceDEP = this.ServiceDepartmentList.find((a) => a.IntegrationName == ENUM_IntegrationNames.OPD);
+    // this.ServiceDepartmentList = this.ServiceDepartmentList.filter((a) => a.IntegrationName != ENUM_IntegrationNames.OPD);
     //instead of Using in OnInit Component is initiated from inside  this function by calling InitiateComponent function
     this.GetDoctorsList();
     this.BillRequestDoubleEntryWarningTimeHrs =
@@ -84,10 +106,15 @@ export class WardBillItemRequestComponent {
     //Asynchronous (incase if user )
     if (this.PatientId && this.VisitId) {
       this._billingBLService
-        .GetDataOfInPatient(this.PatientId, this.VisitId)
+        .GetPatientCurrentVisitContext(this.PatientId, this.VisitId)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK) {
             this.CurrentPatientVisitContext = res.Results;
+            this.sharedPackageBilling.SetCurrPatVisitContext(this.CurrentPatientVisitContext);
+            this.sharedPackageBilling.GetServicePackages(this.SelectedSchemePriceCategory.SchemeId, this.SelectedSchemePriceCategory.PriceCategoryId)
+              .subscribe((packages: BillingPackages_DTO[]) => {
+                this.ServicePackages = packages;
+              });
           } else {
             this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Problem! Cannot get the Current Visit Context ! "], res.ErrorMessage);
           }
@@ -103,13 +130,14 @@ export class WardBillItemRequestComponent {
   ResetServiceDepartmentList(): void {
     if (this.coreService.Masters.ServiceDepartments && this.BillItems) {
       this.ServiceDepartmentList = [];
+      this.sharedPackageBilling.SetServiceItem(this.BillItems);
       this.coreService.Masters.ServiceDepartments.forEach((srv) => {
         if (this.BillItems.find((itm) => itm.ServiceDepartmentId === srv.ServiceDepartmentId)) {
           this.ServiceDepartmentList.push(srv);
         }
       });
       //exclude opd items..
-      this.ServiceDepartmentList = this.ServiceDepartmentList.filter((a) => a.IntegrationName !== "OPD");
+      // this.ServiceDepartmentList = this.ServiceDepartmentList.filter((a) => a.IntegrationName !== "OPD");
     }
   }
 
@@ -144,8 +172,8 @@ export class WardBillItemRequestComponent {
 
   SetBillingTxnDetails(): void {
     let currentVisit = this.VisitList.find((visit) => visit.PatientVisitId === this.VisitId);
-    this.BillingTransaction.SchemeId = this.SchemePriceCategory.SchemeId;
-    this.BillingTransaction.PriceCategoryId = this.SchemePriceCategory.PriceCategoryId;
+    this.BillingTransaction.SchemeId = this.SelectedSchemePriceCategory.SchemeId;
+    this.BillingTransaction.PriceCategoryId = this.SelectedSchemePriceCategory.PriceCategoryId;
     this.BillingTransaction.PatientId = this.PatientId;
     this.BillingTransaction.PatientVisitId = this.VisitId;
     this.BillingTransaction.SubTotal = 0;
@@ -162,8 +190,8 @@ export class WardBillItemRequestComponent {
       txnItem.BillingType = this.BillingType;
       txnItem.VisitType = this.VisitType; //If we use this for OutPatient Then We must modify it dynamically
       txnItem.BillStatus = ENUM_BillingStatus.provisional; // "provisional";
-      txnItem.DiscountSchemeId = this.SchemePriceCategory.SchemeId;
-      txnItem.PriceCategoryId = this.SchemePriceCategory.PriceCategoryId;
+      txnItem.DiscountSchemeId = this.SelectedSchemePriceCategory.SchemeId;
+      txnItem.PriceCategoryId = this.SelectedSchemePriceCategory.PriceCategoryId;
       // txnItem.CounterId = this.securityService.getLoggedInCounter().CounterId;
       txnItem.CounterId = this.CounterId;
       txnItem.IsProvisionalDischarge = this.IsProvisionalDischarge;
@@ -171,8 +199,8 @@ export class WardBillItemRequestComponent {
       txnItem.CreatedBy = this._securityService.GetLoggedInUser().EmployeeId;
       txnItem.CounterDay = moment().format("YYYY-MM-DD");
       txnItem.SubTotal = txnItem.Price * txnItem.Quantity;
-      txnItem.DiscountAmount = 0;
-      txnItem.DiscountPercent = 0;
+      // txnItem.DiscountAmount = 0;
+      // txnItem.DiscountPercent = 0;
       txnItem.DiscountPercentAgg = 0;
       txnItem.TotalAmount = txnItem.SubTotal - txnItem.DiscountAmount;
       txnItem.TaxPercent = 0;
@@ -212,13 +240,21 @@ export class WardBillItemRequestComponent {
     if (this.PatientId && isVisitIdValid) {
       if (this.CheckSelectionFromAutoComplete() && this.BillingTransaction.BillingTransactionItems.length) {
         for (let i = 0; i < this.BillingTransaction.BillingTransactionItems.length; i++) {
-          if (this.BillingTransaction.BillingTransactionItems[i].Price < 0) {
-            this._messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["The price of some items is less than zero ",]);
-            this.loading = false;
+          let currTxnItm = this.BillingTransaction.BillingTransactionItems[i];
+          if (currTxnItm.Price <= 0) {
+            if (currTxnItm.IsZeroPriceAllowed) {
+              currTxnItm.UpdateValidator("off", "Price", "required");
+            } else {
+              currTxnItm.UpdateValidator("on", "Price", "required");
+              this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, ["0 Price is not allowed"]);
+              isFormValid = false;
+              break;
+            }
+          }
+          if (!this.CheckIfOPDItemSelected(i)) {
             isFormValid = false;
             break;
           }
-          let currTxnItm = this.BillingTransaction.BillingTransactionItems[i];
           for (let validationControls in currTxnItm.BillingTransactionItemValidator
             .controls) {
             currTxnItm.BillingTransactionItemValidator.controls[validationControls].markAsDirty();
@@ -265,20 +301,38 @@ export class WardBillItemRequestComponent {
   PostProvisionalDepartmentRequisition(): void {
     const billingTransaction = _.cloneDeep(this.BillingTransaction);
     const billingTransactionItems = _.cloneDeep(this.BillingTransaction.BillingTransactionItems);
-    this._billingBLService.ProceedToBillingTransaction(billingTransaction, billingTransactionItems, "active", "provisional", false, this.CurrentPatientVisitContext).subscribe(res => {
-      if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
-        this.ResetAllRowData();
-        this.loading = false;
-        //check if we can send back the response data so that page below don't have to do server call again.
-        this.EmitBillItemReq.emit({ action: "save", data: null });
-      }
-      else {
-        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Unable to complete transaction."]);
-        console.log(res.ErrorMessage)
-        this.loading = false;
-      }
-    });
+
+    this._billingBLService
+      .ProceedToBillingTransaction(billingTransaction, billingTransactionItems, "active", "provisional", false, this.CurrentPatientVisitContext)
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+          this.AllRequestedData = res.Results;
+
+          if (this.ShowProvisionalSlip === true) {
+            // this.loading = false;
+            this.ProvisionalReceiptInputs.ProvFiscalYrId = this.AllRequestedData[0].ProvisionalFiscalYearId;
+            this.ProvisionalReceiptInputs.ProvReceiptNo = this.AllRequestedData[0].ProvisionalReceiptNo;
+            this.ProvisionalReceiptInputs.visitType = null;
+            this.ShowPrintProvisionalSlip = true;
+          } else {
+            this.EmitBillItemReq.emit({ action: "save", data: this.AllRequestedData });
+
+          }
+
+          //check if we can send back the response data so that page below don't have to do server call again.
+
+          this.ResetAllRowData();
+          this.loading = false;
+          this.IsPackageBilling = false;
+        } else {
+          this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Unable to complete transaction."]);
+          console.log(res.ErrorMessage);
+          this.loading = false;
+        }
+      });
   }
+
+
 
   //posts to Departments Requisition Table
   PostToDepartmentRequisition(): void {
@@ -369,7 +423,7 @@ export class WardBillItemRequestComponent {
             this.DoctorsList = res.Results;
             let Obj = new Object();
             Obj["EmployeeId"] = null; //change by Yub -- 23rd Aug '18
-            Obj["FullName"] = "SELF";
+            Obj["FullName"] = "";
             this.DoctorsList.push(Obj);
           } else {
             console.log(res.ErrorMessage);
@@ -425,6 +479,12 @@ export class WardBillItemRequestComponent {
         this.BillingTransaction.BillingTransactionItems[index].IsValidSelDepartment = true;
         this.BillingTransaction.BillingTransactionItems[index].IsValidSelItemName = true;
         this.BillingTransaction.BillingTransactionItems[index].IsDoctorMandatory = item.IsDoctorMandatory; //sud:6Feb'19--need to verify once.
+        this.BillingTransaction.BillingTransactionItems[index].IsPriceChangeAllowed = item.IsPriceChangeAllowed;
+        this.BillingTransaction.BillingTransactionItems[index].ItemIntegrationName = item.IntegrationName;
+        this.BillingTransaction.BillingTransactionItems[index].IntegrationName = item.IntegrationName;
+        if (!this.CheckIfOPDItemSelected(index)) {
+          return;
+        }
         this.FilterBillItems(index);
         this.CheckItemProviderValidation(index);
         this.ResetDoctorListOnItemChange(item, index);
@@ -529,7 +589,7 @@ export class WardBillItemRequestComponent {
         }
       }
     } else {
-      let billItems = this.BillItems.filter((a) => a.ServiceDepartmentName !== "OPD");
+      let billItems = this.BillItems.filter((a) => a.IntegrationName !== ENUM_IntegrationNames.OPD);
       this.BillingTransaction.BillingTransactionItems[index].ItemList = billItems;
     }
   }
@@ -544,6 +604,10 @@ export class WardBillItemRequestComponent {
     this.SelectedRequestedByDr = [];
     this.VisitList = [];
     this.BillingTransaction = new BillingTransaction();
+    this.SetDefaultPrescriber();
+    if (this.SelectedPackage) {
+      this.SelectedPackage = new BillingPackages_DTO();
+    }
     this.AddNewBillTxnItemRow();
   }
 
@@ -555,10 +619,31 @@ export class WardBillItemRequestComponent {
   }
 
   AddNewBillTxnItemRow(index = null): void {
+    if (index !== null
+      && (!this.BillingTransaction.BillingTransactionItems[index] || !(this.BillingTransaction.BillingTransactionItems[index] && this.BillingTransaction.BillingTransactionItems[index].ServiceItemId))) {
+      if (index !== 0) {
+        this.BillingTransaction.BillingTransactionItems.splice(index, 1);
+      }
+      return;
+    }
+    if (index !== null) {
+      let currentItem = this.BillingTransaction.BillingTransactionItems[index];
+      let isPerformerMandatory = currentItem && currentItem.IsDoctorMandatory;
+      let isPerformerValid = currentItem && currentItem.IsValidCheck('PerformerId', 'required');
+
+      if (isPerformerMandatory && !isPerformerValid) {
+        this._messageBoxService.showMessage(
+          ENUM_MessageBox_Status.Warning,
+          ['Performer is mandatory for this item.']
+        );
+        return;
+      }
+    }
     //method to add the row
     let billItem = this.NewBillingTransactionItem();
     billItem.EnableControl("Price", false);
     this.BillingTransaction.BillingTransactionItems.push(billItem);
+    this.pastTests.push(billItem);
     if (index != null) {
       let new_index = this.BillingTransaction.BillingTransactionItems.length - 1;
       this.SelectedRequestedByDr[new_index] = this.SelectedRequestedByDr[index];
@@ -566,7 +651,7 @@ export class WardBillItemRequestComponent {
       this.AssignRequestedByDoctor(new_index);
       window.setTimeout(function () {
         document.getElementById("items-box" + new_index).focus();
-      }, 0);
+      }, 200);
     }
   }
 
@@ -582,8 +667,17 @@ export class WardBillItemRequestComponent {
     this.BillingTransaction.BillingTransactionItems.slice();
     this.SelectedItems.splice(index, 1);
     this.SelectedItems.slice();
+    this.SelectedServiceDepartment.splice(index, 1); //  selectedServDepts is updated
+    this.SelectedServiceDepartment.slice();
+    this.SelectedAssignedToDr.splice(index, 1); //  selectedAssignedToDr is updated
+    this.SelectedAssignedToDr.slice();
+    this.SelectedRequestedByDr.splice(index, 1); //  selectedRequestedByDr is updated
+    this.SelectedRequestedByDr.slice();
     if (index == 0 && this.BillingTransaction.BillingTransactionItems.length == 0) {
       this.AddNewBillTxnItemRow();
+      this.BillingTransaction.BillingTransactionItems = [];
+      this.ResetAllRowData();
+      this.SelectedRequestedByDr = [];
       this._changeDetectorRef.detectChanges();
     }
     this.CheckForDoubleEntry();
@@ -709,6 +803,10 @@ export class WardBillItemRequestComponent {
     } else {
       this.BillingTransaction.BillingTransactionItems[index].UpdateValidator("off", "PerformerId", null);
     }
+    // Mark the control as dirty to trigger validation UI
+    const performerControl = this.BillingTransaction.BillingTransactionItems[index].BillingTransactionItemValidator.controls['PerformerId'];
+    performerControl.markAsDirty();
+    performerControl.updateValueAndValidity();
   }
   //end: mandatory doctor validations
 
@@ -913,5 +1011,162 @@ export class WardBillItemRequestComponent {
         this.LabTypeName = defaultLabType.LabTypeName;
       }
     }
+  }
+  /**
+   * @returns void
+   * @summary this function is responsible to reset the selected data for package billing, if checkbox is false
+   */
+  HandlePackageBillingChange() {
+    if (this.IsPackageBilling) {
+      this.GoToNextInput('id_Search_Package');
+    } else {
+      this.ResetAllRowData();
+    }
+  }
+
+  GoToNextInput(nextInputId: string) {
+    const nextInput = document.getElementById(nextInputId);
+    console.log('Element found:', nextInput);
+    if (nextInput) {
+      nextInput.focus();
+    } else {
+      console.warn('Element with ID', nextInputId, 'not found.');
+    }
+  }
+  /**
+   *
+   * @param selectedPackage
+   * @summary When package is selected its service items are selected as individual Items
+   * @returns void
+   */
+  OnPackageSelected(selectedPackage: BillingPackages_DTO): void {
+    let billingTransactionItemList = [];
+    this.BillingTransaction.BillingTransactionItems = [];
+    this.SelectedPackage = selectedPackage;
+    if (this.SelectedPackage && typeof this.SelectedPackage === 'object') {
+      this.sharedPackageBilling.handleSelectedPackage(this.SelectedPackage);
+      billingTransactionItemList = this.sharedPackageBilling.getTransactionItems();
+      if (billingTransactionItemList.length) {
+        billingTransactionItemList.forEach((itm) => {
+          const packageAsItemList = Object.assign(new BillingTransactionItem(), itm);
+          packageAsItemList.ServiceDepartmentId = itm.ServiceDepartmentId;
+          packageAsItemList.ServiceDepartmentName = itm.ServiceDepartmentName;
+          packageAsItemList.PrescriberId = itm.PrescriberId;
+          packageAsItemList.PrescriberName = itm.PrescriberName;
+          packageAsItemList.IntegrationItemId = itm.IntegrationItemId;
+          packageAsItemList.ItemCode = itm.ItemCode;
+          if (packageAsItemList.ItemCode) {
+            const serviceItemDetail = this.BillItems.find(si => si.ItemCode === itm.ItemCode);
+            if (serviceItemDetail) {
+              packageAsItemList.IntegrationItemId = serviceItemDetail.IntegrationItemId;
+              packageAsItemList.IntegrationName = serviceItemDetail.IntegrationName;
+              packageAsItemList.IsDiscountApplicable = serviceItemDetail.IsDiscountApplicable;
+              if (this.SchemePriceCategory && this.SchemePriceCategory.IsDiscountApplicable && packageAsItemList.IsDiscountApplicable) {
+                packageAsItemList.DiscountPercent = serviceItemDetail.DiscountPercent;
+              } else if (this.SchemePriceCategory && this.SchemePriceCategory.IsDiscountApplicable && !packageAsItemList.IsDiscountApplicable) {
+                packageAsItemList.DiscountPercent = this.SchemePriceCategory.DiscountPercent;
+              }
+
+              packageAsItemList.IsZeroPriceAllowed = serviceItemDetail.IsZeroPriceAllowed;
+            }
+          }
+          packageAsItemList.ServiceItemId = itm.ServiceItemId;
+          packageAsItemList.ItemName = itm.ItemName;
+          packageAsItemList.ProcedureCode = itm.ProcedureCode;
+          packageAsItemList.IsValidSelDepartment = true;
+          packageAsItemList.IsValidSelItemName = true;
+          packageAsItemList.IsDoctorMandatory = itm.IsDoctorMandatory;
+          packageAsItemList.Quantity = itm.Quantity;
+          packageAsItemList.IsPackageItem = true;
+          packageAsItemList.Price = itm.Price;
+          packageAsItemList.SubTotal = itm.Price * itm.Quantity;
+          const performer = this.DoctorsList.find(dr => dr.EmployeeId === itm.PerformerId);
+          if (performer) {
+            packageAsItemList.PerformerId = performer.EmployeeId;
+            packageAsItemList.PerformerName = performer.FullName;
+          }
+
+          if (packageAsItemList.DiscountPercent > 0) {
+            packageAsItemList.DiscountAmount = (packageAsItemList.DiscountPercent / 100) * packageAsItemList.SubTotal;
+          }
+
+          this.BillingTransaction.BillingTransactionItems.push(packageAsItemList);
+          this.BillingTransaction.BillingTransactionItems.forEach((item, i) => {
+            this.SelectedServiceDepartment[i] = this.ServiceDepartmentList.find(sd => sd.ServiceDepartmentId === item.ServiceDepartmentId);
+            this.SelectedItems[i] = this.BillItems.find(sd => sd.ServiceItemId === item.ServiceItemId);
+            this.SelectedAssignedToDr[i] = this.DoctorsList.find(dr => dr.EmployeeId === item.PerformerId);
+            this.SelectedRequestedByDr[i] = this.DoctorsList.find(dr => dr.EmployeeId === this.CurrentPatientVisitContext.PerformerId);
+          });
+        });
+      }
+    }
+  }
+  SetFocusById(index: number): void {
+
+    if (!this.SelectedItems[index]) {
+      this.coreService.FocusInputById('request-button');
+    }
+
+  }
+  PackageFormatter(data: any): string {
+    let html: string = "";
+    html = `<font color='blue' size='3'>${data["PackageCode"]} :&nbsp;&nbsp;${data["BillingPackageName"]}</font>`;
+
+    if (this.coreService && this.coreService.currencyUnit) {
+      html += `&nbsp;${this.coreService.currencyUnit}<b>${data["TotalPrice"]}</b>`;
+    } else {
+      html += `&nbsp;<b>${data["TotalPrice"]}</b>`;
+    }
+
+    return html;
+  }
+  HandleConfirm(): void {
+    this.loading = true;
+    this.ShowProvisionalSlip = false;
+    this.ShowPrintProvisionalSlip = false;
+    this.SubmitBillingTransaction();
+
+  }
+
+  HandleCancel(): void {
+    this.loading = false;
+    this.ShowProvisionalSlip = false;
+    this.ShowPrintProvisionalSlip = false;
+  }
+  HandlePrintConfirm() {
+    this.loading = true;
+    this.SubmitBillingTransaction();
+    this.ShowProvisionalSlip = true;
+
+  }
+  HandlePrintCancel() {
+    this.loading = false;
+    this.ShowPrintProvisionalSlip = false;
+    this.ShowProvisionalSlip = false
+  }
+  CloseProvisionalSlip() {
+    this.ShowProvisionalSlip = false;
+    this.ShowPrintProvisionalSlip = false;
+    this.loading = false;
+    this.EmitBillItemReq.emit({ action: "save", data: this.AllRequestedData });
+
+  }
+  SetDefaultPrescriber(): void {
+    const doctor = this.DoctorsList.find(d => d.EmployeeId === this.CurrentPatientVisitContext.PerformerId);
+    if (doctor) {
+      this.SelectedRequestedByDr[0] = doctor.FullName;
+    }
+  }
+  CheckIfOPDItemSelected(index: number): boolean {
+    if (this.CurrentPatientVisitContext && this.CurrentPatientVisitContext.VisitType === ENUM_VisitType.outpatient) {
+      const currTxnItem = this.BillingTransaction.BillingTransactionItems[index];
+      if (currTxnItem.ItemIntegrationName != null && (currTxnItem.ItemIntegrationName === this.OPDServiceDEP.IntegrationName)) {
+        const itemName = currTxnItem.ItemName;
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`This item "${itemName}" is not allowed in this visit type, please select an alternative item.`]);
+        return false;
+      }
+      return true;
+    }
+    return true;
   }
 }

@@ -79,6 +79,10 @@ export class LedgerModel {
   public CostCenterId: number = -1;
   public SubLedgerId: number = 0;
   public SubLedgerName: string = "";
+  public HospitalId: number = 0;
+  public IsSystemDefault: boolean = false;
+  public StoreName: string = "";
+
   constructor() {
     this.CreatedOn = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
     var _formBuilder = new FormBuilder();

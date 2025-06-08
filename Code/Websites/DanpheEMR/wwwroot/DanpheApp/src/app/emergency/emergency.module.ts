@@ -11,6 +11,8 @@ import { RegistrationSchemeSharedModule } from '../appointments/shared/registrat
 import { VisitBLService } from '../appointments/shared/visit.bl.service';
 import { VisitDLService } from '../appointments/shared/visit.dl.service';
 import { BillingSharedModule } from '../billing/billing-shared.module';
+import { BillingMasterBlService } from '../billing/shared/billing-master.bl.service';
+import { ClinicalNewSharedModule } from '../clinical-new/clinical-new-shared.module';
 import { ClinicalSharedModule } from '../clinical/clinical-shared-module';
 import { IOAllergyVitalsBLService } from '../clinical/shared/io-allergy-vitals.bl.service';
 import { EmergencyDashboardComponent } from '../dashboards/emergency/emergency-dashboard.component';
@@ -39,6 +41,7 @@ import { ERDorPatientListComponent } from './finalized-patients/er-dor-patient-l
 import { ERFinalizedComponent } from './finalized-patients/er-finalized-patients.component';
 import { ERLamaPatientListComponent } from './finalized-patients/er-lama-patient-list.component';
 import { ERTransferredPatientListComponent } from './finalized-patients/er-transferred-patient-list.component';
+import { NewFinalizedPatientsComponent } from './new-finalized-patients/new-finalized-patients.component';
 import { uploadConsentAcionComponent } from './patients-list/Consent/upload-consent.component';
 import { ERPatientListComponent } from './patients-list/er-patient-list.component';
 import { ERPatientRegistrationComponent } from './registration/er-patient-registration.component';
@@ -67,7 +70,9 @@ import { ERTriagePatientListComponent } from './triage/er-triage-patient-list.co
     VisitDLService,
     AppointmentDLService,
     PatientsDLService,
-    EmergencyService
+    EmergencyService,
+    BillingMasterBlService
+    // PackageBillingService
   ],
   imports: [
     EmergencyRoutingModule,
@@ -84,7 +89,8 @@ import { ERTriagePatientListComponent } from './triage/er-triage-patient-list.co
     ClinicalSharedModule,
     DoctorSharedModule,
     PatientSharedModule,
-    RegistrationSchemeSharedModule
+    RegistrationSchemeSharedModule,
+    ClinicalNewSharedModule,
   ],
   declarations: [
     EmergencyMainComponent,
@@ -108,7 +114,8 @@ import { ERTriagePatientListComponent } from './triage/er-triage-patient-list.co
     AddERDischargeSummaryComponent,
     ERDorPatientListComponent,
     PatientCasesSelectComponent,
-    uploadConsentAcionComponent
+    uploadConsentAcionComponent,
+    NewFinalizedPatientsComponent
   ],
   bootstrap: []
 

@@ -1,18 +1,17 @@
-import { Component, ChangeDetectorRef } from "@angular/core";
-import { InventoryBLService } from "../../shared/inventory.bl.service";
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { InventoryService } from "../../shared/inventory.service";
+import { ChangeDetectorRef, Component } from "@angular/core";
 import { Router } from "@angular/router";
-import { PurchaseRequestModel } from "../../shared/purchase-request.model";
-import { PurchaseRequestItemModel } from "../../shared/purchase-request-item.model";
+import * as moment from "moment";
+import { CoreService } from "../../../core/shared/core.service";
 import { SecurityService } from "../../../security/shared/security.service";
+import { ActivateInventoryService } from "../../../shared/activate-inventory/activate-inventory.service";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_GRItemCategory } from "../../../shared/shared-enums";
 import { ItemModel } from "../../settings/shared/item.model";
 import { VendorsModel } from "../../settings/shared/vendors.model";
-import { CoreService } from "../../../core/shared/core.service";
-import * as moment from "moment";
-import { ENUM_GRItemCategory } from "../../../shared/shared-enums";
-import { ActivateInventoryService } from "../../../shared/activate-inventory/activate-inventory.service";
-import { ItemMaster } from "../../shared/item-master.model";
+import { InventoryBLService } from "../../shared/inventory.bl.service";
+import { InventoryService } from "../../shared/inventory.service";
+import { PurchaseRequestItemModel } from "../../shared/purchase-request-item.model";
+import { PurchaseRequestModel } from "../../shared/purchase-request.model";
 
 
 @Component({
@@ -35,6 +34,7 @@ export class InternalMainPurchaseRequestAddComponent {
   public PRCategories: string[] = [];
   public ItemListFiltered: ItemModel[];
   loading: boolean = false;
+  AllowPreviousFiscalYear: boolean = false;
   constructor(
     public inventoryBLService: InventoryBLService,
     public messageBoxService: MessageboxService,
@@ -473,6 +473,11 @@ export class InternalMainPurchaseRequestAddComponent {
 
   public LoadPRCategory() {
     this.PRCategories = Object.values(ENUM_GRItemCategory).filter(p => isNaN(p as any));
+  }
+
+  Back() {
+    this.router.navigate(['/Inventory/InternalMain/PurchaseRequest/PurchaseRequestList']);
+
   }
 
 }

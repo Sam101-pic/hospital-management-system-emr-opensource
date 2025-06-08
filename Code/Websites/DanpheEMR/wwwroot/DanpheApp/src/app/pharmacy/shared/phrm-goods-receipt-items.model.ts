@@ -58,8 +58,8 @@ export class PHRMGoodsReceiptItemsModel {
     //for local use only
     public Margin: number = 0; // use in calculation logic
     public AdjustedMargin: number = 0; // use only for display purpose
-    public VATAmount: any;
-    public DiscountAmount: any;
+    public VATAmount: number = 0;
+    public DiscountAmount: number = 0;
     public PackingName: any;
     public StripRate: number = 0;
     public StripQty: number = 0;
@@ -67,22 +67,28 @@ export class PHRMGoodsReceiptItemsModel {
     public StockId: number;
     public Packing: PHRMPackingTypeModel = null;
     IsItemDiscountApplicable: boolean;
-    StripMRP: any;
-    FreeStripQuantity: any;
-    IsPacking: boolean;
+    StripSalePrice: number = 0;
+    StripMRP: number = 0;
+    FreeStripQuantity: number = 0;
+    IsPacking: boolean = false;
     public IsCancel: boolean = false;
     public PackingTypeId: number;
     StoreStockId: number;
     CostPrice: number = 0;
-    public ItemRateHistory: Array<null> = new Array<null>();
+    public ItemRateHistory: any[] = [];
     public ItemFreeQuantityHistory: Array<FreeQuantityHistoryModel> = new Array<FreeQuantityHistoryModel>();
-    public ItemMRPHistory: Array<null> = new Array<null>();
+    public ItemMRPHistory: any[] = [];
     public IsItemAltered: boolean; // used as if that GR done item is already dispatched or sent to other store Or posted to Accouting.
     public selectedGeneric: any;
     public GoodReceiptNo: number = 0;
     public RackNo: string = "";
     public MRP: number = 0;
     public PendingFreeQuantity: number = 0;
+    public TaxableSubTotal: number = 0;
+    public NonTaxableSubTotal: number = 0;
+    public BarcodeNumber: number = null;
+    public PackingQuantity: number = 0;
+
 
     constructor() {
 
@@ -90,19 +96,23 @@ export class PHRMGoodsReceiptItemsModel {
         this.GoodReceiptItemValidator = _formBuilder.group({
             'ItemName': ['', [Validators.required, this.registeredItemValidator]],
             //'PackingQuantity': ['', Validators.compose([Validators.required])],
-            'ItemQTy': ['', Validators.compose([Validators.required, this.positiveNum, this.wholeNumberRequired])],
+            'ItemQTy': [0, Validators.compose([Validators.required, this.positiveNum, this.wholeNumberRequired])],
             //'ReceivedQuantity': ['', Validators.compose([Validators.required, this.positiveValueRequired, this.wholeNumberRequired])],
             //'ManufactureDate': ['', Validators.compose([Validators.required, this.pastDateValidator])],
             'ExpiryDate': ['', Validators.compose([Validators.required, this.dateValidator])],
-            'FreeQuantity': ['', Validators.compose([Validators.required, this.positiveNum, this.wholeNumberRequired])],
-            'GRItemPrice': ['', Validators.compose([Validators.required, this.positiveValueRequired])],
-            'SalePrice': ['', Validators.compose([Validators.required])],
+            'FreeQuantity': [0, Validators.compose([Validators.required, this.positiveNum, this.wholeNumberRequired])],
+            'FreeStripQuantity': [0, Validators.compose([Validators.required, this.positiveNum, this.wholeNumberRequired])],
+            'GRItemPrice': [0, Validators.compose([Validators.required, this.positiveValueRequired])],
+            'SalePrice': [0, Validators.compose([Validators.required])],
             'BatchNo': ['', Validators.compose([Validators.required, Validators.pattern(/^(\s+\S+\s*)*(?!\s).*$/)])],
-            'AdjustedMargin': ['', Validators.compose([Validators.required, this.positiveOrZeroValueRequired])],
-            'DiscountPercentage': ['', Validators.compose([Validators.min(0), Validators.max(100)])],
-            'VATPercentage': ['', Validators.compose([Validators.required, Validators.min(0), Validators.max(100)])],
-            'CCCharge': ['', Validators.compose([Validators.required, Validators.min(0), Validators.max(100)])],
-            'MRP': ['', Validators.compose([Validators.required])],
+            'AdjustedMargin': [0, Validators.compose([Validators.required, this.positiveOrZeroValueRequired])],
+            'DiscountPercentage': [0, Validators.compose([Validators.min(0), Validators.max(100)])],
+            'VATPercentage': [0, Validators.compose([Validators.required, Validators.min(0), Validators.max(100)])],
+            'CCCharge': [0, Validators.compose([Validators.required, Validators.min(0), Validators.max(100)])],
+            'MRP': [0, Validators.compose([Validators.required])],
+            'StripSalePrice': [0, Validators.compose([Validators.required])],
+            'StripMRP': [0, Validators.compose([Validators.required])]
+
 
         });
     }

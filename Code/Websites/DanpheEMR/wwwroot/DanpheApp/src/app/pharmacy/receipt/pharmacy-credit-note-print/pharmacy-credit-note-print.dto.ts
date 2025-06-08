@@ -53,4 +53,6 @@ export class PharmacyCreditNotePrintItem_DTO {
     DiscountAmount: number = 0;
     VATAmount: number = 0;
     TotalAmount: number = 0;
+    ItemCode: number = 0;
+    HSCode: number = 0;
 }

@@ -2,7 +2,9 @@
     <button class="btn btn-primary" style="float: left;" (click)="Back()">Back</button>
     <h3 style="font-weight: 600; padding-left: 130px;">Outpatient Morbidity Report</h3>
 </div>
-<from-to-date-select (on-change)="OnFromToDateChange($event)" [date-settings-name]="null" [emit-always]="false">
+<from-to-date-select (on-change)="OnFromToDateChange($event)"
+                     [date-settings-name]="'common-range-with-today'"
+                     [emit-always]="false">
 </from-to-date-select>
 <p>
     <button class="btn green btn-success" (click)="Print()"> Print Report <i class="glyphicon glyphicon-print"></i>

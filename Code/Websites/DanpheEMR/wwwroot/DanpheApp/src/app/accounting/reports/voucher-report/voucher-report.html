@@ -4,7 +4,7 @@
         padding-right: 2px !important;
     }
 </style>
-<transaction-view [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId"
+<transaction-view [voucherNumber]="voucherNumber" [FiscalYearId]="fiscalYearId" [HospitalId]="HospitalId"
                   (callback-txnClose)="CallBackTransactionClose($event)" (callback-close)="GetTxnList()"></transaction-view>
 <div>
     <div class="caption custom-caption top-report-section">
@@ -14,13 +14,13 @@
     </div>
     <div class="col-md-12 col-xs-12 col-sm-12">
 
-        <div class="row" style="background: #bcbcbc; padding-top: 15px;">
+        <div class="row" style="background: #bcbcbc; padding-top: 4px;">
 
-            <div class="col-md-7 col-xs-12" style="margin-right: -45px;">
+            <div class="col-md-8 col-xs-12" style="margin-right: -45px;">
                 <div class="form-group">
-                    <label class="control-label" style="margin-left: 5px;">Select Fiscal Year<b class="color-red"> *</b><b
+                    <label class="control-label col-md-3" style="margin-top: 10px; ">Select Fiscal Year<b class="color-red"> *</b><b
                            style="float:right;">:</b></label>
-                    <div>
+                    <div class="col-md-9">
                         <!-- <danphe-date-picker [(ngModel)]="fromDate" [ngModelOptions]="{standalone: true}" ngDefaultControl>
                         </danphe-date-picker> -->
 
@@ -38,10 +38,19 @@
                     </div>
                 </div>
             </div> -->
-            <div class="col-md-2 col-xs-12" style="margin-right: 10px; margin-top: 6px;">
-                <div class="form-group">
-                    <label class="control-label">Voucher Type<b class="color-red"> *</b><b style="float:right;">:</b></label>
-                    <div>
+            <div class="col-md-4" style="margin-top: -15px;">
+                <label class=" col-md-5" style="margin-top: 20px;">Account Section <b class="color-red"> *</b>:</label><br>
+                <div class="col-md-7">
+                    <select [(ngModel)]="SelectedHospital" class="form-control" (change)="OnHospitalChange()">
+                        <option *ngFor="let h of HospitalList" [ngValue]=h.HospitalId>{{ h.HospitalLongName }}</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-12 col-xs-12" style="margin-right: -45px; margin-top: 5px; margin-bottom: 10px;">
+                <div class="col-md-4 col-xs-12" style="margin-right: 10px; margin-top: 6px;">
+                    <label class="control-label col-md-4" style="margin-top: 5px;">Voucher Type<b class="color-red"> *</b><b
+                           style="float:right;">:</b></label>
+                    <div class="control-label col-md-8">
 
                         <select [(ngModel)]="selVoucher.VoucherId" id="voucher" (ngModelChange)="AssignVoucher()" style="height:30px;">
                             <option value={{-1}} selected>— All —</option>
@@ -50,23 +59,23 @@
                         <div class="color-red font-sm" *ngIf="!selVoucher.VoucherId"> please select voucher.</div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-2 col-xs-12" style="margin-right: -15px;margin-top:6px">
-                <label class="control-label no-padding">Select Module<b class="color-red"> *</b><b style="float:right;">:</b></label>
-                <div>
-                    <select [(ngModel)]="sectionId" id="sectionid" [ngModelOptions]="{standalone: true}" style="width:150px;height:30px;"
-                            (ngModelChange)="GetChangedSection()">
-                        <option *ngFor="let s of sectionList" value="{{s.SectionId}}">{{s.SectionName}}</option>
-                    </select>
+                <div class="col-md-4 col-xs-12" style="margin-right: -15px;margin-top:6px">
+                    <label class="control-label col-md-4" style="margin-top: 5px;">Select Module<b class="color-red"> *</b><b
+                           style="float:right;">:</b></label>
+                    <div class="control-label  col-md-8">
+                        <select [(ngModel)]="sectionId" id="sectionid" [ngModelOptions]="{standalone: true}" style="width:150px;height:30px;"
+                                (ngModelChange)="GetChangedSection()">
+                            <option *ngFor="let s of sectionList" value="{{s.SectionId}}">{{s.SectionName}}</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-1 col-xs-12" style=" margin-top:8px">
-                <div class="form-group">
-                    <br>
-                    <button class="btn blue" type="button" [disabled]="btndisabled" (click)="GetTxnList()">
-                        <i class="fa fa-refresh"></i>
-                        Load
-                    </button>
+                <div class="col-md-4 col-xs-12" style="text-align: right;">
+                    <div class="control-label  col-md-8">
+                        <button class="btn green btn-success" type="button" [disabled]="btndisabled" (click)="GetTxnList()">
+                            <i class="fa fa-refresh"></i>
+                            Load
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

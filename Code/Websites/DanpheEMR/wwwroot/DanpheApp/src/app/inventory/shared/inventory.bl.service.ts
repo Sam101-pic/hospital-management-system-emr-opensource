@@ -741,5 +741,10 @@ export class InventoryBLService {
         return responseData;
       });
   }
-
+  public GetReturnFromSubstoreItems(returnId: number) {
+    return this.inventoryDLService.GetReturnFromSubstoreItemsById(returnId)
+      .map((responseData) => {
+        return responseData;
+      });
+  }
 }

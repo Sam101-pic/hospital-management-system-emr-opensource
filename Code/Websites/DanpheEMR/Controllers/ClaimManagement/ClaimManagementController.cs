@@ -4,6 +4,7 @@ using DanpheEMR.Core.Configuration;
 using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
+using DanpheEMR.ServerModel.ClaimManagementModels;
 using DanpheEMR.Services.ClaimManagement;
 using DanpheEMR.Services.ClaimManagement.DTOs;
 using DanpheEMR.Utilities;
@@ -17,13 +18,13 @@ namespace DanpheEMR.Controllers.ClaimManagement
 {
     public class ClaimManagementController : CommonController
     {
-        public readonly IClaimManagementService _IClaimManagementService; 
+        public readonly IClaimManagementService _IClaimManagementService;
         private readonly ClaimManagementDbContext _claimManagementgDbContext;
         public DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
         public ClaimManagementController(IClaimManagementService iClaimManagementService, IOptions<MyConfiguration> _config) : base(_config)
         {
             _IClaimManagementService = iClaimManagementService;
-            _claimManagementgDbContext = new ClaimManagementDbContext(connString);  
+            _claimManagementgDbContext = new ClaimManagementDbContext(connString);
         }
 
         #region Get APIs
@@ -31,23 +32,23 @@ namespace DanpheEMR.Controllers.ClaimManagement
         [Route("InsuranceApplicableCreditOrganizations")]
         public IActionResult InsuranceApplicableCreditOrganizations()
         {
-            Func<object> func = () => _IClaimManagementService.GetInsuranceApplicableCreditOrganizations(_claimManagementgDbContext); 
+            Func<object> func = () => _IClaimManagementService.GetInsuranceApplicableCreditOrganizations(_claimManagementgDbContext);
             return InvokeHttpGetFunction(func);
         }
 
         [HttpGet]
         [Route("BillReview")]
-        public IActionResult GetBillForReview(DateTime FromDate, DateTime ToDate, int CreditOrganizationId)
+        public IActionResult GetBillForReview(DateTime FromDate, DateTime ToDate, int CreditOrganizationId, int? PatientId)
         {
-            Func<object> func = () => _IClaimManagementService.GetBillForClaimReview(FromDate,ToDate,CreditOrganizationId,_claimManagementgDbContext);
+            Func<object> func = () => _IClaimManagementService.GetBillForClaimReview(FromDate, ToDate, CreditOrganizationId, PatientId, _claimManagementgDbContext);
             return InvokeHttpGetFunction(func);
         }
 
         [HttpGet]
         [Route("IsClaimCodeAvailable")]
-        public IActionResult IsClaimCodeAvailable(Int64 ClaimCode)
+        public IActionResult IsClaimCodeAvailable(Int64 ClaimCode, int PatientVisitId, int CreditOrganizationId, string ApiIntegrationName, int PatientId)
         {
-            Func<object> func = () => _IClaimManagementService.CheckIsClaimCodeAvailable(ClaimCode, _claimManagementgDbContext);
+            Func<object> func = () => _IClaimManagementService.IsClaimCodeAvailable(ClaimCode, PatientVisitId, CreditOrganizationId, ApiIntegrationName, PatientId, _claimManagementgDbContext);
             return InvokeHttpGetFunction(func);
         }
 
@@ -154,6 +155,39 @@ namespace DanpheEMR.Controllers.ClaimManagement
             Func<object> func = () => _IClaimManagementService.GetECHSPatientWithVisitInformation(search, _claimManagementgDbContext);
             return InvokeHttpGetFunction<object>(func);
         }
+        [HttpGet]
+        [Route("Claim/Reports")]
+        public IActionResult GetReportsByClaimId(long ClaimCode)
+        {
+            Func<object> func = () => _IClaimManagementService.GetReportsByClaimCode(ClaimCode, _claimManagementgDbContext);
+            return InvokeHttpGetFunction(func);
+        }
+
+
+        [HttpGet]
+        [Route("InitiatedClaimCodesByPatientId")]
+        public IActionResult GetInitiatedClaimCodesByPatientId(int PatientId)
+        {
+            Func<object> func = () => _IClaimManagementService.GetInitiatedClaimCodesByPatientId(PatientId, _claimManagementgDbContext);
+            return InvokeHttpGetFunction(func);
+        }
+
+
+        [HttpGet]
+        [Route("IsECHSClaimAlreadySubmitted")]
+        public IActionResult IsECHSClaimCodeAlreadySubmitted(Int64 claimCode)
+        {
+            Func<object> func = () => _IClaimManagementService.CheckIfClaimCodeAlreadySettled(claimCode, _claimManagementgDbContext);
+            return InvokeHttpPostFunction(func);
+        }
+
+        [HttpGet]
+        [Route("FinalBillSummaryByClaimCode")]
+        public IActionResult GetFinalBillSummaryByClaimCode(Int64 ClaimCode)
+        {
+            Func<object> func = () => _IClaimManagementService.GetFinalBillSummaryByClaimCode(ClaimCode, _claimManagementgDbContext);
+            return InvokeHttpPostFunction(func);
+        }
         #endregion
 
         #region Post APIs
@@ -171,7 +205,7 @@ namespace DanpheEMR.Controllers.ClaimManagement
         public IActionResult SubmitClaim([FromBody] SubmitedClaimDTO claimDTO)
         {
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => _IClaimManagementService.SubmitClaim(currentUser, claimDTO, false, _claimManagementgDbContext);
+            Func<object> func = () => _IClaimManagementService.SubmitClaim(currentUser, claimDTO, _claimManagementgDbContext);
             return InvokeHttpPostFunction(func);
         }
 
@@ -188,7 +222,7 @@ namespace DanpheEMR.Controllers.ClaimManagement
         #region Put APIs
         [HttpPut]
         [Route("ClaimableStatus")]
-        public IActionResult ChangeClaimableStatus(Boolean claimableStatus,[FromBody] List<ClaimBillReviewDTO> bill)
+        public IActionResult ChangeClaimableStatus(Boolean claimableStatus, [FromBody] List<ClaimBillReviewDTO> bill)
         {
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             Func<object> func = () => _IClaimManagementService.UpdateClaimableStatus(currentUser, claimableStatus, bill, _claimManagementgDbContext);
@@ -218,7 +252,7 @@ namespace DanpheEMR.Controllers.ClaimManagement
         public IActionResult SaveClaimAsDraft([FromBody] SubmitedClaimDTO claimDTO)
         {
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
-            Func<object> func = () => _IClaimManagementService.SubmitClaim(currentUser, claimDTO, true, _claimManagementgDbContext);
+            Func<object> func = () => _IClaimManagementService.SaveClaimAsDraft(currentUser, claimDTO, _claimManagementgDbContext);
             return InvokeHttpPutFunction(func);
         }
 
@@ -248,7 +282,7 @@ namespace DanpheEMR.Controllers.ClaimManagement
             Func<object> func = () => _IClaimManagementService.ConcludeClaim(currentUser, ClaimSubmissionId, _claimManagementgDbContext);
             return InvokeHttpPutFunction(func);
         }
-        
+
         [HttpPut]
         [Route("RevertToClaimScrubbing")]
         public IActionResult RevertClaimToBackToClaimScrubbing(int ClaimSubmissionId)
@@ -284,7 +318,37 @@ namespace DanpheEMR.Controllers.ClaimManagement
             Func<object> func = () => _IClaimManagementService.UpdateInsuranceClaimPayment(currentUser, paymentObject, _claimManagementgDbContext);
             return InvokeHttpPostFunction(func);
         }
-        #endregion
+        [HttpPut]
+        [Route("SetClaimReadyForPayment")]
+        public IActionResult SetClaimReadyForPayment([FromBody] InsuranceClaim claim)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => _IClaimManagementService.SaveClaim(currentUser, claim, _claimManagementgDbContext);
+            return InvokeHttpPostFunction(func);
 
+        }
+        [HttpGet]
+        [Route("Diagnosis")]
+        public IActionResult GetDisgnosis()
+        {
+            Func<object> func = () => _IClaimManagementService.GetDiagnosis(_claimManagementgDbContext);
+            return InvokeHttpPostFunction(func);
+        }
+        [HttpPut]
+        [Route("UpdateDocumentReceivedStatus")]
+        public IActionResult UpdateDocumentReceivedStatus([FromBody] List<ClaimBillReviewDTO> bill)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => _IClaimManagementService.UpdateDocumentReceivedStatus(currentUser, bill, _claimManagementgDbContext);
+            return InvokeHttpPutFunction(func);
+        }
+        [HttpGet]
+        [Route("Claim/ClaimDocumentReceivedReport")]
+        public IActionResult GetClaimDocumentReceivedReport(DateTime FromDate, DateTime ToDate, int? PatientId, long? ClaimCode, string InvoiceNo)
+        {
+            Func<object> func = () => _IClaimManagementService.GetClaimDocumentReceivedReport(FromDate, ToDate, PatientId, ClaimCode, InvoiceNo, _claimManagementgDbContext);
+            return InvokeHttpGetFunction(func);
+        }
+        #endregion
     }
 }

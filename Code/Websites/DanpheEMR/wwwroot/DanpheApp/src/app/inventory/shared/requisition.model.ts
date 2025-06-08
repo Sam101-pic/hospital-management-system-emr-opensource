@@ -45,12 +45,15 @@ export class Requisition {
   IsVerificationEnabled: boolean = false;
   VerifierList: InventoryWardRequisitionVerifier_DTO[] = [];
   VerifierIds: string = null;
+  RequestedBy: string = '';
+  IsReceived: boolean = false;
   constructor() {
 
     var _formBuilder = new FormBuilder();
     this.RequisitionValidator = _formBuilder.group({
       'RequestFromStoreId': ['', Validators.compose([Validators.required])],
-      'RequestToStoreId': ['', Validators.compose([Validators.required])]
+      'RequestToStoreId': ['', Validators.compose([Validators.required])],
+      'RequisitionDate': ['', [Validators.required]]
     });
   }
 
@@ -69,5 +72,4 @@ export class Requisition {
     else
       return !(this.RequisitionValidator.hasError(validator, fieldName));
   }
-
 }

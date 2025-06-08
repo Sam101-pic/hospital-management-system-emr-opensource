@@ -14,7 +14,7 @@ export class LabTestComponent {
   public Range: string = null;
   public Method: string = null;
   public ComponentName: string = null;
-  public ComponentId: number = 0;
+  public ComponentId: number = null;
   public Remarks: string = null;
   public IsSelected: boolean = true;
   //public IsPrint: boolean = null;
@@ -68,6 +68,9 @@ export class LabTestComponent {
 
   public FormulaDescription: string = "";
   public MachineResultIndicator: string = "";
+  public ValuePrecision: number = 0;
+  public ShowInSheet: boolean = false;
+  public ShowRangeDescriptionInLabReport: boolean = false;
   public IsDirty(fieldname): boolean {
     if (fieldname == undefined) {
       return this.ComponentValidator.dirty;

@@ -16,6 +16,7 @@ namespace DanpheEMR.DalLayer
         public DbSet<ReferringOrganizationModel> ReferringOrganization { get; set; }
         public DbSet<ReferralComissionModel> ReferralComission { get; set; }
         public DbSet<BillingFiscalYear> BillingFiscalYears { get; set; }
+        public DbSet<PatientReferralCommissionModel> PatientReferralCommissions { get; set; }
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
             modelBuilder.Entity<BillingTransactionItemModel>().ToTable("BIL_TXN_BillingTransactionItems");
@@ -25,6 +26,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<ReferringOrganizationModel>().ToTable("MKT_MST_ReferringOrganization");
             modelBuilder.Entity<ReferralComissionModel>().ToTable("MKT_TXN_ReferralCommission");
             modelBuilder.Entity<BillingFiscalYear>().ToTable("BIL_CFG_FiscalYears");
+            modelBuilder.Entity<PatientReferralCommissionModel>().ToTable("MKT_TXN_PatientReferralCommision");
         }
     }
 }

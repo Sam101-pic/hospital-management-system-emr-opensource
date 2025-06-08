@@ -100,6 +100,7 @@ export class FromToDateSelectComponent implements AfterViewInit {
   public showDatePicker: boolean = false;
   public isValidToLoad: boolean = true;
   public showAdBsButton: boolean = true;
+  AllowFutureDate = false;
   public EnableEnglishCalendarOnly: boolean = false;
 
   constructor(public npCalendarService: NepaliCalendarService, private coreService: CoreService, public changeDetector: ChangeDetectorRef) {
@@ -174,7 +175,7 @@ export class FromToDateSelectComponent implements AfterViewInit {
     this.dateSettingsObj = FromToDateSettings.GetDateSettingsByName(this.dateSettingsName);
     this.dateRangeOptionString = this.dateSettingsObj.validDateRangesCSV;
     this.defaultRangeName = this.dateSettingsObj.defaultRangeName;
-
+    this.AllowFutureDate = this.dateSettingsObj.allowFutureDate;
     if (this.dateRangeOptionString) {
       // // 1D means Today..
       //comparing with tolowercase to avoid case-sensitive issue by developers.

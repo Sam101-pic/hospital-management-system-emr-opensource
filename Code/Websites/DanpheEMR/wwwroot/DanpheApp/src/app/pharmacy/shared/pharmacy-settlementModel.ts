@@ -40,6 +40,7 @@ export class PHRMSettlementModel {
 
   public StoreId: number = 0;
   public PHRMEmployeeCashTransactions: Array<PHRMEmployeeCashTransaction> = new Array<PHRMEmployeeCashTransaction>();
+  public DiscountReturnAmount: number = 0;
 
 
 

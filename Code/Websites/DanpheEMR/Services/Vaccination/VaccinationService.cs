@@ -191,38 +191,45 @@ namespace DanpheEMR.Services.Vaccination
             return tempPat;
         }
 
-        private void GenerateUniqueVisitCodeAndSaveChanges(VaccinationDbContext vaccinationDbContext, VisitModel immunVisiObj, string connStr)
-        {
-            try
-            {
-                 immunVisiObj.VisitCode = VisitBL.CreateNewPatientVisitCode(immunVisiObj.VisitType, connStr);
-                
-                vaccinationDbContext.SaveChanges();
-            }
-            catch (Exception ex)
-            {
+		private void GenerateUniqueVisitCodeAndSaveChanges(VaccinationDbContext vaccinationDbContext, VisitModel immunVisiObj, string connStr)
+		{
+			try
+			{
+				immunVisiObj.VisitCode = VisitBL.CreateNewPatientVisitCode(immunVisiObj.VisitType, connStr);
+                //Below code should be removed after the UI is changed to select Scheme and PriceCategory. This is a temporary solution.
+				var systemDefaultScheme = vaccinationDbContext.Schemes.FirstOrDefault(a => a.IsSystemDefault && a.IsActive);
+				var systemDefaultPriceCategory = vaccinationDbContext.PriceCategories.FirstOrDefault(a => a.IsDefault && a.IsActive);
+				if (systemDefaultScheme != null && systemDefaultPriceCategory != null)
+				{
+					immunVisiObj.SchemeId = systemDefaultScheme.SchemeId;
+					immunVisiObj.PriceCategoryId = systemDefaultPriceCategory.PriceCategoryId;
+				}
+				vaccinationDbContext.SaveChanges();
+			}
+			catch (Exception ex)
+			{
 
-                if (ex is DbUpdateException dbUpdateEx)
-                {
-                    if (dbUpdateEx.InnerException?.InnerException is SqlException sqlException)
-                    {
+				if (ex is DbUpdateException dbUpdateEx)
+				{
+					if (dbUpdateEx.InnerException?.InnerException is SqlException sqlException)
+					{
 
-                        if (sqlException.Number == 2627)// unique constraint error 
-                        {
-                            GenerateUniqueVisitCodeAndSaveChanges(vaccinationDbContext, immunVisiObj, connStr);
-                        }
-                        else
-                        {
-                            throw;
-                        }
-                    }
-                    else throw;
-                }
-                else throw;
-            }
-        }
+						if (sqlException.Number == 2627)// unique constraint error 
+						{
+							GenerateUniqueVisitCodeAndSaveChanges(vaccinationDbContext, immunVisiObj, connStr);
+						}
+						else
+						{
+							throw;
+						}
+					}
+					else throw;
+				}
+				else throw;
+			}
+		}
 
-        private PatientModel CreatePatientAndSave(VaccinationDbContext vaccinationDbContext, PatientModel patient)
+		private PatientModel CreatePatientAndSave(VaccinationDbContext vaccinationDbContext, PatientModel patient)
         {
             try
             {

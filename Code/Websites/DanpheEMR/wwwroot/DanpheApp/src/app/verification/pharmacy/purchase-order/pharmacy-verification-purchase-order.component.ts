@@ -154,6 +154,10 @@ export class PharmacyVerificationPurchaseOrderComponent {
     }
 
     ApprovePurchaseOrder() {
+        if (this.PurchaseOrder && (!this.PurchaseOrder.VerificationRemarks || (this.PurchaseOrder.VerificationRemarks && this.PurchaseOrder.VerificationRemarks.trim() === ''))) {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, ["Remarks is mandatory."]);
+            return;
+        }
         this.PurchaseOrder.CurrentVerificationLevel = this.CurrentVerificationLevel;
         this.PurchaseOrder.CurrentVerificationLevelCount = this.CurrentVerificationLevelCount;
         this.PurchaseOrder.MaxVerificationLevel = this.MaxVerificationLevel;

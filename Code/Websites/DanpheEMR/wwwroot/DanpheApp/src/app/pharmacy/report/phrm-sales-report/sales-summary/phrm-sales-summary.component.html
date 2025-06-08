@@ -26,7 +26,7 @@
   <!-- Summary -->
   <div class=" col-sm-12 col-md-12" style="margin-bottom: 10px !important; display: flex;justify-content: center;">
     <div class="table-responsive table-wrapper" id="print_summary">
-      <div *ngFor="let data of grandTotalSalesSummary;">
+      <div>
         <table class="table table-bordered table-hover table-condensed custom_table padLess_table" border="1">
           <thead>
             <tr>
@@ -38,34 +38,55 @@
           <tbody>
             <ng-container>
               <tr>
+                <td style="font-weight:bold; color:blue"> Gross Cash Sales </td>
+                <td> {{grandTotalSalesSummary.GrossCashSales | number}} </td>
+                <td style="font-weight:bold; color:blue">Gross Credit Sales </td>
+                <td> {{grandTotalSalesSummary.GrossCreditSales | number}} </td>
+                </tr>
+                <tr>
+                  <td style="font-weight:bold; color:blue"> Cash Discount </td>
+                  <td> {{grandTotalSalesSummary.CashDiscount | number}} </td>
+                  <td style="font-weight:bold; color:blue">Credit Discount </td>
+                  <td> {{grandTotalSalesSummary.CreditDiscount | number}} </td>
+                </tr>
+                <tr>
                 <td style="font-weight:bold; color:blue"> Cash Sales </td>
-                <td> {{data.CashSales | number}} </td>
+                <td> {{grandTotalSalesSummary.CashSales | number}} </td>
+                <td style="font-weight:bold; color:blue"> Credit Sales </td>
+                <td> {{grandTotalSalesSummary.CreditSales | number}} </td>
+
               </tr>
               <tr>
-                <td style="font-weight:bold; color:blue"> Cash Sales Refund </td>
-                <td> {{data.CashSalesRefund | number}} </td>
+                <td style="font-weight:bold; color:blue"> Gross Cash Refund </td>
+                <td> {{grandTotalSalesSummary.GrossCashRefund | number}} </td>
+                <td style="font-weight:bold; color:blue">Gross Credit Refund </td>
+                <td> {{grandTotalSalesSummary.GrossCreditRefund | number}} </td>
               </tr>
+              <tr>
+                <td style="font-weight:bold; color:blue"> Cash Refund Discount </td>
+                <td> {{grandTotalSalesSummary.CashRefundDiscount | number}} </td>
+                <td style="font-weight:bold; color:blue"> Credit Refund Discount </td>
+                <td> {{grandTotalSalesSummary.CreditRefundDiscount | number}} </td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold; color:blue"> Total Cash Refund </td>
+                <td> {{(grandTotalSalesSummary.CashSalesRefund) | number}} </td>
+                <td style="font-weight:bold; color:blue"> Total Credit Refund </td>
+                <td> {{grandTotalSalesSummary.CreditSalesRefund | number}} </td>
+                </tr>
               <tr>
                 <td style="font-weight:bold; color:blue"> Net Cash Sales </td>
-                <td> {{(data.TotalCashSales) | number}} </td>
-              </tr>
-              <!-- <br /> -->
-              <tr>
-                <td style="font-weight:bold; color:blue"> Credit Sales </td>
-                <td> {{data.CreditSales | number}} </td>
-              </tr>
-              <tr>
-                <td style="font-weight:bold; color:blue"> Credit Sales Refund </td>
-                <td> {{data.CreditSalesRefund | number}} </td>
-              </tr>
-              <tr>
+                <td> {{(grandTotalSalesSummary.NetCashSales) | number}} </td>
+
                 <td style="font-weight:bold; color:blue">Net Credit Sales</td>
-                <td> {{data.TotalCreditSales | number}} </td>
+                <td> {{grandTotalSalesSummary.NetCreditSales | number}} </td>
               </tr>
-              <!-- <br /> -->
               <tr style="border: 2px solid;">
-                <td style="font-weight:bold; color:blue"> Total Sales </td>
-                <td style="font-weight:bold;"> {{data.NetTotalSales | number}}</td>
+                <td style="font-weight:bold; color:blue">Net Total Sales</td>
+                <td> {{grandTotalSalesSummary.NetTotalSales | number}} </td>
+                
+                <td style="font-weight:bold; color:blue"> Cash In Hand </td>
+                <td style="font-weight:bold;"> {{grandTotalSalesSummary.CashInHand | number}}</td>
               </tr>
             </ng-container>
           </tbody>

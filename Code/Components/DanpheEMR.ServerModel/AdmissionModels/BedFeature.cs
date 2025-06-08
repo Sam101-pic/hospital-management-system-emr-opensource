@@ -29,7 +29,10 @@ namespace DanpheEMR.ServerModel
         [NotMapped]
         public int? ServiceDepartmentId { get; set; }
 
-  
+        public bool IsPresentationGrouping { get; set; }
+        public string GroupCode { get; set; }
+
+
 
     }
 }

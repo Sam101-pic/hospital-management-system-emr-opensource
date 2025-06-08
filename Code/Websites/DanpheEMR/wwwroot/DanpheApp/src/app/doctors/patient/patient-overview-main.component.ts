@@ -1,18 +1,15 @@
 import { Component } from "@angular/core";
 import {
-  RouterOutlet,
-  RouterModule,
-  Router,
   ActivatedRoute,
-  NavigationEnd,
+  Router
 } from "@angular/router";
 //Security Service for Loading Child Route from Security Service
-import { SecurityService } from "../../security/shared/security.service";
-import { PatientService } from "../../patients/shared/patient.service";
 import { VisitService } from "../../appointments/shared/visit.service";
+import { CoreService } from "../../core/shared/core.service";
+import { PatientService } from "../../patients/shared/patient.service";
+import { SecurityService } from "../../security/shared/security.service";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
 import { DoctorsBLService } from "../shared/doctors.bl.service";
-import { CoreService } from "../../core/shared/core.service";
 
 @Component({
   templateUrl: "./patient-overview-main.html",
@@ -47,7 +44,7 @@ export class PatientOverviewMainComponent {
         "Emergency/PatientOverviewMain"
       );
     }
-    var visitType: string = this.visitService.globalVisit.VisitType;    
+    var visitType: string = this.visitService.globalVisit.VisitType;
     var visitType = visitType ? visitType.toLowerCase() : visitType;
 
     if (visitType == "outpatient") {
@@ -98,29 +95,43 @@ export class PatientOverviewMainComponent {
 
   //sud:4Apr'20--to go to MyAppointments page.
   public BackToHome() {
-    if (this.currentModuleName == "doctor") {
-      this.router.navigate(["/Doctors/OutPatientDoctor"]);
-    } else if (this.currentModuleName == "nursing") {
-      if (this.visitService.globalVisit.VisitType == "outpatient") {
+    if (this.currentModuleName === "doctor") {
+      if (this.visitService.globalVisit.VisitType === "outpatient") {
+        this.router.navigate(["/Doctors/OutPatientDoctor"]);
+      }
+      else {
+        this.router.navigate(["/Doctors/InPatientDepartment"]);
+      }
+    }
+    else if (this.currentModuleName === "nursing") {
+      if (this.visitService.globalVisit.VisitType === "outpatient") {
         this.router.navigate(["/Nursing/OutPatient"]);
-      } else {
+      }
+      else {
         this.router.navigate(["/Nursing/InPatient"]);
       }
 
-    } else if (this.currentModuleName == "emergency") {
-      if (this.visitService.globalVisit.ERTabName == "triaged") {
+    }
+    else if (this.currentModuleName === "emergency") {
+      if (this.visitService.globalVisit.ERTabName === "triaged") {
         this.router.navigate(["/Emergency/TriagePatients"]);
-      } else if (this.visitService.globalVisit.ERTabName == "finalized-lama") {
+      }
+      else if (this.visitService.globalVisit.ERTabName === "finalized-lama") {
         this.router.navigate(["/Emergency/FinalizedPatients/Lama-Patients"]);
-      } else if (this.visitService.globalVisit.ERTabName == "finalized-transferred") {
+      }
+      else if (this.visitService.globalVisit.ERTabName === "finalized-transferred") {
         this.router.navigate(["/Emergency/FinalizedPatients/Transferred-Patients"]);
-      } else if (this.visitService.globalVisit.ERTabName == "finalized-discharge") {
+      }
+      else if (this.visitService.globalVisit.ERTabName === "finalized-discharged") {
         this.router.navigate(["/Emergency/FinalizedPatients/Discharged-Patients"]);
-      } else if (this.visitService.globalVisit.ERTabName == "finalized-admitted") {
+      }
+      else if (this.visitService.globalVisit.ERTabName === "finalized-admitted") {
         this.router.navigate(["/Emergency/FinalizedPatients/Admitted-Patients"]);
-      } else if (this.visitService.globalVisit.ERTabName == "finalized-death") {
+      }
+      else if (this.visitService.globalVisit.ERTabName === "finalized-death") {
         this.router.navigate(["/Emergency/FinalizedPatients/Death-Patients"]);
-      } else if (this.visitService.globalVisit.ERTabName == "finalized-dor") {
+      }
+      else if (this.visitService.globalVisit.ERTabName === "finalized-dor") {
         this.router.navigate(["/Emergency/FinalizedPatients/Dor-Patients"]);
       }
     }

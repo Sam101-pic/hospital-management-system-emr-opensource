@@ -29,11 +29,13 @@ namespace DanpheEMR.Services.BillSettings.DTOs
         public int ItemId { get; set; }
         public bool IsActive { get; set; }
         public int? DisplaySeq { get; set; }
-
+        public bool IsIncentiveApplicable { get; set; }
+        public bool IsInsurancePackage { get; set; }
         public List<BillPriceCategoryServiceItemsDTO> BilCfgItemsVsPriceCategoryMap { get; set; }
+        public string OTCategory { get; set; }
     }
 
-  public class BillPriceCategoryServiceItemsDTO
+    public class BillPriceCategoryServiceItemsDTO
     {
         public int PriceCategoryServiceItemMapId { get; set; }
         public int PriceCatMapId { get; set; }
@@ -50,5 +52,8 @@ namespace DanpheEMR.Services.BillSettings.DTOs
         public bool IsIncentiveApplicable { get; set; }
         public bool HasAdditionalBillingItems { get; set; }
         public int ItemId { get; set; }
+        public bool IsCappingEnabled { get; set; }
+        public int CappingLimitDays { get; set; }
+        public int CappingQuantity { get; set; }
     }
 }

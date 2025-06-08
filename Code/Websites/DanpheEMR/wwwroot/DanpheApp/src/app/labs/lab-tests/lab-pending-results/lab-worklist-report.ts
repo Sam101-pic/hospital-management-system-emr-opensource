@@ -1,22 +1,16 @@
-import { Component, ChangeDetectorRef, Input, Output, EventEmitter } from "@angular/core";
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
+import { Router } from '@angular/router';
 import * as moment from 'moment/moment';
+import { CoreService } from "../../../core/shared/core.service";
 import { PatientService } from '../../../patients/shared/patient.service';
+import { SecurityService } from '../../../security/shared/security.service';
+import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { CommonFunctions } from "../../../shared/common.functions";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { LabCategoryModel } from "../../shared/lab-category.model";
 import { LabTestResultService } from '../../shared/lab.service';
 import { LabsBLService } from '../../shared/labs.bl.service';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { PatientLabSample, LabTestSpecimen, LabResult_TestVM } from '../../shared/lab-view.models';
-import { SecurityService } from '../../../security/shared/security.service';
-import { LabTestRequisition } from '../../shared/lab-requisition.model';
-import { LabTestComponent } from '../../shared/lab-component.model'
-import { CommonFunctions } from "../../../shared/common.functions";
-import * as _ from 'lodash';
-import { LabSticker } from "../../shared/lab-sticker.model";
-import { CoreService } from "../../../core/shared/core.service";
-import { LabReportVM, ReportLookup } from "../../reports/lab-report-vm";
-import { DanpheHTTPResponse } from "../../../shared/common-models";
-import { LabCategoryModel } from "../../shared/lab-category.model";
-import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 
 @Component({
   selector: 'lab-worklist',
@@ -44,7 +38,7 @@ export class LabWorkListReportComponent {
   public departmentName: string;
   public verificationRequired: boolean;
   public loading: boolean = true;
-  public timeId: number  = 0;
+  public timeId: number = 0;
   public isInitialLoad: boolean = true;
 
 
@@ -100,10 +94,10 @@ export class LabWorkListReportComponent {
           console.log(res.ErrorMessage);
         }
       },
-      (err: DanpheHTTPResponse) => {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["failed to get worklist.. please check log for details."]);
-        console.log(err.ErrorMessage);
-      });
+        (err: DanpheHTTPResponse) => {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["failed to get worklist.. please check log for details."]);
+          console.log(err.ErrorMessage);
+        });
   }
 
   // public GetWorkListForNoVerificationRequired(frmdate, todate, categoryIdList) {
@@ -183,7 +177,17 @@ export class LabWorkListReportComponent {
                           }
                           .headerPrintDate {
                             width: 23% !important;
-                          }</style>`;
+                          }
+                          @media print {
+                            .testContainer div {
+                              border-bottom: 1px solid black;
+                            }
+                        
+                            .testContainer div:last-child {
+                              border-bottom: none;
+                            }
+                          }
+                          </style>`;
 
 
     documentContent += `<link rel="stylesheet" type="text/css" href="../../../../../../themes/theme-default/DanphePrintStyle.css" /></head>`;
@@ -218,8 +222,8 @@ export class LabWorkListReportComponent {
       this.timeId = null;
     }
     this.timeId = window.setTimeout(() => {
-      if(this.isInitialLoad){
-        this.LoadWorkListData(this.fromDate,this.toDate,this.categoryIdList);
+      if (this.isInitialLoad) {
+        this.LoadWorkListData(this.fromDate, this.toDate, this.categoryIdList);
         this.isInitialLoad = false;
       }
     }, 300);

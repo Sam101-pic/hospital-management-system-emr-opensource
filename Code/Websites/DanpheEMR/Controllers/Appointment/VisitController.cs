@@ -1,39 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using Microsoft.AspNetCore.Mvc;
-using DanpheEMR.Core.Configuration;
-using DanpheEMR.ServerModel;
-using DanpheEMR.DalLayer;
-using System.Data.Entity;
-using Microsoft.Extensions.Options;
-using DanpheEMR.Utilities;
-using Newtonsoft.Json;
-using DanpheEMR.CommonTypes;
-using DanpheEMR.Security;
-using DanpheEMR.Core;
-using DanpheEMR.Controllers.Billing;
-using System.Data.SqlClient;
 using System.Data;
-using DanpheEMR.Enums;
+using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
+using System.Data.SqlClient;
+using System.Linq;
 using System.Threading.Tasks;
-using Org.BouncyCastle.Asn1.Ocsp;
-using DanpheEMR.ServerModel.BillingModels;
+using DanpheEMR.CommonTypes;
+using DanpheEMR.Controllers.Appointment.DTOs;
+using DanpheEMR.Controllers.Billing;
+using DanpheEMR.Core;
+using DanpheEMR.Core.Configuration;
+using DanpheEMR.DalLayer;
+using DanpheEMR.Enums;
+using DanpheEMR.Security;
+using DanpheEMR.ServerModel;
 //using Microsoft.EntityFrameworkCore;
 using DanpheEMR.ServerModel.AppointmentModels;
-using DanpheEMR.Services.SSF;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using OfficeOpenXml.FormulaParsing.Excel.Functions.Math;
-using Rank = DanpheEMR.ServerModel.AppointmentModels.Rank;
-using Newtonsoft.Json.Linq;
-using DanpheEMR.Services.Billing.DTO;
+using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.Services.Appointment.DTO;
-using DanpheEMR.ServerModel.InsuranceModels;
+using DanpheEMR.Services.Billing.DTO;
 using DanpheEMR.Services.Visits.DTO;
-using DanpheEMR.ServerModel.PatientModels;
-using System.Data.Entity.Migrations;
-using DocumentFormat.OpenXml.Bibliography;
+using DanpheEMR.Utilities;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using Serilog.Core;
+using Rank = DanpheEMR.ServerModel.AppointmentModels.Rank;
 // For more information on enabling Web API for empty projects, visit http://go.microsoft.com/fwlink/?LinkID=397860
 //test for checkin
 namespace DanpheEMR.Controllers
@@ -51,8 +46,10 @@ namespace DanpheEMR.Controllers
         private readonly BillingDbContext _billingDbContext;
         private readonly PatientDbContext _patDbContext;
         private readonly SSFDbContext _ssfDbContext;
+        private readonly ILogger<VisitController> _logger;
 
-        public VisitController(IOptions<MyConfiguration> _config) : base(_config)
+
+        public VisitController(IOptions<MyConfiguration> _config, ILogger<VisitController> logger) : base(_config)
         {
             realTimeRemoteSyncEnabled = _config.Value.RealTimeRemoteSyncEnabled;
             RealTimeSSFClaimBooking = _config.Value.RealTimeSSFClaimBooking;
@@ -65,6 +62,8 @@ namespace DanpheEMR.Controllers
             _billingDbContext = new BillingDbContext(connString);
             _patDbContext = new PatientDbContext(connString);
             _ssfDbContext = new SSFDbContext(connString);
+            _logger = logger;
+
         }
 
         //[HttpGet]
@@ -144,15 +143,21 @@ namespace DanpheEMR.Controllers
         {
             //else if (reqType == "patient-visitHistory-today")
             //{
-            Func<object> func = () => (from visit in _visitDbContext.Visits
-                                       where visit.PatientId == patientId
-                                     //DbFunctions.TruncateTime(defaultLastDateToShow)
-                                     && DbFunctions.TruncateTime(visit.VisitDate) == DbFunctions.TruncateTime(DateTime.Now)
-                                       && visit.BillingStatus != ENUM_BillingStatus.returned // "returned"
-                                       select visit).ToList();
+            Func<object> func = () => GetPatientTodaysVisits(patientId);
             return InvokeHttpGetFunction<object>(func);
         }
-        
+
+        private object GetPatientTodaysVisits(int patientId)
+        {
+            var visits = (from visit in _visitDbContext.Visits
+                          join dep in _visitDbContext.Departments on visit.DepartmentId equals dep.DepartmentId
+                          where visit.PatientId == patientId
+                                 && DbFunctions.TruncateTime(visit.VisitDate) == DbFunctions.TruncateTime(DateTime.Now)
+                                 && visit.BillingStatus != ENUM_BillingStatus.returned // "returned"
+                          select visit).ToList();
+            return visits;
+        }
+
         [HttpGet]
         [Route("PatientVisitsWithDoctors")]
         public ActionResult PatientVisitsWithDoctors(int patientId)
@@ -161,6 +166,44 @@ namespace DanpheEMR.Controllers
             //{
             Func<object> func = () => GetPatientVisitsWithDoctors(patientId);
             return InvokeHttpGetFunction<object>(func);
+        }
+
+        [HttpGet]
+        [Route("PatientVisits")]
+        public ActionResult PatientVisits(int patientId)
+        {
+            Func<object> func = () => GetPatientVisits(patientId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        /// <summary>
+        /// This API is responsible to return the list of patient visits based on the filter option and provided search text, It will use a stored procedure to bring the results.
+        /// </summary>
+        /// <param name="filterBy">This is a parameter that takes what is the filter option selected</param>
+        /// <param name="searchText">This is a search Text put to search patient visits</param>
+        /// <returns>It returns the list of visits for the patient matching the search Text using filter option</returns>
+        [HttpGet]
+        [Route("SearchPatientVisits")]
+        public ActionResult SearchPatientVisits(string filterBy, string searchText)
+        {
+            Func<object> func = () => GetPatientVisitsBySearchFilterOption(filterBy, searchText);
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        /// <summary>
+        /// This method is responsible to return the list of patient visits based on the filter option and provided search text, It will use a stored procedure to bring the results.
+        /// </summary>
+        /// <param name="filterBy">This is a parameter that takes what is the filter option selected</param>
+        /// <param name="searchText">This is a search Text put to search patient visits</param>
+        /// <returns>It returns the list of visits for the patient matching the search Text using filter option</returns>
+        private object GetPatientVisitsBySearchFilterOption(string filterBy, string searchText)
+        {
+            List<SqlParameter> paramList = new List<SqlParameter>() {
+                        new SqlParameter("@FilterBy", filterBy),
+                        new SqlParameter("@SearchText", searchText)
+                    };
+            var patientVisits = DALFunctions.GetDataTableFromStoredProc("SP_GetPatientBySearchFilterOption", paramList, _visitDbContext);
+            return patientVisits;
         }
 
         [HttpGet]
@@ -176,9 +219,9 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("PatientVisitContextForProvisionalPayment")]
-        public ActionResult PatientVisitContextForProvisionalPayment(int patientId, int visitId)
+        public ActionResult PatientVisitContextForProvisionalPayment(int patientId, int patientVisitId)
         {
-            Func<object> func = () => GetPatientVisitContextForProvisionalPayment(patientId, visitId);
+            Func<object> func = () => GetPatientVisitContextForProvisionalPayment(patientId, patientVisitId);
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -349,16 +392,81 @@ namespace DanpheEMR.Controllers
 
         [HttpGet]
         [Route("GetLatestClaimCode")]
-        public ActionResult GetLatestClaimCodeForAutoClaimCodeGeneration(int schemeId)
+        public ActionResult GetLatestClaimCodeForAutoClaimCodeGeneration(int creditOrganizationId)
         {
-            Func<object> func = () => GetLatestClaimCode(schemeId);
+            Func<object> func = () => GetLatestClaimCode(creditOrganizationId);
             return InvokeHttpGetFunction<object>(func);
         }
 
-        private object GetLatestClaimCode(int schemeId)
+        private object GetLatestClaimCode(int creditOrganizationId)
         {
-            NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, schemeId);
+            NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, creditOrganizationId);
             return newClaimObj;
+        }
+
+        [HttpGet]
+        [Route("GetPatientPreviousVisit")]
+        public ActionResult GetPatientPreviousVisit(int patientId)
+        {
+            Func<object> func = () => GetPreviousVisit(patientId);
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        private object GetPreviousVisit(int patientId)
+        {
+            var currentDate = DateTime.Now.Date;
+            var lastVisit = (from visit in _visitDbContext.Visits
+                                    .Where(v => v.PatientId == patientId)
+                                    .OrderByDescending(v => v.PatientVisitId)
+                                    .Take(1)
+                             join patMap in _visitDbContext.PatientSchemeMaps on new { PatientId = visit.PatientId, SchemeId = visit.SchemeId } equals new { PatientId = patMap.PatientId, SchemeId = patMap.SchemeId }
+                             join dep in _visitDbContext.Departments on visit.DepartmentId equals dep.DepartmentId
+                             join sch in _visitDbContext.BillingSchemes on visit.SchemeId equals sch.SchemeId
+                             join emp in _visitDbContext.Employees on visit.PerformerId equals emp.EmployeeId into grp
+                             from performer in grp.DefaultIfEmpty()
+                             select new PatientLastVisitDetail_DTO
+                             {
+                                 PatientVisitId = visit.PatientVisitId,
+                                 PatientId = visit.PatientId,
+                                 DepartmentId = visit.DepartmentId,
+                                 DepartmentName = dep.DepartmentName,
+                                 PerformerId = visit.PerformerId,
+                                 PerformerName = performer != null ? performer.FullName : "",
+                                 VisitDate = visit.VisitDate,
+                                 Scheme = sch.SchemeName,
+                                 MemberNo = patMap.PolicyNo
+                             }).FirstOrDefault();
+
+            if (lastVisit != null)
+            {
+                lastVisit.LastVisitDayCount = (int)currentDate.Subtract(lastVisit.VisitDate.Date).TotalDays;
+            }
+
+            return lastVisit;
+        }
+
+        [HttpGet]
+        [Route("GetPatientWithVisitInformation")]
+        public ActionResult GetPatientWithVisitInformation(int patientId, int patientVisitId)
+        {
+            Func<object> func = () => GetPatientVisitDetails(patientId, patientVisitId);
+            return InvokeHttpGetFunction(func);
+        }
+
+        private object GetPatientVisitDetails(int patientId, int patientVisitId)
+        {
+            var patientVisitDetails = (from visit in _visitDbContext.Visits.Where(v => v.PatientVisitId == patientVisitId)
+                                       join pat in _visitDbContext.Patients.Where(p => p.PatientId == patientId) on visit.PatientId equals pat.PatientId
+                                       select new
+                                       {
+                                           PatientId = pat.PatientId,
+                                           PatientVisitId = visit.PatientVisitId,
+                                           PatientName = pat.ShortName,
+                                           PatientCode = pat.PatientCode,
+                                           PerformerId = visit.PerformerId,
+                                           Performer = visit.PerformerName
+                                       }).FirstOrDefault();
+            return patientVisitDetails;
         }
 
         #region Post APIs
@@ -404,7 +512,7 @@ namespace DanpheEMR.Controllers
             //else if (!string.IsNullOrEmpty(reqType) && reqType == "free-referral-visit")
             //{
             string str = this.ReadPostData();
-            RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             Func<object> func = () => CreateVisitForFreeReferral(str, currentUser);
             return InvokeHttpPostFunction<object>(func);
         }
@@ -416,7 +524,7 @@ namespace DanpheEMR.Controllers
             //else if (!string.IsNullOrEmpty(reqType) && reqType == "free-followup-visit")
             //{
             string str = this.ReadPostData();
-            RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             Func<object> func = () => CreateVisitForFreeFollowUp(str, currentUser);
             return InvokeHttpPostFunction<object>(func);
         }
@@ -428,7 +536,7 @@ namespace DanpheEMR.Controllers
             //else if (!string.IsNullOrEmpty(reqType) && reqType == "paid-followup-visit")
             //{
             string str = this.ReadPostData();
-            RbacUser currentUser = HttpContext.Session.Get<RbacUser>("currentuser");
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             Func<object> func = () => VisitCreateForPaidFollowUp(str, currentUser);
             return InvokeHttpPostFunction<object>(func);
         }
@@ -445,6 +553,128 @@ namespace DanpheEMR.Controllers
             return InvokeHttpPostFunction<object>(func);
         }
 
+        [HttpPost]
+        [Route("CreateFreeVisit")]
+        public ActionResult AddNewOutDoorPatientAndCreateFreeVisit()
+        {
+            string str = this.ReadPostData();
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => CreateFreeVisit(str, currentUser);
+            return InvokeHttpPostFunction<object>(func);
+        }
+
+        private object CreateFreeVisit(string inputString, RbacUser currentUser)
+        {
+            FreeVisit_DTO freeVisit = DanpheJSONConvert.DeserializeObject<FreeVisit_DTO>(inputString);
+            if (freeVisit == null)
+            {
+                throw new ArgumentNullException($"{nameof(freeVisit)} cannot be null");
+            }
+            DanpheHTTPResponse<FreeVisit_DTO> responseData = new DanpheHTTPResponse<FreeVisit_DTO>();
+            try
+            {
+                //check for clashing visit
+                if (freeVisit.Visit.IsFreeVisit == true && VisitBL.HasDuplicateVisitWithSameDepartment(_visitDbContext, freeVisit.Patient.PatientId, freeVisit.Visit.DepartmentId, freeVisit.Visit.VisitDate))
+                {
+                    throw new Exception("Patient already has visit with this Department today.");
+                }
+
+                using (var visitDbTransaction = _visitDbContext.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        freeVisit.Patient = AddPatientForVisit(_visitDbContext, freeVisit.Patient, currentUser.EmployeeId);
+                        freeVisit.Visit = AddFreeVisit(_visitDbContext, freeVisit.Patient.PatientId, freeVisit.Visit, currentUser.EmployeeId, freeVisit.Patient);
+
+                        VisitBL.SavePatientSchemeForFreeVisit(_visitDbContext, freeVisit, currentUser);
+
+                        visitDbTransaction.Commit();
+
+                        //pratik: 5march'20 ---to generate queue no for every new visit
+                        freeVisit.Visit.QueueNo = VisitBL.CreateNewPatientQueueNo(_visitDbContext, freeVisit.Visit.PatientVisitId, connString);
+                    }
+                    catch (Exception ex)
+                    {
+                        visitDbTransaction.Rollback();
+                        _logger.LogError($"exception details:"+ ex.ToString());
+                        throw new Exception(ex.Message);     
+                    }
+                }
+                return freeVisit;
+
+            }
+            catch (Exception ex)
+            {
+                responseData.Status = "Failed";
+                throw ex;
+            }
+        }
+
+        private VisitModel AddFreeVisit(VisitDbContext visitDbContext, int currPatientId, VisitModel currVisit, int currentUserId, PatientModel patient)
+        {
+            try
+            {
+                var schemeObj = _visitDbContext.BillingSchemes.Where(a => a.SchemeId == currVisit.SchemeId).FirstOrDefault();
+                if (schemeObj == null)
+                {
+                    throw new InvalidOperationException($"{schemeObj} cannot be null, there is a problem with scheme provided from client");
+                }
+                //Krishna, this will generate ClaimCode..
+                var creditOrganization = visitDbContext.CreditOrganizations.FirstOrDefault(a => a.OrganizationId == schemeObj.DefaultCreditOrganizationId);
+
+                var INSParameter = _visitDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Insurance" && a.ParameterName == "ClaimCodeAutoGenerateSettings").FirstOrDefault().ParameterValue;
+                var claimcodeParameter = Newtonsoft.Json.Linq.JObject.Parse(INSParameter);
+                var EnableAutoGenerate = Convert.ToBoolean(claimcodeParameter["EnableAutoGenerate"]);
+                int creditOrganizationId = Convert.ToInt32(claimcodeParameter["CreditOrganizationId"]);
+
+                if (creditOrganization != null && creditOrganization.IsClaimCodeAutoGenerate && EnableAutoGenerate && creditOrganizationId == schemeObj.DefaultCreditOrganizationId)
+                {
+                    NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, schemeObj.DefaultCreditOrganizationId);
+                    currVisit.ClaimCode = newClaimObj.NewClaimCode;
+                }
+                else
+                {
+                    if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && creditOrganization.IsClaimCodeCompulsory && creditOrganization.IsClaimCodeAutoGenerate)
+                    {
+                        currVisit.ClaimCode = GenerateClaimCode();
+                    }
+
+                    if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && creditOrganization.IsClaimCodeCompulsory && !creditOrganization.IsClaimCodeAutoGenerate && patient.PatientScheme.LatestClaimCode != null)
+                    {
+                        currVisit.ClaimCode = patient.PatientScheme.LatestClaimCode;
+                    }
+
+                    if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && !creditOrganization.IsClaimCodeCompulsory && !creditOrganization.IsClaimCodeAutoGenerate && patient.PatientScheme.LatestClaimCode != null)
+                    {
+                        currVisit.ClaimCode = patient.PatientScheme.LatestClaimCode;
+                    }
+                }
+                if (!string.IsNullOrEmpty(patient.PatientScheme.PolicyNo))
+                {
+                    currVisit.Remarks = $"PolicyNo: {patient.PatientScheme.PolicyNo}, RegistrationCase: {patient.PatientScheme.RegistrationCase}, RegistrationSubCase: {patient.PatientScheme.RegistrationSubCase}";
+                }
+
+                var hasPreviousVisits = visitDbContext.Visits.Any(v => v.PatientId == currPatientId);
+                currVisit.CreatedBy = currentUserId;
+                currVisit.CreatedOn = DateTime.Now;
+                currVisit.VisitType = ENUM_VisitType.outdoor;
+                currVisit.VisitStatus = ENUM_VisitStatus.initiated;// "initiated";
+                currVisit.SubSchemeId = patient.PatientScheme.SubSchemeId;
+
+                currVisit.BillingStatus = ENUM_BillingStatus.paid;// "paid";
+
+                currVisit.PatientId = currPatientId;
+                currVisit.VisitDate = DateTime.Now;
+                currVisit.VisitTime = TimeSpan.Parse(DateTime.Now.ToString("HH:mm"));
+                currVisit.AppointmentType = hasPreviousVisits ? ENUM_AppointmentType.revisit : ENUM_AppointmentType.New;
+                currVisit.IsFreeVisit = true;
+                visitDbContext.Visits.Add(currVisit);
+                GeneratePatientVisitCodeAndSave(visitDbContext, currVisit, connString);
+                return currVisit;
+
+            }
+            catch (Exception ex) { throw ex; }
+        }
 
         #endregion Post APIs
 
@@ -559,52 +789,58 @@ namespace DanpheEMR.Controllers
                 {
                     throw new Exception("Patient already has visit with this provider today.");
                 }
-                else
+                if (quickVisit.Visit.IsFreeVisit == true && VisitBL.HasDuplicateVisitWithSameDepartment(_visitDbContext, quickVisit.Patient.PatientId, quickVisit.Visit.DepartmentId, quickVisit.Visit.VisitDate))
                 {
-                    using (var visitDbTransaction = _visitDbContext.Database.BeginTransaction())
+                    throw new Exception("Patient already has visit with this Department today.");
+                }
+
+                using (var visitDbTransaction = _visitDbContext.Database.BeginTransaction())
+                {
+                    try
                     {
-                        try
+                        quickVisit.Patient = AddPatientForVisit(_visitDbContext, quickVisit.Patient, currentUser.EmployeeId);
+                        AddPatientCareTaker(_visitDbContext, quickVisit.CareTaker, quickVisit.Patient.PatientId);
+                        quickVisit.Visit = AddVisit(_visitDbContext, quickVisit.Patient.PatientId, quickVisit.Visit, quickVisit.BillingTransaction, currentUser.EmployeeId, quickVisit.Patient);
+                        string department = GetDepartmentName();
+                        if (department != null && quickVisit.Visit.DepartmentName.ToLower() == department.ToLower())
                         {
-                            quickVisit.Patient = AddPatientForVisit(_visitDbContext, quickVisit.Patient, currentUser.EmployeeId);
-                            AddPatientCareTaker(_visitDbContext, quickVisit.CareTaker, quickVisit.Patient.PatientId);
-                            quickVisit.Visit = AddVisit(_visitDbContext, quickVisit.Patient.PatientId, quickVisit.Visit, quickVisit.BillingTransaction, currentUser.EmployeeId, quickVisit.Patient);
-                            string department = GetDepartmentName();
-                            if (department != null && quickVisit.Visit.DepartmentName.ToLower() == department.ToLower())
-                            {
-                                AddEmergencyPatient(_visitDbContext, quickVisit.Visit, currentUser.EmployeeId, quickVisit.Patient);
-                            }
-                            
+                            AddEmergencyPatient(_visitDbContext, quickVisit.Visit, currentUser.EmployeeId, quickVisit.Patient);
+                        }
+
+                        if (!quickVisit.Visit.IsFreeVisit)
+                        {
                             quickVisit.BillingTransaction = AddBillingTransactionForPatientVisit(_visitDbContext,
-                                quickVisit.BillingTransaction,
-                                quickVisit.Visit.PatientId,
-                                 quickVisit.Visit,
-                                currentUser.EmployeeId);
-                            VisitBL.SavePatientScheme(_visitDbContext, quickVisit, currentUser, RealTimeSSFClaimBooking, _ssfDbContext);
-                            //if (quickVisit.Visit.AppointmentType.ToLower() == "transfer" || quickVisit.Visit.AppointmentType.ToLower() == "referral")
-                            if (quickVisit.Visit.AppointmentType.ToLower() == ENUM_AppointmentType.transfer.ToLower()
-                                || quickVisit.Visit.AppointmentType.ToLower() == ENUM_AppointmentType.referral.ToLower())
-
-                            {
-                                UpdateIsContinuedStatus(quickVisit.Visit.ParentVisitId, quickVisit.Visit.AppointmentType, true, currentUser.EmployeeId, _visitDbContext);
-                            }
-
-                            var scheme = _visitDbContext.BillingSchemes.Where(a => a.SchemeId == quickVisit.Visit.SchemeId).FirstOrDefault();
-                            if (scheme != null && scheme.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.Medicare)
-                            {
-                                VisitBL.UpdateMedicareMemberBalance(_visitDbContext, quickVisit, currentUser.EmployeeId);
-
-                            }
-
-                            visitDbTransaction.Commit();
-
-                            //pratik: 5march'20 ---to generate queue no for every new visit
-                            quickVisit.Visit.QueueNo = VisitBL.CreateNewPatientQueueNo(_visitDbContext, quickVisit.Visit.PatientVisitId, connString);
+                            quickVisit.BillingTransaction,
+                            quickVisit.Visit.PatientId,
+                             quickVisit.Visit,
+                            currentUser.EmployeeId);
                         }
-                        catch (Exception ex)
+
+                        VisitBL.SavePatientScheme(_visitDbContext, quickVisit, currentUser, RealTimeSSFClaimBooking, _ssfDbContext);
+                        //if (quickVisit.Visit.AppointmentType.ToLower() == "transfer" || quickVisit.Visit.AppointmentType.ToLower() == "referral")
+                        if (quickVisit.Visit.AppointmentType.ToLower() == ENUM_AppointmentType.transfer.ToLower()
+                            || quickVisit.Visit.AppointmentType.ToLower() == ENUM_AppointmentType.referral.ToLower())
+
                         {
-                            visitDbTransaction.Rollback();
-                            throw new Exception(ex.Message + " exception details:" + ex.ToString());
+                            UpdateIsContinuedStatus(quickVisit.Visit.ParentVisitId, quickVisit.Visit.AppointmentType, true, currentUser.EmployeeId, _visitDbContext);
                         }
+
+                        var scheme = _visitDbContext.BillingSchemes.Where(a => a.SchemeId == quickVisit.Visit.SchemeId).FirstOrDefault();
+                        if (scheme != null && scheme.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.Medicare)
+                        {
+                            VisitBL.UpdateMedicareMemberBalance(_visitDbContext, quickVisit, currentUser.EmployeeId);
+
+                        }
+
+                        visitDbTransaction.Commit();
+
+                        //pratik: 5march'20 ---to generate queue no for every new visit
+                        quickVisit.Visit.QueueNo = VisitBL.CreateNewPatientQueueNo(_visitDbContext, quickVisit.Visit.PatientVisitId, connString);
+                    }
+                    catch (Exception ex)
+                    {
+                        visitDbTransaction.Rollback();
+                        throw new Exception(ex.Message + " exception details:" + ex.ToString());
                     }
                 }
                 return quickVisit;
@@ -784,6 +1020,7 @@ namespace DanpheEMR.Controllers
                     visitDbContext.Entry(clientPat).Property(x => x.DependentId).IsModified = true;
                     visitDbContext.Entry(clientPat).Property(x => x.IDCardNumber).IsModified = true;
                     visitDbContext.Entry(clientPat).Property(x => x.EthnicGroup).IsModified = true;
+                    visitDbContext.Entry(clientPat).Property(x => x.MaritalStatus).IsModified = true;
                     clientPat.ModifiedOn = System.DateTime.Now;
                     clientPat.ModifiedBy = currentUserId;
                     visitDbContext.SaveChanges();
@@ -830,20 +1067,20 @@ namespace DanpheEMR.Controllers
         {
             if (patientCareTaker != null)
             {
-                var careTakerInfo = visitDbContext.Guarantor.Where(x=>x.PatientId==patientId).FirstOrDefault();
+                var careTakerInfo = visitDbContext.Guarantor.Where(x => x.PatientId == patientId).FirstOrDefault();
                 if (careTakerInfo != null)
                 {
                     careTakerInfo.GuarantorName = patientCareTaker.CareTakerName;
                     careTakerInfo.PatientRelationship = patientCareTaker.RelationWithPatient;
                     careTakerInfo.GuarantorPhoneNumber = patientCareTaker.CareTakerContact;
 
-                    visitDbContext.Entry(careTakerInfo).State = EntityState.Modified;                    
+                    visitDbContext.Entry(careTakerInfo).State = EntityState.Modified;
                 }
                 else
                 {
                     var newCareTakerInfo = new GuarantorModel
                     {
-                       PatientId =patientId,
+                        PatientId = patientId,
                         GuarantorName = patientCareTaker.CareTakerName,
                         PatientRelationship = patientCareTaker.RelationWithPatient,
                         GuarantorPhoneNumber = patientCareTaker.CareTakerContact,
@@ -875,18 +1112,52 @@ namespace DanpheEMR.Controllers
                 var INSParameter = _visitDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Insurance" && a.ParameterName == "ClaimCodeAutoGenerateSettings").FirstOrDefault().ParameterValue;
                 var claimcodeParameter = Newtonsoft.Json.Linq.JObject.Parse(INSParameter);
                 var EnableAutoGenerate = Convert.ToBoolean(claimcodeParameter["EnableAutoGenerate"]);
-                int SchemeId = Convert.ToInt32(claimcodeParameter["SchemeId"]);
+                int creditOrganizationId = Convert.ToInt32(claimcodeParameter["CreditOrganizationId"]);
 
-                if (creditOrganization != null && creditOrganization.IsClaimCodeAutoGenerate && EnableAutoGenerate && SchemeId == currVisit.SchemeId)
+                if (creditOrganization != null && creditOrganization.IsClaimCodeAutoGenerate && EnableAutoGenerate && creditOrganizationId == billTxn.OrganizationId)
                 {
-                    NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, currVisit.SchemeId);
-                    currVisit.ClaimCode = newClaimObj.NewClaimCode;
+                    if (currVisit.AppointmentType.ToLower() == ENUM_AppointmentType.referral.ToLower() && schemeObj.ApiIntegrationName.ToLower() == ENUM_Scheme_ApiIntegrationNames.NGHIS.ToLower())
+                    {
+                        if (currVisit.VisitType.ToLower() == ENUM_VisitType.emergency.ToLower())
+                        {
+                            NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, billTxn.OrganizationId);
+                            currVisit.ClaimCode = newClaimObj.NewClaimCode;
+                        }
+                        else
+                        {
+                            var lastVisit = visitDbContext.Visits.Where(a=>a.PatientId == currVisit.PatientId).OrderByDescending(a => a.PatientVisitId).FirstOrDefault();
+
+                            if (lastVisit != null)
+                            {
+                                if (lastVisit.VisitType.ToLower() != ENUM_VisitType.emergency)
+                                {
+                                    currVisit.ClaimCode = lastVisit.ClaimCode;
+                                }
+                                else
+                                {
+                                    NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, billTxn.OrganizationId);
+                                    currVisit.ClaimCode = newClaimObj.NewClaimCode;
+                                }
+                            }
+                            else
+                            {
+                                NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, billTxn.OrganizationId);
+                                currVisit.ClaimCode = newClaimObj.NewClaimCode;
+                            }
+                        }
+
+                    }
+                    else
+                    {
+                        NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, billTxn.OrganizationId);
+                        currVisit.ClaimCode = newClaimObj.NewClaimCode;
+                    }
                 }
                 else
                 {
-                    if(creditOrganization != null && creditOrganization.IsClaimManagementApplicable && creditOrganization.IsClaimCodeCompulsory && creditOrganization.IsClaimCodeAutoGenerate && patient.PatientScheme.LatestClaimCode == null)
+                    if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && creditOrganization.IsClaimCodeCompulsory && creditOrganization.IsClaimCodeAutoGenerate)
                     {
-                        currVisit.ClaimCode = GenerateClaimCode(visitDbContext, currPatientId, patient);
+                        currVisit.ClaimCode = GenerateClaimCode();
                     }
 
                     if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && creditOrganization.IsClaimCodeCompulsory && !creditOrganization.IsClaimCodeAutoGenerate && patient.PatientScheme.LatestClaimCode != null)
@@ -899,12 +1170,17 @@ namespace DanpheEMR.Controllers
                         currVisit.ClaimCode = patient.PatientScheme.LatestClaimCode;
                     }
                 }
+                if (!string.IsNullOrEmpty(patient.PatientScheme.PolicyNo))
+                {
+                    currVisit.Remarks = $"PolicyNo: {patient.PatientScheme.PolicyNo}, RegistrationCase: {patient.PatientScheme.RegistrationCase}, RegistrationSubCase: {patient.PatientScheme.RegistrationSubCase}";
+                }
 
                 currVisit.CreatedBy = currentUserId;
                 currVisit.CreatedOn = DateTime.Now;
                 currVisit.VisitType = currVisit.VisitType;
                 currVisit.VisitStatus = ENUM_VisitStatus.initiated;// "initiated";
                 currVisit.SubSchemeId = patient.PatientScheme.SubSchemeId;
+                currVisit.OtherInfo = patient.PatientScheme.OtherInfo;
                 if (billTxn != null && billTxn.PaymentMode == ENUM_BillPaymentMode.credit)
                 {
                     currVisit.BillingStatus = ENUM_BillingStatus.unpaid;
@@ -922,7 +1198,7 @@ namespace DanpheEMR.Controllers
             catch (Exception ex) { throw ex; }
         }
 
-        private static Int64? GenerateClaimCode(VisitDbContext visitDbContext, int currPatientId, PatientModel patient)
+        private static Int64? GenerateClaimCode()
         {
             // logic to find the last visit of the patient
             //var previousVisitContext = visitDbContext.Visits.Where(a => a.PatientId == currPatientId).OrderByDescending(a => a.PatientVisitId).FirstOrDefault();
@@ -1439,6 +1715,7 @@ namespace DanpheEMR.Controllers
                             adm.Visit.PriceCategoryId,
                             RequestingDepartmentId = adm.AdmittingDoctorId != null ? (from emp in _admissionDbContext.Employees where emp.EmployeeId == adm.AdmittingDoctorId select emp.DepartmentId).FirstOrDefault() : bedInfo.RequestingDeptId,
                             patientScheme.PolicyNo,
+                            adm.Visit.ClaimCode
                         }).OrderByDescending(a => a.StartedOn).FirstOrDefault();
 
             if (data != null)
@@ -1459,7 +1736,8 @@ namespace DanpheEMR.Controllers
                     SchemeId = data.SchemeId,
                     PriceCategoryId = data.PriceCategoryId,
                     RequestingDepartmentId = data.RequestingDepartmentId,
-                    MemberNo = data.PolicyNo
+                    MemberNo = data.PolicyNo,
+                    ClaimCode = data.ClaimCode
                 };
                 return results;
             }
@@ -1525,6 +1803,26 @@ namespace DanpheEMR.Controllers
                         };
                         return results;
                     }
+                    else if (patVisitInfo.VisitType.ToLower() == "outdoor")
+                    {
+                        var results = new
+                        {
+                            PatientId = patVisitInfo.PatientId,
+                            PatientVisitId = patVisitInfo.PatientVisitId,
+                            PerformerId = patVisitInfo.PerformerId,
+                            PerformerName = VisitBL.GetProviderName(patVisitInfo.PerformerId, base.connString),
+                            Current_WardBed = "outdoor",
+                            VisitType = "outdoor",
+                            AdmissionDate = (DateTime?)null,
+                            VisitDate = patVisitInfo.VisitDate,//sud:14Mar'19--needed in Billing
+                            ClaimCode = patVisitInfo.ClaimCode,
+                            MemberNo = patVisitInfo.PolicyNo,
+                            SchemeId = patVisitInfo.SchemeId,
+                            PriceCategoryId = patVisitInfo.PriceCategoryId,
+                            RequestingDepartmentId = patVisitInfo.DepartmentId
+                        };
+                        return results;
+                    }
                 }
                 else
                 {
@@ -1579,7 +1877,8 @@ namespace DanpheEMR.Controllers
                                       Price = itmPrice.Price,
                                       IsTaxApplicable = srvItm.IsTaxApplicable,
                                       IsZeroPriceAllowed = itmPrice.IsZeroPriceAllowed,
-                                      IsDiscountApplicable = itmPrice.IsDiscountApplicable
+                                      IsDiscountApplicable = itmPrice.IsDiscountApplicable,
+                                      IsPriceChangeAllowed = itmPrice.IsPriceChangeAllowed,
                                   }).ToList();
             return docNewOpdItems;
         }
@@ -1647,7 +1946,8 @@ namespace DanpheEMR.Controllers
                                         ItemName = itmPrice.ItemLegalName,
                                         Price = itmPrice.Price,
                                         IsTaxApplicable = srvItm.IsTaxApplicable,
-                                        IsZeroPriceAllowed = itmPrice.IsZeroPriceAllowed
+                                        IsZeroPriceAllowed = itmPrice.IsZeroPriceAllowed,
+                                        IsPriceChangeAllowed = itmPrice.IsPriceChangeAllowed
                                     }).ToList();
             return docFollowUpItems;
         }
@@ -1917,90 +2217,117 @@ namespace DanpheEMR.Controllers
                 {
                     vis.PerformerName = VisitBL.GetProviderName(vis.PerformerId, connString);
                 }
-
-                var parentVisit = _visitDbContext.Visits.Where(x => x.PatientVisitId == vis.PatientVisitId).FirstOrDefault();
-                BillingDbContext billingDbContext = new BillingDbContext(connString);
+                //read the parent visit using which referral is being done.
+                var parentVisit = _visitDbContext.Visits.Where(x => x.PatientVisitId == vis.ParentVisitId).FirstOrDefault();
                 //var priceCategoryObj = billingDbContext.PriceCategoryModels.Where(a => a.PriceCategoryId == parentVisit.PriceCategoryId).FirstOrDefault();
-                BillingSchemeModel schemeObj = billingDbContext.BillingSchemes.Where(sch => sch.SchemeId == parentVisit.SchemeId).FirstOrDefault();
+                var schemeObj = _visitDbContext.BillingSchemes.Where(sch => sch.SchemeId == parentVisit.SchemeId).FirstOrDefault();
+                BillingDbContext billingDbContext = new BillingDbContext(connString);
 
                 /*Manipal-RevisionNeeded*/
                 //Sud:22Mar'23-- Changed from PriceCatgory to Scheme. This new logic seems ok. Review once more Just In case.. 
                 if (parentVisit != null)
                 {
-                    vis.PriceCategoryId = parentVisit.PriceCategoryId;
-                    vis.SchemeId = parentVisit.SchemeId;
-                    if (schemeObj.IsBillingCoPayment == true)
+                    var patientScheme = _visitDbContext.PatientSchemeMaps.FirstOrDefault(a => a.PatientId == vis.PatientId && a.SchemeId == parentVisit.SchemeId);
+                    var creditOrganization = _visitDbContext.CreditOrganizations.FirstOrDefault(a => a.OrganizationId == schemeObj.DefaultCreditOrganizationId);
+
+                    var INSParameter = _visitDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Insurance" && a.ParameterName == "ClaimCodeAutoGenerateSettings").FirstOrDefault().ParameterValue;
+                    var claimcodeParameter = Newtonsoft.Json.Linq.JObject.Parse(INSParameter);
+                    var EnableAutoGenerate = Convert.ToBoolean(claimcodeParameter["EnableAutoGenerate"]);
+                    int creditOrganizationId = Convert.ToInt32(claimcodeParameter["CreditOrganizationId"]);
+
+                    if (creditOrganization != null && creditOrganization.IsClaimCodeAutoGenerate && EnableAutoGenerate && creditOrganizationId == schemeObj.DefaultCreditOrganizationId && schemeObj.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.NGHIS)
                     {
-                        //generate new claim code Here..
-                        Random generator = new Random();
-                        String r = generator.Next(1, 10000).ToString("D4");
-                        vis.ClaimCode = Int64.Parse(r + DateTime.Now.Minute + DateTime.Now.Second);
+                        //NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, schemeObj.DefaultCreditOrganizationId);
+                        //vis.ClaimCode = newClaimObj.NewClaimCode;
+                        vis.ClaimCode = parentVisit.ClaimCode;
+                    }
+                    else
+                    {
+                        if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && creditOrganization.IsClaimCodeCompulsory && creditOrganization.IsClaimCodeAutoGenerate)
+                        {
+                            vis.ClaimCode = GenerateClaimCode();
+                        }
+
+                        if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && creditOrganization.IsClaimCodeCompulsory && !creditOrganization.IsClaimCodeAutoGenerate && patientScheme.LatestClaimCode != null)
+                        {
+                            vis.ClaimCode = patientScheme.LatestClaimCode;
+                        }
+
+                        if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && !creditOrganization.IsClaimCodeCompulsory && !creditOrganization.IsClaimCodeAutoGenerate && patientScheme.LatestClaimCode != null)
+                        {
+                            vis.ClaimCode = patientScheme.LatestClaimCode;
+                        }
                     }
                 }
 
-                _visitDbContext.Visits.Add(vis);
 
-                GenerateVisitCodeAndSave(_visitDbContext, vis, connString);
-                if (schemeObj != null && schemeObj.IsBillingCoPayment)//Sud:22Mar'23-- this logic should be Revised.
-                {
-                    //Krishna, 22Jan'23 Below code is an async method, Hence it will continue at its back, User do not need to hold for this operation to complete while free follow up
-                    SSFDbContext sSFDbContext = new SSFDbContext(connString);
-                    VisitBL.UpdatePatientSchemeForFreeFollowupAndFreeReferral(_visitDbContext, sSFDbContext, vis, parentVisit, currentUser);
+                    _visitDbContext.Visits.Add(vis);
+
+                    GenerateVisitCodeAndSave(_visitDbContext, vis, connString);
+                    if (schemeObj != null && schemeObj.IsBillingCoPayment)//Sud:22Mar'23-- this logic should be Revised.
+                    {
+                        //Krishna, 22Jan'23 Below code is an async method, Hence it will continue at its back, User do not need to hold for this operation to complete while free follow up
+                        SSFDbContext sSFDbContext = new SSFDbContext(connString);
+                        VisitBL.UpdatePatientSchemeForFreeFollowupAndFreeReferral(_visitDbContext, sSFDbContext, vis, parentVisit, currentUser);
+                    }
+                    else if (schemeObj != null)
+                    {
+                        VisitBL.UpdatePatientScheme(_visitDbContext, vis, currentUser);
+                    }
+
+
+                    //updateIsContinuedStatus in case of referral visit and followup visit
+                    if (vis.AppointmentType.ToLower() == ENUM_AppointmentType.referral.ToLower() // "referral"
+                        || vis.AppointmentType.ToLower() == ENUM_AppointmentType.followup.ToLower() //"followup"
+                        || vis.AppointmentType.ToLower() == ENUM_AppointmentType.transfer.ToLower())//"transfer")
+                    {
+                        UpdateIsContinuedStatus(vis.ParentVisitId,
+                            vis.AppointmentType,
+                            true,
+                            currentUser.EmployeeId,
+                            _visitDbContext);
+                    }
+
+                    vis.QueueNo = VisitBL.CreateNewPatientQueueNo(_visitDbContext, vis.PatientVisitId, connString);
+                    //Return Model should be in same format as that of the ListVisit since it's appended in the same list.
+                    ListVisitsVM returnVisit = (from visit in _visitDbContext.Visits
+                                                where visit.PatientVisitId == vis.PatientVisitId
+                                                join department in _visitDbContext.Departments on visit.DepartmentId equals department.DepartmentId
+                                                join patient in _visitDbContext.Patients on visit.PatientId equals patient.PatientId
+                                                select new ListVisitsVM
+                                                {
+                                                    PatientVisitId = visit.PatientVisitId,
+                                                    ParentVisitId = visit.ParentVisitId,
+                                                    VisitDate = visit.VisitDate,
+                                                    VisitTime = visit.VisitTime,
+                                                    PatientId = patient.PatientId,
+                                                    PatientCode = patient.PatientCode,
+                                                    ShortName = patient.FirstName + " " + (string.IsNullOrEmpty(patient.MiddleName) ? "" : patient.MiddleName + " ") + patient.LastName,
+                                                    PhoneNumber = patient.PhoneNumber,
+                                                    DateOfBirth = patient.DateOfBirth,
+                                                    Gender = patient.Gender,
+                                                    DepartmentId = department.DepartmentId,
+                                                    DepartmentName = department.DepartmentName,
+                                                    PerformerName = visit.PerformerName,
+                                                    PerformerId = visit.PerformerId,
+                                                    VisitType = visit.VisitType,
+                                                    AppointmentType = visit.AppointmentType,
+                                                    BillStatus = visit.BillingStatus,
+                                                    Patient = patient,
+                                                    QueueNo = visit.QueueNo
+                                                }).FirstOrDefault();
+
+
+
+                    return returnVisit;
                 }
-
-
-                //updateIsContinuedStatus in case of referral visit and followup visit
-                if (vis.AppointmentType.ToLower() == ENUM_AppointmentType.referral.ToLower() // "referral"
-                    || vis.AppointmentType.ToLower() == ENUM_AppointmentType.followup.ToLower() //"followup"
-                    || vis.AppointmentType.ToLower() == ENUM_AppointmentType.transfer.ToLower())//"transfer")
-                {
-                    UpdateIsContinuedStatus(vis.ParentVisitId,
-                        vis.AppointmentType,
-                        true,
-                        currentUser.EmployeeId,
-                        _visitDbContext);
-                }
-
-                vis.QueueNo = VisitBL.CreateNewPatientQueueNo(_visitDbContext, vis.PatientVisitId, connString);
-                //Return Model should be in same format as that of the ListVisit since it's appended in the same list.
-                ListVisitsVM returnVisit = (from visit in _visitDbContext.Visits
-                                            where visit.PatientVisitId == vis.PatientVisitId
-                                            join department in _visitDbContext.Departments on visit.DepartmentId equals department.DepartmentId
-                                            join patient in _visitDbContext.Patients on visit.PatientId equals patient.PatientId
-                                            select new ListVisitsVM
-                                            {
-                                                PatientVisitId = visit.PatientVisitId,
-                                                ParentVisitId = visit.ParentVisitId,
-                                                VisitDate = visit.VisitDate,
-                                                VisitTime = visit.VisitTime,
-                                                PatientId = patient.PatientId,
-                                                PatientCode = patient.PatientCode,
-                                                ShortName = patient.FirstName + " " + (string.IsNullOrEmpty(patient.MiddleName) ? "" : patient.MiddleName + " ") + patient.LastName,
-                                                PhoneNumber = patient.PhoneNumber,
-                                                DateOfBirth = patient.DateOfBirth,
-                                                Gender = patient.Gender,
-                                                DepartmentId = department.DepartmentId,
-                                                DepartmentName = department.DepartmentName,
-                                                PerformerName = visit.PerformerName,
-                                                PerformerId = visit.PerformerId,
-                                                VisitType = visit.VisitType,
-                                                AppointmentType = visit.AppointmentType,
-                                                BillStatus = visit.BillingStatus,
-                                                Patient = patient,
-                                                QueueNo = visit.QueueNo
-                                            }).FirstOrDefault();
-
-
-
-                return returnVisit;
             }
-        }
 
         private object CreateVisitForFreeFollowUp(string str, RbacUser currentUser)
         {
             VisitModel vis = JsonConvert.DeserializeObject<VisitModel>(str);
 
-            if (vis != null && VisitBL.IsValidForFollowUp(_visitDbContext, (int)vis.ParentVisitId, connString))
+            if (vis != null && (VisitBL.IsValidForFollowUp(_visitDbContext, (int)vis.ParentVisitId, connString) || vis.IsManualFreeFollowup == true))
             {
 
                 //to avoid clashing of visits
@@ -2030,12 +2357,44 @@ namespace DanpheEMR.Controllers
                     {
                         vis.PriceCategoryId = parentVisit.PriceCategoryId;
                         vis.SchemeId = parentVisit.SchemeId;
-                        if (schemeObj.IsBillingCoPayment == true)
+
+                        //if (schemeObj.IsBillingCoPayment == true)
+                        //{
+                        //    //generate new claim code Here..
+                        //    Random generator = new Random();
+                        //    String r = generator.Next(1, 10000).ToString("D4");
+                        //    vis.ClaimCode = Int64.Parse(r + DateTime.Now.Minute + DateTime.Now.Second);
+                        //}
+
+                        var patientScheme = _visitDbContext.PatientSchemeMaps.FirstOrDefault(a => a.PatientId == vis.PatientId && a.SchemeId == parentVisit.SchemeId);
+                        var creditOrganization = _visitDbContext.CreditOrganizations.FirstOrDefault(a => a.OrganizationId == schemeObj.DefaultCreditOrganizationId);
+
+                        var INSParameter = _visitDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Insurance" && a.ParameterName == "ClaimCodeAutoGenerateSettings").FirstOrDefault().ParameterValue;
+                        var claimcodeParameter = Newtonsoft.Json.Linq.JObject.Parse(INSParameter);
+                        var EnableAutoGenerate = Convert.ToBoolean(claimcodeParameter["EnableAutoGenerate"]);
+                        int creditOrganizationId = Convert.ToInt32(claimcodeParameter["CreditOrganizationId"]);
+
+                        if (creditOrganization != null && creditOrganization.IsClaimCodeAutoGenerate && EnableAutoGenerate && creditOrganizationId == schemeObj.DefaultCreditOrganizationId)
                         {
-                            //generate new claim code Here..
-                            Random generator = new Random();
-                            String r = generator.Next(1, 10000).ToString("D4");
-                            vis.ClaimCode = Int64.Parse(r + DateTime.Now.Minute + DateTime.Now.Second);
+                            NewClaimCode_DTO newClaimObj = VisitBL.GetLatestClaimCode(_visitDbContext, schemeObj.DefaultCreditOrganizationId);
+                            vis.ClaimCode = newClaimObj.NewClaimCode;
+                        }
+                        else
+                        {
+                            if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && creditOrganization.IsClaimCodeCompulsory && creditOrganization.IsClaimCodeAutoGenerate)
+                            {
+                                vis.ClaimCode = GenerateClaimCode();
+                            }
+
+                            if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && creditOrganization.IsClaimCodeCompulsory && !creditOrganization.IsClaimCodeAutoGenerate && patientScheme.LatestClaimCode != null)
+                            {
+                                vis.ClaimCode = patientScheme.LatestClaimCode;
+                            }
+
+                            if (creditOrganization != null && creditOrganization.IsClaimManagementApplicable && !creditOrganization.IsClaimCodeCompulsory && !creditOrganization.IsClaimCodeAutoGenerate && patientScheme.LatestClaimCode != null)
+                            {
+                                vis.ClaimCode = patientScheme.LatestClaimCode;
+                            }
                         }
                     }
 
@@ -2047,6 +2406,10 @@ namespace DanpheEMR.Controllers
                         //Krishna, 22Jan'23 Below code is an async method, Hence it will continue at its back, User do not need to hold for this operation to complete while free follow up
                         SSFDbContext sSFDbContext = new SSFDbContext(connString);
                         VisitBL.UpdatePatientSchemeForFreeFollowupAndFreeReferral(_visitDbContext, sSFDbContext, vis, parentVisit, currentUser);
+                    }
+                    else if (schemeObj != null)
+                    {
+                        VisitBL.UpdatePatientScheme(_visitDbContext, vis, currentUser);
                     }
 
 
@@ -2216,10 +2579,10 @@ namespace DanpheEMR.Controllers
             if (parameter != null)
             {
                 string paramValueStr = parameter.ParameterValue;
-                var data = DanpheJSONConvert.DeserializeObject<int>(paramValueStr);
-                if (data > 0)
+                dynamic data = DanpheJSONConvert.DeserializeObject(paramValueStr);
+                if (data != null)
                 {
-                    maximumLastVisitDays = data;
+                    maximumLastVisitDays = (int)data.outpatient;
                 }
             }
             return maximumLastVisitDays;
@@ -2328,25 +2691,120 @@ namespace DanpheEMR.Controllers
 
         private object GetPatientVisitContextForProvisionalPayment(int patientId, int visitId)
         {
-           var patientVisitContext = (from vis in _visitDbContext.Visits
-                                      join patMap in _visitDbContext.PatientSchemeMaps on vis.PatientVisitId equals patMap.LatestPatientVisitId into grp
-                                      from patientScheme in grp.DefaultIfEmpty()
-                                      where vis.PatientId == patientId && (visitId > 0 ? vis.PatientVisitId == visitId : true)
-                                      select new
-                                      {
-                                          PatientId = vis.PatientId,
-                                          PatientVisitId = vis.PatientVisitId,
-                                          PerformerId = vis.PerformerId,
-                                          PerformerName = "",
-                                          VisitType = vis.VisitType,
-                                          VisitDate = vis.VisitDate,
-                                          ClaimCode = vis.ClaimCode,
-                                          MemberNo = patientScheme.PolicyNo,
-                                          SchemeId = vis.SchemeId,
-                                          PriceCategoryId = vis.PriceCategoryId,
-                                          RequestingDepartmentId = vis.DepartmentId
-                                      }).OrderByDescending(a => a.VisitDate).FirstOrDefault();
+            var patientVisitContext = (from vis in _visitDbContext.Visits
+                                       join patMap in _visitDbContext.PatientSchemeMaps on new { PatientId = vis.PatientId, SchemeId = vis.SchemeId } equals new { PatientId = patMap.PatientId, SchemeId = patMap.SchemeId } into grp
+                                       from patientScheme in grp.DefaultIfEmpty()
+                                       where vis.PatientId == patientId && (visitId > 0 ? vis.PatientVisitId == visitId : true)
+                                       select new
+                                       {
+                                           PatientId = vis.PatientId,
+                                           PatientVisitId = vis.PatientVisitId,
+                                           PerformerId = vis.PerformerId,
+                                           PerformerName = "",
+                                           VisitType = vis.VisitType,
+                                           VisitDate = vis.VisitDate,
+                                           ClaimCode = vis.ClaimCode,
+                                           MemberNo = patientScheme.PolicyNo,
+                                           SchemeId = vis.SchemeId,
+                                           PriceCategoryId = vis.PriceCategoryId,
+                                           RequestingDepartmentId = vis.DepartmentId
+                                       }).OrderByDescending(a => a.VisitDate).FirstOrDefault();
             return patientVisitContext;
+        }
+
+        private object GetPatientVisits(int patientId)
+        {
+            var currentDate = DateTime.Now;
+
+            var patAllVisits = (from visit in _visitDbContext.Visits.Where(v => v.PatientId == patientId && v.BillingStatus != ENUM_BillingStatus.returned)
+                                join pat in _visitDbContext.Patients on visit.PatientId equals pat.PatientId
+                                join dep in _visitDbContext.Departments on visit.DepartmentId equals dep.DepartmentId
+                                join sch in _visitDbContext.BillingSchemes on visit.SchemeId equals sch.SchemeId
+                                join doc in _visitDbContext.Employees on visit.PerformerId equals doc.EmployeeId into grp
+                                from perf in grp.DefaultIfEmpty()
+                                join adm in _visitDbContext.Admissions.Where(a => a.DischargeDate != null) on visit.PatientVisitId equals adm.PatientVisitId into admGrp
+                                from ipVisits in admGrp.DefaultIfEmpty()
+                                join patientSchemeMap in _visitDbContext.PatientSchemeMaps on new { PatientId = visit.PatientId, SchemeId = visit.SchemeId } equals new { PatientId = patientSchemeMap.PatientId, SchemeId = patientSchemeMap.SchemeId } into patMapSchemeGrp
+                                from patSchemeMap in patMapSchemeGrp.DefaultIfEmpty()
+                                join careTaker in _visitDbContext.Guarantor on visit.PatientId equals careTaker.PatientId into careTakerGrp
+                                from careTakerInfo in careTakerGrp.DefaultIfEmpty()
+                                join csd in _visitDbContext.CountrySubdivisions on pat.CountrySubDivisionId equals csd.CountrySubDivisionId into csdGrp
+                                from csdInfo in csdGrp.DefaultIfEmpty()
+                                join mun in _visitDbContext.Municipalities on pat.MunicipalityId equals mun.MunicipalityId into munGrp
+                                from municipality in munGrp.DefaultIfEmpty()
+                                select new GetPatientVisits_DTO
+                                {
+                                    PatientId = patientId,
+                                    PatientCode = pat.PatientCode,
+                                    FirstName = pat.FirstName,
+                                    MiddleName = pat.MiddleName,
+                                    LastName = pat.LastName,
+                                    ShortName = pat.ShortName,
+                                    DateOfBirth = pat.DateOfBirth,
+                                    Age = pat.Age,
+                                    Gender = pat.Gender,
+                                    CountryId = pat.CountryId,
+                                    CountrySubDivisionId = pat.CountrySubDivisionId,
+                                    MunicipalityId = pat.MunicipalityId,
+                                    WardNumber = pat.WardNumber,
+                                    CountrySubDivisionName = csdInfo != null ? csdInfo.CountrySubDivisionName : null,
+                                    MunicipalityName = municipality != null ? municipality.MunicipalityName : null,
+                                    PANNumber = pat.PANNumber,
+                                    PhoneNumber = pat.PhoneNumber,
+                                    Address = pat.Address,
+                                    DependentId = pat.DependentId,
+                                    IDCardNumber = pat.IDCardNumber,
+                                    Posting = pat.Posting,
+                                    Rank = pat.Rank,
+                                    PatientVisitId = visit.PatientVisitId,
+                                    VisitCode = visit.VisitCode,
+                                    ParentVisitId = visit.ParentVisitId,
+                                    PerformerId = visit.PerformerId,
+                                    PerformerName = perf != null ? perf.FullName : null,
+                                    ReferredById = visit.ReferredById,
+                                    VisitDate = visit.VisitDate,
+                                    IsAdmitted = (ipVisits != null && ipVisits.DischargeDate == null) ? true : false,
+                                    AdmittingDate = ipVisits != null ? ipVisits.AdmissionDate : (DateTime?)null,
+                                    DischargeDate = ipVisits != null ? ipVisits.DischargeDate : (DateTime?)null,
+                                    VisitTime = visit.VisitTime,
+                                    DepartmentId = visit.DepartmentId,
+                                    Department = dep.DepartmentName,
+                                    VisitType = visit.VisitType,
+                                    AppointmentType = visit.AppointmentType,
+                                    DaysPassed = 0,
+                                    MaxAllowedFollowUpDays = 0,
+                                    SchemeId = sch.SchemeId,
+                                    SchemeName = sch.SchemeName,
+                                    QueueNo = visit.QueueNo,
+                                    IsVisitContinued = visit.IsVisitContinued,
+                                    BillingStatus = visit.BillingStatus,
+                                    PolicyNo = patSchemeMap != null ? patSchemeMap.PolicyNo : null,
+                                    PriceCategoryId = visit.PriceCategoryId,
+                                    IsFreeVisit = visit.IsFreeVisit,
+                                    CareTakerName = careTakerInfo != null ? careTakerInfo.GuarantorName : "",
+                                    RelationWithCareTaker = careTakerInfo != null ? careTakerInfo.PatientRelationship : "",
+                                    CareTakerContact = careTakerInfo != null ? careTakerInfo.GuarantorPhoneNumber : "",
+                                    MaritalStatus = pat.MaritalStatus,
+                                    EthnicGroup = pat.EthnicGroup,
+                                    ApiIntegrationName = sch.ApiIntegrationName
+
+                                }).OrderByDescending(v => v.PatientVisitId).ToList();
+            if (patAllVisits != null)
+            {
+                foreach (var item in patAllVisits)
+                {
+                    if (item.DischargeDate is null)
+                    {
+                        item.DaysPassed = (int)currentDate.Date.Subtract(item.VisitDate.Date).TotalDays;
+                    }
+                    else
+                    {
+                        item.DaysPassed = (int)currentDate.Date.Subtract((DateTime)item.DischargeDate.Value.Date).TotalDays;
+                    }
+                }
+            }
+
+            return patAllVisits;
         }
     }
 

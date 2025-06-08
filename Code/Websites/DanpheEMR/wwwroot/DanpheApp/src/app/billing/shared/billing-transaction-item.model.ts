@@ -99,6 +99,7 @@ export class BillingTransactionItem {
 
   //not mapped field - required while updating adt item quantity
   public ItemIntegrationName: string = null;
+  public IntegrationName: string = null;
   //not mapped field - required while updating adt item quantity
   public SrvDeptIntegrationName: string = null;
 
@@ -167,6 +168,12 @@ export class BillingTransactionItem {
   public IsAutoCalculationStop: boolean = false;
   public IsItemLevelDiscount: boolean = false;
   public IsProvisionalDischarge: boolean = false;
+  public IsBedChargeQuantityEdited: boolean = false;
+  public BedChargeQuantityEditedDate: string = null;
+  public PreviousQuantity: number = 0;
+  public IsPackageItem: boolean = false;
+  UseCappingAPI: boolean;
+  IsBillingCappingApplicable: boolean;
   constructor() {
 
     this.CreatedOn = moment().format("YYYY-MM-DD HH:mm:ss");
@@ -179,7 +186,7 @@ export class BillingTransactionItem {
       //'RequestedBy': ['', Validators.compose([])],  //for biling order.
       'PerformerId': ['', Validators.compose([])],//there will be no validation for providerid at the begining. it is conditional validation.
       'Price': ['', Validators.compose([this.positiveNumberValdiator])],
-      'Quantity': ['', Validators.compose([])],//its validator are conditional, and gets composed at runtime.
+      'Quantity': ['', Validators.compose([Validators.min(1), Validators.required])],//its validator are conditional, and gets composed at runtime.
       'DiscountPercent': ['', Validators.compose([this.discountPercentValidator])],
       'DiscountAmount': ['', Validators.compose([this.discountAmountValdiator])]
     });

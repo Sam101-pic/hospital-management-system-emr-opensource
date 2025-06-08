@@ -4,6 +4,7 @@ import * as _ from 'lodash';
 import { Requisition } from '../../inventory/shared/requisition.model';
 import { WardInventoryReturnModel } from '../inventory-wardsupply/return/ward-inventory-return.model';
 import { PHRMSubStoreRequisition } from './phrm-substore-requisition.model';
+import { WardConsumptionType } from './ward-consumption-types.model';
 import { WARDReportsModel } from './ward-report.model';
 import { WardStockModel } from './ward-stock.model';
 import { WardSupplyAssetRequisitionModel } from './wardsupply-asset-requisition.model';
@@ -99,8 +100,8 @@ export class WardSupplyBLService {
       .map(res => { return res });
   }
   //Get Inventory Consumption Details List
-  public GetInventoryConsumptionListDetails(storeId, fromDate, toDate) {
-    return this.wardSplDLservice.GetInventoryComsumptionListDetails(storeId, fromDate, toDate)
+  public GetInventoryConsumptionListDetails(storeId, fromDate, toDate, consumptionTypeId: number) {
+    return this.wardSplDLservice.GetInventoryComsumptionListDetails(storeId, fromDate, toDate, consumptionTypeId)
       .map(res => { return res });
   }
 
@@ -550,5 +551,17 @@ export class WardSupplyBLService {
   GetVerifiers() {
     return this.wardSplDLservice.GetVerifiers().map(res => { return res });
   }
+  SaveConsumptionType(consumptionType: WardConsumptionType) {
+    return this.wardSplDLservice.SaveConsumptionType(consumptionType).map(res => { return res });
+  }
+  GetActiveConsumptionTypes() {
+    return this.wardSplDLservice.GetActiveConsumptionTypes().map(res => { return res });
+  }
 
+  GetBarCodesOfCapitalItemByItemIdAndSubStoreId(subStoreId: number, itemId: number) {
+    return this.wardSplDLservice.GetBarCodesOfCapitalItemByItemIdAndSubStoreId(subStoreId, itemId).map(res => { return res });
+  }
+  GetWardInventoryReturnReport(FromDate: string, ToDate: string, SourceStoreId: number, TargetStoreId: number, ItemCategory: string, ItemId: number) {
+    return this.wardSplDLservice.GetWardInventoryReturnReport(FromDate, ToDate, SourceStoreId, TargetStoreId, ItemCategory, ItemId).map(res => { return res });
+  }
 }

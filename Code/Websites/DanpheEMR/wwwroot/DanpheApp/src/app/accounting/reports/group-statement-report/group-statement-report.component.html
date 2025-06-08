@@ -81,35 +81,45 @@
     <div class="col-md-12 col-xs-12 col-sm-12">
         <div class="row" style="background: #bcbcbc; padding-top: 0px;">
 
-            <div class="col-md-7 col-xs-12" style="margin-right: -45px;">
+            <div class="col-md-12 col-xs-12" style="margin-right: -45px;">
                 <div class="form-group">
-                    <label class="control-label" style="margin-left: 5px;">Select Fiscal Year<b class="color-red">
+                    <label class="control-label col-md-3">Select Fiscal Year<b class="color-red">
                             *</b><b style="float:right;">:</b></label>
-                    <div>
+                    <div class="col-md-9">
                         <fiscal-year-calendar [showSingleDatePicker]="false" [showAllFiscalYear]="true"
                                               (fiscalYearDate)="selectDate($event)"> </fiscal-year-calendar>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-xs-12" style="margin-right: -15px; padding: 5px 5px !important;margin-top:8px">
-                <label class="control-label no-padding">Select Group<b class="color-red"> *</b><b
-                       style="float:right;">:</b></label><br>
-                <div>
-                    <input danphe-auto-complete class="form-control" [(ngModel)]="selectedLedgerGroup"
-                           [source]="ledgergroupList" placeholder="select ledger group"
-                           display-property-name="LedgerGroupName" value-property-name="LedgerGroupName"
-                           (valueChanged)="AssignSelectedLedgerGroup()" [list-formatter]="LedgerGroupListFormatter"
-                           max-num-list="20" onclick="this.select()" style="background-color: azure;"
-                           [ngModelOptions]="{standalone: true}" />
+            <div class="col-md-12 col-xs-12" style="margin-right: -45px;">
+
+                <div class="col-md-4">
+                    <label class=" col-md-5" style="margin-top: 20px;">Account Section <b class="color-red"> *</b>:</label><br>
+                    <div class="col-md-7">
+                        <select [(ngModel)]="SelectedHospital" class="form-control" (ngModelChange)="FilterLedgerGroup()">
+                            <option *ngFor="let h of HospitalList" value="{{h.HospitalId}}">{{ h.HospitalLongName }}</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-2 col-xs-12" style=" padding:10px 5px !important; margin-top: 9px;">
-                <div class="form-group" style="float: right;">
-                    <br>
-                    <button class="btn green btn-success" type="button" (click)="GetGroupStatementRpt()" [disabled]="btndisabled">
-                        <i class="fa fa-refresh"></i>
-                        Load
-                    </button>
+                <div class="col-md-5 col-xs-12" style="margin-right: -15px; padding: 5px 5px !important;margin-top:8px">
+                    <label class="control-label col-md-4">Select Group<b class="color-red"> *</b><b
+                           style="float:right;">:</b></label>
+                    <div class="col-md-8" style="margin-top: 10px;">
+                        <input danphe-auto-complete class="form-control" [(ngModel)]="selectedLedgerGroup"
+                               [source]="LedgerGroupList" placeholder="select ledger group"
+                               display-property-name="LedgerGroupName" value-property-name="LedgerGroupName"
+                               (valueChanged)="AssignSelectedLedgerGroup()" [list-formatter]="LedgerGroupListFormatter"
+                               max-num-list="20" onclick="this.select()" style="background-color: azure;"
+                               [ngModelOptions]="{standalone: true}" />
+                    </div>
+                </div>
+                <div class="col-md-2 col-xs-12" style=" padding:10px 5px !important; margin-top: 10px;">
+                    <div class="form-group" style="float: right;">
+                        <button class="btn green btn-success" type="button" (click)="GetGroupStatementRpt()" [disabled]="btndisabled">
+                            <i class="fa fa-refresh"></i>
+                            Load
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -213,7 +223,7 @@
 
 </div>
 
-<ledger-report-reusable *ngIf="showLedgerDetail" [showLedgerDetail]="showLedgerDetail" [FiscalYearId]="fiscalYearId"
+<ledger-report-reusable *ngIf="showLedgerDetail" [showLedgerDetail]="showLedgerDetail" [FiscalYearId]="fiscalYearId" [HospitalId]="HospitalId"
                         [fromDate]="fromDate" [toDate]="toDate" [ledgerId]="ledgerId" [ledgerCode]="ledgerCode" [ledgerName]="ledgerName"
                         (callback-add)="ShowReport($event)"></ledger-report-reusable>
 <app-print-page *ngIf="showPrint" [print-data-header]="printDetaiils"></app-print-page>

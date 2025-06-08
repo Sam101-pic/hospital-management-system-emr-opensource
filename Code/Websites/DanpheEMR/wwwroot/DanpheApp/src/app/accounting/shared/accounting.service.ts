@@ -9,6 +9,10 @@ import { CommonFunctions } from '../../shared/common.functions';
 import { DanpheCache, MasterType } from '../../shared/danphe-cache-service-utility/cache-services';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { ENUM_ACC_ReportName, ENUM_ACC_ReportStaticName, ENUM_DateTimeFormat } from '../../shared/shared-enums';
+import { LedgerModel } from '../settings/shared/ledger.model';
+import { ledgerGroupModel } from '../settings/shared/ledgerGroup.model';
+import { SectionModel } from '../settings/shared/section.model';
+import { SubLedgerModel } from '../settings/shared/sub-ledger.model';
 import { AccCacheDataVM } from './acc-view-models';
 
 @Injectable()
@@ -36,6 +40,11 @@ export class AccountingService {
     VoucherNumber: null,
     FiscalyearId: 0
   }
+  public AllLedgerGroup: ledgerGroupModel[] = [];
+  public AllLedgers: LedgerModel[] = [];
+  public AllSubLedger: SubLedgerModel[] = [];
+  public AllCodeDetails: CodeDetailsModel[] = [];
+  public AllSections: SectionModel[] = [];
 
   @Output()
   dateRange: EventEmitter<any> = new EventEmitter<any>();
@@ -101,6 +110,7 @@ export class AccountingService {
     DanpheCache.clearDanpheCacheByType(MasterType.LedgersAll);
     DanpheCache.clearDanpheCacheByType(MasterType.SubLedgerAll);
     DanpheCache.clearDanpheCacheByType(MasterType.CostCenters);
+    DanpheCache.clearDanpheCacheByType(MasterType.Hospitals);
   }
 
   //mumbai-team-june2021-danphe-accounting-cache-change
@@ -118,10 +128,12 @@ export class AccountingService {
     this.accCacheData.LedgersALL = await DanpheCache.GetAccCacheData(MasterType.LedgersAll, null);
     this.accCacheData.SubLedgerAll = await DanpheCache.GetAccCacheData(MasterType.SubLedgerAll, null);
     this.accCacheData.CostCenters = await DanpheCache.GetAccCacheData(MasterType.CostCenters, null);
+    this.accCacheData.Hospitals = await DanpheCache.GetAccCacheData(MasterType.Hospitals, null);
     return this.accCacheData;
   }
 
   public async RefreshAccCacheData() {
+    this.clearAccCacheDataFromDanpheCache();
     await this.getAccCacheData();
   }
 
@@ -206,11 +218,23 @@ export class AccountingService {
             this.paramExportToExcelData = this.exportToExcelSettingParameter[ENUM_ACC_ReportStaticName.AccountHeadDetailReport];
           break;
         }
+        case ENUM_ACC_ReportName.InvoiceWiseAgeingReport: {
+          if (!!printSettingParameter) this.paramData = printSettingParameter[ENUM_ACC_ReportStaticName.InvoiceWiseAgeingReport];
+          if (this.exportToExcelSettingParameter)
+            this.paramExportToExcelData = this.exportToExcelSettingParameter[ENUM_ACC_ReportStaticName.InvoiceWiseAgeingReport];
+          break;
+        }
+        case ENUM_ACC_ReportName.TransactionWiseAgeingReport: {
+          if (!!printSettingParameter) this.paramData = printSettingParameter[ENUM_ACC_ReportStaticName.TransactionWiseAgeingReport];
+          if (this.exportToExcelSettingParameter)
+            this.paramExportToExcelData = this.exportToExcelSettingParameter[ENUM_ACC_ReportStaticName.TransactionWiseAgeingReport];
+          break;
+        }
       }
 
     }
   }
-  public ExportToExcel(tableId, dateRange) {
+  public ExportToExcel(tableId, dateRange = "") {
     try {
       let Footer = JSON.parse(JSON.stringify(this.footerContent));
       let date = JSON.parse(JSON.stringify(dateRange));
@@ -275,7 +299,7 @@ export class AccountingService {
     }
   }
 
-  Print(table, dateRange) {
+  Print(table, dateRange = "") {
     let date = JSON.parse(JSON.stringify(dateRange));
     var printDate = moment().format("YYYY-MM-DD HH:mm");//Take Current Date/Time for PrintedOn Value.
     this.printBy = this.securityService.loggedInUser.Employee.FullName;
@@ -323,7 +347,7 @@ export class AccountingService {
                                   </p>
                                 </div>`
     printContents += "<style> table { border-collapse: collapse; border-color: black;font-size: 11px; } th { color:black; background-color: #599be0;}.ADBS_btn {display:none;padding:0px;}"
-    printContents += ".alignleft {float:left;width:33.33333%;text-align:left;}.aligncenter {float: left;width:33.33333%;text-align:center;}.alignright {float: left;width:33.33333%;text-align:right;}​</style>";
+    printContents += ".alignleft {float:left;width:33.33333%;text-align:left;}.aligncenter {float: left;width:33.33333%;text-align:center;}.no-print{display:none}.alignright {float: left;width:33.33333%;text-align:right;}​</style>";
 
     printContents += document.getElementById(table).innerHTML
     popupWinindow = window.open(
@@ -349,5 +373,30 @@ export class AccountingService {
     popupWinindow.document.write(documentContent);
     popupWinindow.document.close();
     //}
+  }
+  public SetAllLedgerGroup(allLedgerGroup: ledgerGroupModel[]) {
+    this.AllLedgerGroup = allLedgerGroup;
+  }
+  public SetAllLedgers(allLedger: LedgerModel[]) {
+    this.AllLedgers = allLedger;
+  }
+  public SetAllSubLedgers(allsubLedger: SubLedgerModel[]) {
+    this.AllSubLedger = allsubLedger;
+  }
+  public SetAllCodeDetails(allCodeDetails: CodeDetailsModel[]) {
+    this.AllCodeDetails = allCodeDetails;
+  }
+
+  public SetAllSections(sections: SectionModel[]) {
+    this.AllSections = sections;
+  }
+
+  public SetCacheLedgerList(ledgers: Array<LedgerModel>) {
+    ledgers.forEach(led => {
+      let index = this.accCacheData.LedgersALL.findIndex(a => a.LedgerId === led.LedgerId);
+      if (index < 0) {
+        this.accCacheData.LedgersALL.push(led);
+      }
+    })
   }
 }

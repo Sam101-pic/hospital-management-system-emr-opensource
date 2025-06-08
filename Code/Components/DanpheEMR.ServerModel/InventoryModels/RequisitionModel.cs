@@ -58,5 +58,13 @@ namespace DanpheEMR.ServerModel
         public bool IsDirectDispatched { get; set; }
         public bool IsVerificationEnabled { get; set; }
         public string VerifierIds { get; set; }
+
+        [NotMapped]
+        public string RequestedBy { get; set; }
+
+        [NotMapped]
+        public List<string> ReceiverNames { get; set; }
+        [NotMapped]
+        public Boolean IsReceived { get; set; }
     }
 }

@@ -75,6 +75,7 @@ export class SubLedgerComponent {
         if (this.selectedLedgerGroup.LedgerGroupId > 0) {
             this.ledgerList = this.accountingService.accCacheData.LedgersALL;
             this.ledgerList = this.ledgerList.filter(a => a.LedgerGroupId == this.selectedLedgerGroup.LedgerGroupId)
+            this.selectedLedger = new LedgerModel();
         }
         else {
             this.ledgerList = this.accountingService.accCacheData.LedgersALL;
@@ -282,7 +283,7 @@ export class SubLedgerComponent {
             this.newSubLedgerList[index].SubLedgerName = ``;
             this.messabeBoxService.showMessage(ENUM_MessageBox_Status.Warning, [`This SubLedgerName is already entered. Please supply unique name`]);
         }
-        let existingSubLedger = this.subLedgerList.filter(a => a.SubLedgerName.toLowerCase() === this.newSubLedgerList[index].SubLedgerName.toLowerCase()
+        let existingSubLedger = this.subLedgerList.filter(a => a.SubLedgerName.replace(/\s+/g, '').toLowerCase() === this.newSubLedgerList[index].SubLedgerName.replace(/\s+/g, '').toLowerCase()
             && a.LedgerId === this.subLedger.LedgerId);
         if (existingSubLedger.length > 0) {
             this.newSubLedgerList[index].SubLedgerName = ``;
@@ -294,6 +295,7 @@ export class SubLedgerComponent {
         if (this.selectedLedger.LedgerId > 0) {
             this.subLedger.LedgerId = this.selectedLedger.LedgerId;
             let isSubLedgerexisits = false;
+            this.selectedLedgerGroup = this.ledgerGroup.find(a => a.LedgerGroupId === this.selectedLedger.LedgerGroupId);
             this.newSubLedgerList.forEach((sub, index) => {
                 let existingSubLedger = this.subLedgerList.filter(a => a.SubLedgerName.toLowerCase() === sub.SubLedgerName.toLowerCase() && a.LedgerId === this.subLedger.LedgerId);
                 if (existingSubLedger.length > 0) {

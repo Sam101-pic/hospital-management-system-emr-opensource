@@ -33,7 +33,7 @@
           <label>Requested</label>
         </li>
         <li [ngClass]="{'active':verifier.VerifiedBy != null}"
-          *ngFor="let verifier of requisitionVM.Verifiers; let i=index;">
+            *ngFor="let verifier of requisitionVM.Verifiers; let i=index;">
           <span id="VerifiersToolTip" class="tooltip">
             <span> </span>
             <p *ngIf="verifier.VerifiedBy != null" class="tooltiptext ttptextdown no-print">Status:
@@ -47,6 +47,16 @@
             </p>
           </span>
           <label>Verified({{i+1}})</label>
+        </li>
+        <li [ngClass]="{'active':!requisitionVM.MaxVerificationLevel && requisitionVM.MaxVerificationLevel === 0 && requisitionVM.Verifiers}"
+            *ngIf="requisitionVM.MaxVerificationLevel!=null && requisitionVM.MaxVerificationLevel > 0 && requisitionVM.Verifiers == null">
+          <span id="VerifiersToolTip" class="tooltip">
+            <span> </span>
+            <p class="tooltiptext ttptextdown no-print">
+              VerificationStatus: pending
+            </p>
+          </span>
+          <label>Verified</label>
         </li>
         <li [ngClass]="{'active':requisitionVM.Dispatchers.length > 0,'warning':showDispatchWarning}">
           <span id="DispatchersToolTip" class="tooltip">
@@ -64,7 +74,8 @@
           </span>
           <label>Dispatched</label>
         </li>
-        <li [ngClass]="{'active':requisitionVM.Dispatchers.length > 0 && requisitionVM.Dispatchers[0].isReceived == true,'warning':showDispatchWarning}">
+        <li
+            [ngClass]="{'active':requisitionVM.Dispatchers.length > 0 && requisitionVM.Dispatchers[0].isReceived == true,'warning':showDispatchWarning}">
           <span></span>
           <label>Received</label>
         </li>

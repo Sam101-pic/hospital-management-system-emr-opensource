@@ -45,4 +45,5 @@ export class DispatchItemModel {
     SalePrice: number;
     CostPrice: number;
     PendingQuantity: number;
+    ExistingPendingQuantity: number;
 }

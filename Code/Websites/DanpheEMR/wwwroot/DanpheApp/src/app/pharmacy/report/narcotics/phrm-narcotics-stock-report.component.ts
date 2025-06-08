@@ -1,10 +1,9 @@
-import { Component, Directive, ViewChild } from '@angular/core';
-import { PHRMReportsModel } from "../../shared/phrm-reports-model"
-import PHRMGridColumns from '../../shared/phrm-grid-columns';
+import { Component } from '@angular/core';
 import * as moment from 'moment/moment';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
+import PHRMGridColumns from '../../shared/phrm-grid-columns';
+import { PHRMReportsModel } from "../../shared/phrm-reports-model";
 
 @Component({
   templateUrl: "./phrm-narcotics-stock-report.html"
@@ -17,8 +16,9 @@ export class PHRMNarcoticsStockReportComponent {
   PHRMNarcoticsStockReportDataCopy: any[];
   public selectedStoreId: number = null;
   public showReportWithZeroQty: boolean = false;
-  public pharmacy:string = "pharmacy";
-
+  public pharmacy: string = "pharmacy";
+  TotalSalesValue: number = 0;
+  footer: string = '';
   constructor(public pharmacyBLService: PharmacyBLService, public msgBoxServ: MessageboxService) {
     this.PHRMNarcoticsStockReportColumns = PHRMGridColumns.PHRMNArcoticsStockDetailsList;
     this.GetActiveStore();
@@ -51,6 +51,12 @@ export class PHRMNarcoticsStockReportComponent {
     else {
       this.PHRMNarcoticsStockReportData = this.PHRMNarcoticsStockReportData.filter(a => a.StockQty > 0);
     }
+    if (this.PHRMNarcoticsStockReportData && this.PHRMNarcoticsStockReportData.length) {
+      this.TotalSalesValue = this.PHRMNarcoticsStockReportData.reduce((a, b) => a + b.TotalSalesValue, 0);
+    }
+    else {
+      this.TotalSalesValue = 0;
+    }
   }
   public Load() {
     this.pharmacyBLService.GetNarcoticsStoreReport()
@@ -65,6 +71,10 @@ export class PHRMNarcoticsStockReportComponent {
           this.msgBoxServ.showMessage("failed", [res.ErrorMessage])
         }
       });
+  }
+  ngAfterViewChecked() {
+    if (document.getElementById("phrm-narcotic-stock-print-summary"))
+      this.footer = document.getElementById("phrm-narcotic-stock-print-summary").innerHTML;
   }
 }
 

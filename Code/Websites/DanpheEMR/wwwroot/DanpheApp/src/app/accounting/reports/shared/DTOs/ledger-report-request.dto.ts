@@ -4,4 +4,5 @@ export class LedgerReportRequest_DTO {
     public ToDate: string = "";
     public FiscalYearId: number = 0;
     public CostCenterId: number = 0;
+    public HospitalId: number = 0;
 }

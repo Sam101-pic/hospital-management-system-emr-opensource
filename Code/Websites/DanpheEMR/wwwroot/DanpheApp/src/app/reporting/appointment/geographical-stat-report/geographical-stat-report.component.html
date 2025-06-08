@@ -33,11 +33,14 @@
                      [grid-sort]="'CountrySubDivisionName'" max-num-list="10" />
             </div>
           </div>
-          <div class="col-md-2">
+          <div class="col-md-3 col-xs-12">
             <div class="form-group">
-              <button class="btn green btn-success" style="float:right" type="button" (click)="Load()"> <i class="fa fa-search"></i> Show
-                Report
-              </button>
+              <label class="control-label col-md-3">Scheme<b style="float:right;">:</b></label>
+              <div class="col-md-8">
+                <input class="form-control" danphe-auto-complete [(ngModel)]="SelectedScheme" [ngModelOptions]="{standalone: true}"
+                       [list-formatter]="SchemeFormatter" [source]="Schemes" placeholder="Select Scheme" display-property-name="SchemeName"
+                       value-property-name=null (focusout)="OnSchemeChange()" onClick="this.select()">
+              </div>
             </div>
           </div>
         </div>
@@ -64,16 +67,27 @@
               <input danphe-auto-complete id="ddlMunicipality" class="form-control" [ngModelOptions]="{standalone: true}"
                      [(ngModel)]="municipality" [list-formatter]="municipalityListFormatter" [source]="FilteredMunicipalitiesList"
                      placeholder="Select Municipality" display-property-name="MunicipalityName"
-                     value-property-name=null (ngModelChange)="updateGeoStatType();AssignSelectedMunicipality($event)"
+                     value-property-name=null (focusout)="updateGeoStatType();AssignSelectedMunicipality(municipality)"
                      onClick="this.select();" match-formatted="true"
                      [grid-sort]="'MunicipalityName'" max-num-list="10" />
 
             </div>
           </div>
+
+          <div class="col-md-2" style="display:flex; justify-content:flex-end; margin-left:90px;">
+            <div class="col-md-2" style="width:100%; margin-top: 5px;">
+              <label for="id_checkbox_freeVisit" class="is-ref mt-checkbox mt-checkbox-outline" style="width:100px;">
+                <input type="checkbox" id="id_checkbox_freeVisit" (click)="IsFreeVisitClicked()" style="cursor: pointer;" />
+                <span></span>Free Visit
+              </label>
+            </div>
+            <div class="form-group">
+              <button class="btn green btn-success" style="float:right" type="button" (click)="Load()"> <i class="fa fa-search"></i> Show
+                Report
+              </button>
+            </div>
+          </div>
         </div>
-
-
-
       </div>
     </form>
   </div>

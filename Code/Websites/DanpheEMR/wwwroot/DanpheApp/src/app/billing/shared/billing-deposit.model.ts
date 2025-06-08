@@ -34,6 +34,10 @@ export class BillingDeposit {
   public PatientCode: string = null;
   public IsDuplicatePrint: boolean = false;
   public Address: string = null;
+  public CountrySubDivisionName: string;
+  public MunicipalityName: string;
+  public CountryName: string;
+  public WardNumber: number = null;
   public PhoneNumber: string = null;
   public ReceiptNo: number;
   //Added for enchancement task:: Yubraj: 18th Dec '18
@@ -42,6 +46,9 @@ export class BillingDeposit {
   public AdmissionCase: string;
   public AdmissionDate: string;
   public VisitType: string;
+  public CareOfContact: string;
+  public DepositorName: string;
+  public DepositorContact: string;
   public empCashTransactionModel: Array<EmployeeCashTransaction> = new Array<EmployeeCashTransaction>();
   // public IsDepositRefundedUsingDepositReceiptNo: boolean = false;
   public SelectedDepositId: number = null;

@@ -96,10 +96,20 @@
           <i class="fa fa-refresh"></i> Load
         </button>
       </div>
+      <div *ngIf="showStickerButton" style="float:right; margin-right:20px;">
+        <button class="btn green btn-success" [disabled]="Loading" (click)="ShowStickerPopUp()">
+          <i class="fa fa-print"></i> Sticker
+        </button>
+      </div>
 
       <div style="float:right; margin-right:20px;">
         <button *ngIf="showVendorSelectButton" class="btn green btn-success" (click)="ShowVendorSelection()">
           <i class="fa fa-refresh"></i> Change Vendor
+        </button>
+      </div>
+      <div *ngIf="showUndoButton && HasUndoPermission" style="float:right; margin-right:20px;">
+        <button class="btn green btn-success" (click)="ShowUndoOption()">
+          <i class="fa fa-undo"></i> Undo
         </button>
       </div>
       <div *ngIf="showVendorSelectButton" style="float:right;">
@@ -202,5 +212,51 @@
   <div *ngIf="showVendorSelectPopup">
     <lab-vendor-select *ngIf="showVendorSelectPopup" [reqIdList]="selectedReqList"
                        (on-save)="OnVendorAssigned($event)" (on-close)="OnVendorSelectPopupClosed($event)"> </lab-vendor-select>
+  </div>
+
+  <div *ngIf="showLabStickerPopUp" class="popup-static portlet box portlet-fullscreen">
+    <div class="portlet-body form">
+      <div class="col-md-8 col-md-offset-2">
+        <div class="modelbox-div">
+          <div class="modelbox-header">
+            <h4 class="margin-0-vr">Print Lab Sticker</h4>
+          </div>
+          <div class="modelbox-body">
+            <lab-sticker (callback-Add)="CloseAfterPrint($event)" [showlabsticker]="showLabStickerPopUp"
+                         [PatientLabInfo]="PatientLabInfo" [requisitionIdList]="this.ExternalLabDataStatus.RequisitionIds"> </lab-sticker>
+          </div>
+          <div class="modelbox-footer">
+            <div class="all-buttons text-right">
+              <button type="button" class="btn btn-cancel btn-sm horizontal-space" (click)="CloseSticker()"> Close
+              </button>
+            </div>
+          </div>
+          <div class="close-modelbox lb-close-btn">
+            <button class="btn btn-danger" (click)="CloseSticker()">X</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div *ngIf="showUndoOption" class="popup-static portlet box portlet-fullscreen">
+  <div class="portlet-body form">
+    <div class="col-md-8 col-md-offset-2">
+      <div class="modelbox-div">
+        <div class="modelbox-header">
+          <h4 class="margin-0-vr text-danger text-center">
+            <strong>Do you want to revert the status of selected requisitions to 'Sample Collect'?</strong>
+          </h4>
+        </div>
+        <div class="modelbox-body">
+          <undo-samplecode (callback-Add)="ExitOutUndoCall($event)" [showUndoOption]="showUndoOption"
+                           [PatientLabInfo]="PatientLabInfo" [undoFromPageAction]="undoFromPageAction"
+                           [requisitionIdList]="ExternalLabDataStatus.RequisitionIds"> </undo-samplecode>
+        </div>
+        <div class="close-modelbox lb-close-btn">
+          <button class="btn btn-danger" (click)="CloseUndoBox()">X</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

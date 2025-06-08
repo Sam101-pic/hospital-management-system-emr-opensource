@@ -1,5 +1,6 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { DanpheHTTPResponse } from '../../shared/common-models';
 
 @Injectable()
 export class EmergencyDLService {
@@ -76,6 +77,9 @@ export class EmergencyDLService {
     let data = JSON.stringify(dischargeSummary);
     return this.http.put<any>("/api/Emergency/ERDischargeSummary", data, this.options);
   }
+  public UndoFinalizedpatient(ERPatientId) {
+    return this.http.put<any>(`/api/Emergency/ERUndoFinalizePatient?ERPatientId=${ERPatientId}`, this.options);
+  }
   public UpdateERPatient(data) {
     return this.http.put<any>("/api/Emergency/Patient", data, this.options);
   }
@@ -122,4 +126,29 @@ export class EmergencyDLService {
       responseType: 'blob' as 'json',
     });
   }
+  GetEmergencyFinalizedPatientList(fromDate: string, toDate: string, finalizedStatus: string | null = null, selectedCase: number = 0, dateType: string | null = null, isPoliceCase: boolean = false
+  ) {
+    try {
+      const params = new HttpParams()
+        .set('fromDate', fromDate)
+        .set('toDate', toDate)
+        .set('finalizedStatus', finalizedStatus || '')
+        .set('selectedCase', selectedCase.toString())
+        .set('dateType', dateType || '')
+        .set('isPoliceCase', isPoliceCase.toString());
+
+      return this.http.get<DanpheHTTPResponse>("/api/Emergency/EmergencyFinalizedPatientList", {
+        params: params,
+        ...this.options
+      });
+    }
+    catch (ex) {
+      throw ex;
+    }
+  }
+  public GetERPatientCaseDetails(ERPatientId: number) {
+    return this.http.get<DanpheHTTPResponse>("/api/Emergency/EmergencyPatientsCases?ERPatientId=" + ERPatientId, this.options);
+  }
+
 }
+

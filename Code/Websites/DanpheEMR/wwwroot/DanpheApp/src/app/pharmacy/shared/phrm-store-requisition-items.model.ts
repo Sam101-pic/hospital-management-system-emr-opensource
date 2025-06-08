@@ -4,6 +4,7 @@ import {
     FormGroup,
     Validators
 } from '@angular/forms';
+import { PHRMGenericModel } from './phrm-generic.model';
 import { PHRMItemMasterModel } from "./phrm-item-master.model";
 import { PHRMStoreRequisition } from "./phrm-store-requisition.model";
 
@@ -27,9 +28,11 @@ export class PHRMStoreRequisitionItems {
 
     ////to make the instance ItemMaster with new row
     public SelectedItem: PHRMItemMasterModel = null;
+    public selectedGeneneric: PHRMGenericModel = null;
 
     //ItemName only for display purpose
     public ItemName: string = "";
+    public GenericName: string = "";
     public Code: string = ""
     public Item: PHRMItemMasterModel = null;
     public Requisition: PHRMStoreRequisition = null;
@@ -42,6 +45,10 @@ export class PHRMStoreRequisitionItems {
     StoreId: any;
     //for display purpose ie Requisiting Store Name
     public RequestedSourceStore: string;
+    public UOMName: string = null;
+    public FilteredItemList: any[] = [];
+    public ItemCode: string = null;
+    public RequisitionDate: string = '';
 
     constructor() {
 
@@ -75,5 +82,4 @@ export class PHRMStoreRequisitionItems {
         }
 
     }
-
 }

@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component } from "@angular/core";
+import { ChangeDetectorRef, Component, HostListener } from "@angular/core";
 import { Router } from "@angular/router";
 import * as moment from "moment";
 import { BillingService } from "../../../../../billing/shared/billing.service";
@@ -16,9 +16,10 @@ import { CallbackService } from "../../../../../shared/callback.service";
 import { DanpheHTTPResponse } from "../../../../../shared/common-models";
 import { CommonFunctions } from "../../../../../shared/common.functions";
 import { GridEmitModel } from "../../../../../shared/danphe-grid/grid-emit.model";
+import { FewaPayService } from "../../../../../shared/fewa-pay/helpers/fewa-pay.service";
 import { MessageboxService } from "../../../../../shared/messagebox/messagebox.service";
 import { RouteFromService } from "../../../../../shared/routefrom.service";
-import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_ModuleName } from "../../../../../shared/shared-enums";
+import { ENUM_DanpheHTTPResponses, ENUM_FewaPayMessageTypes, ENUM_FewaPayTransactionFrom, ENUM_MessageBox_Status, ENUM_ModuleName, ENUM_POS_ResponseStatus } from "../../../../../shared/shared-enums";
 import DispensaryGridColumns from "../../../../shared/dispensary-grid.column";
 import { DispensaryService } from "../../../../shared/dispensary.service";
 
@@ -81,6 +82,11 @@ export class PendingPHRMSettlementListComponent {
   provisionalFromSettlement: boolean = false;
   public phrmEmpCashTxn: PHRMEmployeeCashTransaction = new PHRMEmployeeCashTransaction();
   public MstPaymentModes: any = [];
+  public PatientVisitId: number = 0;
+  SettlementToPostDTO = new PHRMSettlementModel();
+  loadingScreen: boolean = false;
+  public PatientDataList: Array<PatientInfo_DTO> = new Array<PatientInfo_DTO>();
+  public SelectedPatient: PatientInfo_DTO = new PatientInfo_DTO();
   constructor(public pharmacyService: PharmacyService, private _dispensaryService: DispensaryService,
     public router: Router,
     public routeFromService: RouteFromService,
@@ -91,7 +97,8 @@ export class PendingPHRMSettlementListComponent {
     public patientService: PatientService,
     public msgBoxServ: MessageboxService,
     public coreService: CoreService,
-    public billingService: BillingService) {
+    public billingService: BillingService,
+    private _fewaPayService: FewaPayService) {
     this.MstPaymentModes = this.coreService.masterPaymentModes;
     this.currentCounter = this.securityService.getPHRMLoggedInCounter().CounterId;
     this.currentActiveDispensary = this._dispensaryService.activeDispensary;
@@ -101,7 +108,7 @@ export class PendingPHRMSettlementListComponent {
     }
     else {
       this.PHRMSettlementGridCols = DispensaryGridColumns.PHRMSettlementBillSearch;
-      this.creditOrganizationsList = this.billingService.AllCreditOrganizationsList && this.billingService.AllCreditOrganizationsList.filter(a => !a.IsClaimManagementApplicable);
+      this.creditOrganizationsList = this._dispensaryService.BillingCreditOrganizationList && this._dispensaryService.BillingCreditOrganizationList.filter(a => !a.IsClaimManagementApplicable);//this.billingService.AllCreditOrganizationsList && this.billingService.AllCreditOrganizationsList.filter(a => !a.IsClaimManagementApplicable);
       let orgObj = this.creditOrganizationsList.find(a => a.IsDefault == true);
       if (orgObj) {
         this.OrganizationId = orgObj.OrganizationId;
@@ -109,6 +116,7 @@ export class PendingPHRMSettlementListComponent {
       }
       this.OrganizationId && this.GetBillsForSettlement(this.OrganizationId);
       this.showGrid = true;
+      this.GetPatientInfo();
     }
 
   }
@@ -120,11 +128,23 @@ export class PendingPHRMSettlementListComponent {
 
   GetBillsForSettlement(OrganizationId) {
     this.allPHRMPendingSettlements = [];
+    this.filteredPHRMPendingSettlements = [];
     this.pharmacyBLService.GetPHRMPendingBillsForSettlement(this.currentActiveDispensary.StoreId, OrganizationId)
       .subscribe((res: DanpheHTTPResponse) => {
-        if (res.Status == "OK") {
+        if (res.Status == "OK" && res.Results.length) {
           this.allPHRMPendingSettlements = res.Results;
+          this.allPHRMPendingSettlements = this.allPHRMPendingSettlements.filter(p => p.CreditTotal > 0);
           this.filteredPHRMPendingSettlements = this.allPHRMPendingSettlements;
+        }
+      });
+  }
+
+  GetPatientInfo() {
+    this.PatientDataList = [];
+    this.pharmacyBLService.GetPatientInfoSettlement()
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results.length) {
+          this.PatientDataList = res.Results;
         }
       });
   }
@@ -135,6 +155,7 @@ export class PendingPHRMSettlementListComponent {
         {
           this.showReceipt = false;
           var data = $event.Data;
+          this.PatientVisitId = $event.Data.PatientVisitId;
           this.GetPatientCreditInvoices(data);
 
         }
@@ -305,34 +326,73 @@ export class PendingPHRMSettlementListComponent {
     this.showReceipt = false;
     this.showActionPanel = false;
   }
+
+
+
   SettlePatientBills() {
+    if (!this.settelmentProceedEnable) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please clear all the provisional amount of this patient then come for settlement']);
+      return;
+    }
     this.loading = true;
     if (this.CheckIsDiscountApplied()) {
       this.model.PHRMInvoiceTransactions = this.patCrInvoicDetails;
 
-      let setlmntToPost = this.GetSettlementInvoiceFormatted();
+      this.SettlementToPostDTO = this.GetSettlementInvoiceFormatted();
+      this.HandlePaymentTransaction();
+    }
+    else {
+      this.loading = false;
+    }
+  }
 
-      this.pharmacyBLService.PostSettlementInvoice(setlmntToPost)
-        .subscribe((res: DanpheHTTPResponse) => {
 
+  /**This method is responsible to check whether FewaPay is applicable or not if not proceed with normal workflow else wait for the message sent by FewaPay Browser extension and decide after message is received*/
+  private HandlePaymentTransaction() {
+    if (this._fewaPayService.IsFewaPayApplicable(this.SettlementToPostDTO.PaymentDetails)) {
+      this.loadingScreen = true;
+      const transactionReqString = this._fewaPayService.CreateFewaPayTransactionRequest(this.SettlementToPostDTO.PaymentDetails, this.SettlementToPostDTO.PaidAmount, this.SettlementToPostDTO.Remarks);
+      if (transactionReqString) {
+        window.postMessage({
+          type: ENUM_FewaPayMessageTypes.PaymentInfoRequest,
+          data: transactionReqString,
+        }, "*");
+        console.log('Transaction Request is posted from Danphe.');
+      } else {
+        this.loadingScreen = false;
+        this.loading = false;
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Transaction Request cannot be created due to missing mandatory data like paymentDetails, totalAmount and remarks`]);
+      }
+    } else {
+      this.ClearPatientCredits();
+    }
+  }
+
+
+  private ClearPatientCredits() {
+    this.pharmacyBLService.PostSettlementInvoice(this.SettlementToPostDTO)
+      .finally(() => { this.loading = false; })
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Settled successfully']);
           this.setlmntToDisplay = res.Results;
           this.SettlementId = this.setlmntToDisplay.SettlementId;
           this.setlmntToDisplay.Patient = this.patientService.globalPatient;
           this.showReceipt = true;
           this.showActionPanel = false;
-          this.loading = false;
+          this.loadingScreen = false;
+        }
+        else {
+          this.loadingScreen = false;
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Settlement failed' + res.ErrorMessage]);
+        }
+      },
+        err => {
+          this.loadingScreen = false;
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [err.ErrorMessage]);
+        }
 
-        },
-          err => {
-            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [err.ErrorMessage]);
-            this.loading = true;
-          }
-
-        );
-    }
-    else {
-      this.loading = false;
-    }
+      );
   }
 
   CheckRemarks() {
@@ -374,6 +434,7 @@ export class PendingPHRMSettlementListComponent {
     retSettlModel.DiscountAmount = this.model.DiscountAmount == null ? 0 : this.model.DiscountAmount;
     retSettlModel.Remarks = this.model.Remarks;
     retSettlModel.CollectionFromReceivable = this.model.CollectionFromReceivable == null ? 0 : this.model.CollectionFromReceivable;
+    retSettlModel.DiscountReturnAmount = this.model.DiscountReturnAmount == null ? 0 : this.model.DiscountReturnAmount;
     retSettlModel.StoreId = this._dispensaryService.activeDispensary.StoreId;
     retSettlModel.OrganizationId = this.OrganizationId;
 
@@ -623,6 +684,9 @@ export class PendingPHRMSettlementListComponent {
   public hotkeys(event) {
     if (event.keyCode == 27) {
       this.showInvoiceDetail = false;
+      this.showReceipt = false;
+      this.provisionalFromSettlement = false;
+
     }
   }
   PaymentModeChanges($event: any) {
@@ -652,4 +716,46 @@ export class PendingPHRMSettlementListComponent {
       this.GetBillsForSettlement(this.OrganizationId);
     }
   }
+
+  /**Below HostListener is responsible to catch the responses from FewaPay Browser Extension */
+  @HostListener('window:message', ['$event'])
+  onMessage(event: MessageEvent): void {
+    const result = this._fewaPayService.HandleEventsFromFewaPayBrowserExtension(event);
+    if (result) {
+      if (result.resultCode === ENUM_POS_ResponseStatus.Success) { //! Krishna, 10thDec'23 "000" is success status code sent from POS device.
+        const transactionId = 'verifyTransId' in result && result.verifyTransId;
+        if (transactionId) {
+          this.SettlementToPostDTO.PaymentDetails = `${this.SettlementToPostDTO.PaymentDetails}; TransactionId: ${transactionId}`;
+        }
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.SettlementToPostDTO.PatientId, ENUM_FewaPayTransactionFrom.DispensarySettlement);
+        this.ClearPatientCredits();
+      } else {
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.SettlementToPostDTO.PatientId, ENUM_FewaPayTransactionFrom.DispensarySettlement);
+        this.loading = false;
+        this.loadingScreen = false;
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`${result.message}`]);
+      }
+      return;
+    }
+  }
+  PatientDataOnChanged($event) {
+    if (this.allPHRMPendingSettlements && this.allPHRMPendingSettlements.length) {
+      if ($event && typeof $event === 'object' && $event.PatientId > 0) {
+        this.filteredPHRMPendingSettlements = this.allPHRMPendingSettlements.filter(p => p.PatientId === $event.PatientId);
+      }
+      else {
+        this.filteredPHRMPendingSettlements = this.allPHRMPendingSettlements;
+      }
+    }
+  }
+  PatientListFormatter(data: any): string {
+    return data["PatientName"] + "|" + data["HospitalNo"];
+  }
+}
+export class PatientInfo_DTO {
+
+  PatientId: number = 0;
+  PatientName: string = '';
+  HospitalNo: string = '';
+  PhoneNumber: string = '';
 }

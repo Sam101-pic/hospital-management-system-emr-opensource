@@ -1,49 +1,65 @@
-import { Component, Input, OnInit } from '@angular/core';
-import * as moment from 'moment';
-import { DLService } from "../../../shared/dl.service";
-import { ReportingService } from '../../shared/reporting-service';
+import { Component } from '@angular/core';
 import * as _ from 'lodash';
-import { IGridFilterParameter } from '../../../shared/danphe-grid/grid-filter-parameter.interface';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import * as moment from 'moment';
+import { BillingBLService } from '../../../billing/shared/billing.bl.service';
+import { CoreService } from '../../../core/shared/core.service';
+import { SettingsBLService } from '../../../settings-new/shared/settings.bl.service';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../shared/danphe-grid/NepaliColGridSettingsModel';
+import { IGridFilterParameter } from '../../../shared/danphe-grid/grid-filter-parameter.interface';
+import { DLService } from "../../../shared/dl.service";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { RankWiseDischargePatient_DTO } from '../../shared/dto/rank-wise-discharged-patient-list.dto';
+import { Rank_DTO } from '../../shared/dto/rank.dto';
+import { RPT_SchemeDTO } from '../../shared/dto/scheme.dto';
+import { ReportingService } from '../../shared/reporting-service';
 @Component({
-  selector: 'app-rankwisedischargelist',
+  selector: 'rank-wise-discharged-patient-list',
   templateUrl: './rank-wise-discharge-list.component.html',
   styleUrls: ['./rank-wise-discharge-list.component.css']
 })
 export class RankWiseDischargeListComponent {
-  public filterParameters: IGridFilterParameter[] = [];
-  FromDate: string = moment().format('YYYY-MM-DD');
-  ToDate: string = moment().format('YYYY-MM-DD');
-  MembershipId: number = null;
-  RankMembershipWiseDischargePatientReportData: Array<RankWiseDischargeModel> = new Array<RankWiseDischargeModel>();
-  RankMembershipWiseDischargePatientReportGridColumns: any;
-  selectedMembership: Membership;
-  RankList: Array<Rank> = new Array<Rank>();
-  selectedRank: Rank;
-  public pharmacy: string = "pharmacy";
-  preSelectedMemberships: Array<Membership> = new Array<Membership>();
-  dateRange: string = '';
-  Memberships: Array<Membership> = new Array<Membership>();
-  memberships: string = "";
-  MembershipTypeNames: Array<string> = new Array<string>();
-  MembershipTypeName: any;
-  preSelectedRanks: Array<Rank> = new Array<Rank>();
-  Ranks: Array<Rank> = new Array<Rank>();
-  ranks: string | any = "";
-  loading: boolean = false;
-  public NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
+  FromDate: string = "";
+  ToDate: string = "";
+  DateRange: string = "";
+  TotalDischargedPatientReport = new Array<RankWiseDischargePatient_DTO>();
+  TotalDischargedPatientReportGridColumns: Array<any> = null;
+  NepaliDateInGridSettings = new NepaliDateInGridParams();
+  Schemes: string | any = "";
+  Ranks: string | any = "";
+  loading = false;
+  AllSchemes = new Array<RPT_SchemeDTO>();
+  PreSelectedSchemes = [];
+  AllRanks = new Array<Rank_DTO>();
+  PreSelectedRanks = [];
+  ShowGrid: boolean = false;
+  FooterContent = "";
+  FilterParameters: IGridFilterParameter[] = [];
+  SchemeNames: string | any = "";
+  MembershipSchemeSettings: { ShowCommunity: boolean, IsMandatory: boolean, CommunityLabel: string, SchemeLabel: string };
+  gridExportOptions = {
+    fileName: 'RankMembershipWiseDischargePatientReport' + moment().format('YYYY-MM-DD') + '.xls',
+  };
 
-  constructor(public dlService: DLService, public reportServ: ReportingService, public messageBoxService: MessageboxService) {
-    this.RankMembershipWiseDischargePatientReportGridColumns = this.reportServ.reportGridCols.RankMembershipWiseDischargePatientCols;
+  constructor(
+    private _dlService: DLService,
+    private _coreService: CoreService,
+    private _reportingService: ReportingService,
+    private _messageBoxService: MessageboxService,
+    private _settingsBLService: SettingsBLService,
+    private _billingBLService: BillingBLService,
+  ) {
+    this.TotalDischargedPatientReportGridColumns = this._reportingService.reportGridCols.RankMembershipWiseDischargePatientCols;
+    let param = this._coreService.Parameters.find(p => p.ParameterGroupName === "Billing" && p.ParameterName === "MembershipSchemeSettings");
+    if (param) {
+      const paramValue = JSON.parse(param.ParameterValue);
+      this.MembershipSchemeSettings = paramValue;
+    }
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail("AdmissionDate", false), new NepaliDateInGridColumnDetail("DischargedDate", false));
-    this.GetMembershipType();
-    this.GetRanks();
+    this.LoadSchemes();
+    this.LoadRanks();
   }
-
-
-
 
   ngOnInit() {
 
@@ -52,23 +68,28 @@ export class RankWiseDischargeListComponent {
   OnFromToDateChange($event) {
     this.FromDate = $event ? $event.fromDate : this.FromDate;
     this.ToDate = $event ? $event.toDate : this.ToDate;
-    this.dateRange = this.FromDate + "&nbsp;<b>To</b>&nbsp;" + this.ToDate;
-
-
+    this.DateRange = this.FromDate + "&nbsp;<b>To</b>&nbsp;" + this.ToDate;
   }
-  LoadRankMembershipWiseDischargePatientReport() {
-    this.filterParameters = [
-      { DisplayName: "DateRange:", Value: this.dateRange },
-      { DisplayName: "Rank:", Value: this.ranks == undefined || null ? 'All' : this.ranks.replaceAll(',', ', ') },
-      { DisplayName: "Membership:", Value: this.memberships == undefined || null ? 'All' : this.MembershipTypeName.replaceAll(',', ', ') },
-    ]
 
-    this.dlService.Read(`/BillingReports/RankMembershipWiseDischargePatientReport?FromDate=${this.FromDate} &ToDate=${this.ToDate} &Membership=${this.memberships} &Rank=${this.ranks}`).map(res => res).subscribe(res => {
-      if (res.Status === 'OK') {
-        this.RankMembershipWiseDischargePatientReportData = res.Results;
+  LoadReport() {
+    this.FilterParameters = [
+      {
+        DisplayName: "Date Range",
+        Value: `<strong>${this.FromDate}</strong> to <strong>${this.ToDate}</strong>`,
+      },
+      {
+        DisplayName: "Schemes",
+        Value: this.SchemeNames.replaceAll(",", ", "),
+      },
+      { DisplayName: "Ranks", Value: this.Ranks.replaceAll(",", ", ") },
+    ];
+
+    this._dlService.Read(`/Reporting/RankMembershipWiseDischargePatientReport?fromDate=${this.FromDate}&toDate=${this.ToDate}&schemeIds=${this.Schemes}&ranks=${this.Ranks}`).map(res => res).subscribe(res => {
+      if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+        this.TotalDischargedPatientReport = res.Results;
       }
       else {
-        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed To Load Data']);
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed To Load Data']);
       }
     },
       err => {
@@ -76,117 +97,88 @@ export class RankWiseDischargeListComponent {
       })
 
   }
-  MapPreSelectedMemberships(preSelectedMemberships): void {
-    let defMemberships = [];
-    preSelectedMemberships.forEach(x => {
-      defMemberships.push(x.MembershipTypeId);
-      this.MembershipTypeNames.push(x.MembershipTypeName);
 
+  MapPreSelectedSchemes(preSelectedSchemes): void {
+    let defSchemes = [];
+    preSelectedSchemes.forEach((x) => {
+      defSchemes.push(x.SchemeId);
     });
-    let membership = this.MembershipTypeNames.join(",");
-    this.MembershipTypeName = membership;
-    let membershipList = defMemberships.join(",");
-    this.memberships = membershipList;
+    let schemeList = defSchemes.join(",");
+    this.Schemes = schemeList;
   }
-  gridExportOptions = {
-    fileName: 'RankMembershipWiseDischargePatientReport' + moment().format('YYYY-MM-DD') + '.xls',
-  };
 
-  MembershipsChanged($event): void {
-    let defMemberships = [];
-    this.MembershipTypeNames = [];
-    $event.forEach(x => {
-      defMemberships.push(x.MembershipTypeId);
-      this.MembershipTypeNames.push(x.MembershipTypeName);
+  SchemesChanged($event): void {
+    let defSchemes = [];
+    let defSchemeNames = [];
+    $event.forEach((x) => {
+      defSchemes.push(x.SchemeId);
+      defSchemeNames.push(x.SchemeName);
     });
-    let membershipList = defMemberships.join(",");
-    let membership = this.MembershipTypeNames.join(",");
-    this.MembershipTypeName = membership;
-    this.memberships = membershipList;
+    let schemeList = defSchemes.join(",");
+    this.Schemes = schemeList;
+    let schemeNames = defSchemeNames.join(",");
+    this.SchemeNames = schemeNames;
   }
+
   RanksChanged($event): void {
     let defRanks = [];
-    $event.forEach(x => {
+    $event.forEach((x) => {
       defRanks.push(x.RankName);
     });
     let rankList = defRanks.join(",");
-    this.ranks = rankList;
-  }
-  MembershipFormatter(data: Membership) {
-    return data["MembershipTypeName"];
+    this.Ranks = rankList;
   }
 
-  public GetMembershipType() {
-    this.dlService.Read('/api/Billing/MembershipTypes').subscribe(res => {
-      if (res.Status == 'OK') {
-        let MembershipList = [];
-        MembershipList = res.Results;
-        MembershipList.forEach(p => {
-          let val = _.cloneDeep(p);
-          this.preSelectedMemberships.push(val);
+
+  LoadSchemes(): void {
+    this._settingsBLService.GetSchemesForReport()
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+          let schemes = [];
+          schemes = res.Results;
+          schemes.forEach((p) => {
+            let val = _.cloneDeep(p);
+            this.PreSelectedSchemes.push(val);
+          });
+          this.MapPreSelectedSchemes(this.PreSelectedSchemes);
+          this.AllSchemes = schemes;
+        } else {
+          this._messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [
+            "Couldn't load Schemes",
+          ]);
+        }
+      });
+  }
+
+  LoadRanks(): void {
+    this._billingBLService.GetRank().subscribe((res: DanpheHTTPResponse) => {
+      if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
+        let ranks = [];
+        ranks = res.Results;
+        ranks.forEach((x) => {
+          x["Rank"] = x.RankName;
         });
-        this.MapPreSelectedMemberships(this.preSelectedMemberships);
-        this.Memberships = MembershipList;
-
+        ranks.forEach((p) => {
+          let val = _.cloneDeep(p);
+          this.PreSelectedRanks.push(val);
+        });
+        this.MapPreSelectedRanks(this.PreSelectedRanks);
+        this.AllRanks = ranks;
+      } else {
+        this._messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [
+          "Couldn't load Ranks",
+        ]);
       }
     });
   }
-  GetRanks(): void {
-    this.dlService.Read('/api/Visit/GetRank').subscribe(res => {
-      if (res.Status === 'OK') {
-        let Rank: Array<Rank> = new Array<Rank>();
 
-        Rank = res.Results;
-
-        Rank.forEach(x => {
-          x['Rank'] = x.RankName;
-        });
-        Rank.forEach(p => {
-          let val = _.cloneDeep(p);
-          this.preSelectedRanks.push(val);
-        });
-        this.MapPreSelectedRanks(this.preSelectedRanks);
-        this.Ranks = Rank;
-      }
-    });
-  }
   MapPreSelectedRanks(preSelectedRanks): void {
     let defRanks = [];
     preSelectedRanks.forEach(x => {
       defRanks.push(x.RankName);
     });
     let rankList = defRanks.join(",");
-    this.ranks = rankList;
+    this.Ranks = rankList;
   }
 
-  RankFormatter(data: any): string {
-    return data["RankName"];
-  }
-
-}
-
-
-
-
-class Membership {
-  public MembershipTypeId: number = null;
-  public MembershipTypeName: string = '';
-}
-
-export class Rank {
-  RankId: number = null;
-  RankName: string = '';
-}
-
-class RankWiseDischargeModel {
-  HospitalNo: string = '';
-  IPNumber: string = '';
-  Rank: string = '';
-  Membership: string = '';
-  PatientName: string = '';
-  AgeSex: string = '';
-  Address: string = '';
-  PhoneNumber: string = '';
-  AddmissionDate: string = '';
-  DischargeDate: string = '';
 }

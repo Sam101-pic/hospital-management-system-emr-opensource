@@ -1,11 +1,14 @@
-﻿using DanpheEMR.Core.Configuration;
+﻿using DanpheEMR.Controllers.Pharmacy;
+using DanpheEMR.Core.Configuration;
 using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
+using DanpheEMR.Services.Pharmacy.DTOs.ReturnToSupplier;
 using DanpheEMR.Utilities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
@@ -20,10 +23,13 @@ namespace DanpheEMR.Controllers.PharmacyPurchaseReturn
     {
         public static IHostingEnvironment _environment;
         private readonly PharmacyDbContext _pharmacyDbContext;
-        public PharmacyPurchaseReturnController(IHostingEnvironment env, IOptions<MyConfiguration> _config) : base(_config)
+        private readonly ILogger<PharmacyPurchaseReturnController> _logger;
+
+        public PharmacyPurchaseReturnController(IHostingEnvironment env, ILogger<PharmacyPurchaseReturnController> logger, IOptions<MyConfiguration> _config) : base(_config)
         {
             _environment = env;
             _pharmacyDbContext = new PharmacyDbContext(connString);
+            _logger = logger;
         }
         /*[HttpGet]
         [Route("PharmacyItemsWithTotalAvailableQuantity")]
@@ -204,10 +210,10 @@ namespace DanpheEMR.Controllers.PharmacyPurchaseReturn
                                             join supp in _pharmacyDbContext.PHRMSupplier on retSupp.SupplierId equals supp.SupplierId
                                             join retSuppItm in _pharmacyDbContext.PHRMReturnToSupplierItem on retSupp.ReturnToSupplierId equals retSuppItm.ReturnToSupplierId
                                             join rbac in _pharmacyDbContext.Users on retSupp.CreatedBy equals rbac.EmployeeId
-                                            join gr in _pharmacyDbContext.PHRMGoodsReceipt on retSupp.GoodReceiptId equals gr.GoodReceiptId
+                                            // join gr in _pharmacyDbContext.PHRMGoodsReceipt on retSupp.GoodReceiptId equals gr.GoodReceiptId
                                             where (retSuppItm.Quantity != 0 && (DbFunctions.TruncateTime(retSuppItm.CreatedOn) >= fromDate && DbFunctions.TruncateTime(retSuppItm.CreatedOn) <= toDate))
 
-                                            group new { supp, retSuppItm, retSupp, rbac, gr } by new
+                                            group new { supp, retSuppItm, retSupp, rbac } by new
                                             {
                                                 supp.SupplierName,
                                                 retSupp.ReturnToSupplierId,
@@ -237,7 +243,7 @@ namespace DanpheEMR.Controllers.PharmacyPurchaseReturn
                                                 ReturnStatus = p.Select(a => a.retSupp.ReturnStatus).FirstOrDefault(),
                                                 UserName = p.Select(a => a.rbac.UserName).FirstOrDefault(),
                                                 CreatedOn = p.Select(a => a.retSupp.CreatedOn).FirstOrDefault(),
-                                                GoodReceiptPrintId = p.Select(a => a.gr.GoodReceiptPrintId).FirstOrDefault()
+                                                // GoodReceiptPrintId = p.Select(a => a.gr.GoodReceiptPrintId).FirstOrDefault()
                                             }
                     ).ToList().OrderByDescending(a => a.ReturnToSupplierId);
 
@@ -322,9 +328,11 @@ namespace DanpheEMR.Controllers.PharmacyPurchaseReturn
                                                  VATPercentage = retSuppItm.VATPercentage,
                                                  TotalAmount = retSuppItm.TotalAmount,
                                                  ReturnStatus = retSuppl.ReturnStatus,
-                                                 CreatedBy = retSuppl.CreatedBy,
-                                                 CreatedOn = retSuppl.CreatedOn,
+                                                 CreatedBy = retSuppItm.CreatedBy,
+                                                 CreatedOn = retSuppItm.CreatedOn,
                                                  GoodReceiptId = retSuppl.GoodReceiptId,
+                                                 DiscountedAmount = retSuppItm.DiscountedAmount,
+                                                 VATAmount = retSuppItm.VATAmount,
                                                  //UserName= rbacDbContext.Users.Where(a=>a.EmployeeId == retSuppl.CreatedBy).Select
                                                  //UserName = rbacDbContext.Users.Where(a => a.EmployeeId == retSuppl.CreatedBy).Select(a => a.UserName).FirstOrDefault()
                                                  //UserName = (from rbac in rbacDbContext.Users
@@ -340,7 +348,9 @@ namespace DanpheEMR.Controllers.PharmacyPurchaseReturn
                                              }
                                ).ToList();
             var returnSupplierData = (from retSuppl in _pharmacyDbContext.PHRMReturnToSupplier.Where(rts => rts.ReturnToSupplierId == returnToSupplierId)
-                                      join goodsreceipt in _pharmacyDbContext.PHRMGoodsReceipt on retSuppl.GoodReceiptId equals goodsreceipt.GoodReceiptId
+                                          // join goodsreceipt in _pharmacyDbContext.PHRMGoodsReceipt on retSuppl.GoodReceiptId equals goodsreceipt.GoodReceiptId
+                                      join goodsreceipt in _pharmacyDbContext.PHRMGoodsReceipt on retSuppl.GoodReceiptId equals goodsreceipt.GoodReceiptId into goods
+                                      from goodsreceipt in goods.DefaultIfEmpty()
                                       join supdetail in _pharmacyDbContext.PHRMSupplier on retSuppl.SupplierId equals supdetail.SupplierId into supp
                                       from supplier in supp.DefaultIfEmpty()
 
@@ -485,6 +495,7 @@ namespace DanpheEMR.Controllers.PharmacyPurchaseReturn
                                           select new
                                           {
                                               SupplierId = gr.SupplierId,
+                                              GoodReceiptDate = gr.GoodReceiptDate,
                                               GoodReceiptId = gri.GoodReceiptId,
                                               GoodReceiptItemId = gri.GoodReceiptItemId,
                                               StockId = gri.StockId,
@@ -569,11 +580,22 @@ namespace DanpheEMR.Controllers.PharmacyPurchaseReturn
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             string str = this.ReadPostData();
             PHRMReturnToSupplierModel retSupplModel = DanpheJSONConvert.DeserializeObject<PHRMReturnToSupplierModel>(str);
-            if (retSupplModel != null && retSupplModel.returnToSupplierItems != null)
+            if (retSupplModel != null && retSupplModel.ReturnToSupplierItems != null)
             {
-                var maxretSupp = (from RTS in _pharmacyDbContext.PHRMReturnToSupplier select RTS.CreditNotePrintId).DefaultIfEmpty(0).Max() ?? 0;
+                var grId = retSupplModel.GoodReceiptId;
+                PHRMGoodsReceiptModel goodReceiptItemDetails = _pharmacyDbContext.PHRMGoodsReceipt
+                    .FirstOrDefault(gr => gr.GoodReceiptId == grId);
+                DateTime ReturnDate = retSupplModel.ReturnDate.Date;
+                DateTime GoodReceiptDate = goodReceiptItemDetails.GoodReceiptDate.Date;
+                if (goodReceiptItemDetails != null)
+                {
+                    if (ReturnDate < GoodReceiptDate)
+                    {
+                        throw new Exception("Return date must not exceed the Good Receipt Date");
+                    }
+                }
+                var maxretSupp = (from RTS in _pharmacyDbContext.PHRMReturnToSupplier select RTS.CreditNotePrintId).DefaultIfEmpty(0).Max();
                 retSupplModel.CreditNotePrintId = maxretSupp + 1;
-
                 int outputRTSId = PharmacyBL.ReturnItemsToSupplierTransaction(retSupplModel, currentUser, _pharmacyDbContext);
                 return outputRTSId;
             }
@@ -605,5 +627,143 @@ namespace DanpheEMR.Controllers.PharmacyPurchaseReturn
                 }
         }
     */
+        [HttpPost]
+        [Route("ReturnToSupplier")]
+        public IActionResult ReturnToSupplier([FromBody] ReturnToSupplier_DTO ReturnToSupplier)
+        {
+            Func<object> func = () => PostReturnToSupplier(ReturnToSupplier);
+            return InvokeHttpPostFunction(func);
+        }
+
+        private object PostReturnToSupplier(ReturnToSupplier_DTO ReturnToSupplier)
+        {
+            var returnToSupplier = DanpheJSONConvert.DeserializeObject<PHRMReturnToSupplierModel>(DanpheJSONConvert.SerializeObject(ReturnToSupplier));
+
+            using (var db = _pharmacyDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    var currentDate = DateTime.Now;
+                    RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+                    var currentFiscalYearId = PharmacyBL.GetFiscalYear(_pharmacyDbContext).FiscalYearId;
+
+                    returnToSupplier.CreatedBy = currentUser.EmployeeId;
+                    returnToSupplier.CreatedOn = currentDate;
+                    returnToSupplier.FiscalYearId = currentFiscalYearId;
+                    returnToSupplier.CreditNotePrintId = GetCreditNotePrintId(currentFiscalYearId);
+
+                    var IsDuplicateCreditNoteId = _pharmacyDbContext.PHRMReturnToSupplier.Any(g => g.CreditNoteId == ReturnToSupplier.CreditNoteId && g.SupplierId == ReturnToSupplier.SupplierId && g.FiscalYearId == returnToSupplier.FiscalYearId);
+                    if (IsDuplicateCreditNoteId)
+                    {
+                        throw new Exception("Duplicate Credit Note No. of  Supplier in same fiscal year");
+                    }
+
+                    returnToSupplier.ReturnToSupplierItems.ForEach(item =>
+                    {
+                        item.CreatedBy = currentUser.EmployeeId;
+                        item.CreatedOn = currentDate;
+                        item.ItemPrice = item.ReturnCostPrice;
+                        item.ReturnRemarks = returnToSupplier.Remarks;
+                        item.FreeQuantity = 0;
+                        item.FreeAmount = 0;
+                        item.FreeRate = 0;
+                    });
+
+
+                    _pharmacyDbContext.PHRMReturnToSupplier.Add(returnToSupplier);
+                    _pharmacyDbContext.SaveChanges();
+
+                    UpdateStock(returnToSupplier, currentDate, currentUser, currentFiscalYearId);
+
+                    db.Commit();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Failed to save return to supplier information.", ex);
+                    db.Rollback();
+                    throw ex;
+                }
+            }
+            return returnToSupplier.ReturnToSupplierId;
+        }
+
+        private void UpdateStock(PHRMReturnToSupplierModel returnToSupplier, DateTime currentDate, RbacUser currentUser, int currentFiscalYearId)
+        {
+            var mainStoreInfo = _pharmacyDbContext.PHRMStore.Where(a => a.Name == "Main Store" && a.Category == "store" && a.SubCategory == "pharmacy").FirstOrDefault();
+            int mainStoreId = mainStoreInfo.StoreId;
+
+            decimal nowReturningQty = 0;
+
+            returnToSupplier.ReturnToSupplierItems.ForEach(RTSItem =>
+            {
+                nowReturningQty = (decimal)RTSItem.Quantity;
+                var ExistingStocks = _pharmacyDbContext.StoreStocks
+                                                       .Where(a => a.AvailableQuantity > 0).Include(a => a.StockMaster)
+                                                       .Where(a => a.ItemId == RTSItem.ItemId &&
+                                                                   a.StoreId == mainStoreId &&
+                                                                   a.StockMaster.BatchNo == RTSItem.BatchNo &&
+                                                                   a.StockMaster.ExpiryDate == RTSItem.ExpiryDate &&
+                                                                   a.StockMaster.CostPrice == RTSItem.ReturnCostPrice &&
+                                                                   a.SalePrice == RTSItem.SalePrice)
+                                                       .ToList();
+
+
+                if (ExistingStocks.Count == 0)
+                {
+                    throw new InvalidOperationException($"Stock not found for ItemName ={RTSItem.ItemName}, BatchNo ={RTSItem.BatchNo}, Expiry={RTSItem.ExpiryDate}");
+                }
+
+                double totalAvailableQty = ExistingStocks.Sum(s => s.AvailableQuantity);
+
+                if (totalAvailableQty < RTSItem.Quantity)
+                {
+                    throw new InvalidOperationException($"Stock is not available for Item with BatchNo = {RTSItem.BatchNo} ,ItemName = {RTSItem.ItemName},  Available Quantity = {totalAvailableQty}");
+                }
+                //apply fifo to decrement multiple stocks found in dispensary
+                var totalRemainingQty = RTSItem.Quantity;
+                foreach (var stk in ExistingStocks)
+                {
+                    var dispensaryStockTxn = new PHRMStockTransactionModel(
+                        storeStock: stk,
+                        transactionType: ENUM_PHRM_StockTransactionType.PurchaseReturnedItem,
+                        transactionDate: currentDate,
+                        referenceNo: RTSItem.ReturnToSupplierItemId,
+                        createdBy: currentUser.EmployeeId,
+                        createdOn: currentDate,
+                        fiscalYearId: currentFiscalYearId
+                        );
+
+                    if (stk.AvailableQuantity < totalRemainingQty)
+                    {
+                        totalRemainingQty -= stk.AvailableQuantity;
+                        dispensaryStockTxn.SetInOutQuantity(inQty: 0, outQty: stk.AvailableQuantity);
+                        stk.UpdateAvailableQuantity(newQty: 0);
+                    }
+                    else
+                    {
+                        stk.UpdateAvailableQuantity(newQty: stk.AvailableQuantity - (totalRemainingQty));
+                        dispensaryStockTxn.SetInOutQuantity(inQty: 0, outQty: totalRemainingQty);
+                        totalRemainingQty = 0;
+                    }
+                    _pharmacyDbContext.StockTransactions.Add(dispensaryStockTxn);
+
+                    if (totalRemainingQty == 0)
+                    {
+                        break; //it takes out of the foreach loop. line : foreach (var stock in stockList)
+                    }
+                }
+            });
+            _pharmacyDbContext.SaveChanges();
+        }
+
+        private int GetCreditNotePrintId(int FiscalYearId)
+        {
+
+            int invoiceNumber = (from txn in _pharmacyDbContext.PHRMReturnToSupplier
+                                 where txn.FiscalYearId == FiscalYearId
+                                 select txn.CreditNotePrintId).DefaultIfEmpty(0).Max();
+            return invoiceNumber + 1;
+        }
     }
+
 }

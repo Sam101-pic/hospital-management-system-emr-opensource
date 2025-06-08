@@ -1,7 +1,7 @@
-﻿
-<input type="button" class="btn primary-btn m1" (click)="AddCompany()" value="Add Company"   />
+﻿<input type="button" class="btn primary-btn m1" (click)="AddCompany()" value="Add Company" />
 
-<company-add [showAddPage]="showAddPage" [selected-company]="company" (callback-add)="pushToList($event)"></company-add>
+<company-add [showAddPage]="showAddPage" [selected-company]="company"
+             [companyList]="companyList" (callback-add)="pushToList($event)"></company-add>
 
 <div class="row">
     <div class="col-md-12 col-xs-12 col-sm-12">
@@ -9,6 +9,3 @@
         </danphe-grid>
     </div>
 </div>
-
-
-

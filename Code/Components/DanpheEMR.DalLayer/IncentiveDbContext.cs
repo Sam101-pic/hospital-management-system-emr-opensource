@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DanpheEMR.ServerModel.IncentiveModels;
 using DanpheEMR.ServerModel;
+using DanpheEMR.ServerModel.BillingModels;
 
 namespace DanpheEMR.DalLayer
 {
@@ -34,6 +35,7 @@ namespace DanpheEMR.DalLayer
 
         public DbSet<BillServiceItemModel> ServiceItems { get; set; }
         public DbSet<ServiceDepartmentModel> ServiceDepartments { get; set; }
+        public DbSet<BillMapPriceCategoryServiceItemModel> BillItemsPriceCategoryMaps { get; set; }
 
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
@@ -51,7 +53,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<EmployeeBillItemsMap>().ToTable("INCTV_MAP_EmployeeBillItemsMap");
             modelBuilder.Entity<ItemGroupDistribution>().ToTable("INCTV_CFG_ItemGroupDistribution");
             modelBuilder.Entity<EmployeeIncentiveInfo>().ToTable("INCTV_EmployeeIncentiveInfo");
-
+            modelBuilder.Entity<BillMapPriceCategoryServiceItemModel>().ToTable("BIL_MAP_PriceCategoryServiceItem");
             modelBuilder.Entity<BillServiceItemModel>().ToTable("BIL_MST_ServiceItem");
             modelBuilder.Entity<ServiceDepartmentModel>().ToTable("BIL_MST_ServiceDepartment");
         }

@@ -5,12 +5,13 @@ Pending Changes in this Component:
 */
 
 
-import { ChangeDetectorRef, Component } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
 import * as _ from 'lodash';
 import * as moment from 'moment';
 import { Subscription } from 'rxjs';
 import { SettingsBLService } from '../../../app/settings-new/shared/settings.bl.service';
+import { BillingTransactionItem } from '../../billing/shared/billing-transaction-item.model';
 import { BillingTransaction } from '../../billing/shared/billing-transaction.model';
 import { BillingBLService } from '../../billing/shared/billing.bl.service';
 import { BillingService } from '../../billing/shared/billing.service';
@@ -22,15 +23,20 @@ import { SsfPatient_DTO } from '../../insurance/ssf/shared/service/ssf.service';
 import { Patient } from '../../patients/shared/patient.model';
 import { PatientService } from '../../patients/shared/patient.service';
 import { SecurityService } from '../../security/shared/security.service';
+import { CountrySubdivision } from '../../settings-new/shared/country-subdivision.model';
+import { InsuranceMasterItems_DTO } from '../../shared/DTOs/insurance-master-items.dto';
 import { CallbackService } from '../../shared/callback.service';
 import { DanpheHTTPResponse } from '../../shared/common-models';
 import { CommonFunctions } from "../../shared/common.functions";
+import { DanpheCache, MasterType } from '../../shared/danphe-cache-service-utility/cache-services';
+import { FewaPayService } from '../../shared/fewa-pay/helpers/fewa-pay.service';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../shared/routefrom.service';
-import { ENUM_AppointmentType, ENUM_BillPaymentMode, ENUM_BillingType, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_InvoiceType, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_Scheme_ApiIntegrationNames, ENUM_ServiceBillingContext, ENUM_VisitType } from '../../shared/shared-enums';
+import { ENUM_AppointmentType, ENUM_BillPaymentMode, ENUM_BillingType, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_FewaPayMessageTypes, ENUM_FewaPayTransactionFrom, ENUM_InvoiceType, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_POS_ResponseStatus, ENUM_Scheme_ApiIntegrationNames, ENUM_ServiceBillingContext, ENUM_VisitDepartmentName, ENUM_VisitType } from '../../shared/shared-enums';
 import { AppointmentService } from '../shared/appointment.service';
 import { CurrentVisitContextVM } from '../shared/current-visit-context.model';
 import { PatientLatestVisitContext_DTO } from '../shared/dto/patient-lastvisit-context.dto';
+import { PatientLastVisitDetail_DTO } from '../shared/dto/patient-previous-visit-detail.dto';
 import { QuickVisitVM } from '../shared/quick-visit-view.model';
 import { VisitBLService } from '../shared/visit.bl.service';
 import { Visit } from '../shared/visit.model';
@@ -95,7 +101,7 @@ export class VisitMainComponent {
   public MembershipTypeName: string = null;
   public RegistrationSchemeDetail = new RegistrationScheme_DTO();
   public CreditLimit: number = 0;
-  public serviceBillingContext: string = ENUM_ServiceBillingContext.OpBilling;
+  public serviceBillingContext: string = ENUM_ServiceBillingContext.Registration;
   public SchemePriCeCategoryFromVisitTemp: SchemePriceCategoryCustomType = { SchemeId: 0, PriceCategoryId: 0 };
   public confirmationTitle: string = "Confirm !";
   public confirmationMessage: string = "Are you sure you want to Print Invoice ?";
@@ -104,6 +110,12 @@ export class VisitMainComponent {
   public IsReferred: boolean = false;
   public IsPatientEligibleForService: boolean = true;
   public tenderValue: any;
+  public IsNGHISCoPayApplicable: boolean = false;
+  public IsNGHISScheme: boolean = false;
+  public PatientPreviousVisitDetail = new PatientLastVisitDetail_DTO();
+
+  public InsuranceMasterItems = new Array<InsuranceMasterItems_DTO>();
+  public loadingScreen: boolean = false;
   constructor(public patientService: PatientService,
     public securityService: SecurityService,
     public callBackService: CallbackService,
@@ -117,7 +129,9 @@ export class VisitMainComponent {
     public visitService: VisitService,
     public changeDetRef: ChangeDetectorRef,
     public coreService: CoreService,
-    public settingsBLService: SettingsBLService) {
+    public settingsBLService: SettingsBLService,
+    private _fewaPayService: FewaPayService) {
+    this.GetCountrySubDivision();
     this.CheckAndSetCounter();
     this.Initialize();
     let TeleMedicineConfig = this.coreService.Parameters.find(p => p.ParameterGroupName == "TeleMedicine" && p.ParameterName == "DanpheConfigurationForTeleMedicine").ParameterValue;
@@ -127,6 +141,7 @@ export class VisitMainComponent {
 
     this.isPhoneMandatory = this.coreService.GetIsPhoneNumberMandatory();
     this.allBillItms = this.visitService.allBillItemsPriceList;
+    this.InsuranceMasterItems = this.coreService.InsuranceMasterItems;
   }
 
 
@@ -176,7 +191,6 @@ export class VisitMainComponent {
 
     this.quickVisit.Patient = this.patientService.getGlobal();
 
-
     this.quickVisit.Patient.PatientId =
       this.quickVisit.Visit.PatientId =
       this.quickVisit.BillingTransaction.PatientId =
@@ -185,18 +199,39 @@ export class VisitMainComponent {
     this.quickVisit.Visit.AppointmentType = this.visitService.appointmentType;
     if (this.quickVisit.Visit.AppointmentType.toLowerCase() === ENUM_AppointmentType.referral.toLowerCase()) {
       this.IsReferred = true;
-      //!fetch priceCategory and scheme from the global service.
-      this.SchemePriCeCategoryFromVisit.PriceCategoryId = this.patientService.getGlobal().PriceCategoryId;
-      this.SchemePriCeCategoryFromVisit.SchemeId = this.patientService.getGlobal().SchemeId;
     }
+    //!fetch priceCategory and scheme from the global service.
+    this.SchemePriCeCategoryFromVisit.PriceCategoryId = this.patientService.getGlobal().PriceCategoryId;
+    this.SchemePriCeCategoryFromVisit.SchemeId = this.patientService.getGlobal().SchemeId;
     this.quickVisit.Visit.VisitType = ENUM_VisitType.outpatient;// "outpatient";
     this.quickVisit.BillingTransaction.IsInsuranceBilling = this.billingService.isInsuranceBilling;
 
+    this.LoadPatientLastVisit(this.quickVisit.Visit.PatientId);
     //sud:13Jul'19--get patient's today's visit (not Returned) and check for DuplicateVisit in client side itself.
     this.LoadPatientsTodaysVisitListIntoService(this.patientService.getGlobal().PatientId);
     if (this.routeFromService && this.routeFromService.RouteFrom && this.routeFromService.RouteFrom == "onlineappointment") {
       this.quickVisit.Visit.VisitDate = this.appointmentService.getGlobal().AppointmentDate;
       this.quickVisit.Visit.VisitTime = this.appointmentService.getGlobal().AppointmentTime;
+    }
+
+  }
+
+  LoadPatientLastVisit(patientId) {
+    if (patientId) {
+      this.visitBLService.GetPatientLastVisitDetail(patientId).subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          if (res.Results) {
+            this.PatientPreviousVisitDetail = res.Results;
+          } else {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`This is a new Patient`]);
+          }
+        } else {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Cannot load the patients previous visit`]);
+        }
+      }, err => {
+        console.log(err);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [err]);
+      });
     }
 
   }
@@ -218,7 +253,7 @@ export class VisitMainComponent {
     globalPat.Gender = ipData.Gender;
     globalPat.ShortName = ipData.ShortName;
     globalPat.DateOfBirth = ipData.DateOfBirth;
-    globalPat.Age = ipData.Age;
+    globalPat.Age = CommonFunctions.GetFormattedAge(ipData.DateOfBirth); //ipData.Age;
     globalPat.Address = ipData.Address;
     globalPat.CountrySubDivisionName = ipData.CountrySubDivisionName;
     globalPat.CountryId = ipData.CountryId;
@@ -262,7 +297,8 @@ export class VisitMainComponent {
       this.visitBLService.GetApptForDeptOnSelectedDate(this.quickVisit.Visit.DepartmentId, this.quickVisit.Visit.PerformerId, this.quickVisit.Visit.VisitDate, this.quickVisit.Patient.PatientId)
         .subscribe(res => {
           if ((res.Status === ENUM_DanpheHTTPResponseText.OK) && res.Results && this.restrictApptOnDepartmentLevel) {
-            this.msgBoxServ.showMessage("failed", ['Patient has already appointment for this department on selected date.']);
+
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Patient has already appointment for this department on selected date.']);
             this.loading = false;
           } else {
             this.ValidatePatientVisitData();
@@ -320,6 +356,11 @@ export class VisitMainComponent {
   AssignMatchedPatientAndProceed(patientId) {
 
     let patientInfo = this.matchedPatientList.find(a => a.PatientId == patientId);
+    if (patientInfo) {
+      patientInfo.Age = this.quickVisit.Patient.Age ? (+this.quickVisit.Patient.Age).toString() : "0";
+      patientInfo.CountrySubDivisionName = this.quickVisit.Patient.CountrySubDivisionName;
+      patientInfo.CountrySubDivisionId = this.quickVisit.Patient.CountrySubDivisionId;
+    }
 
     this.showExstingPatientListPage = false;
     this.quickVisit.Patient = Object.assign(this.quickVisit.Patient, patientInfo);
@@ -329,16 +370,11 @@ export class VisitMainComponent {
   //it is the centralized function to check validations.
   //if any of the validation fails then isValid=false, error messages are pushed for each validations.
   CheckValidations(): { isValid: boolean, message: Array<string> } {
-    console.log(this.quickVisit.Patient)
-    if (this.quickVisit.Patient.AgeUnit == null) {
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please select, Patient Age Unit"]);
-      return;
-    }
     if (!this.quickVisit.BillingTransaction.IsInsuranceBilling) {
       this.quickVisit.Visit.UpdateValidator("off", "ClaimCode", null);
     }
-    let validationSummary = { isValid: true, message: [] };
 
+    let validationSummary = { isValid: true, message: [] };
 
     for (let i in this.quickVisit.Patient.PatientValidator.controls) {
       this.quickVisit.Patient.PatientValidator.controls[i].markAsDirty();
@@ -350,6 +386,17 @@ export class VisitMainComponent {
     }
     // const allPriceCategories = this.coreService.Masters.PriceCategories;
     // const selectedPriceCategory = allPriceCategories.find(c => c.PriceCategoryId === this.quickVisit.BillingTransaction.BillingTransactionItems[0].PriceCategoryId);
+
+    if (!this.quickVisit.Patient.Age) {
+      validationSummary.isValid = false;
+      validationSummary.message.push("Patient's Age can't be zero");
+    }
+
+    console.log(this.quickVisit.Patient)
+    if (this.quickVisit.Patient.AgeUnit == null) {
+      validationSummary.isValid = false;
+      validationSummary.message.push("Please select, Patient Age Unit");
+    }
 
     if (!this.quickVisit.Patient.EthnicGroup) {
       validationSummary.isValid = false;
@@ -364,11 +411,21 @@ export class VisitMainComponent {
       validationSummary.isValid = false;
       validationSummary.message.push(`MemberNo is required to Register ${this.RegistrationSchemeDetail.SchemeName} Scheme's Patient!`);
     }
-
-    if ((!this.quickVisit.Patient.PatientId && !this.quickVisit.Patient.IsValidCheck(undefined, undefined))
-      || !this.quickVisit.Visit.IsValidCheck(undefined, undefined) || (this.RegistrationSchemeDetail && this.RegistrationSchemeDetail.IsCoPayment && !this.quickVisit.Patient.PatientScheme.IsValidCheck(undefined, undefined)) || !this.quickVisit.Visit.IsValidSelProvider) {
+    if (!this.quickVisit.Patient.PatientId && !this.quickVisit.Patient.IsValidCheck(undefined, undefined)) {
       validationSummary.isValid = false;
-      validationSummary.message.push("Check all mandatory fields");
+      validationSummary.message.push("Patient ID and information are required.");
+    }
+    if (!this.quickVisit.Visit.IsFreeVisit && !this.quickVisit.Visit.IsValidCheck(undefined, undefined)) {
+      validationSummary.isValid = false;
+      validationSummary.message.push("Visit information is required.");
+    }
+    if (this.RegistrationSchemeDetail && this.RegistrationSchemeDetail.IsCoPayment && !this.quickVisit.Patient.PatientScheme.IsValidCheck(undefined, undefined)) {
+      validationSummary.isValid = false;
+      validationSummary.message.push("Patient scheme information is required for CoPayment.");
+    }
+    if (!this.quickVisit.Visit.IsValidSelProvider) {
+      validationSummary.isValid = false;
+      validationSummary.message.push("Doctor is mandatory .");
     }
     if (this.quickVisit.Patient.CountrySubDivisionId === null || this.quickVisit.Patient.CountrySubDivisionId === undefined) {
       validationSummary.isValid = false;
@@ -408,21 +465,22 @@ export class VisitMainComponent {
         validationSummary.message.push("Credit Organization is mandatory for Credit Payment mode")
       }
     }
-
+    //! Bikesh --22Dec'24 Removed old logic that filters from deprecated API list and used existing one which has already all these properties.
     for (let j = 0; j < this.quickVisit.BillingTransaction.BillingTransactionItems.length; j++) {
-      let itm = this.allBillItms.find(b => this.quickVisit.BillingTransaction.BillingTransactionItems[j].IntegrationItemId == b.IntegrationItemId && this.quickVisit.BillingTransaction.BillingTransactionItems[j].ServiceDepartmentId == b.ServiceDepartmentId);
-      if (itm) {
-        this.quickVisit.BillingTransaction.BillingTransactionItems[j].IsZeroPriceAllowed = itm.IsZeroPriceAllowed;
-        if (itm.IsZeroPriceAllowed) {
-          this.quickVisit.BillingTransaction.BillingTransactionItems[j].UpdateValidator("off", "Price", "positiveNumberValdiator");
+      let currentItem = this.quickVisit.BillingTransaction.BillingTransactionItems[j];
+      if (currentItem.IsZeroPriceAllowed) {
+        currentItem.UpdateValidator("off", "Price", "positiveNumberValdiator");
+      }
+
+      //! Item with price zero should allow only for free visit and NGHIS with same day visit referral.
+      if (!this.quickVisit.Visit.IsFreeVisit && !(this.IsNGHISScheme && this.visitService.appointmentType.toLowerCase() === ENUM_AppointmentType.referral.toLowerCase() && this.quickVisit.Visit.DepartmentName.toLowerCase() !== ENUM_VisitDepartmentName.Emergency.toLowerCase())) {
+        if (!currentItem || (currentItem.Price <= 0 && !currentItem.IsZeroPriceAllowed)) {
+          validationSummary.isValid = false;
+          validationSummary.message.push("Price of Item cannot be zero (0)");
         }
       }
-
-      if (!this.quickVisit.BillingTransaction.BillingTransactionItems[j] || (this.quickVisit.BillingTransaction.BillingTransactionItems[j].Price <= 0 && !this.quickVisit.BillingTransaction.BillingTransactionItems[j].IsZeroPriceAllowed)) {
-        validationSummary.isValid = false;
-        validationSummary.message.push("Price of Item cannot be zero (0)");
-      }
     }
+
     // if (!(this.quickVisit.BillingTransaction.BillingTransactionItems.every(a => a.Price != null && a.Price > 0))) {
     //   validationSummary.isValid = false;
     //   validationSummary.message.push("Price of Item cannot be zero (0)");
@@ -504,12 +562,63 @@ export class VisitMainComponent {
     else if (this.quickVisit.Visit.AppointmentType.toLowerCase() === "referral") {
       this.quickVisit.Visit.ParentVisitId = this.visitService.ParentVisitInfo.PatientVisitId;
       this.quickVisit.Visit.ReferredById = this.visitService.ParentVisitInfo.PerformerId;//this is provider id of last visit.
-      this.CreateVisit();
+      // this.CreateVisit();
+      this.HandleVisitRequest();
     }
     else {
+      // this.CreateVisit();
+      this.HandleVisitRequest();
+    }
+  }
+
+  private HandleVisitRequest() {
+
+    //! Krishna, 16thMay'23, Add A logic to validate the limit and avoid visit creation if limit is exceeding, Only allow to create visit if TotalBillAmount is not exceeding limit.
+    if ((this.RegistrationSchemeDetail.IsCreditLimited || this.RegistrationSchemeDetail.IsGeneralCreditLimited) && !this.CheckCreditLimitsAndHandleCreditLimits()) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Credit Limit exceeded, Cannot Proceed"]);
+      this.loading = false;
+      return;
+    }
+
+    if (this.RegistrationSchemeDetail.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.SSF && !this.quickVisit.Patient.PatientScheme.OtherInfo) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["SSF Case is mandatory for SSF, Please select one"]);
+      this.loading = false;
+      return;
+    }
+
+    //! Krishna, 15thMay, 2024, Check the ItemCode and Price of the Items loaded for Insurance.
+    if (this.RegistrationSchemeDetail.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.SSF || this.RegistrationSchemeDetail.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS) {
+      if (this.quickVisit.BillingTransaction && this.quickVisit.BillingTransaction.BillingTransactionItems && this.quickVisit.BillingTransaction.BillingTransactionItems.length) {
+        if (this.InsuranceMasterItems && this.InsuranceMasterItems.length) {
+          if (!this.CheckItemCodeAndItemPriceInsuranceBilling(this.quickVisit.BillingTransaction.BillingTransactionItems, this.RegistrationSchemeDetail.SchemeApiIntegrationName)) {
+            this.loading = false;
+            return;
+          }
+        }
+      }
+    }
+
+    if (this._fewaPayService.IsFewaPayApplicable(this.quickVisit.BillingTransaction.PaymentDetails)) {
+      this.loadingScreen = true;
+      const transactionReqString = this._fewaPayService.CreateFewaPayTransactionRequest(this.quickVisit.BillingTransaction.PaymentDetails, this.quickVisit.BillingTransaction.ReceivedAmount, this.quickVisit.BillingTransaction.Remarks);
+      if (transactionReqString) {
+        window.postMessage({
+          type: ENUM_FewaPayMessageTypes.PaymentInfoRequest,
+          data: transactionReqString,
+        }, "*");
+        console.log('Transaction Request is posted from Danphe.');
+      } else {
+        this.loadingScreen = false;
+        this.loading = false;
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Transaction Request cannot be created due to missing mandatory data like paymentDetails, totalAmount and remarks`]);
+      }
+
+    } else {
+      this.loadingScreen = true;
       this.CreateVisit();
     }
   }
+
   //Hom 28 Jan'19 Incase of transfer with package billing assigning the values of returned package items to generate a new invoice
   public AssignValuesToBillTxn() {
     this.quickVisit.BillingTransaction.DiscountAmount = 0;
@@ -640,15 +749,14 @@ export class VisitMainComponent {
         this.quickVisit.BillingTransaction.OrganizationName = null;
       }
 
-      //! Krishna, 16thMay'23, Add A logic to validate the limit and avoid visit creation if limit is exceeding, Only allow to create visit if TotalBillAmount is not exceeding limit.
-      if ((this.RegistrationSchemeDetail.IsCreditLimited || this.RegistrationSchemeDetail.IsGeneralCreditLimited) && !this.CheckCreditLimitsAndHandleCreditLimits()) {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Credit Limit exceeded, Cannot Proceed"]);
-        this.loading = false;
-        return;
-      }
       this.quickVisit.Visit.CreatedOn = moment().format("YYYY-MM-DD HH:mm:ss");
       this.quickVisit.Visit.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
-      this.visitBLService.PostVisitToDB(this.quickVisit)
+
+      const quickVisit = _.cloneDeep(this.quickVisit);
+      const Age = this.quickVisit.Patient.Age.replace(/\D/g, '');
+      const countrySubDivisionId = this.quickVisit.Patient.CountrySubDivisionId;
+
+      this.visitBLService.PostVisitToDB(quickVisit)
         .subscribe(
           (res: DanpheHTTPResponse) => {
             if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
@@ -656,12 +764,19 @@ export class VisitMainComponent {
             }
             else {
               this.loading = false;
-              this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+              this.loadingScreen = false;
+              this.quickVisit.Patient.Age = Age.toString(); //! Reassign Age as a numeric string
+              const countrySubdivision = this.countrySubDivisions.find(a => a.CountrySubDivisionId === countrySubDivisionId);
+              if (countrySubdivision) {
+                this.quickVisit.Patient.CountrySubDivision = countrySubdivision;
+              }
+              this.msgBoxServ.showMessage(ENUM_DanpheHTTPResponses.Failed, [res.ErrorMessage]);
             }
           },
           err => {
             this.loading = false;
-            this.msgBoxServ.showMessage("failed", ["Unable to create visit"]);
+            this.loadingScreen = false;
+            this.msgBoxServ.showMessage(ENUM_DanpheHTTPResponses.Failed, ["Unable to create visit"]);
 
           });
     }
@@ -684,6 +799,31 @@ export class VisitMainComponent {
     return isValid;
   }
 
+
+  //! Krishna, 15thMay, 2024, This method is responsible to validate the ItemCode and Price for SSF and HIB Billing.
+  CheckItemCodeAndItemPriceInsuranceBilling(billingTransactionItems: BillingTransactionItem[], schemeApiIntegrationName: string): boolean {
+    if (billingTransactionItems && this.InsuranceMasterItems && this.InsuranceMasterItems.length) {
+      let isValid = true;
+      for (let index = 0; index < billingTransactionItems.length; index++) {
+        const element = billingTransactionItems[index];
+        const insuranceItemWithMatchingItem = this.InsuranceMasterItems.some(a => a.InsuranceType === schemeApiIntegrationName && a.InsCode === element.ItemCode);
+        if (!insuranceItemWithMatchingItem) {
+          isValid = false;
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, [`${element.ItemCode} ItemCode for ${element.ItemName} is not matching with Insurance Provided ItemCode, \n Please Contact your Administrator!`]);
+          break;
+        } else {
+          const matchingItem = this.InsuranceMasterItems.find(a => a.InsuranceType === schemeApiIntegrationName && a.InsCode === element.ItemCode);
+          if (element.Price !== matchingItem.Price) {
+            isValid = false;
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, [`${element.Price} Price for ${element.ItemName} is not matching with Insurance Provided Price, It Should be ${matchingItem.Price}, \n Please contact your Administrator!`]);
+            break;
+          }
+        }
+      }
+      return isValid;
+    }
+  }
+
   /**
    During call back,
    Map current BillingTransaction to BillingReceiptModel and navigate to Billing>ReceiptPrint
@@ -702,18 +842,24 @@ export class VisitMainComponent {
       this.bil_InvoiceNo = bilTxn.InvoiceNo;
       this.bil_FiscalYrId = bilTxn.FiscalYearId;
       this.bil_BilTxnId = bilTxn.BillingTransactionId;
-      this.showbillingReceipt = true;
+      if (this.bil_BilTxnId) {
+        this.showbillingReceipt = true;
+      }
       this.UpdateAppointmentStatus();
       if (this.routeFromService && this.routeFromService.RouteFrom === "onlineappointment") {
         this.updateVisitStatusInTelemedicine(this.appointmentService.GlobalTelemedPatientVisitID);
         this.updatePaymentStatus(this.appointmentService.GlobalTelemedPatientVisitID);
       }
       this.selectedVisit = res.Results.Visit;
-      if (!this.quickVisit.Visit.IsFreeVisit) {
-        this.showSticker = true;
+      if (this.showSticker) {
         this.showOpdSticker = true;
       }
-      this.showPrintingPopup = true;
+      else {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, [`New Visit Successfully Created.`]);
+      }
+      if (this.showOpdSticker || this.showbillingReceipt) { // showPrintingPopup only if either showOpdSticker or showbillingReceipt is true OR Both are true
+        this.showPrintingPopup = true;
+      }
     }
     else {
       this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
@@ -811,9 +957,9 @@ export class VisitMainComponent {
   //this function is hotkeys when pressed by user
   hotkeys(event) {
     if (event.keyCode === 27) {
-      this.router.navigate(["/Appointment/PatientSearch"]);
+      this.router.navigate(["/Appointment/ManageVisits"]);
       this.showPrintingPopup = false;
-      this.router.navigate(["/Appointment/PatientSearch"]);
+      this.router.navigate(["/Appointment/ManageVisits"]);
     }
 
     if (event.altKey) {
@@ -835,7 +981,7 @@ export class VisitMainComponent {
   //sud:16May'21--Moving Invoice Printing as Popup
   public CloseInvoicePrint() {
     this.showPrintingPopup = false;
-    this.router.navigate(["/Appointment/PatientSearch"]);
+    this.router.navigate(["/Appointment/ManageVisits"]);
   }
 
   // CheckMedicarePatientBillingValidations(): boolean {
@@ -857,8 +1003,6 @@ export class VisitMainComponent {
   public schemeId_old: number = 0;
   public schemeObj_old: RegistrationScheme_DTO = new RegistrationScheme_DTO();
   OnRegistrationSchemeChanged(scheme: RegistrationScheme_DTO) {
-    console.log("RegistrationSchemeChange called from Visit-Main.component");
-    console.log(scheme);
     this.RegistrationSchemeDetail = scheme;
     this.IsPatientEligibleForService = this.RegistrationSchemeDetail.IsPatientEligibleForService;
     const newSchemeObj = _.cloneDeep(scheme);
@@ -887,13 +1031,65 @@ export class VisitMainComponent {
         this.quickVisit.Visit.ClaimCode = newSchemeObj.ClaimCode;
         this.quickVisit.BillingTransaction.ClaimCode = newSchemeObj.ClaimCode;
         this.quickVisit.BillingTransaction.SchemeId = newSchemeObj.SchemeId;
+        this.quickVisit.BillingTransaction.DiscountPercent = newSchemeObj.IsDiscountApplicable ? newSchemeObj.DiscountPercent : 0;
         this.quickVisit.Visit.ClaimCode = newSchemeObj.ClaimCode;
         this.quickVisit.Visit.PriceCategoryId = newSchemeObj.PriceCategoryId;
         this.quickVisit.BillingTransaction.MemberNo = newSchemeObj.MemberNo;
         this.quickVisit.BillingTransaction.ClaimCode = newSchemeObj.ClaimCode;
+        this.quickVisit.Patient.PatientScheme.PriceCategoryId = newSchemeObj.PriceCategoryId;
+
+
+        if (newSchemeObj.SchemeApiIntegrationName === ENUM_Scheme_ApiIntegrationNames.NGHIS && newSchemeObj.NSHIPatientDetail) {
+          this.IsNGHISScheme = true;
+          if (newSchemeObj.NSHIPatientDetail.FirstName && !this.quickVisit.Patient.PatientId) {
+            this.quickVisit.Patient.Address = newSchemeObj.NSHIPatientDetail.Address;
+            this.quickVisit.Patient.PhoneNumber = newSchemeObj.NSHIPatientDetail.PhoneNumber;
+            this.quickVisit.Patient.FirstName = newSchemeObj.NSHIPatientDetail.FirstName;
+            this.quickVisit.Patient.MiddleName = newSchemeObj.NSHIPatientDetail.MiddleName;
+            this.quickVisit.Patient.LastName = newSchemeObj.NSHIPatientDetail.LastName;
+            this.quickVisit.Patient.Gender = newSchemeObj.NSHIPatientDetail.Gender;
+            this.quickVisit.Patient.CountrySubDivisionName = newSchemeObj.NSHIPatientDetail.CountrySubDivisionName;
+            if (this.quickVisit.Patient.CountrySubDivisionName) {
+              const countrySubDivision = this.countrySubDivisions.find(a => a.CountrySubDivisionName === this.quickVisit.Patient.CountrySubDivisionName);
+              if (countrySubDivision) {
+                this.quickVisit.Patient.CountrySubDivisionId = countrySubDivision.CountrySubDivisionId;
+              }
+            }
+            this.quickVisit.Patient.DateOfBirth = newSchemeObj.NSHIPatientDetail.DateOfBirth;
+            if (newSchemeObj.NSHIPatientDetail.DateOfBirth && newSchemeObj.NSHIPatientDetail.DateOfBirth.trim().length > 0) {
+              // this.quickVisit.Patient.IsDobVerified = true;
+              this.quickVisit.Patient.DateOfBirth = newSchemeObj.NSHIPatientDetail.DateOfBirth;
+              this.quickVisit.Patient.Age = newSchemeObj.NSHIPatientDetail.Age;
+              this.quickVisit.Patient.AgeUnit = newSchemeObj.NSHIPatientDetail.AgeUnit;
+              this.quickVisit.Patient.PatientValidator.get("Age").setValue(this.quickVisit.Patient.Age);
+            }
+            // else {
+            //   this.quickVisit.Patient.IsDobVerified = false;
+            // }
+            this.quickVisit.Patient.Email = newSchemeObj.NSHIPatientDetail.Email;
+            this.quickVisit.Patient.PatientScheme.GeneralCreditLimit = newSchemeObj.NSHIPatientDetail.eligibilityInfo.AllowedMoney;
+            this.quickVisit.Patient.PatientScheme.Ins_FirstServicePoint = newSchemeObj.NSHIPatientDetail.Ins_FirstServicePoint;
+            this.quickVisit.Patient.PatientScheme.PolicyNo = newSchemeObj.NSHIPatientDetail.Ins_NshiNumber;
+            this.quickVisit.Patient.IsNHSIPatient = true;
+            this.quickVisit.Patient.PatientScheme.PolicyHolderUID = newSchemeObj.NSHIPatientDetail.PolicyHolderUID;
+            this.quickVisit.Patient.PatientScheme.RegistrationCase = newSchemeObj.NSHIPatientDetail.eligibilityInfo.RegistrationCase;
+            if (this.quickVisit.BillingTransaction && newSchemeObj.NSHIPatientDetail.eligibilityInfo.IsCoPayment) {
+              this.quickVisit.BillingTransaction.IsCoPayment = newSchemeObj.NSHIPatientDetail.eligibilityInfo.IsCoPayment;
+              this.quickVisit.BillingTransaction.CoPaymentCashPercent = newSchemeObj.NSHIPatientDetail.eligibilityInfo.CoPayCashPercent;
+              this.IsNGHISCoPayApplicable = true;
+            }
+            else {
+              this.IsNGHISCoPayApplicable = false;
+            }
+          }
+          else {
+            this.quickVisit.Patient.PatientScheme.Ins_FirstServicePoint = newSchemeObj.NSHIPatientDetail.Ins_FirstServicePoint;
+            if (newSchemeObj.NSHIPatientDetail.eligibilityInfo && newSchemeObj.NSHIPatientDetail.eligibilityInfo.AllowedMoney)
+              this.quickVisit.Patient.PatientScheme.GeneralCreditLimit = newSchemeObj.NSHIPatientDetail.eligibilityInfo.AllowedMoney;
+          }
+        }
         this.schemeObj_old = newSchemeObj;
         this.visitService.TriggerSchemeChangeEvent(newSchemeObj);
-
       }
 
       // if (this.RegistrationSchemeDetail.IsCreditLimited) {
@@ -906,7 +1102,6 @@ export class VisitMainComponent {
     }
 
   }
-
   GetPatientSchemeMappedFromRegistrationSchemeDto(patientSchemeObj: PatientScheme_DTO): PatientScheme {
     const patientScheme = new PatientScheme();
 
@@ -964,5 +1159,48 @@ export class VisitMainComponent {
 
   handleCancel() {
     this.loading = false;
+  }
+
+  public countrySubDivisions = new Array<CountrySubdivision>();
+
+  GetCountrySubDivision() {
+    const countries = DanpheCache.GetData(MasterType.Country, null);
+    if (countries) {
+      const nepal = countries.find(c => c.CountryName === "Nepal");
+      if (nepal) {
+        this.visitBLService.GetCountrySubDivision(nepal.CountryId)
+          .subscribe(res => {
+            if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
+              this.countrySubDivisions = res.Results;
+            }
+            else {
+              console.log(res.ErrorMessage);
+            }
+          });
+      }
+    }
+
+  }
+
+  @HostListener('window:message', ['$event'])
+  onMessage(event: MessageEvent): void {
+    const result = this._fewaPayService.HandleEventsFromFewaPayBrowserExtension(event);
+    if (result) {
+      if (result.resultCode === ENUM_POS_ResponseStatus.Success) { //! Krishna, 10thDec'23 "000" is success status code sent from POS device.
+        const transactionId = 'verifyTransId' in result && result.verifyTransId;
+        if (transactionId) {
+          this.quickVisit.BillingTransaction.PaymentDetails = `${this.quickVisit.BillingTransaction.PaymentDetails}; TransactionId: ${transactionId}`;
+        }
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.quickVisit.BillingTransaction.PatientId, ENUM_FewaPayTransactionFrom.Appointment);
+
+        this.CreateVisit();
+      } else {
+        this._fewaPayService.SaveFewaPayTransactionLogs(result, this.quickVisit.BillingTransaction.PatientId, ENUM_FewaPayTransactionFrom.Appointment);
+        this.loading = false;
+        this.loadingScreen = false;
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`${result.message}`]);
+      }
+      return;
+    }
   }
 }

@@ -100,7 +100,7 @@ export class ReportingItemAndBillItemMapComponent {
       var reportingItemandBillMap: ReportingItemBillingItemMappingModel = new ReportingItemBillingItemMappingModel();
       var IsExisting: boolean = false;
       for (let existingItem of this.existingReportingItemBillItemList) {
-        if (existingItem.ServiceItemId === currItem.BillItemPriceId) {
+        if (existingItem.ServiceItemId === currItem.ServiceItemId) {
           reportingItemandBillMap = existingItem;
           IsExisting = true;
           break;
@@ -130,13 +130,13 @@ export class ReportingItemAndBillItemMapComponent {
     else {
       //for existing item add to exisitingModifiedList for update
       for (let reportingItemandBillMap of this.existingReportingItemBillItemList) {
-        if (reportingItemandBillMap.ServiceItemId === currItem.BillItemPriceId)
+        if (reportingItemandBillMap.ServiceItemId === currItem.ServiceItemId)
           this.ModifyExistingReportingItemandBillMap(reportingItemandBillMap, false);
       }
       //remove from selectedList
-      var index = this.selectedReportingItemBillItemList.findIndex(x => x.ServiceItemId == currItem.BillItemPriceId);
+      let index = this.selectedReportingItemBillItemList.findIndex(x => x.ServiceItemId == currItem.ServiceItemId);
       this.selectedReportingItemBillItemList.splice(index, 1);
-      this.ChangeMainListSelectStatus(currItem.BillItemPriceId, false);
+      this.ChangeMainListSelectStatus(currItem.ServiceItemId, false);
     }
   }
   //change the IsActive Status of already exisiting item based on condition

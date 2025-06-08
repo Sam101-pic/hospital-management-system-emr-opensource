@@ -48,6 +48,8 @@ namespace DanpheEMR.Services.Pharmacy.DTOs.Provisional
         public decimal CoPaymentCreditAmount { get; set; }
         public List<PHRMTransactionProvisionalItems_DTO> InvoiceItems { get; set; }
         public virtual List<PHRMEmployeeCashTransaction_DTO> PHRMEmployeeCashTransactions { get; set; }
+        public decimal DepositReturnAmount { get; set; }
+        public string PaymentDetails { get; set; }
 
     }
 }

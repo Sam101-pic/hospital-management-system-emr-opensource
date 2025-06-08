@@ -8,13 +8,15 @@ import { CoreService } from "../../core/shared/core.service";
 import { SsfPatient_DTO, SsfService } from "../../insurance/ssf/shared/service/ssf.service";
 import { Patient } from "../../patients/shared/patient.model";
 import { PatientService } from "../../patients/shared/patient.service";
+import { Salutation } from "../../settings-new/shared/DTOs/Salutation.Model";
 import { CountrySubdivision } from "../../settings-new/shared/country-subdivision.model";
+import { SettingsBLService } from "../../settings-new/shared/settings.bl.service";
 import { GeneralFieldLabels } from "../../shared/DTOs/general-field-label.dto";
 import { Municipality } from "../../shared/address-controls/municipality-model";
 import { DanpheCache, MasterType } from "../../shared/danphe-cache-service-utility/cache-services";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
 import { RouteFromService } from "../../shared/routefrom.service";
-import { ENUM_Country, ENUM_DanpheHTTPResponseText } from "../../shared/shared-enums";
+import { ENUM_Country, ENUM_DanpheHTTPResponseText, ENUM_MaritalStatus } from "../../shared/shared-enums";
 import { VisitBLService } from "../shared/visit.bl.service";
 import { VisitService } from "../shared/visit.service";
 
@@ -26,6 +28,9 @@ import { VisitService } from "../shared/visit.service";
 export class VisitPatientInfoComponent implements OnInit {
   @Input("patient")
   public patient: Patient = new Patient();
+
+  @Input("billingPaymentMode")
+  public BillingPaymentMode: string;
 
   public countrySubDivisions: Array<CountrySubdivision> = [];
   public municipalities: Array<Municipality> = [];
@@ -53,6 +58,11 @@ export class VisitPatientInfoComponent implements OnInit {
   patientLastName: string = ""
   public PatientInfoSubscription = new Subscription();
   public ssfPatientDetail: SsfPatient_DTO = new SsfPatient_DTO();
+  SalutationList: Array<Salutation> = new Array<Salutation>();
+  MaritalStatus = {
+    Married: ENUM_MaritalStatus.Married,
+    UnMarried: ENUM_MaritalStatus.UnMarried
+  };
   public GeneralFieldLabel = new GeneralFieldLabels();
 
   constructor(public patientService: PatientService,
@@ -64,6 +74,7 @@ export class VisitPatientInfoComponent implements OnInit {
     public renderer2: Renderer2,
     public router: Router,
     public RouteFrom: RouteFromService,
+    private _settingsBLService: SettingsBLService,
     public ssfService: SsfService) {
     //this.patient.MembershipTypeId = this.patientService.getGlobal().MembershipTypeId;
     //this.tempMembershipTypeId = this.patient.MembershipTypeId;
@@ -71,6 +82,7 @@ export class VisitPatientInfoComponent implements OnInit {
     this.GetCountries();
     this.initialLoad = true;
     this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
+    this.SalutationList = this.coreService.SalutationData.filter(salutation => salutation.IsActive && salutation.IsApplicableForPatients);
 
     if (this.coreService.Masters.UniqueDataList && this.coreService.Masters.UniqueDataList.UniqueAddressList) {
       this.olderAddressList = this.coreService.Masters.UniqueDataList.UniqueAddressList;
@@ -97,6 +109,15 @@ export class VisitPatientInfoComponent implements OnInit {
     this.PatientInfoSubscription.unsubscribe();
   }
   ngAfterViewChecked() {
+    if (this.countrySubDivisions && this.countrySubDivisions.length && this.patient.CountrySubDivisionName && this.patient.CountrySubDivisionName.trim() && this.patient.IsNHSIPatient) {
+      this.countrySubDivision = this.countrySubDivisions.find(c => c.CountrySubDivisionName === this.patient.CountrySubDivisionName);
+      this.patient.PatientValidator.controls['CountrySubDivisionId'].setValue(this.countrySubDivision);
+    }
+    if (this.patient.CountrySubDivision && this.patient.CountrySubDivision.CountrySubDivisionId) {
+      this.countrySubDivision = this.countrySubDivisions.find(c => c.CountrySubDivisionId === this.patient.CountrySubDivisionId);
+      this.patient.PatientValidator.controls['CountrySubDivisionId'].setValue(this.countrySubDivision);
+
+    }
     this.changeDetector.detectChanges();
   }
 
@@ -139,11 +160,13 @@ export class VisitPatientInfoComponent implements OnInit {
       this.disableMembership = true;
     }
   }
+
   setEthnicGroupOfPatient(patientLastName: string): void {
     this.patientLastName = patientLastName;
   }
 
   DisableInputFields() {
+    this.patient.EnableControl("SalutationName", false);
     this.patient.EnableControl("FirstName", false);
     this.patient.EnableControl("LastName", false);
     this.patient.EnableControl("MiddleName", false);
@@ -158,10 +181,14 @@ export class VisitPatientInfoComponent implements OnInit {
     this.patient.EnableControl("Email", false);
     if (this.patient.PhoneNumber)
       this.patient.EnableControl("PhoneNumber", false);
+    this.patient.EnableControl("LandLineNumber", false);
     this.patient.EnableControl("CountryId", false);
     this.patient.EnableControl("Address", false);
     this.patient.EnableControl("PANNumber", false);
     this.patient.EnableControl("MembershipTypeId", false);
+    this.patient.EnableControl("CareTakerName", true);
+    this.patient.EnableControl("RelationWithPatient", true);
+    this.patient.EnableControl("CareTakerContact", true);
     //this.AgeUnitDisable = true;
   }
 
@@ -206,8 +233,8 @@ export class VisitPatientInfoComponent implements OnInit {
               var selCountrySubDiv = this.countrySubDivisions.find(a => a.CountryId === Number(this.patient.CountryId));
               this.patient.CountrySubDivisionName = selCountrySubDiv.CountrySubDivisionName;
               this.patient.CountrySubDivisionId = selCountrySubDiv.CountrySubDivisionId;
-              const country = this.countries.find(a => a.CountryId === Number(this.patient.CountryId))
-              this.patient.CountryName = country ? country.countryName : "";
+              // const country = this.countries.find(a => a.CountryId === Number(this.patient.CountryId))
+              // this.patient.CountryName = country ? country.countryName : "";
             }
           }
           this.AssignSelectedDistrict();
@@ -219,6 +246,7 @@ export class VisitPatientInfoComponent implements OnInit {
         }
       });
   }
+
   private updatePatientValidatorsInCaseOfCountryNepal(): void {
     if (this.patient.CountryName === ENUM_Country.Nepal && this.showMunicipality) {
       //this.patient.PatientValidator.get("WardNumber").setValidators([Validators.required, Validators.pattern('^[0-9]{1,2}$')]);
@@ -286,6 +314,9 @@ export class VisitPatientInfoComponent implements OnInit {
     if (this.countrySubDivision && this.countrySubDivision.CountrySubDivisionId) {
       this.patient.CountrySubDivisionId = this.countrySubDivision.CountrySubDivisionId;
       this.patient.CountrySubDivisionName = this.countrySubDivision.CountrySubDivisionName;
+    } else if (this.patient.CountrySubDivision && this.patient.CountrySubDivision.CountrySubDivisionId) {
+      this.patient.CountrySubDivisionId = this.patient.CountrySubDivision.CountrySubDivisionId;
+      this.patient.CountrySubDivisionName = this.patient.CountrySubDivision.CountrySubDivisionName;
     } else {
       this.patient.CountrySubDivisionId = null;
       this.patient.CountrySubDivisionName = null;
@@ -324,14 +355,15 @@ export class VisitPatientInfoComponent implements OnInit {
   }
   @Input() tender: any;
 
-  SetFocusTenderOrRemarks() {
-    const tenderDisabled = this.tender === 'credit';
-    if (tenderDisabled) {
+  public SetFocusTenderOrRemarks(): void {
+    if (this.BillingPaymentMode === 'credit') {
       this.coreService.FocusInputById('id_billing_remarks', 100);
     } else {
       this.coreService.FocusInputById('tender', 100);
     }
   }
+
+
   public phoneNumberMandatory() {
     if (!this.isPhoneMandatory) {
       this.patient.UpdatePhoneValidator("off", "PhoneNumber");
@@ -365,7 +397,26 @@ export class VisitPatientInfoComponent implements OnInit {
     if (ethnicGroup) {
       this.patient.EthnicGroup = ethnicGroup.ethnicGroup;
     }
+    if (this.patient.EthnicGroup) {
+      this.SetFocusById('txtAgeInput')
+    }
+    else {
+      this.SetFocusById('id_select_ethnic_group')
+    }
   }
+
+  ClearEthnicGroup(): void {
+    this.patient.EthnicGroup = "";
+  }
+
+  UpdateMaritalStatus(maritalStatus: ENUM_MaritalStatus, isChecked: boolean) {
+    if (isChecked) {
+      this.patient.MaritalStatus = maritalStatus;
+    } else {
+      this.patient.MaritalStatus = '';
+    }
+  }
+
 }
 
 //! Krishna, 15thMarch'23 Below class should not be here, need to move it to its appropriate location

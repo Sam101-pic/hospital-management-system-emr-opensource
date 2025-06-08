@@ -34,6 +34,11 @@ namespace DanpheEMR.Controllers.Accounting.DTOs
         public int? ParentMedicareMemberId { get; set; }
         public bool IsIpLimitExceeded { get; set; }
         public bool IsOpLimitExceeded { get; set; }
+        public DateTime? MedicareEndDate { get; set; }
+        public int? PriceCategoryId { get; set; }
+        public int? SchemeId { get; set; }
+        public string PriceCategoryName { get; set; }
+        public string SchemeName { get; set; }
 
     }
 

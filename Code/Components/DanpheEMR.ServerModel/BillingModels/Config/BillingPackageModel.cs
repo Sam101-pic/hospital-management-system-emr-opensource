@@ -20,8 +20,12 @@ namespace DanpheEMR.ServerModel
         public bool IsActive { get; set; }
         public bool InsuranceApplicable { get; set; }
         public string   LabTypeName { get; set; }
-        public int SchemeId { get; set; }
+        public int? SchemeId { get; set; }
         public int PriceCategoryId { get; set; }
         public bool IsEditable { get; set; }
+        public bool IsItemLevelDiscount { get; set; }
+        public bool IsItemLoadPackage { get; set; }
+        public bool IsHealthPackage { get; set; }
+        public bool IsDiscountEditableInSales { get; set; }
     }
 }

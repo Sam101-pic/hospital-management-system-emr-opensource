@@ -1,9 +1,10 @@
-import { Component, Directive, ViewChild, ChangeDetectorRef } from '@angular/core';
-import { Input, Output, EventEmitter, OnInit } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from '@angular/core';
 import { Router } from '@angular/router';
+import { BillingBLService } from '../../billing/shared/billing.bl.service';
 import { EditDoctorFeatureViewModel } from '../../billing/shared/edit-doctor-feature-view.model';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { BillingBLService } from '../../billing/shared/billing.bl.service';
+import { ENUM_DanpheHTTPResponses } from '../../shared/shared-enums';
+import { EditDoctor_DTO } from '../shared/DTOs/edit-doctor.dto';
 
 @Component({
   selector: "rad-edit-doctor",
@@ -27,7 +28,9 @@ export class RadiologyEditDoctorsPopupComponent {
   public showPrescriberChange: boolean = false;
   public status: string = null;
   public message: string = null;
-
+  DoctorsDetails = new EditDoctor_DTO;
+  SelectedRefId: number = null;
+  SelectedReferrerName: string = null;
   constructor(public msgBoxServ: MessageboxService, public changeDetector: ChangeDetectorRef,
     public billingBlService: BillingBLService, public router: Router) {
 
@@ -41,21 +44,13 @@ export class RadiologyEditDoctorsPopupComponent {
     if (this.SelectedItem.PrescriberId) {
       this.newPrescriber = { EmployeeId: this.SelectedItem.PrescriberId, EmployeeName: this.SelectedItem.PrescriberName };
     }
-
+    if (this.SelectedItem.ReferredById && this.SelectedItem.ReferrerName) {
+      this.SelectedRefId = this.SelectedItem.ReferredById;
+      this.SelectedReferrerName = this.SelectedItem.ReferrerName;
+    }
   }
 
-
-  //@Input("showEditDoctorPage")
-  //public set value(val: boolean) {
-  //  if (val) {
-
-  //    //get the  provider list
-  //    this.GetProviderList();
-  //  }
-  //  this.showEditDoctorPage = val;
-  //}
-
-  //load doctor  
+  //load doctor
   GetDoctorList(): void {
     this.newPerformer = null;
     this.newPrescriber = null;
@@ -63,7 +58,6 @@ export class RadiologyEditDoctorsPopupComponent {
       .subscribe(res => this.CallBackGenerateDoctor(res));
   }
 
-  ////this is a success callback of GenerateDoctorList function.
   CallBackGenerateDoctor(res) {
     if (res.Status == "OK") {
       this.doctorList = [];
@@ -89,31 +83,32 @@ export class RadiologyEditDoctorsPopupComponent {
 
 
   // for updating the provider
-  UpdatePeformerAndPrescriber() {
-    let billTxnItemId = this.SelectedItem.BillingTransactionItemId;
-    let requisitionId = this.SelectedItem.RequisitionId;
-    let performer;
-    let prescriber;
-
+  UpdatePerformerAndPrescriber() {
+    this.DoctorsDetails.BillTxnItemId = this.SelectedItem.BillingTransactionItemId;
+    this.DoctorsDetails.RequisitionId = this.SelectedItem.RequisitionId;
     if (this.newPerformer) {
-      performer = this.newPerformer.EmployeeName.replace(/&/g, '%26');
-      this.newPerformer.EmployeeName = performer;
+      let performer = this.newPerformer.EmployeeName.replace(/&/g, '%26');
+      this.DoctorsDetails.NewPerformer.EmployeeName = performer;
+      this.DoctorsDetails.NewPerformer.EmployeeId = this.newPerformer.EmployeeId;
     }
-    if (this.newPrescriber) {
-      prescriber = this.newPrescriber.EmployeeName.replace(/&/g, '%26');
-      this.newPrescriber.EmployeeName = prescriber;
-    }
-    //let provider = this.newProvider.EmployeeName.replace(/&/g, '%26');//this is URL-Encoded value for character  '&'    --see: URL Encoding in Google for details.
-    //let referrer = this.newReferrer.EmployeeName.replace(/&/g, '%26');//this is URL-Encoded value for character  '&'    --see: URL Encoding in Google for details.
-    //this.newProvider.EmployeeName = provider;
-    //this.newReferrer.EmployeeName = referrer;
-    this.billingBlService.UpdateDoctorafterDoctorEditRadiology(billTxnItemId, requisitionId, this.newPerformer, this.newPrescriber)
-      .subscribe(res => {
-        if (res.Status == "OK") {
 
-           ///emiting the event to the parent page 
-           this.updateDoctor.emit({ SelectedItem: this.SelectedItem });
-         
+    if (this.newPrescriber) {
+      let prescriber = this.newPrescriber.EmployeeName.replace(/&/g, '%26');
+      this.DoctorsDetails.NewPrescriber.EmployeeName = prescriber;
+      this.DoctorsDetails.NewPrescriber.EmployeeId = this.newPrescriber.EmployeeId;
+    }
+    if (this.SelectedRefId && this.SelectedReferrerName) {
+      this.DoctorsDetails.NewReferrer.EmployeeId = this.SelectedRefId;
+      this.DoctorsDetails.NewReferrer.EmployeeName = this.SelectedReferrerName;
+    }
+
+    this.billingBlService.ChangeRadiologyDoctor(this.DoctorsDetails)
+      .subscribe(res => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+
+          ///emiting the event to the parent page
+          this.updateDoctor.emit({ SelectedItem: this.SelectedItem });
+
           //this.changeDetector.detectChanges();
           this.router.navigate(['/Radiology/EditDoctors']);
           this.msgBoxServ.showMessage("success", ["Saved Successfully."]);
@@ -137,5 +132,9 @@ export class RadiologyEditDoctorsPopupComponent {
   showPrescriber() {
     return this.showPrescriberChange = true;
   }
+  OnReferrerChanged($event) {
+    this.SelectedRefId = $event.ReferrerId;
+    this.SelectedReferrerName = $event.ReferrerName;
 
+  }
 }

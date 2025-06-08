@@ -1,15 +1,16 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
+import { CoreService } from "../../../../core/shared/core.service";
+import DispensaryGridColumns from '../../../../dispensary/shared/dispensary-grid.column';
+import { DispensaryService } from '../../../../dispensary/shared/dispensary.service';
 import { PharmacyBLService } from '../../../../pharmacy/shared/pharmacy.bl.service';
 import { PHRMStoreModel } from '../../../../pharmacy/shared/phrm-store.model';
 import { PHRMWriteOffItemModel } from '../../../../pharmacy/shared/phrm-write-off-items.model';
 import { PHRMWriteOffModel } from '../../../../pharmacy/shared/phrm-write-off.model';
 import { GridEmitModel } from '../../../../shared/danphe-grid/grid-emit.model';
-import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
-import DispensaryGridColumns from '../../../../dispensary/shared/dispensary-grid.column';
-import { DispensaryService } from '../../../../dispensary/shared/dispensary.service';
-import { Router } from '@angular/router';
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../../../shared/danphe-grid/NepaliColGridSettingsModel';
-import { CoreService } from "../../../../core/shared/core.service";
+import { GeneralFieldLabels } from '../../../../shared/DTOs/general-field-label.dto';
+import { MessageboxService } from '../../../../shared/messagebox/messagebox.service';
 
 @Component({
   selector: 'app-write-off-list',
@@ -34,18 +35,25 @@ export class WriteOffListComponent implements OnInit {
   public WriteOffdata: PHRMWriteOffItemModel = new PHRMWriteOffItemModel();
   currentActiveDispensary: PHRMStoreModel;
   public NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
+  public GeneralFieldLabel = new GeneralFieldLabels();
 
-  constructor( private _dispensaryService : DispensaryService,
+  headerDetail: { hospitalName, address, email, PANno, tel, DDA };
+
+
+  constructor(private _dispensaryService: DispensaryService,
     public pharmacyBLService: PharmacyBLService,
     public changeDetector: ChangeDetectorRef,
-    public msgBoxServ: MessageboxService, public router: Router,public coreService: CoreService) {
+    public msgBoxServ: MessageboxService, public router: Router, public coreService: CoreService) {
     /////Grid Coloumn Variable
     this.writeOffListGridColumns = DispensaryGridColumns.WriteOffList;
     this.currentActiveDispensary = this._dispensaryService.activeDispensary;
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('WriteOffDate', false));
 
     ////Get All Write Off List With Its All Item 
+    this.GetPharmacyReceiptHeaderParameter();
     this.getWriteOffList();
+    this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
+
   }
   ngOnInit(): void {
   }
@@ -178,7 +186,18 @@ export class WriteOffListComponent implements OnInit {
       console.log("Stack Details =>   " + ex.stack);
     }
   }
-  AddBreakage(){
+  AddBreakage() {
     this.router.navigate(['/Pharmacy/Store/WriteOffItems/Add']);
   }
+
+  GetPharmacyReceiptHeaderParameter() {
+    var paramValue = this.coreService.Parameters.find(a => a.ParameterName == 'Pharmacy Receipt Header').ParameterValue;
+    if (paramValue) {
+      this.headerDetail = JSON.parse(paramValue);
+    }
+    else {
+      this.msgBoxServ.showMessage("error", ["Please enter parameter values for BillingHeader"]);
+    }
+  }
+
 }

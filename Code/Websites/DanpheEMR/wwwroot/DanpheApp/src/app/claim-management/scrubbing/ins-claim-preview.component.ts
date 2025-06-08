@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import * as moment from 'moment';
+import { RadiologyService } from '../../radiology/shared/radiology-service';
 import { SecurityService } from '../../security/shared/security.service';
 import { User } from '../../security/shared/user.model';
 import { DanpheHTTPResponse } from '../../shared/common-models';
@@ -38,9 +39,11 @@ export class InsuranceClaimsPreviewComponent {
     constructor(
         private securityService: SecurityService,
         private claimManagementBlService: ClaimManagementBLService,
-        private messageBoxService: MessageboxService
+        private messageBoxService: MessageboxService,
+        private radiologyService: RadiologyService
     ) {
         this.currentUser = this.securityService.GetLoggedInUser();
+        this.radiologyService.GetTemplatesStyles();
     }
 
     ngOnInit() {

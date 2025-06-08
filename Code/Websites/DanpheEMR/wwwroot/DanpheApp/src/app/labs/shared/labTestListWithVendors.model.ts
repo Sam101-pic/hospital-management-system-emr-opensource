@@ -5,4 +5,11 @@ export class PatLabInfoVM {
     VendorName: string = null;
     IsSelected: boolean = false;
     ExternalLabSampleStatus: string = "";
+    HospitalNo: string = null
+    AgeSex: string = null;
+    Gender: string = null;
+    DateOfBirth: string = null;
+    BarCodeNumber: number = null;
+    SampleCodeFormatted: string = null;
+
 }

@@ -30,16 +30,16 @@
   <ul class="page-breadcrumb" *ngIf="validRoutes != undefined">
     <!--Start: Primary Menu Items -->
     <li *ngFor="let route of primaryNavItems"> <a routerLink="{{route.RouterLink}}" [routerLinkActive]="'link3-active'"
-        *ngIf="route.IsSecondaryNavInDropdown!=1"> {{route.DisplayName}} <i class="{{route.Css}}"></i> </a> </li>
+         *ngIf="route.IsSecondaryNavInDropdown!=1"> {{route.DisplayName}} <i class="{{route.Css}}"></i> </a> </li>
     <!--End: Primary Menu Items -->
 
     <!--Start: Secondary Menu Items-->
     <li *ngIf="secondaryNavItems && secondaryNavItems.length>0" class="dropdown bil-hr-bar"
-      style="display:inline-block;"> <a class="dropdown-toggle" data-toggle="dropdown" aria-expanded="false"> More...
+        style="display:inline-block;"> <a class="dropdown-toggle" data-toggle="dropdown" aria-expanded="false"> More...
         <span class="caret"></span> </a>
       <ul class="dropdown-menu bil-hr-dropdown">
         <li class="hr-ddlCstm" *ngFor="let route of secondaryNavItems"> <a routerLink="{{route.RouterLink}}"
-            [routerLinkActive]="'link3-active'"> {{route.DisplayName}} <i class="{{route.Css}}"></i> </a> </li>
+             [routerLinkActive]="'link3-active'"> {{route.DisplayName}} <i class="{{route.Css}}"></i> </a> </li>
       </ul>
     </li>
     <!--End: Secondary Menu Items-->
@@ -48,17 +48,17 @@
   <ul class="page-breadcrumb" style="float:right;" *ngIf="validRoutes != undefined">
     <li *ngIf="securityService.AccHospitalInfo">
       <button (click)="RefreshAccCacheData()" title="Refresh Data" class="btn green btn-success margin-rt-15">
-        <i class="fa fa-refresh" *ngIf="securityService.AccHospitalInfo.TotalHospitalPermissionCount > 0"></i>
+        <i class="fa fa-refresh"></i>
       </button>
       <button (click)="OpenHospitalChangeWindow()" class="btn green btn-success margin-rt-15"
-        [disabled]="securityService.AccHospitalInfo.TotalHospitalPermissionCount <=1">
+              [disabled]="securityService.AccHospitalInfo.TotalHospitalPermissionCount <=1">
         Active: {{securityService.AccHospitalInfo.HospitalShortName}}
-        <i class="fa fa-pencil" *ngIf="securityService.AccHospitalInfo.TotalHospitalPermissionCount > 1"></i>
+        <i class="fa fa-pencil"></i>
       </button>
 
     </li>
     <li style="font-weight: bold;"> <span style="color:black !important;"
-        *ngIf="securityService.AccHospitalInfo && securityService.AccHospitalInfo.CurrFiscalYear !=null">
+            *ngIf="securityService.AccHospitalInfo && securityService.AccHospitalInfo.CurrFiscalYear !=null">
         <span> <span style="font-size:14px;text-align:center;">
             Fiscal Year: {{securityService.AccHospitalInfo.CurrFiscalYear.FiscalYearName}} </span> <br />
           <span style="font-size:11px;text-align:center;">
@@ -73,13 +73,9 @@
     </li>
   </ul>
 </div>
-<div *ngIf="loading">  <!-- //mumbai-team-june2021-danphe-accounting-cache-change -->
+<div *ngIf="loading"> <!-- //mumbai-team-june2021-danphe-accounting-cache-change -->
   Loading...
 </div>
 <div class="wrapper" *ngIf="!loading">
   <router-outlet></router-outlet>
 </div>
-
-<!-- <accounting-hospital-activate *ngIf="changeActivatedHospital" [changeRequest]="changeActivatedHospital"
-  (actionEmitter)="activatedRouteChanged($event)">
-</accounting-hospital-activate> -->

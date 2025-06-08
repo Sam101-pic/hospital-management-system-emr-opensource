@@ -7,6 +7,7 @@ import { CommonFunctions } from "../../../shared/common.functions";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { ENUM_DanpheHTTPResponseText, ENUM_Data_Type, ENUM_DateTimeFormat, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { CashBankBookModel, DateWiseCashBookModel } from "../../settings/shared/cash-bank-book-model";
+import { Hospital_DTO } from "../../settings/shared/dto/hospitals.dto";
 import { LedgerModel } from "../../settings/shared/ledger.model";
 import { ledgerGroupModel } from "../../settings/shared/ledgerGroup.model";
 import { AccountingService } from "../../shared/accounting.service";
@@ -52,7 +53,11 @@ export class CashBankBookReportComponent {
   public ShowDetailPopUp: boolean = false;
   public HideZeroTxn: boolean = false;
   public showParticularcheckBox: boolean = false;
-
+  public HospitalList: Array<Hospital_DTO> = new Array<Hospital_DTO>();
+  public SelectedHospital: number = 0;
+  public HospitalId: number = 0;
+  public AllLedgerGroups: ledgerGroupModel[] = [];
+  public ActiveHospital: number = 0;
   constructor(
     public accReportBLService: AccountingReportsBLService,
     public coreservice: CoreService,
@@ -61,49 +66,37 @@ export class CashBankBookReportComponent {
     public securityService: SecurityService,
     public nepaliCalendarService: NepaliCalendarService,
     public changeDetector: ChangeDetectorRef) {
-    this.todayDate = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
-    this.GetLedgers();
-    this.GetLedgerGroup();
-    this.GetVoucher();
-    var paramValue = this.coreservice.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader").ParameterValue;
-    if (paramValue) {
-      this.headerDetail = JSON.parse(paramValue);
+    this.LoadData();
+  }
+  LoadData() {
+    try {
+      this.todayDate = moment().format(ENUM_DateTimeFormat.Year_Month_Day);
+      this.AllLedgerGroups = this.accountingService.AllLedgerGroup;
+      this.ledgerList = this.accountingService.AllLedgers;
+      this.GetVoucher();
+      var paramValue = this.coreservice.Parameters.find(a => a.ParameterGroupName == "Common" && a.ParameterName == "CustomerHeader").ParameterValue;
+      if (paramValue) {
+        this.headerDetail = JSON.parse(paramValue);
+      }
+      this.accountingService.getCoreparameterValue();
+      this.CheckAndAssignHospital();
+      this.FilterLedgerGroup();
     }
-    this.accountingService.getCoreparameterValue();
+    catch (error) {
+      console.error('Error loading data:', error);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Error loading data']);
+    }
+  }
+  CheckAndAssignHospital() {
+    this.ActiveHospital = this.securityService.AccHospitalInfo.ActiveHospitalId;
+    this.HospitalList = this.accountingService.accCacheData.Hospitals ? this.accountingService.accCacheData.Hospitals : [];
+    if (this.HospitalList.length === 1) {
+      this.SelectedHospital = this.HospitalList[0].HospitalId;
+    } else {
+      this.SelectedHospital = this.ActiveHospital;
+    }
   }
 
-  public GetLedgers() {
-    if (!!this.accountingService.accCacheData.Ledgers && this.accountingService.accCacheData.Ledgers.length > 0) {
-      this.ledgerList = this.accountingService.accCacheData.Ledgers;
-      let codeDetail = this.accountingService.accCacheData.CodeDetails.filter(a => (a.Code === '021' || a.Code === '022') && a.Description === 'LedgerGroupName');
-      let ledgerGroups = new Array<ledgerGroupModel>();
-      if (codeDetail) {
-        codeDetail.forEach(code => {
-          let ledGroup = this.accountingService.accCacheData.LedgerGroups.find(a => a.Name === code.Name);
-          if (ledGroup) {
-            ledgerGroups.push(ledGroup)
-          }
-        });
-      }
-      this.filteredLedgerList = this.ledgerList.filter(a => ledgerGroups.some(ledGroup => a.LedgerGroupId === ledGroup.LedgerGroupId));
-      this.filteredLedgerList.forEach(a => {
-        this.selectedLedgerLists.push(a.LedgerId);
-      })
-      Object.assign(this.selectedLedgers, this.filteredLedgerList);
-    }
-  }
-  public GetLedgerGroup() {
-    this.ledgerGroupList = [];
-    let codeDetail = this.accountingService.accCacheData.CodeDetails.filter(a => (a.Code === '021' || a.Code === '022') && a.Description === 'LedgerGroupName');
-    if (codeDetail) {
-      codeDetail.forEach(code => {
-        let ledGroup = this.accountingService.accCacheData.LedgerGroups.find(a => a.Name === code.Name);
-        if (ledGroup) {
-          this.ledgerGroupList.push(ledGroup)
-        }
-      });
-    }
-  }
   public GetVoucher() {
     if (!!this.accountingService.accCacheData.VoucherType && this.accountingService.accCacheData.VoucherType.length > 0) {
       this.voucherList = this.accountingService.accCacheData.VoucherType;
@@ -120,23 +113,25 @@ export class CashBankBookReportComponent {
     );
   }
   AssignSelectedLedgerGroup() {
-    this.selectedLedgerLists = [];
-    if (typeof (this.selectedLedgerGroup) == 'object' && this.selectedLedgerGroup.LedgerGroupId > 0) {
-      var ledgerList = this.ledgerList.filter(a => a.LedgerGroupId == this.selectedLedgerGroup.LedgerGroupId);
-      this.filteredLedgerList = ledgerList;
-    }
-    else {
-      let codeDetail = this.accountingService.accCacheData.CodeDetails.filter(a => (a.Code === '021' || a.Code === '022') && a.Description === 'LedgerGroupName');
-      let ledgerGroups = new Array<ledgerGroupModel>();
-      if (codeDetail) {
-        codeDetail.forEach(code => {
-          let ledGroup = this.accountingService.accCacheData.LedgerGroups.find(a => a.Name === code.Name);
-          if (ledGroup) {
-            ledgerGroups.push(ledGroup)
-          }
-        });
+    if (this.selectedLedgerGroup != null) {
+      this.selectedLedgerLists = [];
+      if (typeof (this.selectedLedgerGroup) == 'object' && this.selectedLedgerGroup.LedgerGroupId > 0) {
+        var ledgerList = this.ledgerList.filter(a => a.LedgerGroupId == this.selectedLedgerGroup.LedgerGroupId && a.HospitalId === this.SelectedHospital);
+        this.filteredLedgerList = ledgerList;
       }
-      this.filteredLedgerList = this.ledgerList.filter(a => ledgerGroups.some(ledGroup => a.LedgerGroupId === ledGroup.LedgerGroupId));
+      else {
+        let codeDetail = this.accountingService.accCacheData.CodeDetails.filter(a => (a.Code === '021' || a.Code === '022') && a.Description === 'LedgerGroupName');
+        let ledgerGroups = new Array<ledgerGroupModel>();
+        if (codeDetail) {
+          codeDetail.forEach(code => {
+            let ledGroup = this.accountingService.accCacheData.LedgerGroups.find(a => a.Name === code.Name);
+            if (ledGroup) {
+              ledgerGroups.push(ledGroup)
+            }
+          });
+        }
+        this.filteredLedgerList = this.ledgerList.filter(a => ledgerGroups.some(ledGroup => a.LedgerGroupId === ledGroup.LedgerGroupId));
+      }
     }
   }
 
@@ -168,8 +163,9 @@ export class CashBankBookReportComponent {
     this.OriginalDateWiseTotal = [];
     this.PopUpDetail = [];
     this.GrandTotal = 0;
+    this.HospitalId = this.SelectedHospital;
     if (this.CheckSelLedger() && this.checkDateValidation()) {
-      this.accReportBLService.GetCashBankBookReport(this.fromDate, this.toDate, this.fiscalYearId, this.selectedLedgerLists)
+      this.accReportBLService.GetCashBankBookReport(this.fromDate, this.toDate, this.fiscalYearId, this.selectedLedgerLists, this.HospitalId)
         .subscribe(res => {
           if (res.Status === ENUM_DanpheHTTPResponseText.OK && res.Results) {
             this.OpeningData = res.Results.OpeningData;
@@ -190,6 +186,10 @@ export class CashBankBookReportComponent {
     let flag = true;
     if (!this.validDate) {
       this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['Invalid date is selected. Please select valid date.']);
+      flag = false;
+    }
+    if (!this.HospitalId) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['Please select Account Section']);
       flag = false;
     }
     return flag;
@@ -217,7 +217,7 @@ export class CashBankBookReportComponent {
     });
     this.TransactionData.forEach((txn, index) => {
       txn.LedgerName = this.ledgerList.filter(a => a.LedgerId == txn.LedgerId)[0].LedgerName;
-      txn.VoucherType = this.voucherList.filter(a => a.VoucherId == txn.VoucherId)[0].VoucherName;
+      //txn.VoucherType = this.voucherList.filter(a => a.VoucherId == txn.VoucherId)[0].VoucherName;
       if (index == 0)
         txn.Accumulated = this.OpeningData[0].OpeningBalance + txn.DrAmount - txn.CrAmount;
       else
@@ -472,6 +472,37 @@ export class CashBankBookReportComponent {
       }
     } catch (ex) {
       console.log(ex);
+    }
+  }
+  FilterLedgerGroup() {
+    this.selectedLedgerGroup = null;
+    this.selectedLedgerLists = null;
+    this.ledgerGroupList = [];
+    this.filteredLedgerList = [];
+    this.DateWiseTotal = [];
+    if (this.SelectedHospital > 0) {
+
+      let codeDetail = this.accountingService.AllCodeDetails.filter(a => (a.Code === '021' || a.Code === '022') && a.Description === 'LedgerGroupName' && a.HospitalId == this.SelectedHospital);
+      let ledgerGroups = new Array<ledgerGroupModel>();
+      if (codeDetail) {
+        codeDetail.forEach(code => {
+          let ledGroup = this.AllLedgerGroups.find(a => a.Name === code.Name && a.HospitalId === this.SelectedHospital);
+          if (ledGroup) {
+            ledgerGroups.push(ledGroup);
+          }
+        });
+      }
+      this.filteredLedgerList = this.ledgerList.filter(a => ledgerGroups.some(ledGroup => a.LedgerGroupId === ledGroup.LedgerGroupId && a.HospitalId == this.SelectedHospital));
+
+      if (this.AllLedgerGroups) {
+        this.ledgerGroupList = [];
+        ledgerGroups.forEach(code => {
+          let ledGroup = this.AllLedgerGroups.find(a => a.Name === code.Name && a.HospitalId === this.SelectedHospital);
+          if (ledGroup) {
+            this.ledgerGroupList.push(ledGroup)
+          }
+        });
+      }
     }
   }
 }

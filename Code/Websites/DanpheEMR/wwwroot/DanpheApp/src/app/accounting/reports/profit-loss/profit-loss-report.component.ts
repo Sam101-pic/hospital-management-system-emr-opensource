@@ -7,7 +7,9 @@ import { FiscalYearModel } from '../../settings/shared/fiscalyear.model';
 import { AccountingReportsBLService } from "../shared/accounting-reports.bl.service";
 
 import * as _ from 'lodash';
+import { SecurityService } from '../../../security/shared/security.service';
 import { ENUM_DanpheHTTPResponseText, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { Hospital_DTO } from '../../settings/shared/dto/hospitals.dto';
 import { AccountingService } from "../../shared/accounting.service";
 
 @Component({
@@ -42,15 +44,33 @@ export class ProfitLossReportComponent {
   public IsZeroAmountRecords: boolean = false;
   public showPrint: boolean = false;
   public printDetaiils: any;
+  public SelectedHospital: number = 0;
+  public HospitalList: Array<Hospital_DTO> = new Array<Hospital_DTO>();
+  public HospitalId: number = 0;
+  public ActiveHospital: number = 0;
+
   constructor(
     public msgBoxServ: MessageboxService,
     public coreservice: CoreService,
+    public securityService: SecurityService,
+
     public accReportBLServ: AccountingReportsBLService, public accountingService: AccountingService,
     private changeDetector: ChangeDetectorRef) {
 
     this.dateRange = "today";
     this.showExport();
     this.accountingService.getCoreparameterValue();
+    this.CheckAndAssignHospital();
+
+  }
+  CheckAndAssignHospital() {
+    this.ActiveHospital = this.securityService.AccHospitalInfo.ActiveHospitalId;
+    this.HospitalList = this.accountingService.accCacheData.Hospitals ? this.accountingService.accCacheData.Hospitals : [];
+    if (this.HospitalList.length === 1) {
+      this.SelectedHospital = this.HospitalList[0].HospitalId;
+    } else {
+      this.SelectedHospital = this.ActiveHospital;
+    }
   }
   public validDate: boolean = true;
   selectDate(event) {
@@ -68,8 +88,9 @@ export class ProfitLossReportComponent {
 
   loadData() {
     this.btndisabled = true;
+    this.HospitalId = this.SelectedHospital;
     if (this.checkDateValidation()) {
-      this.accReportBLServ.GetProfitLossReport(this.fromDate, this.toDate, this.fiscalYearId).subscribe(res => {
+      this.accReportBLServ.GetProfitLossReport(this.fromDate, this.toDate, this.fiscalYearId, this.HospitalId).subscribe(res => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
           this.btndisabled = false;
           let data = res.Results;
@@ -374,7 +395,11 @@ export class ProfitLossReportComponent {
 
   checkDateValidation() {
     if (!this.validDate) {
-      this.msgBoxServ.showMessage("error", ['Select proper date.']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['Select proper date.']);
+      return false;
+    }
+    if (!this.HospitalId) {
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, ['Please select Account Section']);
       return false;
     }
     let flag = true;
@@ -382,7 +407,7 @@ export class ProfitLossReportComponent {
     flag = moment(this.toDate, "YYYY-MM-DD").isValid() == true ? flag : false;
     flag = (this.toDate >= this.fromDate) == true ? flag : false;
     if (!flag) {
-      this.msgBoxServ.showMessage("error", ['select proper date(FromDate <= ToDate)']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['select proper date(FromDate <= ToDate)']);
     }
     return flag;
   }

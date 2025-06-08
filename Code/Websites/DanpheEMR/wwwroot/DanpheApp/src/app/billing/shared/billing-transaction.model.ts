@@ -108,6 +108,7 @@ export class BillingTransaction {
   public VisitType: string = ENUM_VisitType.outpatient; //Bibek 14thJune'23
   public OtherCurrencyDetail: string = null;
   public IsProvisionalDischargeCleared: boolean = false;
+  public CoPaymentCashPercent: number = 0;
   constructor() {
     this.CreatedOn = moment().format("YYYY-MM-DD HH:mm:ss");
   }

@@ -1,29 +1,33 @@
-import { Component, ChangeDetectorRef } from "@angular/core";
-import { Router } from '@angular/router';
+import { ChangeDetectorRef, Component } from "@angular/core";
 
-import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
 import GridColumnSettings from '../../shared/danphe-grid/grid-column-settings.constant';
+import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
 
 import { VisitService } from '../../appointments/shared/visit.service';
 import { PatientService } from '../../patients/shared/patient.service';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { ImagingItemReport, ImagingReportViewModel } from '../shared/imaging-item-report.model';
 import { ImagingBLService } from '../shared/imaging.bl.service';
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 //needed to assign external html as innerHTML property of some div
 //otherwise angular removes some css property from the DOM. 
-import { DomSanitizer } from '@angular/platform-browser';
-import { ImagingType } from "../shared/imaging-type.model";
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import * as moment from 'moment/moment';
 import { CoreService } from "../../../../src/app/core/shared/core.service";
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from "../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { SecurityService } from "../../security/shared/security.service";
+import { DanpheHTTPResponse } from "../../shared/common-models";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../shared/danphe-grid/NepaliColGridSettingsModel";
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../shared/shared-enums";
+import { FileUpload_DTO } from "../shared/DTOs/file-upload.dto";
+import { ImagingItemReportDTO } from "../shared/DTOs/imaging-item-report.dto";
+import { ImagingType } from "../shared/imaging-type.model";
 
 
 @Component({
   templateUrl: "./imaging-reports-list.html"
 })
 export class ImagingReportsListComponent {
-  public allImagingReports: Array<ImagingItemReport> = new Array<ImagingItemReport>();
-  public allImagingFilteredReports: Array<ImagingItemReport> = new Array<ImagingItemReport>();
+  public allImagingReports: Array<ImagingItemReportDTO> = new Array<ImagingItemReportDTO>();
+  public allImagingFilteredReports: Array<ImagingItemReportDTO> = new Array<ImagingItemReportDTO>();
   //enable preview is for message dialog box.
   public enablePreview: boolean = false;
   public selReport: ImagingReportViewModel = new ImagingReportViewModel();
@@ -41,19 +45,29 @@ export class ImagingReportsListComponent {
   public dateRange: string = "last1Week";//by default show last 1 week data.;
   public fromDate: string = null;
   public toDate: string = null;
+  fileSrc: SafeResourceUrl;
+  ShowFilePreviewPopUp: boolean = false;
+  patientFileDetail: FileUpload_DTO[] = [];
+  patientsUploadedFile: any;
 
   constructor(public visitService: VisitService, public msgBoxServ: MessageboxService,
     public imagingBLService: ImagingBLService, public coreService: CoreService,
     public patientService: PatientService,
     public changeDetector: ChangeDetectorRef,
+    public _securityService: SecurityService,
+    private _sanitizer: DomSanitizer,
     public sanitizer: DomSanitizer) {
     //this.getImagingType();
     this.imgReportsListGridColumns = this.getRadReportListFilteredColumns(this.coreService.GetRadReportListColmArr());
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('CreatedOn', true));
     //this.GetPatientReportsByImagineType();
   }
+  ngOnInit() {
+    GridColumnSettings.initialize(this._securityService);
+  }
 
   getRadReportListFilteredColumns(columnObj: any): Array<any> {
+
     let cols = GridColumnSettings.ImagingReportListSearch;
     var filteredColumns = [];
     if (columnObj) {
@@ -87,6 +101,11 @@ export class ImagingReportsListComponent {
           if ((res.Status == "OK") && (res.Results != null)) {
             this.allImagingReports = res.Results;
             this.allImagingFilteredReports = res.Results;
+            if (this.allImagingFilteredReports && this.allImagingFilteredReports.length > 0) {
+              this.allImagingFilteredReports.map(imaging => {
+                imaging.Age = this.coreService.CalculateAge(imaging.DateOfBirth);
+              })
+            }
             //if (this.selImgType == 'All') {
             //  this.allImagingFilteredReports = this.allImagingReports.filter(x => x.IsActive == true);
             //} else {
@@ -143,12 +162,50 @@ export class ImagingReportsListComponent {
           this.ViewReport(selReport);
         }
         break;
+      case "view-file":
+        {
+          this.patientFileDetail = [];
+          var selReport = $event.Data;
+          let selectedPatDetail = new FileUpload_DTO();
+          selectedPatDetail.PatientFileId = selReport.PatientFileId;
+          selectedPatDetail.PatientId = selReport.PatientId;
+          selectedPatDetail.ImagingReportId = selReport.ImagingReportId;
+          this.patientFileDetail.push(selectedPatDetail);
+          this.GetPatientFileDetail();
+        }
+        break;
 
       default:
         break;
     }
   }
+  GetPatientFileDetail() {
+    this.imagingBLService.GetPatientFileDetail(this.patientFileDetail)
+      .subscribe({
+        next: (res: DanpheHTTPResponse) => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['File fetched successfully']);
+            this.patientsUploadedFile = res.Results;
+            this.DocumentPreview(this.patientsUploadedFile.file);
+          } else {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ['Failed to fetch file']);
+          }
+        },
+        error: (err) => {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, err.errorMessage);
+        }
+      });
+  }
+  public DocumentPreview(selectedDocument: any) {
+    const indx = selectedDocument.BinaryData.indexOf(',');
+    const binaryString = window.atob(selectedDocument.BinaryData.substring(indx + 1));
+    const bytes = new Uint8Array(binaryString.length);
+    const arrayBuffer = bytes.map((byte, i) => binaryString.charCodeAt(i));
+    const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+    this.fileSrc = this._sanitizer.bypassSecurityTrustResourceUrl(URL.createObjectURL(blob));
+    this.ShowFilePreviewPopUp = true;
 
+  }
   GetBackOnClose($event) {
     if ($event.Submit) {
       this.GetPatientReportsByImagineType(this.fromDate, this.toDate);
@@ -198,6 +255,9 @@ export class ImagingReportsListComponent {
   gridExportOptions = {
     fileName: 'ImagingReportsList_' + moment().format('YYYY-MM-DD') + '.xls',
   };
-
+  CloseFilePreviewPopUp(): void {
+    this.ShowFilePreviewPopUp = false;
+    this.patientFileDetail = [];
+  }
 }
 

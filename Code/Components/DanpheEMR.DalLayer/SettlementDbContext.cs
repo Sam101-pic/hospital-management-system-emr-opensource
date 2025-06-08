@@ -1,4 +1,5 @@
 ﻿using Audit.EntityFramework;
+using DanpheEMR.Core.Parameters;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.MasterModels;
@@ -35,6 +36,7 @@ namespace DanpheEMR.DalLayer
         public DbSet<PHRMTransactionCreditBillStatus> PHRMTransactionCreditBillStatuses { get; set; }
         public DbSet<PHRMInvoiceReturnModel> PHRMInvoiceReturnModels { get; set; }
         public DbSet<DepositHeadModel> DepositHeadModels { get; set; }
+        public DbSet<ParameterModel> AdminParameters { get; set; }
 
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
@@ -56,6 +58,7 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<PHRMTransactionCreditBillStatus>().ToTable("PHRM_TXN_CreditBillStatus");
             modelBuilder.Entity<PHRMInvoiceReturnModel>().ToTable("PHRM_TXN_InvoiceReturn");
             modelBuilder.Entity<DepositHeadModel>().ToTable("BIL_MST_DepositHead");
+            modelBuilder.Entity<ParameterModel>().ToTable("CORE_CFG_Parameters");
         }
     }
 

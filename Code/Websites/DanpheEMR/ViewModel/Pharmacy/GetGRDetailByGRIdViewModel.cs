@@ -45,11 +45,12 @@ namespace DanpheEMR.ViewModel.Pharmacy
                                    CancelledBy = (cancelByuser != null) ? cancelByuser.FullName : "",
                                    CancelledOn = gr.CancelOn,
                                    PaymentMode = gr.TransactionType,
-                                   CreditPeriod = gr.CreditPeriod
+                                   CreditPeriod = gr.CreditPeriod,
+                                   Adjustment = gr.Adjustment
                                })
                                .FirstOrDefault();
 
-            goodreceipt.GoodsReceiptItems = (from gri in db.PHRMGoodsReceiptItems
+            goodreceipt.GoodReceiptItem = (from gri in db.PHRMGoodsReceiptItems
                                              join item in db.PHRMItemMaster on gri.ItemId equals item.ItemId
                                              join generic in db.PHRMGenericModel on item.GenericId equals generic.GenericId
                                              join uom in db.PHRMUnitOfMeasurement on item.UOMId equals uom.UOMId
@@ -79,7 +80,7 @@ namespace DanpheEMR.ViewModel.Pharmacy
                                                  SubTotal = gri.SubTotal,
                                                  GrPerItemVATAmt = gri.GrPerItemVATAmt,
                                                  VATAmt = gri.GrPerItemVATAmt,
-                                                 GrTotalDisAmt = gri.GrTotalDisAmt,
+                                                 GrTotalDisAmt = gri.GrPerItemDisAmt,
                                                  TotalAmount = gri.TotalAmount,
                                                  PackingName = packingLJ.PackingName,
                                                  PackingQuantity = gri.PackingQty,
@@ -151,11 +152,12 @@ namespace DanpheEMR.ViewModel.Pharmacy
         public DateTime CreatedOn { get; set; }
         public bool IsCancel { get; set; }
         public string Remarks { get; set; }
-        public IList<GetGRDetailsByGRIdItemDTO> GoodsReceiptItems { get; set; }
+        public IList<GetGRDetailsByGRIdItemDTO> GoodReceiptItem { get; set; }
         public string CancelRemarks { get; set; }
         public string CancelledBy { get; set; }
         public DateTime? CancelledOn { get; set; }
         public string PaymentMode { get; set; }
         public int? CreditPeriod { get; set; }
+        public decimal? Adjustment { get; set; }
     }
 }

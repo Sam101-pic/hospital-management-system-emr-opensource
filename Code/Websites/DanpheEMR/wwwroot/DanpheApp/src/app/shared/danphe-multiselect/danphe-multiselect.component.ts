@@ -1,5 +1,4 @@
-import { Component } from '@angular/core';
-import { Input, Output, EventEmitter, OnInit } from "@angular/core"
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 @Component({
     selector: "danphe-multiselect",
     templateUrl: "./danphe-multiselect.html"
@@ -128,7 +127,7 @@ export class DanpheMultiSelectComponent implements OnInit {
         let replaceAsItemNameProperty = this.dispayPropertyName;
         let replaceThisItemNameProperty = "itemName"
         //changes of valueProperty
-        var strData = JSON.stringify(inputData);//we want only  value type not a reference type
+        var strData = JSON.stringify(inputData);//we want only  value type not a reference type  
         var jsonData = JSON.parse(strData);
         jsonData.map(function (item) {
             if (replaceThisId in item) {
@@ -160,7 +159,12 @@ export class DanpheMultiSelectComponent implements OnInit {
         let replaceAsName = "itemName";
         let replaceThisName = this.dispayPropertyName;
         //replace id
-        var strData = JSON.stringify(inputData);//we want only  value type not a reference type
+        if (typeof (inputData) !== 'string') {
+            var strData = JSON.stringify(inputData);//we want only  value type not a reference type
+        }
+        else {
+            var strData = inputData;
+        }
         var jsonData = JSON.parse(strData);
         jsonData.map(function (item) {
             if (replaceThisId in item) {

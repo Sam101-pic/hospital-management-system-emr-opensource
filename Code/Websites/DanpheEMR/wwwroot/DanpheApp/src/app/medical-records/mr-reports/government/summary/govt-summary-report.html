@@ -30,7 +30,9 @@
     </div>
 
     <div class="col-md-6 col-xs-12">
-      <from-to-date-select (on-change)="OnFromToDateChange($event)"> </from-to-date-select>
+      <from-to-date-select (on-change)="OnFromToDateChange($event)"
+                           [date-settings-name]="'common-range-with-today'">
+      </from-to-date-select>
     </div>
 
     <div class="col-md-2 col-xs-12">
@@ -420,7 +422,8 @@
     <div style="margin-top: 25px;">
       <p style="text-align:center;">
         <button class="btn blue" (click)="Print()"> Print Report <i class="glyphicon glyphicon-print"></i> </button>
-        <button class="blue btn" type="button" title="Export to Excel" (click)="ExportToExcel('govReportWithoutHeader')"> <i class="fa fa-file-excel-o"></i> Export</button>
+        <button class="blue btn" type="button" title="Export to Excel" (click)="ExportToExcel('govReportWithoutHeader')"> <i
+             class="fa fa-file-excel-o"></i> Export</button>
       </p>
     </div>
   </section>

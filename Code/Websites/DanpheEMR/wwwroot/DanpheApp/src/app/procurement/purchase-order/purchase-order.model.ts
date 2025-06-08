@@ -1,4 +1,4 @@
-import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, FormGroup, ValidatorFn, Validators } from '@angular/forms';
 import * as moment from 'moment/moment';
 import { ItemMaster } from '../../inventory/shared/item-master.model';
 import { VendorMaster } from '../../inventory/shared/vendor-master.model';
@@ -38,7 +38,7 @@ export class PurchaseOrder {
   public CurrencyId: number = null;
 
   public PurchaseOrderItems: Array<PurchaseOrderItems> = new Array<PurchaseOrderItems>();
-  public PurchaseOrderValidator: FormGroup = null;
+  public PurchaseOrderValidator: FormGroup;
 
   //sanjit: added for verification purpose
   public IsVerificationEnabled: boolean = false;
@@ -81,7 +81,26 @@ export class PurchaseOrder {
       'VendorId': ['', [Validators.required, this.registeredVendorValidator]],
       'CurrencyCode': ['', Validators.required],
       'PaymentMode': ['', Validators.required],
-    });
+      'PoDate': ['', Validators.compose([Validators.required])],
+      'DeliveryDate': ['']
+    },
+      { validator: this.PoDateAndDeliveryDateValidator('PoDate', 'DeliveryDate') });
+  }
+  PoDateAndDeliveryDateValidator(targetKey: string, toMatchKey: string): ValidatorFn {
+    return (group: FormGroup): { [key: string]: any } => {
+      const poDate = group.controls[targetKey];
+      const deliveryDate = group.controls[toMatchKey];
+      const _poDate = poDate.value;
+      const _deliveryDate = deliveryDate.value;
+
+      if (_poDate > _deliveryDate) {
+        deliveryDate.setErrors({ 'invalidDateComparison': true });
+      } else {
+        deliveryDate.setErrors(null);
+      }
+
+      return null;
+    };
   }
   ngOnInit() {
     this.PurchaseOrderValidator.get('VendorId').valueChanges.subscribe(() => {
@@ -142,6 +161,7 @@ export class PurchaseOrder {
       return { 'notRegisteredVendor': true };
   }
 
+
   public updateItemDuplicationStatus() {
     if (this.PurchaseOrderItems) {
       for (var i = 0; i < this.PurchaseOrderItems.length; i++) {
@@ -153,7 +173,7 @@ export class PurchaseOrder {
 }
 
 export class POVerifier {
-  Id: number;
+  Id: number = 0;
   Name: string = "";
   Type: string = "";
 }

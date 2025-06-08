@@ -78,6 +78,9 @@ namespace DanpheEMR.Controllers
                             p.PriceCategoryId = el.PriceCategoryId;
                             p.ProfileId = profileId;
                             p.PrescriberPercent = el.PrescriberPercent;
+                            p.ReferrerPercent = el.ReferrerPercent;
+                            p.ServiceItemId =  el.ServiceItemId;
+                            p.BillingTypesApplicable = el.BillingTypesApplicable;
 
                             InsertUpdateProfileItemMap(incentiveDb, p, currentUserId);
                         });
@@ -132,11 +135,13 @@ namespace DanpheEMR.Controllers
                     var proItmMap = incentiveDb.ProfileItemMap.Where(a => a.BillItemProfileMapId == id).FirstOrDefault();
                     proItmMap.PerformerPercent = profileItemMap.PerformerPercent;
                     proItmMap.PrescriberPercent = profileItemMap.PrescriberPercent;
+                    proItmMap.ReferrerPercent = profileItemMap.ReferrerPercent;
                     proItmMap.BillingTypesApplicable = profileItemMap.BillingTypesApplicable;
                     proItmMap.ModifiedBy = currentUserId;
                     proItmMap.ModifiedOn = DateTime.Now;
                     incentiveDb.Entry(proItmMap).Property(x => x.PerformerPercent).IsModified = true;
                     incentiveDb.Entry(proItmMap).Property(x => x.PrescriberPercent).IsModified = true;
+                    incentiveDb.Entry(proItmMap).Property(x => x.ReferrerPercent).IsModified = true;
                     incentiveDb.Entry(proItmMap).Property(x => x.BillingTypesApplicable).IsModified = true;
                     incentiveDb.Entry(proItmMap).Property(x => x.ModifiedBy).IsModified = true;
                     incentiveDb.Entry(proItmMap).Property(x => x.ModifiedOn).IsModified = true;
@@ -247,8 +252,10 @@ namespace DanpheEMR.Controllers
                     var empBillItmMap = incentiveDb.EmployeeBillItemsMap.Where(a => a.EmployeeBillItemsMapId == employeeItemMap.EmployeeBillItemsMapId || (a.ServiceItemId == employeeItemMap.ServiceItemId && a.EmployeeId == employeeItemMap.EmployeeId && a.PriceCategoryId == employeeItemMap.PriceCategoryId)).FirstOrDefault();
                     empBillItmMap.PerformerPercent = employeeItemMap.PerformerPercent;
                     empBillItmMap.PrescriberPercent = employeeItemMap.PrescriberPercent;
+                    empBillItmMap.ReferrerPercent = employeeItemMap.ReferrerPercent;
                     empBillItmMap.PriceCategoryId = employeeItemMap.PriceCategoryId;
                     empBillItmMap.HasGroupDistribution = employeeItemMap.HasGroupDistribution;
+                    empBillItmMap.BillingTypesApplicable = employeeItemMap.BillingTypesApplicable;
                     empBillItmMap.ModifiedBy = currentUser;
                     empBillItmMap.ModifiedOn = DateTime.Now;
                     empBillItmMap.IsActive = employeeItemMap.IsActive;

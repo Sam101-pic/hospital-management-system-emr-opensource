@@ -10,6 +10,7 @@ import { DanpheAutoCompleteModule } from "../shared/danphe-autocomplete";
 import { SharedModule } from "../shared/shared.module";
 import { SchemeRefundPrintComponent } from './Print/scheme-refund-print.component';
 import { ChangeBillingCounterComponent } from './change-billing-counter/change-billing-counter.component';
+import { ChangePolicyNumberComponent } from "./change-policy-number/change-policy-number.component";
 import { ChangeSchemePriceCategoryComponent } from "./change-visit-scheme/change-scheme-price-category.component";
 import { OrganizationDepositComponent } from './organization-deposit/organization-deposit/organization-deposit.component';
 import { SchemeRefundListComponent } from "./scheme-refund/list/scheme-refund-list.component";
@@ -51,7 +52,7 @@ import { UtilitiesRoutingModule } from "./utilities-routing.module";
     ChangeBillingCounterComponent,
     OrganizationDepositComponent,
     SchemeRefundPrintComponent,
-    //PrintOrganizationDepositComponent,
+    ChangePolicyNumberComponent
 
   ],
   bootstrap: []

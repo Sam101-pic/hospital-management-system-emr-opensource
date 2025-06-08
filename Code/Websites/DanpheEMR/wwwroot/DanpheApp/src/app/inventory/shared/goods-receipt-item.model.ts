@@ -66,6 +66,11 @@ export class GoodsReceiptItems {
   public RegisterPageNumber: number = null;
   public grItemCharges: GRItemChargesViewModel[] = [];
   public GRItemCharges: GRItemChargesDTO[] = [];
+  public Code: string = null;
+  public UOMName: string = '';
+  public CancelledOn: string = null;
+  public CancelRemarks: string = '';
+
   constructor() {
     var _formBuilder = new FormBuilder();
     this.GoodsReceiptItemValidator = _formBuilder.group({

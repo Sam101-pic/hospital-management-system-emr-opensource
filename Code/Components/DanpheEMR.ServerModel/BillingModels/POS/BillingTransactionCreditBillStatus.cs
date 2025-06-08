@@ -36,5 +36,8 @@ namespace DanpheEMR.ServerModel.BillingModels
         public int CreatedBy { get; set; }
         public DateTime? ModifiedOn { get; set; }
         public int? ModifiedBy { get; set; }
+        public bool IsDocumentReceived { get; set; }
+        public string Remarks { get; set; }
+        public DateTime? DocumentReceivedDate { get; set; }
     }
 }

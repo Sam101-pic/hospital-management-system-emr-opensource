@@ -1,10 +1,9 @@
 import {
-  NgForm,
-  FormGroup,
+  FormBuilder,
   FormControl,
-  Validators,
-  FormBuilder
-} from '@angular/forms'
+  FormGroup,
+  Validators
+} from '@angular/forms';
 
 import * as moment from 'moment/moment';
 
@@ -44,7 +43,7 @@ export class GovInsurancePatientVM {
   public ModifiedOn: string = null;
   public ModifiedBy: number = null;
   public IsActive: boolean = true;
- 
+
   public Ins_HasInsurance: boolean = true;
   public Ins_NshiNumber: string = '';
   public Ins_InsuranceBalance: number = 0;
@@ -61,7 +60,14 @@ export class GovInsurancePatientVM {
   public MunicipalityId: number = 0;
   public MunicipalityName: string = null;
   public EthnicGroup: string = "";
-
+  public Email: string = '';
+  public PolicyHolderUID: string = '';
+  PolicyNo: number = null;
+  IsPatientInformationLoaded = false;
+  IsPatientEligibilityLoaded = false;
+  eligibilityInfo: Eligibility = new Eligibility();
+  Ins_FirstServicePoint: string = '';
+  PatientImageURL: string = '';
   constructor() {
     var _formBuilder = new FormBuilder();
     this.GovInsPatientValidator = _formBuilder.group({
@@ -76,9 +82,9 @@ export class GovInsurancePatientVM {
       'Ins_NshiNumber': ['', Validators.compose([Validators.required, Validators.pattern('^[0-9]{1,10}$')])],
       'InsuranceProviderId': ['', Validators.required,],
       'Ins_InsuranceBalance': ['', Validators.required,],
-       'Ins_IsFirstServicePoint': ['', Validators.required],
-       
-       'Ins_IsFamilyHead': ['', Validators.required],
+      'Ins_IsFirstServicePoint': ['', Validators.required],
+
+      'Ins_IsFamilyHead': ['', Validators.required],
     });
 
   }
@@ -151,4 +157,11 @@ export class GovInsurancePatientVM {
     }
     this.GovInsPatientValidator.controls[formControlName].updateValueAndValidity();
   }
+}
+export class Eligibility {
+
+  AllowedMoney: number = 0;
+  RegistrationCase: string = '';
+  IsCoPayment: boolean = false;
+  CoPayCashPercent: number = null;
 }

@@ -5,8 +5,9 @@ import { CoreService } from '../../../core/shared/core.service';
 import { DanpheHTTPResponse } from '../../../shared/common-models';
 import { CommonFunctions } from '../../../shared/common.functions';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_DanpheHTTPResponseText, ENUM_ExternalLab_SampleStatus, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { ENUM_DanpheHTTPResponseText, ENUM_ExternalLab_SampleStatus, ENUM_MessageBox_Status, LabPageAction } from '../../../shared/shared-enums';
 import { ExternalLabStatus_DTO } from '../../shared/DTOs/external-lab-sample-satatus.dto';
+import { LabSticker } from '../../shared/lab-sticker.model';
 import { LabTest } from '../../shared/lab-test.model';
 import { PatLabInfoVM } from '../../shared/labTestListWithVendors.model';
 import { LabsBLService } from '../../shared/labs.bl.service';
@@ -24,7 +25,7 @@ export class InternalTestListComponent {
    //private patLabInfo = { PatientName: "Sud", TestName: "CBC", VendorName: "External" };
 
    public patLabInfoList: Array<PatLabInfoVM> = [];
-   PatientLabInfo: PatLabInfoVM = new PatLabInfoVM();
+   PatientLabInfo: LabSticker = new LabSticker();
    public showVendorSelectButton: boolean = false;
    public showVendorSelectPopup: boolean = false;
    public selectedReqList: Array<number> = [];
@@ -57,6 +58,13 @@ export class InternalTestListComponent {
    public ExternalLabReportStatusHeader: any;
    public printDate: string = null;
    public verificationRequired: boolean;
+   public showStickerButton: boolean = false;
+   public showUndoOption: boolean = false;
+   public showLabStickerPopUp: boolean = false;
+   public showUndoButton: boolean = false;
+   public requisitionIdList = [];
+   public HasUndoPermission: boolean;
+   public undoFromPageAction: LabPageAction = LabPageAction.ExternalLab;
 
    constructor(public msgBox: MessageboxService, public labBLService: LabsBLService, public changeDetector: ChangeDetectorRef, public coreService: CoreService) {
       this.LoadAllVendors();
@@ -69,6 +77,7 @@ export class InternalTestListComponent {
       }
       this.printDate = moment().toString();
       this.verificationRequired = this.coreService.EnableVerificationStep();
+      this.HasUndoPermission = this.labBLService.securityService.HasPermission("btn-lab-undo-receive-sample") ? true : false;
    }
 
    public GetAllTestListForExternalLabs() {
@@ -76,6 +85,8 @@ export class InternalTestListComponent {
       this.selectAll = false;
       this.ShowReceiveButton = false;
       this.showVendorSelectButton = false;
+      this.showStickerButton = false;
+      this.showUndoButton = false;
       this.SelectedVendorName = this.VendorList.find(a => a.LabVendorId === this.SelectedVendorId)
       if (this.SelectedExternalLabStatus === ENUM_ExternalLab_SampleStatus.SampleCollected) {
          this.dispatchConfirmationMessage = 'Are you sure want to Dispatch these Samples to ' + this.SelectedVendorName.VendorName + '  ?';
@@ -126,13 +137,29 @@ export class InternalTestListComponent {
 
    CheckForRowSelection() {
       this.showVendorSelectButton = false;
+      this.showStickerButton = false;
+      this.showUndoButton = false;
       let isSelected = this.patLabInfoList.some((item) => item.IsSelected === true);
 
       const patLabInfos = this.patLabInfoList.filter((item) => item.IsSelected === true);
       this.ExternalLabDataStatus.RequisitionIds = [];
       patLabInfos.forEach(itm => {
          this.ExternalLabDataStatus.RequisitionIds.push(itm.RequisitionId);
+         this.PatientLabInfo.PatientName = itm.PatientName;
+         this.PatientLabInfo.HospitalNumber = itm.HospitalNo;
+         this.PatientLabInfo.Age = this.coreService.CalculateAge(itm.DateOfBirth);
+         this.PatientLabInfo.AgeSex = this.coreService.FormateAgeSex(this.PatientLabInfo.Age, itm.Gender);
+         this.PatientLabInfo.BarCodeNumber = itm.BarCodeNumber;
+         this.PatientLabInfo.SampleCodeFormatted = itm.SampleCodeFormatted;
       })
+      if (this.ExternalLabDataStatus.RequisitionIds.length === 1) {
+         this.showStickerButton = true;
+         this.showUndoButton = true;
+      }
+      else {
+         this.showStickerButton = false;
+         this.showUndoButton = false;
+      }
       if (isSelected) {
          if (this.SelectedExternalLabStatus === ENUM_ExternalLab_SampleStatus.SampleCollected) {
             this.showVendorSelectButton = true;
@@ -149,6 +176,8 @@ export class InternalTestListComponent {
       else {
          this.showVendorSelectButton = false;
          this.ShowReceiveButton = false;
+         this.showStickerButton = false;
+         this.showUndoButton = false;
          this.IsReceive = false;
       }
 
@@ -190,7 +219,7 @@ export class InternalTestListComponent {
             if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
                if (res.Results && res.Results.length > 0) {
                   this.VendorList = res.Results;
-                  this.VendorList = this.VendorList.filter(vendor => vendor.IsExternal === true);
+                  this.VendorList = this.VendorList.filter(vendor => vendor.IsExternal === true && vendor.IsActive === true);
                   this.SelectedVendorId = this.VendorList[0].LabVendorId;
                }
             }
@@ -245,9 +274,6 @@ export class InternalTestListComponent {
    checkSelectAllStatus() {
       this.selectAll = this.patLabInfoList.every(lab => lab.IsSelected);
    }
-
-
-
    ConfirmDispatch() {
       this.IsDispatch = false;
       this.ExternalLabDataStatus.SelectedExternalLabStatusType = ENUM_ExternalLab_SampleStatus.SampleDispatched;
@@ -260,6 +286,8 @@ export class InternalTestListComponent {
                   this.GetAllTestListForExternalLabs();
                   this.IsDispatch = true;
                   this.showVendorSelectButton = false;
+                  this.showStickerButton = false;
+                  this.showUndoButton = false;
                   this.ExternalLabDataStatus.RequisitionIds = [];
                   this.ExternalLabDataStatus.SelectedExternalLabStatusType = "";
                }
@@ -273,9 +301,6 @@ export class InternalTestListComponent {
                this.IsDispatch = true;
             });
    }
-
-
-
 
    CancelDispatch() {
 
@@ -314,11 +339,15 @@ export class InternalTestListComponent {
       this.IsReceive = false;
       this.ShowReceiveButton = false;
       this.showVendorSelectButton = false;
+      this.showStickerButton = false;
+      this.showUndoButton = false;
    }
    ClearList() {
       this.patLabInfoList = [];
       this.ShowReceiveButton = false;
       this.showVendorSelectButton = false;
+      this.showStickerButton = false;
+      this.showUndoButton = false;
       this.selectAll = false;
    }
 
@@ -378,6 +407,65 @@ export class InternalTestListComponent {
          this.ShowHeader = false;
       }, 100)
 
+   }
+   ShowStickerPopUp() {
+      this.showLabStickerPopUp = true;
+   }
+   public CloseAfterPrint($event) {
+      if ($event.exit) {
+         this.showLabStickerPopUp = false;
+      }
+   }
+   CloseSticker() {
+      this.PatientLabInfo = new LabSticker();
+      this.ExternalLabDataStatus.RequisitionIds = [];
+      this.patLabInfoList.forEach(item => {
+         item.IsSelected = false;
+      });
+      this.showLabStickerPopUp = false;
+      this.showStickerButton = false;
+
+   }
+   ShowUndoOption() {
+      // this.CheckForRowSelection();
+      // const patLabInfos = this.patLabInfoList.filter((item) => item.IsSelected === true);
+      // const allRequisitionIds = patLabInfos.map(item => item.RequisitionId).reduce((acc, val) => acc.concat(val), []);
+      // allRequisitionIds.forEach(reqId => {
+      //    if (this.requisitionIdList && this.requisitionIdList.length) {
+      //       if (!this.requisitionIdList.includes(+reqId)) {
+      //          this.requisitionIdList.push(+reqId);
+      //       }
+      //    } else {
+      //       this.requisitionIdList.push(+reqId);
+      //    }
+      // });
+
+      this.showUndoOption = false;
+      this.changeDetector.detectChanges();
+      this.showUndoOption = true;
+
+   }
+   ExitOutUndoCall($event) {
+      if ($event.exit) {
+         if ($event.exit == 'exitonsuccess') {
+            this.PatientLabInfo = new LabSticker();
+            this.requisitionIdList = [];
+            this.GetAllTestListForExternalLabs();
+            //  this.GetPendingLabResults(this.fromDate, this.toDate, this.catIdList);
+            this.showUndoOption = false;
+         }
+         else if ($event.exit == 'close') {
+            this.CloseUndoBox();
+         }
+
+      }
+   }
+   CloseUndoBox() {
+      this.PatientLabInfo = new LabSticker();
+      this.requisitionIdList = [];
+      this.GetAllTestListForExternalLabs();
+      // this.GetPendingLabResults(this.fromDate, this.toDate, this.catIdList);
+      this.showUndoOption = false;
    }
 }
 

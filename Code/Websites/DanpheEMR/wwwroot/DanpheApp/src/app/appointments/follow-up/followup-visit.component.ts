@@ -7,6 +7,7 @@ import { BillingService } from '../../billing/shared/billing.service';
 import { PatientService } from '../../patients/shared/patient.service';
 import { PatientsDLService } from '../../patients/shared/patients.dl.service';
 import { SecurityService } from '../../security/shared/security.service';
+import { Department } from '../../settings-new/shared/department.model';
 import { DanpheHTTPResponse } from '../../shared/common-models';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../shared/routefrom.service';
@@ -26,6 +27,7 @@ export class FollowUpVisitComponent {
 
   @Output("on-followup-add")
   followupCompleted: EventEmitter<Object> = new EventEmitter<Object>();
+  deptList = new Array<Department>();
   //getting the input parameter as 'visit' and setting it to selectedVisit.
   //doing so is necessary, since we were unable to call the functions (written here) inside constructor before this value is set
   @Input("parent-visit")
@@ -62,6 +64,14 @@ export class FollowUpVisitComponent {
 
 
   public docOrDeptChangedSubscription: Subscription;
+  public ChangedDoctor: boolean = false;
+  public allowDoctorChange: boolean;
+  SelectedDepartment: Department;
+  FilteredDocList: Array<{ DepartmentId: number, DepartmentName: string, PerformerId: number, PerformerName: string, ItemName: string, Price: number, IsTaxApplicable: boolean, SAARCCitizenPrice: number, ForeignerPrice: number }>;
+  FilteredDepartmentList: Array<Department> = [];
+  DoctorsList: Array<{ DepartmentId: number, DepartmentName: string, PerformerId: number, PerformerName: string, ItemName: string, Price: number, IsTaxApplicable: boolean, SAARCCitizenPrice: number, ForeignerPrice: number }>;
+  SelectedDoctor = { DepartmentId: 0, DepartmentName: "", PerformerId: 0, PerformerName: "", ItemName: "", Price: 0, IsTaxApplicable: false, DepartmentLevelAppointment: false };
+  HasChangeDoctorPermission: boolean = false;
 
   constructor(public visitBLService: VisitBLService,
     public messageBoxService: MessageboxService,
@@ -72,6 +82,10 @@ export class FollowUpVisitComponent {
     public routeFromService: RouteFromService,
     public billingService: BillingService,
     public patientDl: PatientsDLService) {
+    this.DoctorsList = this.visitService.ApptApplicableDoctorsList;
+    this.FilteredDocList = this.visitService.ApptApplicableDoctorsList;
+    this.FilteredDepartmentList = this.visitService.ApptApplicableDepartmentList;
+    this.HasChangeDoctorPermission = this.securityService.HasPermission("btn-appointment-change-followup-doctor") ? true : false;
 
   }
 
@@ -89,13 +103,12 @@ export class FollowUpVisitComponent {
       this.newVisitForChangeDoctor.PatientId = this.parentVisit.PatientId;
       this.newVisitForChangeDoctor.PriceCategoryId = this.parentVisit.PriceCategoryId;
       this.newVisitForChangeDoctor.SchemeId = this.parentVisit.SchemeId;
+      this.SelectedDepartment = this.FilteredDepartmentList.find(dep => dep.DepartmentId == this.newVisitForChangeDoctor.DepartmentId)
 
       this.GetPatientById();
       //sud:13Jul'19--needed to check Duplicate Visits (with same doctor) in client side.
       this.LoadPatientsTodaysVisitListIntoService(this.parentVisit.PatientId);
-
     }
-
   }
 
   public GetPatientById(): void {
@@ -204,6 +217,10 @@ export class FollowUpVisitComponent {
 
   public PostFreeFollowup(): void {
     this.loading = true;//disables FollowUp button
+    if (!this.SelectedDoctor || this.SelectedDoctor.toString() === "") {
+      this.loading = false;
+      return this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Please select doctor`]);
+    }
     this.visitBLService.PostFreeFollowupVisit(this.newVisitForChangeDoctor, this.parentVisit.PatientVisitId)
       .subscribe((res: DanpheHTTPResponse) => {
         if (res.Status === ENUM_DanpheHTTPResponses.OK) {
@@ -388,5 +405,31 @@ export class FollowUpVisitComponent {
     if (event.keyCode === 27) {
       this.followupCompleted.emit("Close");
     }
+  }
+  MyDepartmentListFormatter(data: any): string {
+    let html = data["DepartmentName"];
+    return html;
+  }
+  DocListFormatter(data: any): string {
+    let html = data["PerformerName"];
+    return html;
+  }
+  AssignSelectedDepartment() {
+    if (this.SelectedDepartment) {
+      this.FilteredDocList = this.DoctorsList.filter(doc => doc.DepartmentId === this.SelectedDepartment.DepartmentId);
+    }
+  }
+  AssignSelectedDoctor() {
+    if (this.SelectedDoctor) {
+      const departmentId = this.SelectedDoctor.DepartmentId;
+      this.SelectedDepartment = this.FilteredDepartmentList.find(d => d.DepartmentId === departmentId);
+      this.newVisitForChangeDoctor.PerformerId = this.SelectedDoctor.PerformerId;
+      this.newVisitForChangeDoctor.PerformerName = this.SelectedDoctor.PerformerName;
+    }
+  }
+  OnDoctorChange() {
+    this.allowDoctorChange = this.ChangedDoctor;
+    this.AssignSelectedDepartment();
+    this.SelectedDoctor = this.parentVisit.PerformerName;
   }
 }

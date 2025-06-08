@@ -8,6 +8,7 @@ import { SecurityService } from '../../../security/shared/security.service';
 //Parse, validate, manipulate, and display dates and times in JS.
 import * as moment from 'moment/moment';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 
 
 @Component({
@@ -21,6 +22,9 @@ export class PackagingTypeAddComponent {
     public showAddPage: boolean = false;
     @Input("selectedPackagingType")
     public selectedPackagingType: PackagingTypeModel;
+
+    @Input("packagingtypeList")
+    public PackagingtypeList = Array<PackagingTypeModel>();
     @Output("callback-add")
     callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
     public update: boolean = false;
@@ -53,8 +57,6 @@ export class PackagingTypeAddComponent {
     }
 
 
-
-
     //adding new department
     AddPackagingType() {
         //for checking validations, marking all the fields as dirty and checking the validity.
@@ -63,6 +65,14 @@ export class PackagingTypeAddComponent {
             this.CurrentPackagingType.PackagingTypeValidator.controls[i].updateValueAndValidity();
         }
 
+        if (this.PackagingtypeList && this.PackagingtypeList.length) {
+            const isPackagingTypeNameAlreadyExists = this.PackagingtypeList.some(a => a.PackagingTypeName.toLowerCase() === this.CurrentPackagingType.PackagingTypeName.toLowerCase());
+            if (isPackagingTypeNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add PackagingType as the PackagingType Name "${this.CurrentPackagingType.PackagingTypeName}" already exists.`]);
+                return;
+            }
+
+        }
 
         if (this.CurrentPackagingType.IsValidCheck(undefined, undefined)) {
             this.loading = true;
@@ -90,6 +100,16 @@ export class PackagingTypeAddComponent {
             this.CurrentPackagingType.PackagingTypeValidator.controls[i].markAsDirty();
             this.CurrentPackagingType.PackagingTypeValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.PackagingtypeList && this.PackagingtypeList.length) {
+            const isPackagingTypeNameAlreadyExists = this.PackagingtypeList.some(a => a.PackagingTypeName.toLowerCase() === this.CurrentPackagingType.PackagingTypeName.toLowerCase() && a.PackagingTypeId !== this.CurrentPackagingType.PackagingTypeId);
+            if (isPackagingTypeNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update PackagingType as the PackagingType Name "${this.CurrentPackagingType.PackagingTypeName}" already exists.`]);
+                return;
+            }
+
+        }
+
 
         if (this.CurrentPackagingType.IsValidCheck(undefined, undefined)) {
             this.loading = true;

@@ -17,4 +17,9 @@ export class UploadedFile {
     public IsActive: boolean = true;
     public Size: number = 0;
     public BinaryData: string = "";
+    public FileUploadedBy: string = "";
+    public SizeInString: string = "";
+    public FileBase64Url: string = "";
+    public FileData: string = "";
+    public Type: string = "";
 }

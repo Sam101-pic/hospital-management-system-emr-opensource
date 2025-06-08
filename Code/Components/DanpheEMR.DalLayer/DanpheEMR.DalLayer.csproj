@@ -335,7 +335,9 @@
     <Compile Include="AdmissionDbContext.cs" />
     <Compile Include="BillingDbContext.cs" />
     <Compile Include="ClaimManagementDbContext.cs" />
+    <Compile Include="ClinicalSettingDbContext.cs" />
     <Compile Include="DischargeDbContext.cs" />
+    <Compile Include="FewaPayLogDbContext.cs" />
     <Compile Include="LISDbContext.cs" />
     <Compile Include="MarketingReferralDbContext.cs" />
     <Compile Include="MedicareDbContext.cs" />

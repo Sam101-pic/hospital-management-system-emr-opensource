@@ -60,13 +60,20 @@
                         <th scope="col" class="wd-130">SchemeName</th>
                         <th scope="col" class="wd-270">PriceCategory</th>
                         <th scope="col" class="wd-80">IsDefault</th>
+                        <th scope="col" class="wd-80">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr *ngFor="let mapItem of SchemePriceCategoryMapList">
+                      <tr *ngFor="let mapItem of SchemePriceCategoryMapList; let i = index">
                         <td>{{mapItem.SchemeName}}</td>
                         <td>{{mapItem.PriceCategoryName}}</td>
                         <td>{{mapItem.IsDefault}}</td>
+                        <td style="padding: 7px 0px 0px 0px; float:left">
+                          <a class="btn-round delBtn" (click)="DeleteMappedRow(i)" title="Click to remove this item">
+                            <i class=" fa fa-trash">
+                            </i>
+                          </a>
+                        </td>
                       </tr>
                     </tbody>
                   </table>

@@ -168,13 +168,13 @@ export class ERDeathPatientListComponent {
   public ReturnFromPatRegistrationEdit($event) {
     this.CloseAllERPatientPopUp();
     if ($event.submit) {
-      let itmIndex = this.allDeathPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
-      if (itmIndex >= 0) {
-        this.allDeathPatients.splice(itmIndex, 1, $event.ERPatient);
-        this.allDeathPatients = this.allDeathPatients.slice();
-      } else {
-        this.GetERDeathPatientList();
-      }
+      // let itmIndex = this.allDeathPatients.findIndex(tst => tst.ERPatientId == $event.ERPatient.ERPatientId);
+      // if (itmIndex >= 0) {
+      //   this.allDeathPatients.splice(itmIndex, 1, $event.ERPatient);
+      //   this.allDeathPatients = this.allDeathPatients.slice();
+      // } else {
+      this.GetERDeathPatientList();
+      // }
     }
   }
 

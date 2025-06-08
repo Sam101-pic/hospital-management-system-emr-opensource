@@ -40,11 +40,11 @@
       </div>
       <div class="portlet-body">
         <div *ngIf="currentPatient.LabRequisitions[0] == undefined"
-          style="position: relative; width: auto; height: 50px;">
+             style="position: relative; width: auto; height: 50px;">
           <p class="no-data-div">no records found</p>
         </div>
         <div *ngIf="currentPatient.LabRequisitions[0] != undefined" class="over-fl-vr-scr"
-          style="position: relative; width: auto; overflow: auto;">
+             style="position: relative; width: auto; overflow: auto;">
           <div class="table-wrapper no-margin">
             <table class="table table-striped table-hover /">
               <tr>
@@ -83,18 +83,18 @@
         </div>
         <div class="actions" *ngIf="enableAddOrders">
           <a (click)="routeTo('imaging')" class="btn btn-default btn-sm btn-doc"
-            style="background: #6e58ea !important;">
+             style="background: #6e58ea !important;">
             <i class="fa fa-plus-circle"></i> Add
           </a>
         </div>
       </div>
       <div class="portlet-body">
         <div *ngIf="currentPatient.ImagingItemRequisitions[0] == undefined"
-          style="position: relative; width: auto; height: 50px;">
+             style="position: relative; width: auto; height: 50px;">
           <p class="no-data-div">no records found</p>
         </div>
         <div *ngIf="currentPatient.ImagingItemRequisitions[0] != undefined" class="over-fl-vr-scr"
-          style="position: relative; overflow: auto; width: auto;">
+             style="position: relative; overflow: auto; width: auto;">
           <div class="table-wrapper no-margin">
             <table class="table table-striped table-hover custom_table padLess_table table-bordered">
               <tr>
@@ -133,7 +133,7 @@
         </div>
         <div class="actions" *ngIf="enableAddOrders">
           <a href="javascript:;" routerLink="../ProblemsMain/ActiveMedical" class="btn btn-default btn-sm btn-doc"
-            style="background: #6e58ea !important;">
+             style="background: #6e58ea !important;">
             <i class="fa fa-plus-circle"></i> Add
           </a>
         </div>
@@ -143,7 +143,7 @@
           <p class="no-data-div">no records found</p>
         </div>
         <div *ngIf="currentPatient.Problems[0] != undefined" class="over-fl-vr-scr"
-          style="position: relative; overflow: auto; width: auto;">
+             style="position: relative; overflow: auto; width: auto;">
           <table class="table table-striped table-hover custom_table padLess_table table-bordered">
             <tr>
               <th>Problem</th>
@@ -162,7 +162,7 @@
               </td>
               <td>
                 <a style="text-decoration: underline;font-weight: bold;cursor: pointer;"
-                  (click)="ShowAddProblemNote(res)">Add Note</a>
+                   (click)="ShowAddProblemNote(res)">Add Note</a>
               </td>
             </tr>
           </table>
@@ -176,18 +176,18 @@
         </div>
         <div class="actions" *ngIf="enableAddOrders">
           <a (click)="routeTo('medication')" class="btn btn-default btn-sm btn-doc"
-            style="background: #6e58ea !important;">
+             style="background: #6e58ea !important;">
             <i class="fa fa-plus-circle"></i> Add
           </a>
         </div>
       </div>
       <div class="portlet-body">
         <div *ngIf="currentPatient.MedicationPrescriptions[0] == undefined"
-          style="position: relative; width: auto; height: 50px;">
+             style="position: relative; width: auto; height: 50px;">
           <p class="no-data-div">no records found</p>
         </div>
         <div *ngIf="currentPatient.MedicationPrescriptions[0] != undefined" class="over-fl-vr-scr"
-          style="position: relative; overflow: auto; width: auto;">
+             style="position: relative; overflow: auto; width: auto;">
           <table class="table table-striped table-hover custom_table padLess_table table-bordered">
             <tr *ngFor="let med of currentPatient.MedicationPrescriptions">
               <td><b>{{med.MedicationName}}</b>&nbsp;&nbsp;{{med.Frequency}}&nbsp;times a day </td>
@@ -212,7 +212,7 @@
               Show
             </span>Graph
           </a> <a href="javascript:;" routerLink="../Clinical/Vitals" class="btn btn-default btn-sm btn-doc"
-            style="background: #6e58ea !important;">
+             style="background: #6e58ea !important;">
             <i class="fa fa-plus-circle"></i> Add Vitals
           </a>
         </div>
@@ -239,8 +239,8 @@
                   <div *ngIf="vital.HeightUnit=='cm' || vital.HeightUnit=='meter'">
                     <!--{{vital.Height | HasValue: vital.HeightUnit}}-->
                     <span class="tooltip"
-                      title="{{heightFoot[i] | number}} feet &#013;{{heightMeter[i] | number }} meter &#013;{{heightCm[i] | number}} cm"
-                      style="display: inline; white-space:pre-line;">{{vital.Height | HasValue:
+                          title="{{heightFoot[i] | number}} feet &#013;{{heightMeter[i] | number }} meter &#013;{{heightCm[i] | number}} cm"
+                          style="display: inline; white-space:pre-line;">{{vital.Height | HasValue:
                       vital.HeightUnit}}</span>
 
                   </div>
@@ -252,7 +252,7 @@
                 <td *ngFor="let vital of currentPatient.Vitals; let i=index;">
                   <!--{{vital.Weight | HasValue: vital.WeightUnit}}-->
                   <span class="tooltip" title="{{weightkg[i] | number}} kg &#013;{{weightPound[i] | number}} lbs"
-                    style="display: inline; white-space:pre-line;">{{vital.Weight | HasValue: vital.WeightUnit}}</span>
+                        style="display: inline; white-space:pre-line;">{{vital.Weight | HasValue: vital.WeightUnit}}</span>
                 </td>
               </tr>
               <tr>
@@ -265,7 +265,7 @@
                   <!--{{vital.Temperature | HasValue: vital.TemperatureUnit}}-->
 
                   <span class="tooltip" title="{{degFarenheit[i] | number }} F&#013;{{degCelsius[i] | number}} C"
-                    style="display: inline; white-space:pre-line;">{{vital.Temperature | HasValue:
+                        style="display: inline; white-space:pre-line;">{{vital.Temperature | HasValue:
                     vital.TemperatureUnit}}</span>
                 </td>
               </tr>
@@ -280,9 +280,21 @@
                 </td>
               </tr>
               <tr>
+                <td>Remarks </td>
+                <td *ngFor="let vital of currentPatient.Vitals;">
+                  {{vital.Remarks}}
+                </td>
+              </tr>
+              <tr>
                 <td>Respiratory Rate</td>
                 <td *ngFor="let vital of currentPatient.Vitals;">
                   {{vital.RespiratoryRatePerMin | HasValue:'/min'}}
+                </td>
+              </tr>
+              <tr>
+                <td>GCS</td>
+                <td *ngFor="let vital of currentPatient.Vitals;">
+                  {{ vital.Eyes|HasValue:'E'}} {{ vital.Verbal|HasValue:'V'}} {{ vital.Motor|HasValue:'M'}}
                 </td>
               </tr>
               <tr>
@@ -309,7 +321,7 @@
         </div>
         <div class="actions">
           <a (click)="AddNewComplaintRow()" class="btn btn-default btn-sm btn-doc"
-            style="background: #6e58ea !important;">
+             style="background: #6e58ea !important;">
             <i class="fa fa-plus-circle"></i> New Complaint
           </a>
         </div>
@@ -319,7 +331,7 @@
           <p class="no-data-div">no records found</p>
         </div>
         <div *ngIf="chiefComplaints && chiefComplaints.length" class="over-fl-vr-scr"
-          style="position: relative; overflow: auto; width: auto;">
+             style="position: relative; overflow: auto; width: auto;">
           <div class="table-wrapper no-margin">
             <table class="table table-striped table-hover custom_table padLess_table table-bordered">
               <tbody>
@@ -327,12 +339,12 @@
                   <td>
                     <div class="inline-complaint">
                       <app-inline-edit [ngModelOptions]="{standalone: true}" [(ngModel)]="comp.Value"
-                        [isTextArea]="true" type="text" (getBack)="complainLoading=true;UpdateComplaint(comp)"
-                        [tooltip-text]="'click to edit this Complain'">
+                                       [isTextArea]="true" type="text" (getBack)="complainLoading=true;UpdateComplaint(comp)"
+                                       [tooltip-text]="'click to edit this Complain'">
                       </app-inline-edit>
 
                       <button [disabled]="complainLoading" (click)="complainLoading = true; UpdateComplaint(comp, true)"
-                        class="btn btn-danger remove-complaint"><i class="fa fa-close"></i></button>
+                              class="btn btn-danger remove-complaint"><i class="fa fa-close"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -342,7 +354,7 @@
         </div>
 
         <div *ngIf="newChiefComplaints && newChiefComplaints.length" class="over-fl-vr-scr"
-          style="position: relative; overflow: auto; width: auto;">
+             style="position: relative; overflow: auto; width: auto;">
           <div class="table-wrapper no-margin">
             <table class="table table-striped table-hover custom_table padLess_table table-bordered">
               <tbody>
@@ -351,14 +363,14 @@
                     <div class="inline-complaint">
                       <textarea style="width: 90%;" [(ngModel)]="newComp.Value" class="form-control"></textarea>
                       <button class="btn blue remove-complaint" (click)="RemoveComplaintRow(i)"><i
-                          class="fa fa-close"></i></button>
+                           class="fa fa-close"></i></button>
                     </div>
                   </td>
                 </tr>
                 <tr *ngIf="newChiefComplaints && newChiefComplaints.length">
                   <td>
                     <button [disabled]="complainLoading" class="btn blue"
-                      (click)="complainLoading=true;AddComplaint()">Add</button>
+                            (click)="complainLoading=true;AddComplaint()">Add</button>
                   </td>
                 </tr>
               </tbody>
@@ -375,7 +387,7 @@
         </div>
         <div class="actions">
           <a href="javascript:;" routerLink="../Clinical/Allergy" class="btn btn-default btn-sm btn-doc"
-            style="background: #6e58ea !important;">
+             style="background: #6e58ea !important;">
             <i class="fa fa-plus-circle"></i> Add
           </a>
         </div>
@@ -385,7 +397,7 @@
           <p class="no-data-div">no records found</p>
         </div>
         <div *ngIf="currentPatient.Allergies[0] != undefined" class="over-fl-vr-scr"
-          style="position: relative; overflow: auto; width: auto;">
+             style="position: relative; overflow: auto; width: auto;">
           <div class="table-wrapper no-margin">
             <table class="table table-striped table-hover custom_table padLess_table table-bordered">
               <tbody>
@@ -425,7 +437,7 @@
     <div class="modelbox-div" style="width: 90%; margin: 0 auto;">
       <div style="margin-left: 0px;"> <i class="btn btn-danger" style="float: right;" (click)="CloseLabReport()">X</i>
         <danphe-lab-results [requisitionIdList]="labRequisitionIdList" [showReport]="showLabReport" [showHeader]="false"
-          [enableEdit]="false" [enableResultEdit]="false" [showSignatories]="false" [showAddEditResult]="false">
+                            [enableEdit]="false" [enableResultEdit]="false" [showSignatories]="false" [showAddEditResult]="false">
         </danphe-lab-results>
       </div>
     </div>
@@ -440,7 +452,7 @@
       <!--Model Box Title End-->
       <!--Model Box Header Buttons Start-->
       <div class="tools"> <a href="javascript:;" class="fullscreen" data-original-title="" title=""> </a> <i
-          class="remove btn btn-danger" (click)="CloseAddProblemNote()">x</i>
+           class="remove btn btn-danger" (click)="CloseAddProblemNote()">x</i>
         <!--<a href="javascript:;" class="remove" data-original-title="" title=""> </a>-->
       </div>
       <!--Model Box Heder Buttons End-->
@@ -453,10 +465,10 @@
         <hr />
         <form [formGroup]="selectedProblem.ActiveMedicalValidator" class="form-horizontal">
           <textarea type="text" class="form-control" maxlength="200" formControlName="Note"
-            [(ngModel)]="selectedProblem.Note"></textarea>
+                    [(ngModel)]="selectedProblem.Note"></textarea>
           <span class="color-red font-sm" *ngIf="selectedProblem.IsDirty('Note')"
-            [hidden]="selectedProblem.IsValidCheck('Note','maxlength')">Note should not exceed 200 characters.</span> <i
-            class="remove btn btn-danger" (click)="AddProblemNote()">Submit</i>
+                [hidden]="selectedProblem.IsValidCheck('Note','maxlength')">Note should not exceed 200 characters.</span> <i
+             class="remove btn btn-danger" (click)="AddProblemNote()">Submit</i>
         </form>
       </div>
     </div>

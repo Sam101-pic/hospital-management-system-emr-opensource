@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.LabModels;
+using DanpheEMR.ServerModel.PatientModels;
 
 namespace DanpheEMR.DalLayer
 {
@@ -45,11 +46,14 @@ namespace DanpheEMR.DalLayer
         public DbSet<LabGovReportMappingModel> LabGovReportMapping { get; set; }
 
         public DbSet<CountrySubDivisionModel> CountrySubdivisions { get; set; }
+        public DbSet<CountryModel> Countries { get; set; }
+
         public DbSet<LabSMSModel> LabSms { get; set; }
         public DbSet<LabTypesModel> LabTypes { get; set; }
 
         public DbSet<MunicipalityModel> Municipalities { get; set; }
-        
+        public DbSet<PatientSchemeMapModel> PatientSchemeMap { get; set; }
+        public DbSet<LabStatusTransitionLogModel> LabStatusTransitionLog { get; set; }
 
         public LabDbContext(string conn) : base(conn)
         {
@@ -100,6 +104,9 @@ namespace DanpheEMR.DalLayer
             modelBuilder.Entity<MunicipalityModel>().ToTable("MST_Municipality");
             modelBuilder.Entity<LabTypesModel>().ToTable("MST_LabTypes");
             modelBuilder.Entity<PatientFilesModel>().ToTable("PAT_PatientFiles");
+            modelBuilder.Entity<PatientSchemeMapModel>().ToTable("PAT_MAP_PatientSchemes");
+            modelBuilder.Entity<LabStatusTransitionLogModel>().ToTable("LAB_LabStatusTransitionLog");
+            modelBuilder.Entity<CountryModel>().ToTable("MST_Country");
         }
 
         public void Attach(LabGovReportMappingModel dbComp)

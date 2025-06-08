@@ -28,6 +28,8 @@ import { RPT_BIL_UserCollectionReportComponent } from "./billing/user-collection
 
 import { VisitBLService } from "../appointments/shared/visit.bl.service";
 import { VisitService } from "../appointments/shared/visit.service";
+import { PatientsBLService } from "../patients/shared/patients.bl.service";
+import { PatientsDLService } from "../patients/shared/patients.dl.service";
 import { RPTADTAdmissionAndDischargeListComponent } from './adt/admission-and-discharge-report/rpt-adt-admission-and-discharge-list/rpt-adt-admission-and-discharge-list.component';
 import { RPT_ADT_TotalAdmittedPatientComponent } from "./adt/admission/total-admitted-patient.component";
 import { RPT_ADT_ADTReportsMainComponent } from "./adt/adt-reports-main.component";
@@ -36,7 +38,8 @@ import { RPT_ADT_DischargeBillBreakupComponent } from "./adt/discharge/discharge
 import { RPT_ADT_DischargedPatientComponent } from "./adt/discharge/discharged-patient.component";
 import { RPT_ADT_InpatientCensusComponent } from "./adt/inpatient-census/inpatient-census.component";
 import { RPT_ADT_InPatientOutstandingReport } from "./adt/inpatient-outstanding-report/inpatient-outstanding-report.component";
-import { RankMembershipwiseAdmittedPatientReportComponent } from "./adt/rank-membershipwise-admitted-patient-report/rpt-adt-rank-membershipwise-admitted-patient-list/rpt-adt-rank-membershipwise-admitted-patient-list.component";
+import { RPT_ADT_PatientBedDetailsReportComponent } from "./adt/patient-bed-details-report/patient-bed-details-report.component";
+import { RankWiseAdmittedPatientReportComponent } from "./adt/rank-wise-admission-report/rank-wise-admitted-patient-list.component";
 import { RankWiseDischargeListComponent } from './adt/rank-wise-discharge-list/rank-wise-discharge-list.component';
 import { RPT_ADT_TransferredPatientsComponent } from "./adt/transfer/transferred-patient.component";
 import { RPT_APPT_AgeClassifiedOPStatsReportComponent } from "./appointment/age-classified-op-stats-report/age-classified-op-stats-report.component";
@@ -54,8 +57,11 @@ import { RPT_APPT_RankwiseDailyAppointmentReportComponent } from "./appointment/
 import { RPT_BIL_EHSBillReportComponent } from "./billing/EHS-billing-report/ehs-bill-report.component";
 import { RPT_BIL_PaymentModeWiseReport } from "./billing/PaymentMode Wise Report/payment-mode-wise-report.component";
 import { BillDetailComponent } from './billing/bill-detail/bill-detail.component';
+import { RPT_BIL_BillWiseSalesReportComponent } from "./billing/bill-wise-sales-report/bill-wise-sales-report.component";
 import { RPT_BIL_BillingReportsMainComponent } from "./billing/billing-reports-main.component";
 import { RPT_BIL_BillCancelSummaryComponent } from "./billing/cancel-summary/bill-cancel-summary.component";
+import { RPT_BIL_ClaimSubmissionReportComponent } from "./billing/claim-submission-report/claim-submission-report";
+import { CopaymentReportComponent } from "./billing/copayment-report/copayment-report.component";
 import { RPT_BIL_CreditSettlementReport } from "./billing/credit-settlement-report/credit-settlement-report.component";
 import { CreditSettlementReportViewDetails } from "./billing/credit-settlement-report/credit-settlement-rpt-view-details.component";
 import { RPT_BIL_CustomReportComponent } from "./billing/custom-reports/custom-report.component";
@@ -76,6 +82,7 @@ import { RPT_BIL_DoctorSummaryMainComponent } from "./billing/doctor-summary/bil
 import { RPT_BIL_DocSummaryComponent } from "./billing/doctor-summary/bill-doc-summary.component";
 import { RPT_BIL_IncomeSegregationComponent } from "./billing/income-segregation/income-segregation.component";
 import { RPT_BIL_ItemSummaryReportComponent } from "./billing/item-summary/bill-item-summary-report.component";
+import { RPT_BIL_ItemWiseCopaymentReportComponent } from "./billing/item-wise-copay-report/itemwise-copay-report.component";
 import { RPT_BIL_DailyMISReportComponent } from "./billing/mis-reports/daily-mis-report.component";
 import { RPT_BIL_PackageSalesReportComponent } from "./billing/package-sales/package-sales-report-component";
 import { RPT_BIL_PatientCensusReportComponent } from "./billing/pat-census/patient-census-report.component";
@@ -86,6 +93,7 @@ import { RPT_BIL_ReferralSummaryMainComponent } from "./billing/referral-reports
 import { RPT_BIL_ReferralSummaryComponent } from "./billing/referral-reports/bill-referral-summary.component";
 import { RPT_BIL_ReturnBillReportComponent } from "./billing/return-bills/return-bill.component";
 import { RPT_BIL_SchemeDetailInvoiceReportComponent } from "./billing/scheme-detail-invoice-report/scheme-detail-invoice-report.component";
+import { RPT_BIL_ServiceDepartmentWiseCopaymentReportComponent } from "./billing/service-department-wise-copaymentreport/service-department-wise-copayment-report";
 import { RPT_BIL_UserWiseCashCollectionComponent } from "./billing/user-wise-cash-collection-report/user-wise-cash-collection.component";
 import { RPT_DOC_DoctorsReportMainComponent } from "./doctors/doctors-report-main.component";
 import { RPT_DOC_DoctorWiseEncounterPatientReportComponent } from "./doctors/doctorwise-encounter-patient-report.component";
@@ -124,6 +132,8 @@ import { RPT_RAD_TotalRevenueFromRadiologyComponent } from "./radiology/revenue/
     ADT_DLService,
     VisitService,
     VisitBLService,
+    PatientsBLService,
+    PatientsDLService
   ],
   imports: [
     ReportingRoutingModule,
@@ -190,6 +200,7 @@ import { RPT_RAD_TotalRevenueFromRadiologyComponent } from "./radiology/revenue/
     RPT_BIL_DocSummaryComponent,
     RPT_LAB_ItemWiseLabReportComponent,
     RPT_ADT_DiagnosisWisePatientReportComponent,
+    RPT_ADT_PatientBedDetailsReportComponent,
     RPT_BIL_ReferralSummaryMainComponent,
     RPT_BIL_ReferralSummaryComponent,
     RPT_BIL_ReferralItemComponent,
@@ -224,14 +235,18 @@ import { RPT_RAD_TotalRevenueFromRadiologyComponent } from "./radiology/revenue/
     DepartmentWiseRankCountReportComponent,
     RPT_APPT_RankwiseDailyAppointmentReportComponent,
     RankWiseDischargeListComponent,
-    RankMembershipwiseAdmittedPatientReportComponent,
+    RankWiseAdmittedPatientReportComponent,
     RPT_ADT_DayAndMonthWiseVisitReportComponent,
     RPT_APPT_DepartmentwiseStatReportComponent,
     RPT_APPT_AgeClassifiedOPStatsReportComponent,
     RPT_ADT_GeographicalStatReportComponent,
     RPT_APPT_DoctortwiseStatisticsReportComponent,
-    RPT_ADT_InPatientOutstandingReport
-  ],
+    RPT_ADT_InPatientOutstandingReport,
+    RPT_BIL_ClaimSubmissionReportComponent,
+    CopaymentReportComponent,
+    RPT_BIL_ItemWiseCopaymentReportComponent,
+    RPT_BIL_ServiceDepartmentWiseCopaymentReportComponent,
+    RPT_BIL_BillWiseSalesReportComponent],
   bootstrap: [RPT_ReportingMainComponent],
 })
 export class ReportingModule { }

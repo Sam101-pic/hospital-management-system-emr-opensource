@@ -1,11 +1,12 @@
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import * as moment from 'moment';
 import { PHRMStoreRequisitionItems } from "./phrm-store-requisition-items.model";
 
 export class PHRMStoreRequisition {
     public RequisitionId: number = 0;
     public RequistionNo: number = 0;
     public StoreId: number = 0;
-    public RequisitionDate: string = "";
+    public RequisitionDate: string = moment().format('YYYY-MM-DD');
     public RequisitionStatus: string = "";
     public CreatedBy: number = 0;
     public CreatedOn: string = "";
@@ -18,6 +19,7 @@ export class PHRMStoreRequisition {
 
         var _formBuilder = new FormBuilder();
         this.RequisitionValidator = _formBuilder.group({
+            'RequisitionDate': ['', Validators.compose([Validators.required])]
         });
     }
 
@@ -36,5 +38,4 @@ export class PHRMStoreRequisition {
         else
             return !(this.RequisitionValidator.hasError(validator, fieldName));
     }
-
 }

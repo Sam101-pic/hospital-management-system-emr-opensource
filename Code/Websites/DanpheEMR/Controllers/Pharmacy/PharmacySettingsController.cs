@@ -17,6 +17,10 @@ using System.IO;
 using DanpheEMR.ViewModel.Pharmacy;
 using System.Collections.Generic;
 using DanpheEMR.ServerModel.CommonModels;
+using DanpheEMR.Services.Pharmacy.DTOs.Package;
+using Serilog.Core;
+using Serilog;
+using System.Data;
 
 namespace DanpheEMR.Controllers.Pharmacy
 {
@@ -73,7 +77,7 @@ namespace DanpheEMR.Controllers.Pharmacy
         public IActionResult GetCreditOrganizations()
         {
             //else if (reqType == "get-credit-organizations")
-            Func<object> func = () => _pharmacyDbContext.CreditOrganizations.OrderBy(co => co.OrganizationName).ToList();
+            Func<object> func = () => _pharmacyDbContext.billingCreditOrganizations.OrderBy(co => co.OrganizationName).ToList();
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -119,60 +123,8 @@ namespace DanpheEMR.Controllers.Pharmacy
         public IActionResult GetItemsWithAllDetails()
         {
             //else if (reqType == "items")
-            Func<object> func = () => (from I in _pharmacyDbContext.PHRMItemMaster.Include(itm => itm.PHRM_MAP_MstItemsPriceCategories)
-                                       join compny in _pharmacyDbContext.PHRMCompany on I.CompanyId equals compny.CompanyId
-                                       join itmtype in _pharmacyDbContext.PHRMItemType on I.ItemTypeId equals itmtype.ItemTypeId
-                                       join catType in _pharmacyDbContext.PHRMCategory on itmtype.CategoryId equals catType.CategoryId
-                                       join unit in _pharmacyDbContext.PHRMUnitOfMeasurement on I.UOMId equals unit.UOMId
-                                       join generic in _pharmacyDbContext.PHRMGenericModel on I.GenericId equals generic.GenericId
-                                       join salesCat in _pharmacyDbContext.PHRMStoreSalesCategory on I.SalesCategoryId equals salesCat.SalesCategoryId
-                                       let GRI = _pharmacyDbContext.PHRMGoodsReceiptItems.Where(GRI => I.ItemId == GRI.ItemId).OrderByDescending(GRI => GRI.GoodReceiptItemId).FirstOrDefault()
-                                       select new
-                                       {
-                                           ItemId = I.ItemId,
-                                           ItemName = I.ItemName,
-                                           IsNarcotic = I.IsNarcotic,
-                                           ItemCode = I.ItemCode,
-                                           CompanyId = I.CompanyId,
-                                           CompanyName = compny.CompanyName,
-                                           ItemTypeId = I.ItemTypeId,
-                                           ItemTypeName = itmtype.ItemTypeName,
-                                           UOMId = I.UOMId,
-                                           UOMName = unit.UOMName,
-                                           ReOrderQuantity = I.ReOrderQuantity,
-                                           MinStockQuantity = I.MinStockQuantity,
-                                           BudgetedQuantity = I.BudgetedQuantity,
-                                           PurchaseVATPercentage = I.PurchaseVATPercentage,
-                                           SalesVATPercentage = I.SalesVATPercentage,
-                                           IsVATApplicable = I.IsVATApplicable,
-                                           IsActive = I.IsActive,
-                                           PackingTypeId = I.PackingTypeId,
-                                           IsInternationalBrand = I.IsInternationalBrand,
-                                           GenericId = I.GenericId,
-                                           ABCCategory = I.ABCCategory,
-                                           Dosage = I.Dosage,
-                                           GRItemPrice = (GRI != null) ? GRI.GRItemPrice : 0,
-                                           GenericName = generic.GenericName,
-                                           CategoryName = catType.CategoryName,
-                                           StoreRackId = I.StoreRackId,
-                                           IsBatchApplicable = salesCat.IsBatchApplicable,
-                                           IsExpiryApplicable = salesCat.IsExpiryApplicable,
-                                           SalesCategoryId = salesCat.SalesCategoryId,
-                                           VED = I.VED,
-                                           CCCharge = I.CCCharge,
-                                           IsInsuranceApplicable = I.IsInsuranceApplicable,
-                                           GovtInsurancePrice = I.GovtInsurancePrice,
-                                           PurchaseRate=I.PurchaseRate,
-                                           SalesRate=I.SalesRate,
-                                           PurchaseDiscount=I.PurchaseDiscount,
-                                           PHRM_MAP_MstItemsPriceCategories = I.PHRM_MAP_MstItemsPriceCategories,
-                                           RackNoDetails = (from rackItem in _pharmacyDbContext.PHRMRackItem.Where(ri => ri.ItemId == I.ItemId)
-                                                            join rack in _pharmacyDbContext.PHRMRack on rackItem.RackId equals rack.RackId
-                                                            select new
-                                                            {
-                                                                RackNo = rack.RackNo
-                                                            }).ToList()
-                                       }).ToList().OrderByDescending(a => a.ItemId);
+            Func<object> func = () => GetMasterItems();
+
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -265,6 +217,19 @@ namespace DanpheEMR.Controllers.Pharmacy
             //else if (reqType == "getGenericList")
             Func<object> func = () => (from generics in _pharmacyDbContext.PHRMGenericModel.Include(g => g.PHRM_MAP_MstItemsPriceCategories)
                                        select generics).ToList();
+            return InvokeHttpGetFunction<object>(func);
+        }
+        [HttpGet]
+        [Route("GenericWithoutPriceCategory")]
+        public IActionResult getGenerics()
+        {
+            Func<object> func = () => (from generics in _pharmacyDbContext.PHRMGenericModel.Where(g => g.IsActive == true)
+                                       select new
+                                       {
+                                           generics.GenericId,
+                                           generics.GenericName,
+                                           generics.ItemCode
+                                       }).ToList();
             return InvokeHttpGetFunction<object>(func);
         }
 
@@ -600,9 +565,13 @@ namespace DanpheEMR.Controllers.Pharmacy
         private object AddGeneric(string ipDataString, RbacUser currentUser)
         {
             PHRMGenericModel genericData = DanpheJSONConvert.DeserializeObject<PHRMGenericModel>(ipDataString);
+
+            var duplicateGeneric = _pharmacyDbContext.PHRMGenericModel.Any(g => g.GenericName.ToLower() == genericData.GenericName.Trim().ToLower());
+            if (duplicateGeneric)
+            {
+                throw new Exception("Generic Name   " + genericData.GenericName + "   already exists.");
+            }
             genericData.CreatedOn = System.DateTime.Now;
-            int genId = _pharmacyDbContext.PHRMGenericModel.OrderByDescending(a => a.GenericId).First().GenericId;
-            genericData.GenericId = genId + 1;
             genericData.CreatedBy = currentUser.EmployeeId;
             _pharmacyDbContext.PHRMGenericModel.Add(genericData);
             _pharmacyDbContext.SaveChanges();
@@ -969,6 +938,9 @@ namespace DanpheEMR.Controllers.Pharmacy
                 priceCategory.ModifiedOn = DateTime.Now;
                 priceCategory.ModifiedBy = currentUser.EmployeeId;
                 priceCategory.GenericId = category.GenericId;
+                priceCategory.IsCappingEnable = category.IsCappingEnable;
+                priceCategory.CappingDaysLimit = category.CappingDaysLimit;
+                priceCategory.CappingQuantity = category.CappingQuantity;
                 _pharmacyDbContext.SaveChanges();
                 return priceCategory;
             }
@@ -1058,6 +1030,8 @@ namespace DanpheEMR.Controllers.Pharmacy
             supplier.ContactAddress = supplierData.ContactAddress;
             supplier.AdditionalContactInformation = supplierData.AdditionalContactInformation;
             supplier.Description = supplierData.Description;
+            supplier.CountryId = supplierData.CountryId;
+            supplier.CountrySubDivisionId = supplierData.CountrySubDivisionId;
             supplier.City = supplierData.City;
             supplier.PANNumber = supplierData.PANNumber;
             supplier.DDA = supplierData.DDA;
@@ -1154,7 +1128,22 @@ namespace DanpheEMR.Controllers.Pharmacy
         }
         private object UpdateGeneric(string ipDataString, RbacUser currentUser)
         {
+
             PHRMGenericModel genericData = DanpheJSONConvert.DeserializeObject<PHRMGenericModel>(ipDataString);
+            var duplicateGeneric = _pharmacyDbContext.PHRMGenericModel
+    .Any(g =>
+        g.GenericName == genericData.GenericName &&
+        g.IsActive == genericData.IsActive &&
+        g.CategoryId == genericData.CategoryId &&
+        g.ItemCode == genericData.ItemCode &&
+        g.GeneralCategory == genericData.GeneralCategory &&
+        g.TherapeuticCategory == genericData.TherapeuticCategory &&
+        g.Counseling == genericData.Counseling);
+
+            if (duplicateGeneric)
+            {
+                throw new Exception(" Generic Name   " + genericData.GenericName + "   already exists.");
+            }
             _pharmacyDbContext.PHRMGenericModel.Attach(genericData);
             _pharmacyDbContext.Entry(genericData).State = EntityState.Modified;
             _pharmacyDbContext.Entry(genericData).Property(x => x.CreatedOn).IsModified = false;
@@ -1238,6 +1227,386 @@ namespace DanpheEMR.Controllers.Pharmacy
             }).ToList();
             return InvokeHttpGetFunction(func);
         }
+
+
+
+
+        #region Package Billing
+
+        [HttpPost]
+        [Route("Package")]
+        public IActionResult PostPackage([FromBody] PHRMPackage_DTO phrmPackage)
+        {
+            if (phrmPackage == null) throw new ArgumentNullException(nameof(phrmPackage));
+
+            Func<object> func = () => AddPackage(phrmPackage);
+            return InvokeHttpPostFunction(func);
+
+        }
+
+        private object AddPackage(PHRMPackage_DTO phrmPackage)
+        {
+            bool IsPackageAlreadyExist = _pharmacyDbContext.PharmacyPackages.Any(p => p.PharmacyPackageName == phrmPackage.PharmacyPackageName || p.PackageCode == phrmPackage.PackageCode);
+            if (IsPackageAlreadyExist)
+            {
+                throw new Exception("Duplicate PackageName or PackageCode is not allowed");
+            }
+            var currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            var currentDate = DateTime.Now;
+            using (var dbTxn = _pharmacyDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    var package = new PHRMPackageModel();
+                    package.PharmacyPackageName = phrmPackage.PharmacyPackageName;
+                    package.PackageCode = phrmPackage.PackageCode;
+                    package.Description = phrmPackage.Description;
+                    package.IsActive = true;
+                    package.CreatedBy = currentUser.EmployeeId;
+                    package.CreatedOn = currentDate;
+
+                    AddPackageItems(phrmPackage, currentUser, currentDate, package);
+
+                    _pharmacyDbContext.PharmacyPackages.Add(package);
+                    _pharmacyDbContext.SaveChanges();
+                    dbTxn.Commit();
+                    return package;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex.Message);
+                    dbTxn.Rollback();
+                    throw ex;
+                }
+            }
+        }
+
+        private static void AddPackageItems(PHRMPackage_DTO phrmPackage, RbacUser currentUser, DateTime currentDate, PHRMPackageModel package)
+        {
+            if (package.PackageItems == null)
+            {
+                package.PackageItems = new List<PHRMPackageItemModel>();
+            }
+            var packageItems = new List<PHRMPackageItemModel>();
+            phrmPackage.PackageItems.ForEach(item =>
+            {
+                var packageItem = new PHRMPackageItemModel();
+                packageItem.PharmacyPackageId = package.PharmacyPackageId;
+                packageItem.ItemId = item.ItemId;
+                packageItem.GenericId = item.GenericId;
+                packageItem.Quantity = item.Quantity;
+                packageItem.CreatedBy = currentUser.EmployeeId;
+                packageItem.CreatedOn = currentDate;
+                packageItem.IsActive = true;
+                packageItems.Add(packageItem);
+            });
+            package.PackageItems.AddRange(packageItems);
+        }
+
+
+        [HttpPut]
+        [Route("Package")]
+        public IActionResult PutPackage([FromBody] PHRMPackage_DTO phrmPackage)
+        {
+            if (phrmPackage == null) throw new ArgumentNullException(nameof(phrmPackage));
+
+            Func<object> func = () => UpdatePackage(phrmPackage);
+            return InvokeHttpPutFunction(func);
+
+        }
+
+        private object UpdatePackage(PHRMPackage_DTO phrmPackage)
+        {
+            var currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            var currentDate = DateTime.Now;
+
+            using (var dbTxn = _pharmacyDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    var package = GetPackage(phrmPackage.PharmacyPackageId);
+                    UpdatePackageProperties(package, phrmPackage, currentUser, currentDate);
+                    UpdatePackageItems(package, phrmPackage, currentUser, currentDate);
+                    AddNewPackageItems(package, phrmPackage, currentUser, currentDate);
+
+                    _pharmacyDbContext.SaveChanges();
+                    dbTxn.Commit();
+                    return package;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex.Message);
+                    dbTxn.Rollback();
+                    throw ex;
+                }
+            }
+        }
+
+
+        private PHRMPackageModel GetPackage(int packageId)
+        {
+            var package = _pharmacyDbContext.PharmacyPackages
+                .Include(p => p.PackageItems)
+                .FirstOrDefault(p => p.PharmacyPackageId == packageId);
+
+            if (package == null)
+            {
+                throw new ArgumentNullException(nameof(package));
+            }
+
+            return package;
+        }
+
+        private void UpdatePackageProperties(PHRMPackageModel package, PHRMPackage_DTO phrmPackage, RbacUser currentUser, DateTime currentDate)
+        {
+            package.PharmacyPackageName = phrmPackage.PharmacyPackageName;
+            package.PackageCode = phrmPackage.PackageCode;
+            package.Description = phrmPackage.Description;
+            package.IsActive = true;
+            package.ModifiedBy = currentUser.EmployeeId;
+            package.ModifiedOn = currentDate;
+        }
+
+        private void UpdatePackageItems(PHRMPackageModel package, PHRMPackage_DTO phrmPackage, RbacUser currentUser, DateTime currentDate)
+        {
+            var packageItemDictionary = phrmPackage.PackageItems.Where(item => item.PackageItemId != 0).ToDictionary(item => item.PackageItemId);
+
+            foreach (var itemFromServer in package.PackageItems)
+            {
+                if (packageItemDictionary.TryGetValue(itemFromServer.PackageItemId, out var itemFromClient))
+                {
+                    itemFromServer.ItemId = itemFromClient.ItemId;
+                    itemFromServer.Quantity = itemFromClient.Quantity;
+                    itemFromServer.GenericId = itemFromClient.GenericId;
+                }
+                else
+                {
+                    itemFromServer.IsActive = false;
+                }
+
+                itemFromServer.ModifiedOn = currentDate;
+                itemFromServer.ModifiedBy = currentUser.EmployeeId;
+            }
+        }
+
+        private void AddNewPackageItems(PHRMPackageModel package, PHRMPackage_DTO phrmPackage, RbacUser currentUser, DateTime currentDate)
+        {
+            var newPackageItems = phrmPackage.PackageItems.Where(pkgitem => pkgitem.PackageItemId == 0).ToList();
+
+            foreach (var newItem in newPackageItems)
+            {
+                var existingItem = _pharmacyDbContext.PharmacyPackageItems.Where(i => i.PharmacyPackageId == newItem.PharmacyPackageId && i.ItemId == newItem.ItemId && i.GenericId == newItem.GenericId).FirstOrDefault();
+                if (existingItem != null)
+                {
+                    existingItem.Quantity = newItem.Quantity;
+                    existingItem.ModifiedBy = currentUser.EmployeeId;
+                    existingItem.ModifiedOn = currentDate;
+                    existingItem.IsActive = true;
+                }
+                else
+                {
+                    var packageItem = new PHRMPackageItemModel
+                    {
+                        PharmacyPackageId = package.PharmacyPackageId,
+                        ItemId = newItem.ItemId,
+                        GenericId = newItem.GenericId,
+                        Quantity = newItem.Quantity,
+                        CreatedBy = currentUser.EmployeeId,
+                        CreatedOn = currentDate,
+                        IsActive = true
+                    };
+                    package.PackageItems.Add(packageItem);
+                }
+            }
+        }
+
+        #endregion
+
+        [HttpPut]
+        [Route("ActivateDeactivatePackage")]
+        public IActionResult PutActivateDeactivatePackage(int pharmacyPackageId, bool flag)
+        {
+            Func<object> func = () => ActivateDeactivatePackage(pharmacyPackageId, flag);
+            return InvokeHttpPutFunction(func);
+        }
+
+        private object ActivateDeactivatePackage(int pharmacyPackageId, bool flag)
+        {
+
+            var currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            var currentDate = DateTime.Now;
+
+            using (var dbTxn = _pharmacyDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    var package = GetPackage(pharmacyPackageId);
+                    package.IsActive = flag;
+                    package.ModifiedBy = currentUser.EmployeeId;
+                    package.ModifiedOn = currentDate;
+                    _pharmacyDbContext.SaveChanges();
+                    dbTxn.Commit();
+                    return package;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex.Message);
+                    dbTxn.Rollback();
+                    throw ex;
+                }
+            }
+
+        }
+
+        [HttpGet]
+        [Route("Packages")]
+        public IActionResult Packages()
+        {
+            Func<object> func = () => GetPackages();
+            return InvokeHttpGetFunction(func);
+        }
+
+        private object GetPackages()
+        {
+            var packages = (from pkg in _pharmacyDbContext.PharmacyPackages
+                            join emp in _pharmacyDbContext.Employees on pkg.CreatedBy equals emp.EmployeeId
+                            select new
+                            {
+                                PharmacyPackageId = pkg.PharmacyPackageId,
+                                PharmacyPackageName = pkg.PharmacyPackageName,
+                                PackageCode = pkg.PackageCode,
+                                Description = pkg.Description,
+                                EmployeeName = emp.FullName,
+                                IsActive = pkg.IsActive,
+                                CreatedOn = pkg.CreatedOn
+                            }).ToList().OrderByDescending(a => a.CreatedOn);
+            return packages;
+        }
+
+        [HttpGet]
+        [Route("PackageInfo")]
+        public IActionResult GetPackageInfo(int pharmacyPackageId)
+        {
+            Func<object> func = () => GetPackage(pharmacyPackageId);
+            return InvokeHttpGetFunction(func);
+        }
+
+        [HttpGet]
+        [Route("PackagesForSale")]
+        public IActionResult GetPackagesForSale()
+        {
+            Func<object> func = () => _pharmacyDbContext.PharmacyPackages
+                .Where(pkg => pkg.IsActive)
+                .Select(pkg => new
+                {
+                    PharmacyPackageId = pkg.PharmacyPackageId,
+                    IsActive = pkg.IsActive,
+                    PharmacyPackageName = pkg.PharmacyPackageName,
+                    PackageCode = pkg.PackageCode,
+                    Description = pkg.Description
+                }).ToList();
+            return InvokeHttpGetFunction(func);
+        }
+
+
+        [HttpGet]
+        [Route("PackageItemForSale")]
+        public IActionResult GetPackageItemForSale()
+        {
+            Func<object> func = () => GetPackageItems();
+            return InvokeHttpGetFunction(func);
+        }
+
+        private object GetPackageItems()
+        {
+            var packageItems = (from pkgItem in _pharmacyDbContext.PharmacyPackageItems.Where(pkgitem => pkgitem.IsActive)
+                                join item in _pharmacyDbContext.PHRMItemMaster on pkgItem.ItemId equals item.ItemId
+                                join gen in _pharmacyDbContext.PHRMGenericModel on pkgItem.GenericId equals gen.GenericId
+                                select new
+                                {
+                                    PharmacyPackageId = pkgItem.PharmacyPackageId,
+                                    IsActive = pkgItem.IsActive,
+                                    PackageItemId = pkgItem.PackageItemId,
+                                    ItemId = pkgItem.ItemId,
+                                    ItemName = item.ItemName,
+                                    GenericId = pkgItem.GenericId,
+                                    GenericName = gen.GenericName,
+                                    ItemCode = gen.ItemCode,
+                                    Quantity = pkgItem.Quantity
+                                }).ToList();
+            return packageItems;
+        }
+        [HttpGet]
+        [Route("ItemsWithGenericId")]
+        public IActionResult GetItemsWithGenericId()
+        {
+            Func<object> func = () => (from item in _pharmacyDbContext.PHRMItemMaster.Where(i => i.IsActive == true)
+                                       join generic in _pharmacyDbContext.PHRMGenericModel on item.GenericId equals generic.GenericId
+                                       select new
+                                       {
+                                           item.ItemId,
+                                           item.ItemName,
+                                           generic.GenericId
+                                       }).ToList();
+            return InvokeHttpGetFunction(func);
+        }
+        [HttpGet]
+        [Route("PackageInfoByPharmacyPackageId")]
+        public IActionResult GetPackageWithItemsInfo(int pharmacyPackageId)
+        {
+            Func<object> func = () => GetPackageWithItems(pharmacyPackageId);
+            return InvokeHttpGetFunction(func);
+        }
+        private PHRMPackage_DTO GetPackageWithItems(int pharmacyPackageId)
+        {
+            var package = (from pack in _pharmacyDbContext.PharmacyPackages.Where(p => p.PharmacyPackageId == pharmacyPackageId && p.IsActive == true)
+                           select new PHRMPackage_DTO
+                           {
+                               PackageCode = pack.PackageCode,
+                               PharmacyPackageName = pack.PharmacyPackageName,
+                               PharmacyPackageId = pack.PharmacyPackageId,
+                               Description = pack.Description
+                           }).FirstOrDefault();
+
+            var packageItems = (from packItems in _pharmacyDbContext.PharmacyPackageItems.Where(i => i.PharmacyPackageId == package.PharmacyPackageId && i.IsActive == true)
+                                join generic in _pharmacyDbContext.PHRMGenericModel on packItems.GenericId equals generic.GenericId
+                                join item in _pharmacyDbContext.PHRMItemMaster on packItems.ItemId equals item.ItemId
+                                select new PHRMPackageItem_DTO
+                                {
+                                    PackageItemId = packItems.PackageItemId,
+                                    GenericName = generic.GenericName,
+                                    GenericId = generic.GenericId,
+                                    ItemName = item.ItemName,
+                                    ItemId = item.ItemId,
+                                    ItemCode = generic.ItemCode,
+                                    Quantity = packItems.Quantity,
+                                    PharmacyPackageId = packItems.PharmacyPackageId
+                                }).ToList();
+            package.PackageItems = packageItems;
+
+
+            if (package == null)
+            {
+                throw new ArgumentNullException(nameof(package));
+            }
+
+            return package;
+        }
+
+        private object GetMasterItems()
+        {
+            DataTable invoiceList = DALFunctions.GetDataTableFromStoredProc("SP_PHRM_GetMasterItems", _pharmacyDbContext);
+            return invoiceList;
+        }
+
+        [HttpGet]
+        [Route("MasterItemPriceCategories")]
+        public IActionResult GetMasterItemPriceCategories(int ItemId)
+        {
+            Func<object> func = () => _pharmacyDbContext.PHRM_MAP_MstItemsPriceCategories.Where(pc => pc.ItemId == ItemId).ToList();
+            return InvokeHttpGetFunction(func);
+        }
+
     }
 }
 

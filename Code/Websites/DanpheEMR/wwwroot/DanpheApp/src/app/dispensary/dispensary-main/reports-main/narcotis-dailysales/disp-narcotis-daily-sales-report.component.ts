@@ -138,7 +138,7 @@ export class DISPNarcoticsDailySalesReportComponent {
         try {
             if ((typeof this.selectedItem !== 'object') || (typeof this.selectedItem === "undefined") || (typeof this.selectedItem === null)) {
                 this.selectedItem = null;
-                this.itemId = 0;
+                this.itemId = null;
             }
         }
         catch (exception) {

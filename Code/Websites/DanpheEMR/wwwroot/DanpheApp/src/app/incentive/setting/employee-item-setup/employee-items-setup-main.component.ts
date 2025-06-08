@@ -21,6 +21,7 @@ export class EmployeeItemsSetupMainComponent {
   public EmployeeIncentiveSetupGridColumns: Array<any> = [];
   public EmployeeIncentiveList: Array<any> = [];
   public showEmployeeSetUpPopup: boolean = false;
+  IsViewMapping: boolean = false;
   public allDoctorList: any = [];
   public allBillitmList: any = [];
   public selectedEmployee: number = null;
@@ -66,6 +67,13 @@ export class EmployeeItemsSetupMainComponent {
       case 'editItemsPercent': {
         this.selectedEmployee = $event.Data.EmployeeId;
         this.showEmployeeSetUpPopup = true;
+        this.IsViewMapping = false;
+        break;
+      }
+      case 'viewMapping': {
+        this.selectedEmployee = $event.Data.EmployeeId;
+        this.showEmployeeSetUpPopup = true;
+        this.IsViewMapping = true;
         break;
       }
       case 'edit-tds': {
@@ -165,6 +173,7 @@ export class EmployeeItemsSetupMainComponent {
     this.selectedEmployee = null;
     this.isNewEmpIncentive = true;//we'll check it's value later on.
     this.showEmployeeSetUpPopup = true;
+    this.IsViewMapping = true;
   }
 
 

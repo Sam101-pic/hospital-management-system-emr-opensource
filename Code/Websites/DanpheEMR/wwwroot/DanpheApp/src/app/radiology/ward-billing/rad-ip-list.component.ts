@@ -1,16 +1,15 @@
-import { Component, ChangeDetectorRef, Output, EventEmitter } from '@angular/core';
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { Router } from '@angular/router';
-import { Patient } from "../../patients/shared/patient.model";
 import GridColumnSettings from '../../shared/danphe-grid/grid-column-settings.constant';
 import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 //import { InPatientVM } from '../shared/InPatientVM';
 import { ADT_BLService } from '../../adt/shared/adt.bl.service';
+import { CoreService } from '../../core/shared/core.service';
 import { InPatientVM } from '../../labs/shared/InPatientVM';
 import { LabsBLService } from '../../labs/shared/labs.bl.service';
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from '../../shared/danphe-grid/NepaliColGridSettingsModel';
 import { WardPatientVM } from './ward-patient-view-model';
-import { CommonFunctions } from '../../shared/common.functions';
-import { NepaliDateInGridParams, NepaliDateInGridColumnDetail } from '../../shared/danphe-grid/NepaliColGridSettingsModel';
 
 @Component({
   templateUrl: "./rad-ip-list.html",
@@ -34,7 +33,9 @@ export class Rad_InpatientListComponent {
     public router: Router,
     public labBLService: LabsBLService,
     public msgBoxServ: MessageboxService,
-    public changeDetector: ChangeDetectorRef, public admissionBLService: ADT_BLService) {
+    public changeDetector: ChangeDetectorRef,
+    public coreService: CoreService,
+    public admissionBLService: ADT_BLService) {
     this.WardGridColumns = GridColumnSettings.RadiologyWardBillingColumns;
     this.GetInpatientlist();
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('AdmittedDate', true));
@@ -82,7 +83,7 @@ export class Rad_InpatientListComponent {
     retPatient.PatientFullName = patInfo.Name;
     retPatient.PatientVisitId = patInfo.PatientVisitId;
     retPatient.VisitDateTime = patInfo.AdmittedDate;
-    retPatient.Age = CommonFunctions.GetFormattedAge(patInfo.DateOfBirth);
+    retPatient.Age = this.coreService.CalculateAge(patInfo.DateOfBirth);
 
     let ward_bedName = patInfo.BedInformation != null ? patInfo.BedInformation.Ward + "/" + patInfo.BedInformation.BedCode : null;
     retPatient.Ward_BedName = ward_bedName;

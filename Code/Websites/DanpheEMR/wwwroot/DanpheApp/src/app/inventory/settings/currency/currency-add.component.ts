@@ -7,6 +7,7 @@ import { SecurityService } from '../../../security/shared/security.service';
 //Parse, validate, manipulate, and display dates and times in JS.
 import * as moment from 'moment/moment';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 
 
 @Component({
@@ -20,6 +21,9 @@ export class CurrencyAddComponent {
     public showAddPage: boolean = false;
     @Input("selectedCurrency")
     public selectedCurrency: CurrencyModel;
+
+    @Input(" currencyList")
+    public CurrencyList = new Array<CurrencyModel>();
     @Output("callback-add")
     callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
     public update: boolean = false;
@@ -67,6 +71,13 @@ export class CurrencyAddComponent {
             this.CurrentCurrency.CurrencyValidator.controls[i].updateValueAndValidity();
         }
 
+        if (this.CurrencyList && this.CurrencyList.length) {
+            const isCurrencyCodeAlreadyExists = this.CurrencyList.some(a => a.CurrencyCode.toLowerCase() === this.CurrentCurrency.CurrencyCode.toLowerCase());
+            if (isCurrencyCodeAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add Currency as the Currency Code "${this.CurrentCurrency.CurrencyCode}" already exists.`]);
+                return;
+            }
+        }
 
         if (this.CurrentCurrency.IsValidCheck(undefined, undefined)) {
             this.loading = true;
@@ -94,6 +105,13 @@ export class CurrencyAddComponent {
             this.CurrentCurrency.CurrencyValidator.controls[i].updateValueAndValidity();
         }
 
+        if (this.CurrencyList && this.CurrencyList.length) {
+            const isCurrencyCodeAlreadyExists = this.CurrencyList.some(a => a.CurrencyCode.toLowerCase() === this.CurrentCurrency.CurrencyCode.toLowerCase() && a.CurrencyID !== this.CurrentCurrency.CurrencyID);
+            if (isCurrencyCodeAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Currency as the Currency Code "${this.CurrentCurrency.CurrencyCode}" already exists.`]);
+                return;
+            }
+        }
         if (this.CurrentCurrency.IsValidCheck(undefined, undefined)) {
             this.loading = true;
             this.invSettingBL.UpdateCurrency(this.CurrentCurrency)

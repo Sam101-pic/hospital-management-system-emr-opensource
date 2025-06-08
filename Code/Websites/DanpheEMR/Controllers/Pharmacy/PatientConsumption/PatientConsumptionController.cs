@@ -8,7 +8,6 @@ using DanpheEMR.ServerModel.MedicareModels;
 using DanpheEMR.ServerModel.PatientModels;
 using DanpheEMR.ServerModel.PharmacyModels;
 using DanpheEMR.ServerModel.PharmacyModels.Patient_Consumption;
-using DanpheEMR.ServerModel.SSFModels.ClaimResponse;
 using DanpheEMR.Services.Dispensary.DTOs.PharmacyConsumption;
 using DanpheEMR.Services.Dispensary.DTOs.PharmacyPatientConsumption;
 using DanpheEMR.Utilities;
@@ -16,6 +15,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,7 +57,8 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                 catch (Exception ex)
                 {
                     dbTxn.Rollback();
-                    throw new Exception(ex.Message.ToString());
+                    Log.Error("Failed to save patient consumption " + ex.ToString());
+                    throw ex;
                 }
             }
         }
@@ -221,7 +222,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
 
                     SaveInvoice(consumptionInvoiceObj, currentUser, out invoiceTxn, currFiscalYearId);
 
-                    if (invoiceitems == null || invoiceitems.Count == 0) throw new ArgumentException("No Items to update.");
+                    if (invoiceitems.Count == 0) throw new ArgumentException("No Items to update.");
 
                     SaveInvoiceItems(invoiceitems, invoiceTxn.InvoiceId);
 
@@ -235,9 +236,9 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                         SaveCreditBillStatus(invoiceTxn, currentUser);
                     }
 
-                    if (employeeCashTransactions.Count() > 0)
+                    if (employeeCashTransactions.Count > 0)
                     {
-                        SaveEmployeeCashTransaction(invoiceTxn, currentUser, employeeCashTransactions);
+                        SaveEmployeeCashTransaction(invoiceTxn, employeeCashTransactions);
                     }
 
                     if (invoiceTxn.SchemeId > 0)
@@ -268,6 +269,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                 catch (Exception ex)
                 {
                     dbTxn.Rollback();
+                    Log.Error("Failed to create invoice from consumption clearance" + ex.ToString());
                     throw new Exception("Invoice details is null or failed to Save. Exception Detail: " + ex.Message.ToString());
                 }
             }
@@ -395,7 +397,8 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                     OutAmount = consumptionInvoiceObj.DepositDeductAmount,
                     DepositBalance = depositDetails.DepositBalance - consumptionInvoiceObj.DepositDeductAmount,
                     PaymentMode = ENUM_BillPaymentMode.cash,
-                    ReceiptNo = GetDepositReceiptNo(_patientConsumptionDbContext, currFiscalYearId)
+                    ReceiptNo = GetDepositReceiptNo(_patientConsumptionDbContext, currFiscalYearId),
+                    StoreId = consumptionInvoiceObj.StoreId
                 };
                 _patientConsumptionDbContext.Deposits.Add(dep);
                 _patientConsumptionDbContext.SaveChanges();
@@ -532,7 +535,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
             return invoiceTxn;
         }
 
-        private void SaveEmployeeCashTransaction(PHRMInvoiceTransactionModel invoiceTxn, RbacUser currentUser, List<PHRMEmployeeCashTransaction> empCashTxns)
+        private void SaveEmployeeCashTransaction(PHRMInvoiceTransactionModel invoiceTxn, List<PHRMEmployeeCashTransaction> empCashTxns)
         {
             empCashTxns.ForEach(txn => { txn.ReferenceNo = invoiceTxn.InvoiceId; });
             _patientConsumptionDbContext.PharmacyEmployeeCashTransactions.AddRange(empCashTxns);
@@ -561,7 +564,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
             invoiceTxn.Tender = consumptionInvoiceObj.Tender;
             invoiceTxn.SubTotal = consumptionInvoiceObj.SubTotal;
             invoiceTxn.CreateOn = DateTime.Now;
-            invoiceTxn.IsOutdoorPat = consumptionInvoiceObj.VisitType == ENUM_VisitType.inpatient ? true : false;
+            invoiceTxn.IsOutdoorPat = consumptionInvoiceObj.VisitType == ENUM_VisitType.inpatient;
             invoiceTxn.CounterId = (int)consumptionInvoiceObj.CounterId;
             invoiceTxn.FiscalYearId = currFiscalYearId;
             invoiceTxn.VATAmount = 0;
@@ -570,6 +573,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
             invoiceTxn.PatientVisitId = consumptionInvoiceObj.PatientVisitId;
             invoiceTxn.SchemeId = consumptionInvoiceObj.SchemeId;
             invoiceTxn.ClaimCode = visitDetails != null ? visitDetails.ClaimCode : null;
+            invoiceTxn.PrescriberId = consumptionInvoiceObj.PrescriberId;
             invoiceTxn.PaidAmount = consumptionInvoiceObj.PaidAmount;
             invoiceTxn.IsCopayment = consumptionInvoiceObj.IsCoPayment;
 
@@ -724,7 +728,8 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                                           PatientVisitId = patConsumption.PatientVisitId,
                                           ContactNo = pat.PhoneNumber,
                                           StoreId = patConsumption.StoreId,
-                                          SchemeId = patConsumption.SchemeId
+                                          SchemeId = patConsumption.SchemeId,
+                                          PrescriberId = patConsumption.PrescriberId
                                       }
                                      ).FirstOrDefault();
 
@@ -803,7 +808,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
 
                     List<PatientConsumptionReturnItemModel> patientConsumptionReturnItems = new List<PatientConsumptionReturnItemModel>();
 
-                    patientConsumptionItems.ForEach(item =>
+                    patientConsumptionItems.ForEach((Action<PatientConsumptionItemModel>)(item =>
                     {
                         var patientConsumptionReturnItem = new PatientConsumptionReturnItemModel();
                         patientConsumptionReturnItem.PatientConsumptionItemId = item.PatientConsumptionItemId;
@@ -849,8 +854,8 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                         foreach (var stock in stockList)
                         {
                             double consumedQty = StockTransactions.Where(s => s.StockId == stock.StockId).Sum(s => s.OutQty);
-                            double? previouslyReturnedQuantity = StockTransactions.Where(s => s.StockId == stock.StockId).Sum(s => s.InQty);
-                            double totalReturnableQtyForThisStock = consumedQty - (previouslyReturnedQuantity ?? 0);
+                            double previouslyReturnedQuantity = StockTransactions.Where(s => s.StockId == stock.StockId).Sum(s => s.InQty);
+                            double totalReturnableQtyForThisStock = consumedQty - previouslyReturnedQuantity;
                             double remainingReturnedQuantity = (double)item.Quantity;
 
                             PHRMStockTransactionModel newStockTxn = null;
@@ -868,7 +873,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                                     // create new txn for this store
                                     newStockTxn = new PHRMStockTransactionModel(
                                                         storeStock: stock,
-                                                        transactionType: ENUM_PHRM_StockTransactionType.PHRMPatientConsumptionReturn,
+                                                        transactionType: ENUM_PHRM_StockTransactionType.PatientConsumptionCancel,
                                                         transactionDate: currentDate,
                                                         referenceNo: patientConsumptionReturnItem.PatientConsumptionReturnItemId,
                                                         createdBy: currentUser.EmployeeId,
@@ -890,8 +895,8 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                                             stockMaster: stock.StockMaster,
                                             storeId: item.ReturningStoreId,
                                             quantity: totalReturnableQtyForThisStock,
-                                            costPrice: returningStoreStock.CostPrice,
-                                            salePrice: returningStoreStock.SalePrice
+                                            costPrice: stock.CostPrice,
+                                            salePrice: stock.SalePrice
                                             );
 
                                         _patientConsumptionDbContext.StoreStocks.Add(returningStoreStock);
@@ -900,7 +905,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                                     // create new txn for this store
                                     newStockTxn = new PHRMStockTransactionModel(
                                                         storeStock: returningStoreStock,
-                                                        transactionType: ENUM_PHRM_StockTransactionType.PHRMPatientConsumptionReturn,
+                                                        transactionType: ENUM_PHRM_StockTransactionType.PatientConsumptionCancel,
                                                         transactionDate: currentDate,
                                                         referenceNo: patientConsumptionReturnItem.PatientConsumptionReturnItemId,
                                                         createdBy: currentUser.EmployeeId,
@@ -920,7 +925,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                                     // create new txn for this store
                                     newStockTxn = new PHRMStockTransactionModel(
                                                         storeStock: stock,
-                                                        transactionType: ENUM_PHRM_StockTransactionType.PHRMPatientConsumptionReturn,
+                                                        transactionType: ENUM_PHRM_StockTransactionType.PatientConsumptionCancel,
                                                         transactionDate: currentDate,
                                                         referenceNo: patientConsumptionReturnItem.PatientConsumptionReturnItemId,
                                                         createdBy: currentUser.EmployeeId,
@@ -953,7 +958,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                                     // create new txn for this store
                                     newStockTxn = new PHRMStockTransactionModel(
                                                         storeStock: returningStoreStock,
-                                                        transactionType: ENUM_PHRM_StockTransactionType.PHRMPatientConsumptionReturn,
+                                                        transactionType: ENUM_PHRM_StockTransactionType.PatientConsumptionCancel,
                                                         transactionDate: currentDate,
                                                         referenceNo: patientConsumptionReturnItem.PatientConsumptionReturnItemId,
                                                         createdBy: currentUser.EmployeeId,
@@ -975,7 +980,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
 
                         }
 
-                    });
+                    }));
 
                     dbTxn.Commit();
                     return consumptionReturnReceiptNo;
@@ -1292,7 +1297,7 @@ namespace DanpheEMR.Controllers.Pharmacy.PatientConsumption
                                        {
                                            patcon.PatientConsumptionId,
                                            patcon.ConsumptionReceiptNo,
-                                           IpNo = patVisit,
+                                           IpNo = patVisit.VisitCode,
                                            ConsumptionDate = patcon.CreatedOn,
                                            patcon.TotalAmount,
                                            UserName = emp.FullName

@@ -19,6 +19,10 @@ export class BillingPackage {
   public SchemeId: number = 0;
   public PriceCategoryId: number = 0;
   public IsEditable: boolean = false;
+  public IsItemLevelDiscount: boolean = false;
+  public IsDiscountEditableInSales: boolean = false;
+  public IsHealthPackage: boolean = true;
+  public IsItemLoadPackage: boolean = false;
   public BillingPackageValidator: FormGroup = null;
 
   public PackageServiceItems: Array<BillingPackageItem> = new Array<BillingPackageItem>();
@@ -28,7 +32,8 @@ export class BillingPackage {
     this.BillingPackageValidator = _formBuilder.group({
       'BillingPackageName': ['', Validators.compose([Validators.required, Validators.maxLength(100)])],
       'Description': [''],
-      'PackageCode': ['', Validators.compose([Validators.required, Validators.maxLength(20)])]
+      'PackageCode': ['', Validators.compose([Validators.required, Validators.maxLength(20)])],
+
     });
   }
 

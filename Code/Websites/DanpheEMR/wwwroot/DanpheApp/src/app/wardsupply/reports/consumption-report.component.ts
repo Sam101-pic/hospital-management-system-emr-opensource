@@ -1,13 +1,12 @@
-import { Component, Directive, ViewChild } from '@angular/core';
-import { FormControlName } from '@angular/forms';
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
 import * as moment from 'moment/moment';
+import { SecurityService } from '../../security/shared/security.service';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
-import { GridEmitModel } from "../../shared/danphe-grid/grid-emit.model";
-import { WardSupplyBLService } from "../shared/wardsupply.bl.service";
+import { ENUM_MessageBox_Status } from '../../shared/shared-enums';
 import WARDGridColumns from "../shared/ward-grid-cloumns";
 import { WARDReportsModel } from '../shared/ward-report.model';
-import { Router } from '@angular/router';
-import { SecurityService } from '../../security/shared/security.service';
+import { WardSupplyBLService } from "../shared/wardsupply.bl.service";
 
 
 @Component({
@@ -52,15 +51,14 @@ export class WardConsumptionReportComponent {
   Load() {
     this.wardBLService.GetWardConsumptionReport(this.wardReports)
       .subscribe(res => {
-        if (res.Status == 'OK') {
+        if (res.Status == 'OK' && res.Results.length) {
           this.WardConsumptionData = res.Results;
         }
         else {
 
-          this.msgBoxServ.showMessage("failed", [res.ErrorMessage])
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [res.ErrorMessage])
         }
       });
 
   }
-
 }

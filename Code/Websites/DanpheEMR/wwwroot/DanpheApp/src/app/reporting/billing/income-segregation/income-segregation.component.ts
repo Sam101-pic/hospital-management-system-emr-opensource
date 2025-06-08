@@ -1,11 +1,11 @@
-import { Component, Directive, ViewChild } from '@angular/core';
-import { ReportingService } from "../../../reporting/shared/reporting-service";
-import { DLService } from "../../../shared/dl.service"
+import { Component } from '@angular/core';
 import * as moment from 'moment/moment';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { CoreService } from "../../../core/shared/core.service";
+import { ReportingService } from "../../../reporting/shared/reporting-service";
 import { CommonFunctions } from '../../../shared/common.functions';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { DLService } from "../../../shared/dl.service";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 
 @Component({
   templateUrl: "./income-segregation.html"
@@ -53,6 +53,8 @@ export class RPT_BIL_IncomeSegregationComponent {
 
   constructor(
     public dlService: DLService, public msgBoxServ: MessageboxService, public coreService: CoreService, public reportServ: ReportingService) {
+    this.IncomeSegregationColumns = this.reportServ.reportGridCols.GetColumn_Billing_IncomeSegregation;
+
   }
 
   ngAfterViewChecked() {
@@ -64,7 +66,7 @@ export class RPT_BIL_IncomeSegregationComponent {
   };
 
   public loading: boolean = false;
-  
+
   Load() {
     //this is syntactic sugar code 
     //Reset all Global variable to Zero 
@@ -90,7 +92,6 @@ export class RPT_BIL_IncomeSegregationComponent {
 
   Success(res) {
     if (res.Status == "OK" && res.Results.length > 0) {
-      this.IncomeSegregationColumns = this.reportServ.reportGridCols.GetColumn_Billing_IncomeSegregation;
       this.incomeSegregationData = res.Results;
       this.CalculateSummaryAmounts(this.incomeSegregationData);
       this.FormatAmountsForGrid(this.incomeSegregationData);//pass this data for formatting.
@@ -98,7 +99,6 @@ export class RPT_BIL_IncomeSegregationComponent {
     }
     else if (res.Status == "OK" && res.Results.length == 0) {
       this.msgBoxServ.showMessage("notice-message", ["No Data is Available For Selcted Parameter"]);
-      this.IncomeSegregationColumns = this.reportServ.reportGridCols.GetColumn_Billing_IncomeSegregation;
       this.incomeSegregationData = res.Results;
     }
     else {
@@ -163,11 +163,14 @@ export class RPT_BIL_IncomeSegregationComponent {
       this.tot_CreditDiscount = CommonFunctions.parseAmount(this.tot_CreditDiscount);
       this.tot_GrossSales = CommonFunctions.parseAmount(this.tot_GrossSales);
       this.tot_TotalDiscount = CommonFunctions.parseAmount(this.tot_TotalDiscount);
-      this.tot_ReturnCashSales = CommonFunctions.parseAmount(this.tot_ReturnCashSales);
+
+      //! Bikesh: Adjusted the 'tot_ReturnCashSales', 'tot_ReturnCreditSales', tot_TotalSalesReturn  because they are negative and we need calculate only positive integer for summary report.
+      this.tot_ReturnCashSales = - (CommonFunctions.parseAmount(this.tot_ReturnCashSales));
+      this.tot_ReturnCreditSales = - (CommonFunctions.parseAmount(this.tot_ReturnCreditSales));
+      this.tot_TotalSalesReturn = - (CommonFunctions.parseAmount(this.tot_TotalSalesReturn));
+
       this.tot_ReturnCashDiscount = CommonFunctions.parseAmount(this.tot_ReturnCashDiscount);
-      this.tot_ReturnCreditSales = CommonFunctions.parseAmount(this.tot_ReturnCreditSales);
       this.tot_ReturnCreditDiscount = CommonFunctions.parseAmount(this.tot_ReturnCreditDiscount);
-      this.tot_TotalSalesReturn = CommonFunctions.parseAmount(this.tot_TotalSalesReturn);
       this.tot_TotalReturnDiscount = CommonFunctions.parseAmount(this.tot_TotalReturnDiscount);
       this.tot_NetSales = CommonFunctions.parseAmount(this.tot_NetSales);
 

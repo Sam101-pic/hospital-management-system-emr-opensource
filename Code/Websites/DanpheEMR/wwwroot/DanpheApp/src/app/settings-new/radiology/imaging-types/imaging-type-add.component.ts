@@ -1,9 +1,11 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 
 import { ImagingType } from '../../../radiology/shared/imaging-type.model';
 import { SecurityService } from '../../../security/shared/security.service';
-import { SettingsBLService } from '../../shared/settings.bl.service';
+import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+import { SettingsBLService } from '../../shared/settings.bl.service';
 
 
 @Component({
@@ -18,6 +20,10 @@ export class ImagingTypeAddComponent {
     public showAddPage: boolean = false;
     @Input("selectedImgType")
     public selectedImgType: ImagingType;
+
+    @Input("imgTypeList")
+    public ImgTypeList = new Array<ImagingType>();
+
     @Output("callback-add")
     callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
     public update: boolean = false;
@@ -49,16 +55,34 @@ export class ImagingTypeAddComponent {
             this.CurrentImagingType.ImagingTypeValidator.controls[i].markAsDirty();
             this.CurrentImagingType.ImagingTypeValidator.controls[i].updateValueAndValidity();
         }
+
+        //Checking if Imaging Item Name already exists
+        if (this.ImgTypeList && this.ImgTypeList.length) {
+            const isAlreadyExists = this.ImgTypeList.some(a => a.ImagingTypeName.toLowerCase() === this.CurrentImagingType.ImagingTypeName.toLowerCase());
+            if (isAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add imaging type as the Imaging Type "${this.CurrentImagingType.ImagingTypeName}" already exists.`]);
+                return;
+            }
+        }
+
         //if valid then call the BL service to do post request.
         if (this.CurrentImagingType.IsValidCheck(undefined, undefined) == true) {
 
             this.settingsBLService.AddImagingType(this.CurrentImagingType)
-                .subscribe(res => {
-                    this.showMessageBox("Success", "Item Added");
-                    this.CallBackAddUpdate(res);
-
-                },
-                err => this.logError(err));
+                .subscribe(
+                    (res: DanpheHTTPResponse) => {
+                        if (res.Status == ENUM_DanpheHTTPResponses.OK) {
+                            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['Imaging Type Added Successfully']);
+                            this.CallBackAddUpdate(res);
+                        } else {
+                            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [`Failed to add Imaging Type!`]);
+                        }
+                        this.Close();
+                    },
+                    err => {
+                        this.logError(err);
+                        this.Close();
+                    });
         }
     }
     UpdateImagingType(): void {
@@ -68,24 +92,44 @@ export class ImagingTypeAddComponent {
             this.CurrentImagingType.ImagingTypeValidator.controls[i].markAsDirty();
             this.CurrentImagingType.ImagingTypeValidator.controls[i].updateValueAndValidity();
         }
+
+        //Checking if Imaging Item Name already exists
+        if (this.ImgTypeList && this.ImgTypeList.length) {
+            const isAlreadyExists = this.ImgTypeList.some(a => a.ImagingTypeName.toLowerCase() === this.CurrentImagingType.ImagingTypeName.toLowerCase() && a.ImagingTypeId !== this.CurrentImagingType.ImagingTypeId);
+            if (isAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update imaging type as the Imaging type "${this.CurrentImagingType.ImagingTypeName}" already exists.`]);
+                return;
+            }
+        }
+
         //if valid then call the BL service to do post request.
         if (this.CurrentImagingType.IsValidCheck(undefined, undefined) == true) {
 
             this.settingsBLService.UpdateImagingType(this.CurrentImagingType)
-                .subscribe(res => {
-                    this.showMessageBox("Success", "Item Updated");
-                    this.CallBackAddUpdate(res);
+                .subscribe(
+                    (res: DanpheHTTPResponse) => {
+                        if (res.Status == ENUM_DanpheHTTPResponses.OK && res.Results) {
+                            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Imaging Type Updated Successfully"]);
+                            this.CallBackAddUpdate(res);
+                        } else {
+                            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Failed to update Imaging Type!"]);
+                        }
+                        this.Close();
 
-                },
-                err => this.logError(err));
+                    },
+                    err => {
+                        this.logError(err);
+                        this.Close();
+                    }
+                );
         }
     }
     CallBackAddUpdate(res) {
-        if (res.Status == "OK") {
+        if (res.Status == ENUM_DanpheHTTPResponses.OK) {
             this.callbackAdd.emit({ imgType: res.Results });
         }
         else {
-            this.showMessageBox("Error", "Check log for details");
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Check log for details"]);
             console.log(res.ErrorMessage);
         }
     }
@@ -103,15 +147,15 @@ export class ImagingTypeAddComponent {
     }
     FocusElementById(id: string) {
         window.setTimeout(function () {
-          let itmNameBox = document.getElementById(id);
-          if (itmNameBox) {
-            itmNameBox.focus();
-          }
+            let itmNameBox = document.getElementById(id);
+            if (itmNameBox) {
+                itmNameBox.focus();
+            }
         }, 600);
-      }
-      hotkeys(event){
-          if(event.keyCode==27){
-              this.Close()
-          }
-      }
+    }
+    hotkeys(event) {
+        if (event.keyCode == 27) {
+            this.Close()
+        }
+    }
 }

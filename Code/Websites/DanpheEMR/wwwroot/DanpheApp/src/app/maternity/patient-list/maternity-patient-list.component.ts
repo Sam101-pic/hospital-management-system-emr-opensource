@@ -1,19 +1,19 @@
-import { ChangeDetectorRef, Component, HostListener } from '@angular/core'
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
-import { SecurityService } from "../../security/shared/security.service"
+import { ChangeDetectorRef, Component } from '@angular/core';
+import { Router } from '@angular/router';
+import * as moment from 'moment/moment';
 import { CoreService } from '../../core/shared/core.service';
+import { SecurityService } from "../../security/shared/security.service";
+import { GridEmitModel } from '../../shared/danphe-grid/grid-emit.model';
 import { MessageboxService } from '../../shared/messagebox/messagebox.service';
 import { MaternityBLService } from '../shared/maternity.bl.service';
-import { MaternityPatientListModel, MaternityPatientVM } from '../shared/maternity.model';
-import * as moment from 'moment/moment';
 import MaternityGridColumnSettings from '../shared/maternity.grid.settings';
-import { GridEmitModel } from '../../shared/danphe-grid/grid-emit.model';
+import { MaternityPatientListModel, MaternityPatientVM } from '../shared/maternity.model';
 import { PatientInfoVM } from './maternity-patient-add/patient-detailsVM';
-import { HttpResponse } from '@angular/common/http';
 
 
 @Component({
-  templateUrl: "./maternity-patient-list.html"
+  templateUrl: "./maternity-patient-list.html",
+  host: { '(window:keydown)': 'hotkeys($event)' }
 })
 
 // App Component class
@@ -42,10 +42,11 @@ export class MaternityPatientListComponent {
 
   public allKeys: Array<string>;
   public tmr: any;
-
-  @HostListener('document:keydown.escape', ['$event']) onKeydownHandler(event: KeyboardEvent) {
-    this.allKeys.forEach(k => this.showHideButtonObj[k] = false);
-    this.showPatientAddPopup = false;
+  hotKeys(event) {
+    if (event.keyCode === 27) {
+      this.allKeys.forEach(k => this.showHideButtonObj[k] = false);
+      this.showPatientAddPopup = false;
+    }
   }
 
   constructor(public securityService: SecurityService, public router: Router,

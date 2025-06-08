@@ -24,7 +24,8 @@
   <div class="col-md-12">
     <div class="row">
       <div class="col-md-7">
-        <from-to-date-select (on-change)="OnDateRangeChange($event)">
+        <from-to-date-select (on-change)="OnDateRangeChange($event)"
+                             [date-settings-name]="'inctv-txns'">
         </from-to-date-select>
       </div>
 

@@ -17,4 +17,5 @@ export class PharmacyProvisionalReturnReceipt_DTO {
     ReturnDate: string = null;
     ProvisionalInvoiceItems: PharmacyProvisionalReturnReceiptItem_DTO[];
     CancellationReceiptNo: number = null;
+    WardNumber: number = null;
 }

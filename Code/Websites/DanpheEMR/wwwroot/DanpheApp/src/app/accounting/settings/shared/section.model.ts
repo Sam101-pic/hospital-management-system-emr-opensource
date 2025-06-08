@@ -1,11 +1,8 @@
 import {
-  NgForm,
-  FormGroup,
-  FormControl,
-  Validators,
   FormBuilder,
-  ReactiveFormsModule
-} from '@angular/forms'
+  FormGroup,
+  Validators
+} from '@angular/forms';
 
 export class SectionModel {
 
@@ -15,6 +12,7 @@ export class SectionModel {
   public SectionValidator: FormGroup = null;
   public IsDefault: boolean = false;
   public IsActive: boolean = true;
+  public HospitalId: number = 0;
 
   constructor() {
 

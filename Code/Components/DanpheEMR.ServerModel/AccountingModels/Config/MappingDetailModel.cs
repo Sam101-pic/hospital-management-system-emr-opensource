@@ -25,6 +25,7 @@ namespace DanpheEMR.ServerModel
         public string Name { get; set; }
         [NotMapped]
         public int? LedgerReferenceId { get; set; }
+        public int HospitalId { get; set; }
 
     }
 }

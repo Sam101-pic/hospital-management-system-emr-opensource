@@ -6,7 +6,7 @@
 </style>
 <div class="wrapper">
     <div class="row">
-        <form [formGroup]="selectedDepartmentwiseStatParameter.DyanamicValidator" class="form-horizontal">
+        <form [formGroup]="selectedDepartmentwiseStatParameter.DynamicValidator" class="form-horizontal">
             <div class="form-body">
                 <div class="col-md-12">
                     <div class="caption custom-caption" style="float: left;"> <i class="glyphicon glyphicon-asterisk"></i> <span
@@ -15,7 +15,7 @@
                 </div>
 
                 <div>
-                    <div class="col-md-5 col-xs-12">
+                    <div class="col-md-4 col-xs-12">
                         <from-to-date-select (on-change)="OnFromToDateChange($event)" [date-settings-name]="'billing-reports'">
                         </from-to-date-select>
                     </div>
@@ -37,9 +37,31 @@
                             <option value="All">All</option>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
+                            <option value="Others">Other</option>
                         </select>
                     </div>
-                    <div class="col-md-2">
+
+                    <div class="col-md-3 col-xs-12">
+                        <div class="form-group">
+                            <label class="control-label col-md-3">Scheme<b style="float:right;">:</b></label>
+                            <div class="col-md-8">
+                                <input class="form-control" danphe-auto-complete [(ngModel)]="SelectedScheme" [ngModelOptions]="{standalone: true}"
+                                       [list-formatter]="SchemeFormatter" [source]="Schemes" placeholder="Select Scheme"
+                                       display-property-name="SchemeName"
+                                       value-property-name=null (focusout)="OnSchemeChange()" onClick="this.select()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-12" style="display: flex; justify-content: flex-end;">
+                    <div class="col-md-1" style="padding: 0px; margin: 5px 0px 0px 0px;">
+                        <label for="id_checkbox_freeVisit" class="is-ref mt-checkbox mt-checkbox-outline">
+                            <input type="checkbox" id="id_checkbox_freeVisit" style="cursor: pointer;" (click)="IsFreeVisitClicked()" />
+                            <span></span>Free Visit
+                        </label>
+                    </div>
+                    <div style="margin-right: 55px;">
                         <div class="form-group">
                             <button class="btn green btn-success" type="button" (click)="Load()"> <i class="fa fa-search"></i> Show
                                 Report
@@ -47,6 +69,8 @@
                         </div>
                     </div>
                 </div>
+
+
             </div>
         </form>
     </div>
@@ -85,25 +109,25 @@
                     </tbody>
                     <tbody>
                         <tr>
-                            <td>Total Adult-Folowup Visit</td>
+                            <td>Total Adult-Followup Visit</td>
                             <td style="text-align: center;">{{summary.tot_AdultFollowup}}</td>
                         </tr>
                     </tbody>
                     <tbody>
                         <tr>
-                            <td>Total Child-Folowup Visit</td>
+                            <td>Total Child-Followup Visit</td>
                             <td style="text-align: center;">{{summary.tot_ChildFollowup}}</td>
                         </tr>
                     </tbody>
                     <tbody>
                         <tr>
-                            <td>Total Folowup Visit Patient</td>
+                            <td>Total Followup Visit Patient</td>
                             <td style="text-align: center;">{{summary.tot_FollowupPatients}}</td>
                         </tr>
                     </tbody>
                     <tbody>
                         <tr>
-                            <td>Total Registered Patient</td>
+                            <td>Total Patient Visit</td>
                             <td style="text-align: center;">{{summary.tot_RegisteredVisitPatients}}</td>
                         </tr>
                     </tbody>

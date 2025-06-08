@@ -58,7 +58,9 @@
   </ItemGroup>-->
 
   <ItemGroup>
-    <None Include="App.config" />
+    <None Include="App.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="Controllers\AccountController.cs" />
     <None Include="Controllers\Accounting\AccountingBL.cs" />
     <None Include="Controllers\Accounting\AccLedgerMappingController.cs" />
@@ -184,13 +186,16 @@
     <PackageReference Include="Audit.NET.SqlServer" Version="14.0.2" />
     <PackageReference Include="Audit.WebApi.Core" Version="14.0.2" />
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="8.1.1" />
+    <PackageReference Include="FluentValidation" Version="9.5.4" />
     <PackageReference Include="Google.Apis.Drive.v3" Version="1.52.0.2354" />
     <PackageReference Include="iTextSharp" Version="5.5.13" />
+    <PackageReference Include="MailKit" Version="3.1.1" />
     <PackageReference Include="Microsoft.AspNetCore" Version="2.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="2.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Http.Features" Version="2.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Http.Features" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Razor" Version="2.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.ViewCompilation" Version="2.0.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.1.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="2.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="2.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer.Design" Version="1.0.4" />
@@ -218,15 +223,19 @@
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Web.BrowserLink" Version="2.0.0" />
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="2.0.1" />
+    <PackageReference Include="NetBarcode" Version="1.7.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="RefactorThis.GraphDiff" Version="2.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Session" Version="2.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Http.Extensions" Version="2.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Http.Extensions" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.SqlServer" Version="2.0.0" />
     <PackageReference Include="Sendgrid" Version="9.10.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="3.0.0" />
+    <PackageReference Include="Serilog.Sinks.MSSqlServer" Version="5.4.0" />
+    <PackageReference Include="Serilog.Sinks.Seq" Version="5.2.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="4.0.0" />
     <PackageReference Include="Syncfusion.XlsIO.WinForms" Version="20.1.0.52" />
-    <PackageReference Include="System.Buffers" Version="4.4.0" />
+    <PackageReference Include="System.Buffers" Version="4.5.1" />
     <PackageReference Include="EPPlus" Version="4.1.0" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="2.7.2" />
     <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
@@ -254,6 +263,7 @@
 
   <ItemGroup>
 	  <Folder Include="Controllers\DispensaryTransfer\" />
+	  <Folder Include="Controllers\Reporting\DTO\" />
 	  <Folder Include="Controllers\Settings\NewFolder\" />
 	  <Folder Include="Services\Pharmacy\DashBoard\" />
   </ItemGroup>
@@ -269,6 +279,15 @@
     <Content Update="Views\PharmacyView\Sale\PHRMRequisitionList.cshtml">
       <Pack>$(IncludeRazorContentInPack)</Pack>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="logging.Configuration.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

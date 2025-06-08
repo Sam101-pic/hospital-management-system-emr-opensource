@@ -47,6 +47,7 @@ import { Old_BillingLedgerMappingComponent } from './ledger-mapping/billing-ledg
 import { ConsultantLedgerMappingComponent } from './ledger-mapping/consultant-ledger-mapping/consultant-ledger-mapping.component';
 import { CreditOrganizationLedgerMappingComponent } from './ledger-mapping/credit-org-ledger-mapping/credit-org-ledger-mapping.component';
 import { InventorySubcategoryLedgerMappingComponent } from './ledger-mapping/inv-subcategory-ledger-mapping/inv-subcategory-ledger-mapping.component';
+import { InventorySubStoreLedgerMappingComponent } from './ledger-mapping/inv-substore-ledger-mapping/inv-substore-ledger-mapping.component';
 import { InventoryVendorLedgerMappingComponent } from './ledger-mapping/inv-vendor-ledger-mapping/inv-vendor-ledger-mapping.component';
 import { LedgerMappingComponent } from './ledger-mapping/ledger-mapping.component';
 import { MedicareTypesLedgerMappingComponent } from './ledger-mapping/medicare-types-ledger-mapping/medicare-type-ledger-mapping.component';
@@ -96,6 +97,7 @@ import { SubLedgerComponent } from './subLedger/sub-ledger.component';
         PharmacySupplierLedgerMappingComponent,
         InventoryVendorLedgerMappingComponent,
         InventorySubcategoryLedgerMappingComponent,
+        InventorySubStoreLedgerMappingComponent,
         PaymentModeLedgerMappingComponent,
         BankReconciliationCategoryLedgerMappingComponent,
         SubLedgerComponent,

@@ -37,6 +37,10 @@ export class DischargeSummaryViewModel {
 
     public selectedADT: any;
     public Address: string;
+    public CountryName: string;
+    public CountrySubDivisionNAme: string;
+    public MunicipalityName: string;
+
     public DepartmentName: string;
     public CreatedBy: string;
     public ConsultantName: string = null;
@@ -46,6 +50,6 @@ export class DischargeSummaryViewModel {
     public DischargeConditionId: string;
     public BabyWeight: string;
     public ResidenceDrName: string;
-    public Anaesthetists: string;
+    public Anesthetists: string;
 
 }

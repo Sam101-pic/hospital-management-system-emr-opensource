@@ -4,7 +4,7 @@
       <div class="form-body">
         <div class="col-md-12">
           <div class="caption custom-caption"> <i class="glyphicon glyphicon-asterisk"></i> <b><span
-                class="caption-subject">Patient Wise Credit Report On {{TodayDate}}</span></b> </div>
+                    class="caption-subject">Patient Wise Credit Report On {{TodayDate}}</span></b> </div>
           <div class="row">
             <div class="col-md-6">
               <from-to-date-select (on-change)="OnFromToDateChange($event)" [date-settings-name]="'billing-reports'">
@@ -33,7 +33,7 @@
             <div class="col-md-2 col-xs-12">
               <div class="form-group">
                 <button class="btn green btn-success" type="button" (click)="Load();this.loading=true;" [disabled]="loading"> <i
-                    class="fa fa-search"></i> Show Report </button>
+                     class="fa fa-search"></i> Show Report </button>
               </div>
             </div>
           </div>
@@ -42,11 +42,11 @@
     </form>
   </div>
   <div class="row">
-    <div class="col-lg-12 col-sm-12" *ngIf="patientCreditSummaryData.length>0">
+    <div class="col-lg-12 col-sm-12">
       <danphe-grid [grid-colDefaults]="patientCreditSummaryColumns" [grid-data]="patientCreditSummaryData"
-        [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" [report-for]="billing"
-        [grid-date-range]="dateRange" (grid-actions)="OnGridExport($event)"
-        [NepaliDateInGridParams]="NepaliDateInGridSettings"> </danphe-grid>
+                   [grid-exportOptions]="gridExportOptions" [grid-showExport]="true" [report-for]="billing"
+                   [grid-date-range]="dateRange" (grid-actions)="OnGridExport($event)"
+                   [NepaliDateInGridParams]="NepaliDateInGridSettings"> </danphe-grid>
     </div>
   </div>
 </div>

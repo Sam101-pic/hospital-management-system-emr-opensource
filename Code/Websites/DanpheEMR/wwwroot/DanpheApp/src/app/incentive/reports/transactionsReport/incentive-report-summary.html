@@ -3,7 +3,9 @@
     padding: 15px;
     margin-top: 15px;
   }
-    .round-shadow-div .padLess_table th,.round-shadow-div .padLess_table td {
+
+  .round-shadow-div .padLess_table th,
+  .round-shadow-div .padLess_table td {
     padding: 8px 5px !important;
   }
 </style>
@@ -40,7 +42,7 @@
               <td style="text-align:center"><b>{{GeneralFieldLabel.PANNo}}</b></td>
               <!--<td style="text-align:center"><b>Referral Income</b></td>
               <td style="text-align:center"><b>Assigned Income</b></td>-->
-              <td style="text-align:center"><b>Total Income</b></td>  
+              <td style="text-align:center"><b>Total Income</b></td>
               <!--<td style="text-align:center"><b>TDS%</b></td>-->
               <td style="text-align:center"><b>TDS Amt.</b></td>
               <td style="text-align:center"><b>Net Income</b></td>
@@ -49,7 +51,8 @@
           <tbody>
             <tr *ngFor="let row of reportData;let i=index">
               <td style="text-align:center">{{i+1}}</td>
-              <td><a style="font-weight:bold; font-family: 'Quicksand', 'Open Sans', sans-serif; text-align: left;" (click)="LoadDoctorItems(row)">{{row.PrescriberName}}</a></td>
+              <td><a style="font-weight:bold; font-family: 'Quicksand', 'Open Sans', sans-serif; text-align: left;"
+                   (click)="LoadDoctorItems(row)">{{row.PrescriberName}}</a></td>
               <td style="text-align:right">{{row.PanNo}}</td>
               <!--<td style="text-align:right">{{row.ReferralAmount}}</td>
               <td style="text-align:right">{{row.AssignedAmount}}</td>-->
@@ -77,5 +80,6 @@
 
 
 <div class="col-md-12">
-  <incentive-item-summary *ngIf="showItemSummary" [fromDate]="FromDate" [toDate]="ToDate" [employeeId]="selDoctorId" [isReferralOnly]="IsReferralOnly" (callback)="DoctorItemOnClose()"></incentive-item-summary>
+  <incentive-item-summary *ngIf="showItemSummary" [fromDate]="FromDate" [toDate]="ToDate" [employeeId]="selDoctorId" [isReferralOnly]="IsReferralOnly"
+                          (callback)="DoctorItemOnClose()"></incentive-item-summary>
 </div>

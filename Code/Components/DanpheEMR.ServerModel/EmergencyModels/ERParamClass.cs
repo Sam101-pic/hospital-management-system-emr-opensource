@@ -9,6 +9,6 @@ namespace DanpheEMR.ServerModel.EmergencyModels
     public class ERParamClass
     {
         public string DepartmentName { get; set; }
-        public string ERDutyDoctorFirstName { get; set; }
+        public int ERDefaultDoctorId { get; set; }
     }
 }

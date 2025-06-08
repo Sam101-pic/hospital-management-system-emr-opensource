@@ -41,6 +41,7 @@
                 <div class="col-md-12">
                   <admission-reserve *ngIf="ShowAdmitPopUp" [requestingDepartmentName]="CurrentDepartmentName" [actionName]="'emergency'"
                                      [patientVisitId]="SelectedPatient.PatientVisitId" [patientId]="SelectedPatient.PatientId"
+                                     [admission-case]="AdmissionCase"
                                      (closePopUp)="ReturnFromPatBedReservation($event)"></admission-reserve>
                 </div>
               </div>
@@ -80,12 +81,17 @@
     </div>
   </div>
 </div>
-
-
-<div *ngIf="ShowAddVitals" class="cstm-popup-holder" style="padding: 55px;">
-  <div id="cstmSlideFromTop" class="cstm-slidefromtop">
-    <div style="width: 100%; height: auto;">
-      <vitals-add [showVitalList]="ShowVitalsList" [visitIdfromADT]="VisitId" (callback-add)="ReturnFromAllERPatientActions($event)"></vitals-add>
+<div *ngIf="ShowAddVitals" class="popup-static portlet box portlet-fullscreen custom_modal">
+  <div class="portlet-body form">
+    <div class="row">
+      <div class="col-md-11" style="margin-left:4%">
+        <div class="modelbox-div ref_modal_div clearfix">
+          <div class="caption custom-caption no-margin">
+            <a class="btn btn-danger" (click)="CloseVitalsPopUp()">X</a>
+          </div>
+          <vitals-new></vitals-new>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -93,8 +99,7 @@
 
 
 
-
-<div class="triaged-patient-tablelist table-responsive">
+<div *ngIf="ShowTriagedPatientList" class="triaged-patient-tablelist table-responsive">
   <div class="row">
     <div class="col-md-4">
       <input id="searchBxLabReport" class="custom-table-search" [(ngModel)]="SearchString" onclick="this.select();" placeholder="Search">
@@ -161,6 +166,8 @@
 
             <a class="grid-action" (click)="GoToPatientOverview(pat)"><i class="fa fa-tv" style="padding: 3px;" title="overview"></i></a>
             <a class="grid-action" (click)="AddVitals(pat)">Add Vitals</a>
+            <a *ngIf="!pat.DischargeSummaryId && hasViewSummaryPermission" class="grid-action" (click)="AddSummary(pat)">Add Summary</a>
+            <a *ngIf="pat.DischargeSummaryId && hasViewSummaryPermission" class="grid-action" (click)="ViewSummary(pat)">View Summary</a>
             <a class="grid-action" (click)="OrderForERPat(pat)">Order</a>
             <a class="grid-action" (click)="AssignDoctor(pat)">Assign Doctor</a>
 
@@ -170,12 +177,13 @@
                 <span class="caret"> </span>
               </button>
               <ul class="dropdown-menu grid-ddlCstm er-grid-ddlCstm">
-                <li><a (click)="AdmitERPatient(pat)" class="blackText">Admit</a></li>
+                <li><a (click)="AdmitERPatient(pat)" class="blackText">Reserve</a></li>
                 <li><a (click)="TransferERPatient(pat)" class="blackText">Transfer</a></li>
                 <li><a (click)="DischargeERPatient(pat)" class="blackText">Discharge</a></li>
                 <li><a (click)="LeaveERPatOnMedicalAdvice(pat)" class="blackText">LAMA</a></li>
                 <li><a (click)="DeathCaseOfERPatient(pat)" class="blackText">Death</a></li>
                 <li><a (click)="DischargeERPatientOnRequest(pat)" class="blackText">DOR</a></li>
+                <li><a (click)="Absconded(pat)" class="blackText">Absconded</a></li>
                 <li><a (click)="UploadConsent(pat)" class="blackText">Upload Consent</a></li>
               </ul>
             </div>
@@ -194,7 +202,7 @@
           <div class="modelbox-div clearfix">
             <div class="caption custom-caption">
               <h3> <span>Upload Files</span></h3>
-              <a class="btn btn-danger" (click)="showUploadConsent.upload_files=false" title="Cancel">X</a>
+              <a class="btn btn-danger" (click)="CloseUpload()" title="Cancel">X</a>
             </div>
 
             <div class="col-md-12">
@@ -209,4 +217,20 @@
       </div>
     </div>
   </div>
+</div>
+
+<div *ngIf="ShowDischargeSummary">
+  <button class="btn btn-primary btn-sm" (click)="HideDischargeSummary()"> <i class="fa fa-backward"></i>&nbsp;&nbsp;&nbsp;Back </button>
+  <discharge-summary-add
+                         [selectedDischarge]="SelectedDischarge"
+                         [fromClinical]="false" [IsERPatient]="true"
+                         [showDischargeSummary]="ShowDischargeSummary"
+                         (sendData)="DischargeSummaryCallback($event)"
+                         (CallBackFromAdd)='CallBackFromAddEdit($event)'>
+  </discharge-summary-add>
+</div>
+<div *ngIf="ShowSummaryView">
+  <button class="btn btn-primary btn-sm" (click)="HideDischargeSummary()"> <i class="fa fa-backward"></i>&nbsp;&nbsp;&nbsp;Back </button>
+  <discharge-summary-view [selectedADT]="SelectedDischarge"
+                          (EditRecordEvent)='CallbackFromViewPage($event)' [showSummaryView]="ShowSummaryView"></discharge-summary-view>
 </div>

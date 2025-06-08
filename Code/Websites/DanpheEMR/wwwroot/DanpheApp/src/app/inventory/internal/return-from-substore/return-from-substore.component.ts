@@ -35,6 +35,7 @@ export class ReturnFromSubstoreComponent implements OnInit {
     public isReceived: boolean;
     public Status: string = "";
     selecteditems: ReturnItem = new ReturnItem();
+    ReturnId: number = null;
     constructor(public messageBoxService: MessageboxService, public _activeInvService: ActivateInventoryService, public inventoryBLService: InventoryBLService,
     ) {
         this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('CreatedOn', false), new NepaliDateInGridColumnDetail('ReceivedOn', false));
@@ -49,14 +50,6 @@ export class ReturnFromSubstoreComponent implements OnInit {
     OnDateRangeChange($event) {
         this.fromDate = $event ? $event.fromDate : this.fromDate;
         this.toDate = $event ? $event.toDate : this.toDate;
-        if (this.fromDate != null && this.toDate != null) {
-            if (moment(this.fromDate).isBefore(this.toDate) || moment(this.fromDate).isSame(this.toDate)) {
-                this.GetReturnItems(this.fromDate, this.toDate, this.currentActiveInventory.StoreId, this.sourceSubstoreId);
-            } else {
-                this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Please enter valid From date and To date"]);
-            }
-
-        }
     }
     ShowReturnData() {
         if (this.fromDate != null && this.toDate != null) {
@@ -100,7 +93,12 @@ export class ReturnFromSubstoreComponent implements OnInit {
             })
     }
     AssignSelectedSubstore($event) {
-        this.sourceSubstoreId = $event.StoreId;
+        if ($event && typeof $event === 'object') {
+            this.sourceSubstoreId = $event.StoreId;
+        }
+        else {
+            this.sourceSubstoreId = null;
+        }
     }
     ReturnListFormatter(data: any): string {
         return data["StoreName"];
@@ -109,13 +107,13 @@ export class ReturnFromSubstoreComponent implements OnInit {
         switch ($event.Action) {
             case "Receive": {
                 this.showReceiveStockPopUp = true;
-                this.selecteditems = $event.Data;
+                this.ReturnId = $event.Data.ReturnId;
                 break;
             }
             case "view": {
                 this.selecteditems = null;
                 this.showViewPopUp = true;
-                this.selecteditems = $event.Data;
+                this.ReturnId = $event.Data.ReturnId;
                 break;
             }
             default:
@@ -123,9 +121,10 @@ export class ReturnFromSubstoreComponent implements OnInit {
         }
     }
     GetReturnId($event) {
-        this.returnId = $event.data;
-        this.GetReturnItems(this.fromDate, this.toDate, this.currentActiveInventory.StoreId, this.sourceSubstoreId);
-
+        if ($event) {
+            this.returnId = $event.data;
+            this.GetReturnItems(this.fromDate, this.toDate, this.currentActiveInventory.StoreId, this.sourceSubstoreId);
+        }
     }
 }
 

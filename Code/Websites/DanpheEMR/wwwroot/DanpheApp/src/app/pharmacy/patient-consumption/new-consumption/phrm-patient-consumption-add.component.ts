@@ -276,6 +276,11 @@ export class PHRMPatientConsumptionAddComponent {
     }
     onChangeItem() {
         if (this.SelectedItem.ItemId > 0) {
+            let currentDate = moment().format('YYYY-MM-DD');
+            if (this.SelectedItem.ExpiryDate <= currentDate) {
+                this.messageboxService.showMessage(ENUM_MessageBox_Status.Error, [`The selected Item ${this.SelectedItem.ItemName} is Expired.Please Select another Item`]);
+                return;
+            }
             this.patientConsumptionGenericName = this.SelectedItem.GenericName;
             this.Item.AvailableQuantity = this.Items.filter(item => item.ItemId == this.SelectedItem.ItemId && item.BatchNo == this.SelectedItem.BatchNo)[0].AvailableQuantity;
             this.patientConsumptionItem.ItemName = this.SelectedItem.ItemName;
@@ -518,8 +523,11 @@ export class PHRMPatientConsumptionAddComponent {
 
     OnStoreChanged() {
         if (this.SelectedStore && this.SelectedStore.StoreId) {
+            this.StoreId = this.SelectedStore.StoreId;
             this.LoadItemTypeList(this.SelectedStore.StoreId, this.currentPatient.PriceCategoryId);
             this.patientConsumptionItem = new PHRMPatientConsumptionItem();
+        } else {
+            this.StoreId = null;
         }
     }
 

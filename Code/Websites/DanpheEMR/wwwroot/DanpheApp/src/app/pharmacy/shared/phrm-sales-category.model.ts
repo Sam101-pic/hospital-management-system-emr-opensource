@@ -5,7 +5,7 @@ import {
 } from '@angular/forms';
 
 export class PHRMSalesCategoryModel {
-  public SalesCategoryId: number = null;
+  public SalesCategoryId: number = 0;
   public Name: string = "";
   public Description: string = "";
   public CreatedOn: string = '';

@@ -15,6 +15,7 @@ namespace DanpheEMR.Services.SSF.DTO
         public bool IsAccidentCase { get; set; }
         public string BillingInvoiceNo { get; set; }
         public string PharmacyInvoiceNo { get; set; }
+        public bool IsCreditNote { get; set; }
         //public List<ClaimBooking_DTO> ClaimBookings { get; set; }
 
     }

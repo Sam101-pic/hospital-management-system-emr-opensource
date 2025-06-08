@@ -5,12 +5,12 @@ import { RequisitionItems } from "../../../inventory/shared/requisition-items.mo
 import { Requisition } from "../../../inventory/shared/requisition.model";
 import { SecurityService } from "../../../security/shared/security.service";
 import { DanpheHTTPResponse } from "../../../shared/common-models";
+import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
 import { RouteFromService } from "../../../shared/routefrom.service";
 import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import { VerificationBLService } from "../../shared/verification.bl.service";
 import { VerificationService } from "../../shared/verification.service";
-import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 @Component({
   selector: "app-inventory-requisition-details",
   templateUrl: "./inventory-requisition-details.html"
@@ -67,7 +67,7 @@ export class VER_INV_RequisitionDetailsComponent implements OnInit, OnDestroy {
   }
 
   private CheckForVerificationApplicable() {
-    if (this.Requisition.isVerificationAllowed == true && this.Requisition.RequisitionStatus == "pending") {
+    if (this.Requisition.isVerificationAllowed == true && (this.Requisition.RequisitionStatus == "pending" || this.Requisition.RequisitionStatus == "active")) {
       this.isVerificationAllowed = true;
     }
     else if (this.Requisition.isVerificationAllowed == false && this.Requisition.RequisitionStatus == "active") {
@@ -180,8 +180,8 @@ export class VER_INV_RequisitionDetailsComponent implements OnInit, OnDestroy {
     }
   }
   private CheckForValidItemQuantity(): boolean {
-    if (this.RequisitionVM.RequisitionItemList.some(RI => RI.Quantity < 1)) {
-      this.messageBoxService.showMessage("Failed", ["One of the quantity is edited less that 1.", "Use item cancel button instead."]);
+    if (this.RequisitionVM.RequisitionItemList.some(RI => RI.Quantity <= 0)) {
+      this.messageBoxService.showMessage(ENUM_DanpheHTTPResponses.Failed, ["Quantity cannot be less than or equal to 0"]);
       return false;
     }
     return true;

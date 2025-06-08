@@ -20,7 +20,7 @@ export class InventoryPatientConsumptionListComponent {
   public consumptionListDetailsGridColumns: Array<WARDGridColumns> = []
   public consumptionListDetailsLocal = new Array<{ DepartmentId: number, ConsumptionListByDept: Array<WardInventoryConsumptionModel> }>();
   public consumptionListDetails: Array<WardInventoryConsumptionModel> = []
-  public patientConsumptionList: Array<WardInventoryConsumptionModel>[]
+  public patientConsumptionList: Array<WardInventoryConsumptionModel> = []
   public loading: boolean = false;
   public showConsumpList: boolean = false;
   public rowIndex: number = null;

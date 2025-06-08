@@ -124,7 +124,7 @@
                                             <div class="col-md-12">
                                                 <div class="po-form--control-with-validation">
                                                     <div class="po-form--control">
-                                                        <label class="control-label">Vendor<b>:</b></label>
+                                                        <label class="control-label" style="padding-left:0px;">Vendor<b>:</b></label>
                                                         <div class="div-relative" style="display:inline-block">
                                                             <input id="VendorName" danphe-auto-complete [(ngModel)]="selectedVndr"
                                                                    [source]="VendorList"
@@ -158,36 +158,43 @@
                                                 </div>
                                             </div>
                                             <div class="col-md-12" style="margin-top: 30px;">
-                                                <div class="form-group" class="po-form--control col-md-2">
-                                                    <label class="control-label col-md-6">Reference No.<b>:</b></label>
+                                                <div class="form-group" class="po-form--control col-md-2" style="padding-left:0px;margin-top: 10px;">
+                                                    <label class="control-label col-md-6" style="padding-left:0px;font-size: 11px;">Reference
+                                                        No.<b>:</b></label>
                                                     <textarea class="col-md-6 form-control" type="text" id="ReferenceNo" name="ReferenceNo"
                                                               [(ngModel)]="currentPOD.ReferenceNo"
                                                               [ngModelOptions]="{standalone: true}" (keyup.enter)="GoToNextInput('')" cols="15"
                                                               rows="3"></textarea>
                                                 </div>
-                                                <div class="form-group po-form--control col-md-3">
-                                                    <label class="control-label col-md-3">Invoicing Address<b>:</b></label>
+                                                <div class="form-group po-form--control col-md-3" style="padding-left:0px !important;margin-left:1%;">
+                                                    <label class="control-label col-md-3" style="padding-left:0px;font-size: 11px;">Invoicing
+                                                        Address<b>:</b></label>
                                                     <textarea class="col-md-9 form-control" type="text" id="InvolvingAddress" name="InvolvingAddress"
                                                               [(ngModel)]="currentPOD.InvoicingAddress" [ngModelOptions]="{standalone: true}"
                                                               (keyup.enter)="GoToNextInput('')"
                                                               cols="15" rows="3"></textarea>
                                                 </div>
-                                                <div class="form-group po-form--control col-md-3">
-                                                    <label class="control-label col-md-4">Delivery Address<b>:</b></label>
+                                                <div class="form-group po-form--control col-md-3"
+                                                     style="padding-left:0px !important; margin-left:1%;">
+                                                    <label class="control-label col-md-4" style="padding-left:0px;font-size: 11px;">Delivery
+                                                        Address<b>:</b></label>
                                                     <textarea class="col-md-8 form-control" type="text" id="DeliveryAddress" name="DeliveryAddress"
                                                               [(ngModel)]="currentPOD.DeliveryAddress" [ngModelOptions]="{standalone: true}"
                                                               (keyup.enter)="GoToNextInput('')"
                                                               cols="15" rows="3"></textarea>
                                                 </div>
-                                                <div class="form-group po-form--control col-md-2">
-                                                    <label class="control-label col-md-5">Contact Person<b>:</b></label>
+                                                <div class="form-group po-form--control col-md-2"
+                                                     style="padding-left:0px !important; margin-left:1%;">
+                                                    <label class="control-label col-md-5" style="padding-left:0px;font-size: 11px;">Contact
+                                                        Person<b>:</b></label>
                                                     <textarea class="col-md-7 form-control" type="text" id="ContactPerson" name="ContactPerson"
                                                               [(ngModel)]="currentPOD.ContactPersonName" [ngModelOptions]="{standalone: true}"
                                                               (keyup.enter)="GoToNextInput('')"
                                                               cols="15" rows="3"></textarea>
                                                 </div>
-                                                <div class="form-group po-form--control col-md-2">
-                                                    <label class="control-label col-md-4">Contact Email<b>:</b></label>
+                                                <div class="form-group po-form--control col-md-2" style="padding-left:0px;float:right;">
+                                                    <label class="control-label col-md-4" style="padding-left:0px;font-size: 11px;">Contact
+                                                        Email<b>:</b></label>
                                                     <textarea class="col-md-8 form-control" type="text" id="ContactEmail" name="ContactEmail"
                                                               [(ngModel)]="currentPOD.ContactPersonEmail" [ngModelOptions]="{standalone: true}"
                                                               (keyup.enter)="GoToNextInput('')"

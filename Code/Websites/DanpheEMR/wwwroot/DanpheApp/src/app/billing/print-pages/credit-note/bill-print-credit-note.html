@@ -55,7 +55,7 @@
     vertical-align: top !important;
   }
 </style>
-<div class="A5 landscape">
+<div class="A5 landscape" *ngIf="!PrintTemplateTypeSettings.Enable">
   <section class="sheet" id="divCreditNotePrintPage" *ngIf="isDataLoaded">
     <div class="box-body invoice header " style="color: #000; font-weight:600;">
       <!-- <table border="0" style="width: 100%; margin: 0 auto;" cellspacing="0" cellpadding="0">
@@ -103,12 +103,12 @@
 
       <table border="0" style="width: 100%; margin: 0 auto;" cellspacing="0" cellpadding="0">
         <tr>
-          <td colspan="8" style="text-align: center;">
+          <td colspan="9" style="text-align: center;">
             <p><strong>CREDIT NOTE</strong></p>
           </td>
         </tr>
         <tr style="border: 1px solid #ccc;">
-          <td colspan="8" style="padding: 6px !important;">
+          <td colspan="9" style="padding: 6px !important;">
             <table class="patient-information" style="width: 100%; margin-bottom: 0; line-height: 1.2;">
               <tr>
                 <td colspan="4" style="text-align: left;">
@@ -162,12 +162,14 @@
         </tr>
         <tr>
           <th style="padding: 3px 5px !important; width: 5%">SN.</th>
+          <th style="padding: 3px 5px !important; width: 5%">HS Code</th>
           <th colspan="5" style="padding: 3px 5px !important; width: 80%">Particular(s)</th>
           <th style="padding: 3px 5px !important; width: 5%">Unit</th>
           <th style="padding: 3px 5px !important; width: 5%">Amount</th>
         </tr>
         <tr *ngFor="let row of ReturnInvoice.ReturnInvoiceItems; let i=index">
           <td style="padding: 0 5px !important;  width: 5%">{{i+1}}.</td>
+          <td style="padding: 0 5px !important;  width: 5%"></td>
           <td colspan="5" style="padding: 0 5px !important; width: 80%">{{row.ItemName}}</td>
           <td style="padding: 0 5px !important;  width: 5%">{{row.RetQuantity}}</td>
           <td style="padding: 0 5px !important;  width: 5%">{{row.RetTotalAmount}}</td>
@@ -177,7 +179,7 @@
             <p class="c_paragraphs" *ngIf="ReturnInvoice.TotalAmount !=0"><strong>In Words :{{ReturnInvoice.TotalAmount | number: "1.2-2" |
                 NumberInWords | uppercase}} ONLY</strong></p>
           </td>
-          <td colspan="3" style="padding: 5px !important; text-align: right;">
+          <td colspan="4" style="padding: 5px !important; text-align: right;">
             <p class="c_paragraphs"><strong>Total Amount: </strong></p>
             <p class="c_paragraphs" *ngIf="ReturnInvoice.ReturnCashAmount > 0"><strong>Total Cash Return Amount: </strong></p>
           </td>
@@ -208,9 +210,18 @@
     </div>
   </section>
 </div>
-<div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;">
+<div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;" *ngIf="!PrintTemplateTypeSettings.Enable">
   <button class="btn green btn-success" value="" (click)="print()" id="btnPrintCreditNote" [disabled]="loading">
     <span>Print</span>&nbsp;&nbsp;
+    &nbsp;&nbsp; <i class="glyphicon glyphicon-print"></i>
+  </button>
+</div>
+<div id="id_dynamic_template_return_invoice_detail" *ngIf="PrintTemplateTypeSettings.Enable">
+  <!--Here Dynamically the credit note will be rendered-->
+</div>
+<div style="text-align:center;z-index: 4;position: relative;margin-bottom: 25px; margin-top: 15px;" *ngIf="PrintTemplateTypeSettings.Enable">
+  <button class="btn green btn-success" value="" (click)="PrintDynamicReceipt()" id="id_btn_print_dynamic_credit_note_receipt" [disabled]="loading">
+    <span>Print Receipt</span>&nbsp;&nbsp;
     &nbsp;&nbsp; <i class="glyphicon glyphicon-print"></i>
   </button>
 </div>

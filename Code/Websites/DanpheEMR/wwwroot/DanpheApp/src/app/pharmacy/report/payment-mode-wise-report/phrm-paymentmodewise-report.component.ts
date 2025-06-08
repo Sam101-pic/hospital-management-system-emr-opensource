@@ -1,17 +1,16 @@
 import { HttpClient } from "@angular/common/http";
 import { Component } from "@angular/core";
-import { CommonFunctions } from "../../../shared/common.functions";
+import * as moment from "moment";
 import { CoreService } from "../../../core/shared/core.service";
+import { DispensaryService } from "../../../dispensary/shared/dispensary.service";
+import { ReportingService } from "../../../reporting/shared/reporting-service";
 import { SecurityService } from "../../../security/shared/security.service";
 import { SettingsBLService } from "../../../settings-new/shared/settings.bl.service";
+import { NepaliCalendarService } from "../../../shared/calendar/np/nepali-calendar.service";
+import { CommonFunctions } from "../../../shared/common.functions";
+import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { DLService } from "../../../shared/dl.service";
 import { MessageboxService } from "../../../shared/messagebox/messagebox.service";
-import * as moment from "moment";
-import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
-import { NepaliCalendarService } from "../../../shared/calendar/np/nepali-calendar.service";
-import { ReportingService } from "../../../reporting/shared/reporting-service";
-import { PHRMReportsModel } from "../../shared/phrm-reports-model";
-import { DispensaryService } from "../../../dispensary/shared/dispensary.service";
 
 @Component({
     templateUrl: "phrm-paymentmodewise-report.html"
@@ -41,8 +40,6 @@ export class PHRMPaymentModeWiseReportComponent {
         { TypeName: 'Deposit Refund' },
         { TypeName: 'Cash Discount Given' },
         { TypeName: 'Cash Discount Received' },
-        { TypeName: 'Maternity Allowance' },
-        { TypeName: 'Maternity Allowance Return' },
     ]
 
     public gridExportOptions: any;
@@ -57,13 +54,13 @@ export class PHRMPaymentModeWiseReportComponent {
     StoreId: number = null;
 
     constructor(
-        public _dlService: DLService,
-        public msgBoxServ: MessageboxService,
-        public reportServ: ReportingService,
+        private _dlService: DLService,
+        private _msgBoxServ: MessageboxService,
+        private _reportServ: ReportingService,
         public coreservice: CoreService,
-        public settingsBLService: SettingsBLService,
-        public securityService: SecurityService,
-        public _dispensaryService: DispensaryService,
+        private _settingsBLService: SettingsBLService,
+        private _securityService: SecurityService,
+        private _dispensaryService: DispensaryService,
         public nepCalendarService: NepaliCalendarService) {
         this.GetHeaderParameter();
         this.LoadUser();
@@ -100,12 +97,12 @@ export class PHRMPaymentModeWiseReportComponent {
     }
 
     LoadUser() {
-        this.settingsBLService.GetUserList()
+        this._settingsBLService.GetUserList()
             .subscribe(res => {
                 if (res.Status == "OK") {
                     this.userList = res.Results;
                     CommonFunctions.SortArrayOfObjects(this.userList, "EmployeeName");
-                    this.CurrentUser = this.securityService.loggedInUser.Employee.FullName;
+                    this.CurrentUser = this._securityService.loggedInUser.Employee.FullName;
 
                 }
                 else {
@@ -149,14 +146,14 @@ export class PHRMPaymentModeWiseReportComponent {
                     err => this.Error(err));
         }
         else {
-            this.msgBoxServ.showMessage("notice-message", ["dates are not proper."]);
+            this._msgBoxServ.showMessage("notice-message", ["dates are not proper."]);
         }
     }
 
     Success(res) {
         this.loading = false;
         if (res.Status == "OK") {
-            this.MultiplePaymentModeReportColumns = this.reportServ.reportGridCols.DigitalPaymentReport;
+            this.MultiplePaymentModeReportColumns = this._reportServ.reportGridCols.DigitalPaymentReport;
             this.reportData = null;
             this.summaryData = null;
             this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('Date', false));
@@ -171,11 +168,11 @@ export class PHRMPaymentModeWiseReportComponent {
             }
             else {
                 //this.ClearSummary();
-                this.msgBoxServ.showMessage("notice-message", ['Data is Not Available Between Selected dates...Try Different Dates or select different User']);
+                this._msgBoxServ.showMessage("notice-message", ['Data is Not Available Between Selected dates...Try Different Dates or select different User']);
             }
         }
         else {
-            this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+            this._msgBoxServ.showMessage("failed", [res.ErrorMessage]);
             //this.ClearSummary();
         }
     }
@@ -183,7 +180,7 @@ export class PHRMPaymentModeWiseReportComponent {
     Error(err) {
         this.loading = false;
         //this.ClearSummary();
-        this.msgBoxServ.showMessage("error", [err.ErrorMessage]);
+        this._msgBoxServ.showMessage("error", [err.ErrorMessage]);
     }
 
     LoadExportOptions() {

@@ -1,17 +1,30 @@
-﻿using DanpheEMR.DalLayer;
-using DanpheEMR.Enums;
-using DanpheEMR.Security;
-using DanpheEMR.ServerModel.ClaimManagementModels;
-using DanpheEMR.Services.ClaimManagement.DTOs;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Entity;
 using System.Data.SqlClient;
-using System.Linq;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Threading.Tasks;
+using DanpheEMR.DalLayer;
+using DanpheEMR.Enums;
+using DanpheEMR.Security;
+using DanpheEMR.ServerModel;
+using DanpheEMR.ServerModel.BillingModels;
 using DanpheEMR.ServerModel.BillingModels.POS;
+using DanpheEMR.ServerModel.ClaimManagementModels;
 using DanpheEMR.ServerModel.PharmacyModels;
+using DanpheEMR.Services.ClaimManagement.DTOs;
+using DanpheEMR.Services.Insurance;
+using DanpheEMR.Services.Insurance.DTOs;
+using DanpheEMR.Utilities;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Serilog;
+using static DanpheEMR.Services.Insurance.HIBApiResponses;
 
 namespace DanpheEMR.Services.ClaimManagement
 {
@@ -41,36 +54,41 @@ namespace DanpheEMR.Services.ClaimManagement
             return InsuranceApplicableCreditOrganizations;
         }
 
-        public object GetBillForClaimReview(DateTime FromDate, DateTime ToDate, int CreditOrganizationId, ClaimManagementDbContext _claimManagementgDbContext)
+        public object GetBillForClaimReview(DateTime FromDate, DateTime ToDate, int CreditOrganizationId, int? PatientId, ClaimManagementDbContext _claimManagementgDbContext)
         {
             List<SqlParameter> paramList = new List<SqlParameter>() {
                         new SqlParameter("@FromDate", FromDate),
                         new SqlParameter("@ToDate", ToDate),
                         new SqlParameter("@CreditOrganizationId", CreditOrganizationId),
+                        new SqlParameter("@PatientId",PatientId)
                     };
             DataTable dt = DALFunctions.GetDataTableFromStoredProc("SP_INS_InsuranceBillReview", paramList, _claimManagementgDbContext);
             return dt;
         }
 
-        public object CheckIsClaimCodeAvailable(Int64 ClaimCode, ClaimManagementDbContext _claimManagementgDbContext)
+        public bool IsClaimCodeAvailable(Int64 claimCode, int patientVisitId, int creditOrganizationId, string apiIntegrationName, int patientId, ClaimManagementDbContext _claimManagementgDbContext)
         {
-            if (ClaimCode != 0)
-            {
-                var result = _claimManagementgDbContext.InsuranceClaim.Any(a => a.ClaimCode == ClaimCode);
-                //if (!result)
-                //{
-                //    result = _claimManagementgDbContext.BillingCreditBillStatus.Any(a => a.ClaimCode == ClaimCode && a.PatientId != PatientId);
-                //    if (!result)
-                //    {
-                //        result = _claimManagementgDbContext.PharmacyCreditBillStatus.Any(a => a.ClaimCode == ClaimCode && a.PatientId != PatientId);
-                //    }
-                //}
-                return !result;
-            }
-            else
-            {
-                return false;
-            }
+            if (claimCode == 0) return false;
+
+            var claimStatus = _claimManagementgDbContext.InsuranceClaim
+                .Where(b => b.ClaimCode == claimCode && b.CreditOrganizationId == creditOrganizationId)
+                .ToList();
+
+            // If no records found, claim code is available
+            if (!claimStatus.Any())
+                return true;
+
+            var isAvailable = CheckClaimCodeAvailability(claimStatus, patientVisitId, apiIntegrationName, patientId);
+
+            return isAvailable;
+        }
+        
+        private bool CheckClaimCodeAvailability(IEnumerable<dynamic> records, int patientVisitId, string apiIntegrationName, int patientId)
+        {
+            if (!records.Any()) return true;
+
+            bool isEchs = apiIntegrationName == ENUM_Scheme_ApiIntegrationNames.ECHS;
+            return records.All(a => a.PatientId == patientId && (isEchs || a.PatientVisitId == patientVisitId) && (a.ClaimStatus != ENUM_ClaimManagement_ClaimStatus.PaymentPending || a.ClaimStatus != ENUM_ClaimManagement_ClaimStatus.Settled));
         }
 
         public object GetPendingClaims(int CreditOrganizationId, ClaimManagementDbContext _claimManagementgDbContext)
@@ -137,17 +155,20 @@ namespace DanpheEMR.Services.ClaimManagement
 
         public object GetDocumentsByClaimCode(int ClaimCode, ClaimManagementDbContext _claimManagementDbContext)
         {
-            var DocumentList = _claimManagementDbContext.TXNUploadedFile.Where(doc => doc.ClaimCode == ClaimCode).Select(a => new
-            UploadedFileDTO
-            {
-                FileId = a.FileId,
-                FileDisplayName = a.FileDisplayName,
-                FileExtension = a.FileExtension,
-                FileDescription = a.FileDescription,
-                UploadedBy = a.UploadedBy,
-                UploadedOn = a.UploadedOn,
-                Size = a.Size
-            }).ToList();
+            var DocumentList = (from upload in _claimManagementDbContext.TXNUploadedFile.Where(doc => doc.ClaimCode == ClaimCode)
+                                join emp in _claimManagementDbContext.EmployeeModels on upload.UploadedBy equals emp.EmployeeId
+                                select new
+                            UploadedFileDTO
+                                {
+                                    FileId = upload.FileId,
+                                    FileDisplayName = upload.FileDisplayName,
+                                    FileExtension = upload.FileExtension,
+                                    FileDescription = upload.FileDescription,
+                                    UploadedBy = upload.UploadedBy,
+                                    UploadedOn = upload.UploadedOn,
+                                    Size = upload.Size,
+                                    FileUploadedBy = emp.FullName
+                                }).ToList();
             return DocumentList;
         }
 
@@ -259,13 +280,13 @@ namespace DanpheEMR.Services.ClaimManagement
         {
             try
             {
-               var apiIntegrationName = _claimManagementgDbContext.Schemes
-                                                                  .Where(o => o.DefaultCreditOrganizationId == OrganizationId)
-                                                                  .Select(a => new
-                                                                  {
+                var apiIntegrationName = _claimManagementgDbContext.Schemes
+                                                                   .Where(o => o.DefaultCreditOrganizationId == OrganizationId)
+                                                                   .Select(a => new
+                                                                   {
                                                                        a.ApiIntegrationName
-                                                                  })
-                                                                  .FirstOrDefault();
+                                                                   })
+                                                                   .FirstOrDefault();
                 return apiIntegrationName;
             }
             catch (Exception ex)
@@ -273,6 +294,59 @@ namespace DanpheEMR.Services.ClaimManagement
                 throw new Exception(ex + "No Results found for the given OrganizationId");
             }
         }
+
+        public object GetInitiatedClaimCodesByPatientId(int PatientId, ClaimManagementDbContext _claimManagementDbContext)
+        {
+            if (PatientId == 0)
+            {
+                Log.Error($"{nameof(PatientId)} cannot be zero inorder to get claim codes!");
+                throw new ArgumentNullException($"{nameof(PatientId)} cannot be zero inorder to get claim codes!");
+            }
+            var ClaimCodes = _claimManagementDbContext.InsuranceClaim
+                                                      .Where(claim => claim.ClaimStatus == ENUM_ClaimManagement_ClaimStatus.Initiated && claim.PatientId == PatientId)
+                                                      .Select(claim => claim.ClaimCode)
+                                                      .Distinct()
+                                                      .OrderByDescending(claimCode => claimCode)
+                                                      .ToList();
+            if (ClaimCodes.Count > 0)
+            {
+                return ClaimCodes;
+            }
+            else
+            {
+                throw new NoNullAllowedException("Claim Code not found.");
+            }
+
+        }
+
+
+        public object GetFinalBillSummaryByClaimCode(Int64 ClaimCode, ClaimManagementDbContext _claimManagementgDbContext)
+        {
+            if (ClaimCode == 0)
+            {
+                Log.Error($"{nameof(ClaimCode)} cannot be zero inorder to get patient details!");
+                throw new ArgumentNullException($"{nameof(ClaimCode)} cannot be zero inorder to get patient details!");
+            }
+            try
+            {
+                List<SqlParameter> paramList = new List<SqlParameter>() {
+                        new SqlParameter("@ClaimCode", ClaimCode)
+                    };
+                DataSet ds = DALFunctions.GetDatasetFromStoredProc("SP_GetFinalBillSummaryByClaimCode", paramList, _claimManagementgDbContext);
+                var FinalBillSummary = new
+                {
+                    PatientDetails = ds.Tables[0],
+                    ChargeDetails = ds.Tables[1],
+                };
+                return FinalBillSummary;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex + "No Results found for the given InvoiceRefId");
+            }
+
+        }
+
 
         #endregion
 
@@ -287,6 +361,7 @@ namespace DanpheEMR.Services.ClaimManagement
                     {
                         InsuranceClaim claim = new InsuranceClaim();
                         claim.PatientId = bills[0].PatientId;
+                        claim.PatientVisitId = bills[0].PatientVisitId;
                         claim.PatientCode = bills[0].HospitalNo;
                         claim.ClaimCode = bills[0].ClaimCode;
                         claim.MemberNumber = bills[0].MemberNo;
@@ -557,136 +632,218 @@ namespace DanpheEMR.Services.ClaimManagement
                 }
             }
         }
+        public object SaveClaimAsDraft(RbacUser currentUser, SubmitedClaimDTO claimDTO, ClaimManagementDbContext _claimManagementgDbContext)
+        {
+            try
+            {
+                SaveDocuments(currentUser, claimDTO, _claimManagementgDbContext);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.Message);
+                throw ex;
+            }
 
-        public object SubmitClaim(RbacUser currentUser, SubmitedClaimDTO claimDTO, Boolean IsForDraft, ClaimManagementDbContext _claimManagementgDbContext)
+        }
+        public async Task<object> SubmitClaim(RbacUser currentUser, SubmitedClaimDTO claimDTO, ClaimManagementDbContext _claimManagementgDbContext)
         {
             using (var dbContextTransaction = _claimManagementgDbContext.Database.BeginTransaction())
             {
                 try
                 {
-                    var claim = _claimManagementgDbContext.InsuranceClaim.Where(a => a.ClaimSubmissionId == claimDTO.claim.ClaimSubmissionId).FirstOrDefault();
-                    if (claim != null)
+
+                    var scheme = _claimManagementgDbContext.Schemes.Where(a => a.SchemeId == claimDTO.claim.SchemeId).FirstOrDefault();
+                    if (scheme != null)
                     {
-                        claim.ClaimedAmount = claimDTO.claim.ClaimedAmount;
-                        claim.ClaimStatus = IsForDraft ? ENUM_ClaimManagement_ClaimStatus.InReview : ENUM_ClaimManagement_ClaimStatus.PaymentPending;
-                        claim.ClaimRemarks = claimDTO.claim.ClaimRemarks;
-                        claim.ClaimableAmount = claimDTO.claim.ClaimableAmount;
-                        claim.NonClaimableAmount = claimDTO.claim.NonClaimableAmount;
-                        claim.TotalBillAmount = claimDTO.claim.TotalBillAmount;
-                        claim.ModifiedBy = currentUser.EmployeeId;
-                        claim.ModifiedOn = DateTime.Now;
-                        _claimManagementgDbContext.Entry(claim).State = EntityState.Modified;
-                        _claimManagementgDbContext.SaveChanges();
-                    }
-                    if (claimDTO.files.Count > 0)
-                    {
-                        var location = (from dbc in _claimManagementgDbContext.CoreCfgParameter
-                                        where dbc.ParameterGroupName == "ClaimManagement"
-                                        && dbc.ParameterName == "InsuranceClaimFileUploadLocation"
-                                        select dbc.ParameterValue).FirstOrDefault();
-
-                        List<dynamic> existingFiles = new List<dynamic>();
-                        existingFiles.AddRange(_claimManagementgDbContext.TXNUploadedFile
-                                                                         .Where(a => a.ClaimCode == claimDTO.claim.ClaimCode)
-                                                                         .ToList());
-                        if (!Directory.Exists(location))
+                        if (scheme.ApiIntegrationName == ENUM_Scheme_ApiIntegrationNames.NGHIS)
                         {
-                            Directory.CreateDirectory(location);
+                            if (claimDTO.HIBClaimSubmitPayload is null)
+                            {
+                                Log.Error($"{nameof(claimDTO.HIBClaimSubmitPayload)} is null for Scheme {scheme.SchemeName} which is why Claim cannot be submitted!");
+                                throw new InvalidOperationException($"{nameof(claimDTO.HIBClaimSubmitPayload)} is required for Scheme {scheme.SchemeName} to process further for claim Submission!");
+                            }
+                            var responseData = await HIBClaimSubmit(currentUser, claimDTO.HIBClaimSubmitPayload, claimDTO.claim, _claimManagementgDbContext);
+                            dbContextTransaction.Commit();
+                            return responseData;
                         }
-
-                        var fileCounter = 1;
-
-                        foreach (var doc in claimDTO.files)
+                        else
                         {
-                            existingFiles.RemoveAll(f => f.FileId == doc.FileId);
-
-                            var matchingFile = _claimManagementgDbContext.TXNUploadedFile
-                                                                         .Where(a => a.FileId == doc.FileId)
-                                                                         .FirstOrDefault();
-
-                            if (matchingFile != null)
+                            if (claimDTO.claim is null)
                             {
-                                matchingFile.FileDescription = doc.FileDescription;
-                                _claimManagementgDbContext.SaveChanges();
+                                Log.Error($"{nameof(claimDTO.claim)} is null for Scheme {scheme.SchemeName} which is why Claim cannot be submitted!");
+                                throw new InvalidOperationException($"{nameof(claimDTO.claim)} is required for Scheme {scheme.SchemeName} to process further for claim Submission!");
                             }
-                            else
-                            {
-                                string filename = claim.PatientCode.ToString() + "_" + claim.ClaimCode.ToString() + "_" + DateTime.Now.ToString("yyyyMMddHHmmss") + "_" + fileCounter.ToString();
-                                string imgPath = Path.Combine(location, (filename + Path.GetExtension(doc.FileDisplayName)));
-                                byte[] imageBytes = Convert.FromBase64String(doc.BinaryData);
-                                File.WriteAllBytes(imgPath, imageBytes);
-
-                                TXNUploadedFile file = new TXNUploadedFile();
-
-                                file.FileDisplayName = doc.FileDisplayName;
-                                file.FileName = filename;
-                                file.FileId = doc.FileId;
-                                file.FileExtension = doc.FileExtension;
-                                file.FileLocationFullPath = imgPath;
-                                file.FileDescription = doc.FileDescription;
-                                file.UploadedBy = currentUser.EmployeeId;
-                                file.UploadedOn = DateTime.Now;
-                                file.ClaimCode = claimDTO.claim.ClaimCode;
-                                file.PatientId = claimDTO.claim.PatientId;
-                                file.SystemFeatureName = ENUM_FileUpload_SystemFeatureName.InsuranceClaim;
-                                file.IsActive = true;
-                                file.ReferenceNumber = claimDTO.claim.ClaimSubmissionId;
-                                file.ReferenceEntityType = ENUM_FileUpload_ReferenceEntityType.InsuranceClaim;
-                                file.PatientVisitId = null;
-                                file.Size = doc.Size;
-
-                                fileCounter++;
-
-                                _claimManagementgDbContext.TXNUploadedFile.Add(file);
-                                _claimManagementgDbContext.SaveChanges();
-                            }
-                        }
-
-                        if (existingFiles != null)
-                        {
-                            foreach (TXNUploadedFile files in existingFiles)
-                            {
-                                var fileTobeRemoved = _claimManagementgDbContext.TXNUploadedFile
-                                                                                .Where(a => a.FileId == files.FileId)
-                                                                                .FirstOrDefault();
-                                var FileLocationFullPath = fileTobeRemoved.FileLocationFullPath;
-                                if (fileTobeRemoved != null)
-                                {
-                                    _claimManagementgDbContext.TXNUploadedFile.Remove(fileTobeRemoved);
-                                    _claimManagementgDbContext.SaveChanges();
-
-                                    File.Delete(FileLocationFullPath);
-                                }
-                            }
+                            var responseData = await SaveDocumentsAndClaim(currentUser, claimDTO, _claimManagementgDbContext);
+                            dbContextTransaction.Commit();
+                            return responseData;
                         }
                     }
-                    else if (claimDTO.files.Count == 0)
+                    else
                     {
-                        var existingFiles = _claimManagementgDbContext.TXNUploadedFile
-                                                    .Where(a => a.ClaimCode == claimDTO.claim.ClaimCode)
-                                                    .ToList();
-                        if (existingFiles != null)
-                        {
-                            _claimManagementgDbContext.TXNUploadedFile.RemoveRange(existingFiles);
-                            _claimManagementgDbContext.SaveChanges();
-
-                            foreach (TXNUploadedFile file in existingFiles)
-                            {
-                                File.Delete(file.FileLocationFullPath);
-                            }
-                        }
+                        Log.Error("Scheme is null");
+                        throw new InvalidOperationException("Scheme is required");
                     }
-                    dbContextTransaction.Commit();
-                    return true;
                 }
                 catch (Exception ex)
                 {
                     dbContextTransaction.Rollback();
-                    throw ex;
+                    throw;
                 }
             }
         }
+        private async Task<object> SaveDocumentsAndClaim(RbacUser currentUser, SubmitedClaimDTO claimDTO, ClaimManagementDbContext _claimManagementgDbContext)
+        {
+            try
+            {
+                Log.Information("Claim Submission process has been Started");
+                SaveClaim(currentUser, claimDTO.claim, _claimManagementgDbContext);
+                Log.Information("Claim Submission process has been Completed");
 
+                Log.Information("Claim Document Submission process has been Started");
+                SaveDocuments(currentUser, claimDTO, _claimManagementgDbContext);
+                Log.Information("Claim Document Submission process has been Completed");
+
+                var result = new
+                {
+                    status = true,
+                    message = "Successfully claim submitted"
+                };
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.Message);
+                throw ex;
+            }
+        }
+
+        private static void SaveDocuments(RbacUser currentUser, SubmitedClaimDTO claimDTO, ClaimManagementDbContext _claimManagementgDbContext)
+        {
+            if (claimDTO.files.Count > 0)
+            {
+                var location = (from dbc in _claimManagementgDbContext.CoreCfgParameter
+                                where dbc.ParameterGroupName == "ClaimManagement"
+                                && dbc.ParameterName == "InsuranceClaimFileUploadLocation"
+                                select dbc.ParameterValue).FirstOrDefault();
+
+                List<dynamic> existingFiles = new List<dynamic>();
+                existingFiles.AddRange(_claimManagementgDbContext.TXNUploadedFile
+                                                                 .Where(a => a.ClaimCode == claimDTO.claim.ClaimCode)
+                                                                 .ToList());
+                if (!Directory.Exists(location))
+                {
+                    Directory.CreateDirectory(location);
+                }
+
+                var fileCounter = 1;
+
+                foreach (var doc in claimDTO.files)
+                {
+                    existingFiles.RemoveAll(f => f.FileId == doc.FileId);
+
+                    var matchingFile = _claimManagementgDbContext.TXNUploadedFile
+                                                                 .Where(a => a.FileId == doc.FileId)
+                                                                 .FirstOrDefault();
+
+                    if (matchingFile != null)
+                    {
+                        matchingFile.FileDescription = doc.FileDescription;
+                        _claimManagementgDbContext.SaveChanges();
+                    }
+                    else
+                    {
+                        var claim = _claimManagementgDbContext.InsuranceClaim.Where(a => a.ClaimSubmissionId == claimDTO.claim.ClaimSubmissionId).FirstOrDefault();
+                        string filename = claim.PatientCode.ToString() + "_" + claim.ClaimCode.ToString() + "_" + DateTime.Now.ToString("yyyyMMddHHmmss") + "_" + fileCounter.ToString();
+                        string imgPath = Path.Combine(location, (filename + Path.GetExtension(doc.FileDisplayName)));
+                        byte[] imageBytes = Convert.FromBase64String(doc.BinaryData);
+                        File.WriteAllBytes(imgPath, imageBytes);
+
+                        TXNUploadedFile file = new TXNUploadedFile();
+
+                        file.FileDisplayName = doc.FileDisplayName;
+                        file.FileName = filename;
+                        file.FileId = doc.FileId;
+                        file.FileExtension = doc.FileExtension;
+                        file.FileLocationFullPath = imgPath;
+                        file.FileDescription = doc.FileDescription;
+                        file.UploadedBy = currentUser.EmployeeId;
+                        file.UploadedOn = DateTime.Now;
+                        file.ClaimCode = claimDTO.claim.ClaimCode;
+                        file.PatientId = claimDTO.claim.PatientId;
+                        file.SystemFeatureName = ENUM_FileUpload_SystemFeatureName.InsuranceClaim;
+                        file.IsActive = true;
+                        file.ReferenceNumber = claimDTO.claim.ClaimSubmissionId;
+                        file.ReferenceEntityType = ENUM_FileUpload_ReferenceEntityType.InsuranceClaim;
+                        file.PatientVisitId = null;
+                        file.Size = doc.Size;
+
+                        fileCounter++;
+
+                        _claimManagementgDbContext.TXNUploadedFile.Add(file);
+                        _claimManagementgDbContext.SaveChanges();
+                    }
+                }
+
+                if (existingFiles != null)
+                {
+                    foreach (TXNUploadedFile files in existingFiles)
+                    {
+                        var fileTobeRemoved = _claimManagementgDbContext.TXNUploadedFile
+                                                                        .Where(a => a.FileId == files.FileId)
+                                                                        .FirstOrDefault();
+                        var FileLocationFullPath = fileTobeRemoved.FileLocationFullPath;
+                        if (fileTobeRemoved != null)
+                        {
+                            _claimManagementgDbContext.TXNUploadedFile.Remove(fileTobeRemoved);
+                            _claimManagementgDbContext.SaveChanges();
+
+                            File.Delete(FileLocationFullPath);
+                        }
+                    }
+                }
+            }
+            else if (claimDTO.files.Count == 0)
+            {
+                var existingFiles = _claimManagementgDbContext.TXNUploadedFile
+                                            .Where(a => a.ClaimCode == claimDTO.claim.ClaimCode)
+                                            .ToList();
+                if (existingFiles != null)
+                {
+                    _claimManagementgDbContext.TXNUploadedFile.RemoveRange(existingFiles);
+                    _claimManagementgDbContext.SaveChanges();
+
+                    foreach (TXNUploadedFile file in existingFiles)
+                    {
+                        File.Delete(file.FileLocationFullPath);
+                    }
+                }
+            }
+        }
+        public object SaveClaim(RbacUser currentUser, InsuranceClaim claim, ClaimManagementDbContext _claimManagementgDbContext)
+        {
+            var Claim = _claimManagementgDbContext.InsuranceClaim.Where(a => a.ClaimSubmissionId == claim.ClaimSubmissionId).FirstOrDefault();
+            if (claim != null)
+            {
+                Claim.ClaimedAmount = claim.ClaimedAmount;
+                Claim.ClaimStatus = ENUM_ClaimManagement_ClaimStatus.PaymentPending;
+                Claim.ClaimRemarks = claim.ClaimRemarks;
+                Claim.ClaimableAmount = claim.ClaimableAmount;
+                Claim.NonClaimableAmount = claim.NonClaimableAmount;
+                Claim.TotalBillAmount = claim.TotalBillAmount;
+                Claim.ModifiedBy = currentUser.EmployeeId;
+                Claim.ModifiedOn = DateTime.Now;
+                _claimManagementgDbContext.Entry(Claim).State = EntityState.Modified;
+                _claimManagementgDbContext.SaveChanges();
+                return claim;
+            }
+            else
+            {
+                Log.Error("Claim is null");
+                throw new InvalidOperationException("Claim is required");
+            }
+        }
         public object UpdateClaimCodeOfInvoices(RbacUser currentUser, Int64 claimCode, List<ClaimBillReviewDTO> bill, ClaimManagementDbContext _claimManagementgDbContext)
         {
             using (var dbContextTransaction = _claimManagementgDbContext.Database.BeginTransaction())
@@ -695,31 +852,59 @@ namespace DanpheEMR.Services.ClaimManagement
                 {
                     bill.ForEach(bil =>
                     {
-                        if (bil.CreditModule == ENUM_ClaimManagement_CreditModule.Billing)
+                        var visit = _claimManagementgDbContext.PatientVisits.Where(a => a.PatientVisitId == bil.PatientVisitId).FirstOrDefault();
+                        if (visit != null)
                         {
-                            var entity = _claimManagementgDbContext.BillingCreditBillStatus.Where(a => a.BillingCreditBillStatusId == bil.CreditStatusId).FirstOrDefault();
-                            if (entity != null)
-                            {
-                                entity.ClaimCode = claimCode;
-                                entity.ModifiedBy = currentUser.EmployeeId;
-                                entity.ModifiedOn = DateTime.Now;
-                                _claimManagementgDbContext.Entry(entity).State = EntityState.Modified;
-                                _claimManagementgDbContext.SaveChanges();
-                            }
+                            visit.ClaimCode = claimCode;
+                            visit.ModifiedBy = currentUser.EmployeeId;
+                            visit.ModifiedOn = DateTime.Now;
+                            _claimManagementgDbContext.Entry(visit).State = EntityState.Modified;
                         }
-                        else
+
+                        List<BillingTransactionCreditBillStatusModel> bills = _claimManagementgDbContext.BillingCreditBillStatus.Where(a => a.PatientVisitId == bil.PatientVisitId).ToList();
+                        if (bills != null)
                         {
-                            var entity = _claimManagementgDbContext.PharmacyCreditBillStatus.Where(a => a.PhrmCreditBillStatusId == bil.CreditStatusId).FirstOrDefault();
-                            if (entity != null)
+                            bills.ForEach(credit =>
                             {
-                                entity.ClaimCode = claimCode;
-                                entity.ModifiedBy = currentUser.EmployeeId;
-                                entity.ModifiedOn = DateTime.Now;
-                                _claimManagementgDbContext.Entry(entity).State = EntityState.Modified;
-                                _claimManagementgDbContext.SaveChanges();
-                            }
+                                credit.ClaimCode = claimCode;
+                                credit.ModifiedBy = currentUser.EmployeeId;
+                                credit.ModifiedOn = DateTime.Now;
+                                _claimManagementgDbContext.Entry(credit).State = EntityState.Modified;
+
+                            });
+                        }
+                        var billTxns = _claimManagementgDbContext.BillTxn.Where(a => a.PatientVisitId == bil.PatientVisitId).ToList();
+                        if (billTxns != null)
+                        {
+                            billTxns.ForEach(billTxn =>
+                            {
+                                billTxn.ClaimCode = claimCode;
+                                _claimManagementgDbContext.Entry(billTxn).State = EntityState.Modified;
+                            });
+
+                        }
+                        var phrmBills = _claimManagementgDbContext.PharmacyCreditBillStatus.Where(a => a.PatientVisitId == bil.PatientVisitId).ToList();
+                        if (phrmBills != null)
+                        {
+                            phrmBills.ForEach(phrmBill =>
+                            {
+                                phrmBill.ClaimCode = claimCode;
+                                phrmBill.ModifiedBy = currentUser.EmployeeId;
+                                phrmBill.ModifiedOn = DateTime.Now;
+                                _claimManagementgDbContext.Entry(phrmBill).State = EntityState.Modified;
+                            });
+                        }
+                        List<PHRMInvoiceTransactionModel> phrmTxns = _claimManagementgDbContext.PHRMInvoiceTransaction.Where(a => a.PatientVisitId == bil.PatientVisitId).ToList();
+                        if (phrmTxns != null)
+                        {
+                            phrmTxns.ForEach(phrmTxn =>
+                            {
+                                phrmTxn.ClaimCode = claimCode;
+                                _claimManagementgDbContext.Entry(phrmTxn).State = EntityState.Modified;
+                            });
                         }
                     });
+                    _claimManagementgDbContext.SaveChanges();
                     dbContextTransaction.Commit();
                     return true;
                 }
@@ -731,7 +916,7 @@ namespace DanpheEMR.Services.ClaimManagement
             }
         }
 
-        public object UpdateApprovedAndRejectedAmount (RbacUser currentUser, PendingClaimDTO claimObject, ClaimManagementDbContext _claimManagementgDbContext)
+        public object UpdateApprovedAndRejectedAmount(RbacUser currentUser, PendingClaimDTO claimObject, ClaimManagementDbContext _claimManagementgDbContext)
         {
             using (var dbContextTransaction = _claimManagementgDbContext.Database.BeginTransaction())
             {
@@ -917,7 +1102,7 @@ namespace DanpheEMR.Services.ClaimManagement
                         _claimManagementgDbContext.SaveChanges();
                     }
                     var matchingCreditBill = _claimManagementgDbContext.PharmacyCreditBillStatus.Where(a => a.InvoiceId == PharmacyCreditBillItemDTO.InvoiceId).FirstOrDefault();
-                    if(matchingCreditBill != null)
+                    if (matchingCreditBill != null)
                     {
                         var matchingInsuranceClaim = _claimManagementgDbContext.InsuranceClaim.Where(a => a.ClaimSubmissionId == matchingCreditBill.ClaimSubmissionId).FirstOrDefault();
                         if (PharmacyCreditBillItemDTO.IsClaimable == false)
@@ -990,11 +1175,229 @@ namespace DanpheEMR.Services.ClaimManagement
 
         public object GetECHSPatientWithVisitInformation(string search, ClaimManagementDbContext _claimManagementgDbContext)
         {
-           DataTable dtEchsPatient = DALFunctions.GetDataTableFromStoredProc("SP_PAT_ECHSPatientsListWithVisitinformation",
-                    new List<SqlParameter>() { new SqlParameter("@SearchTxt", search) }, _claimManagementgDbContext);
+            DataTable dtEchsPatient = DALFunctions.GetDataTableFromStoredProc("SP_PAT_ECHSPatientsListWithVisitinformation",
+                     new List<SqlParameter>() { new SqlParameter("@SearchTxt", search) }, _claimManagementgDbContext);
             return dtEchsPatient;
         }
 
         #endregion
+        #region Claim Submission For HIB Patient
+
+        public async Task<object> HIBClaimSubmit(RbacUser currentUser, ClaimSubmitRequest claimSubmitRequest, InsuranceClaim claim, ClaimManagementDbContext claimManagementDbContext)
+        {
+            AdminParametersModel HIBConfigurationParameter = GetHIBConfigurationParameter(claimManagementDbContext);
+            var HIBConfig = DanpheJSONConvert.DeserializeObject<HIBApiConfig>(HIBConfigurationParameter.ParameterValue);
+            var hibCredentials = Convert.ToBase64String(Encoding.GetEncoding("ISO-8859-1").GetBytes(HIBConfig.HIBUsername + ":" + HIBConfig.HIBPassword));
+
+
+
+            using (HttpClient client = new HttpClient())
+            {
+                ConfigureHttpClient(client, HIBConfig, hibCredentials);
+
+                var jsonContent = JsonConvert.SerializeObject(claimSubmitRequest);
+
+                // Remove 'nmc' and 'careType' properties from ClaimSubmitRequest if old API is used
+                if (!HIBConfig.IsLatestAPI)
+                {
+                    JObject jsonObject = JObject.Parse(jsonContent);
+                    // Remove properties
+                    jsonObject.Remove("nmc");
+                    jsonObject.Remove("careType");
+                    jsonContent = jsonObject.ToString();
+                }
+
+
+                StringContent content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                try
+                {
+                    Log.Information($"The Payload we are submitting to the HIB server is {jsonContent}");
+                    var clientResponse = await client.PostAsync($"Claim/", content);
+                    if (clientResponse.IsSuccessStatusCode)
+                    {
+                        Log.Information("Claim is successfully submitted at the HIB Server!");
+                        var response = await clientResponse.Content.ReadAsStringAsync();
+                        //var serializeData = JsonConvert.DeserializeObject<ClaimSubmitResponse>(response);
+
+                        var claimApiResponse = new InsuranceClaimAPIResponse();
+                        claimApiResponse.ClaimSubmissionId = claim.ClaimSubmissionId;
+                        claimApiResponse.ResponseStatus = clientResponse.IsSuccessStatusCode;
+                        claimApiResponse.ResponseData = response;
+                        claimApiResponse.CreditOrganizationId = claim.CreditOrganizationId;
+                        claimApiResponse.PostedBy = currentUser.EmployeeId;
+                        claimApiResponse.PostedOn = DateTime.Now;
+                        claimApiResponse.RequestApiURL = HIBConfig.HIBUrl + "Claim";
+                        claimManagementDbContext.insuranceClaimAPIResponses.Add(claimApiResponse);
+                        await claimManagementDbContext.SaveChangesAsync(cancellationToken: default);
+                        Log.Information("Claim is successfully submitted and The response is successfully saved in our server");
+
+
+                        var insuranceClaim = await claimManagementDbContext.InsuranceClaim.FirstOrDefaultAsync(i => i.ClaimSubmissionId == claim.ClaimSubmissionId);
+                        if(insuranceClaim != null)
+                        {
+                            insuranceClaim.ClaimStatus = ENUM_ClaimManagement_ClaimStatus.PaymentPending;
+                            insuranceClaim.ModifiedBy = currentUser.EmployeeId;
+                            insuranceClaim.ModifiedOn = DateTime.Now;
+
+                            claimManagementDbContext.Entry(insuranceClaim).State = EntityState.Modified;
+                            await claimManagementDbContext.SaveChangesAsync(cancellationToken: default);
+                        }
+
+                        var result = new
+                        {
+                            status = true,
+                            message = "Successfully claim submitted"
+                        };
+
+                        return result;
+                    }
+                    else
+                    {
+                        Log.Warning("Claim Submission failed with error messages");
+                        var errorString = await clientResponse.Content.ReadAsStringAsync();
+                        Log.Warning($"Claim Submission failed with error message as \n {errorString}");
+
+                        var claimApiResponseForError = new InsuranceClaimAPIResponse();
+                        claimApiResponseForError.ClaimSubmissionId = claim.ClaimSubmissionId;
+                        claimApiResponseForError.ResponseStatus = false;
+                        claimApiResponseForError.CreditOrganizationId = claim.CreditOrganizationId;
+                        claimApiResponseForError.PostedBy = currentUser.EmployeeId;
+                        claimApiResponseForError.PostedOn = DateTime.Now;
+                        claimApiResponseForError.RequestApiURL = HIBConfig.HIBUrl + "Claim";
+                        claimApiResponseForError.ErrorMessage = errorString;
+                        claimManagementDbContext.insuranceClaimAPIResponses.Add(claimApiResponseForError);
+                        await claimManagementDbContext.SaveChangesAsync(cancellationToken: default);
+
+                        Log.Warning($"Claim Submission failed and error response is saved in our server");
+
+                        var result = new
+                        {
+                            status = false,
+                            message = errorString
+                        };
+                        return result;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error($"Could not perform Claim Submission Process {ex.Message.ToString()}");
+                    throw ex;
+                }
+            }
+        }
+        public object GetReportsByClaimCode(long ClaimCode, ClaimManagementDbContext _claimManagementgDbContext)
+        {
+            DataTable reportsByClaimCode = DALFunctions.GetDataTableFromStoredProc("SP_Claim_Wise_Lab_Radiology_DischargeSummary_RPT",
+                               new List<SqlParameter>() { new SqlParameter("@ClaimCode", ClaimCode) }, _claimManagementgDbContext);
+            return reportsByClaimCode;
+        }
+        #endregion
+        private static AdminParametersModel GetHIBConfigurationParameter(ClaimManagementDbContext ClaimManagementDbContext)
+        {
+            var HIBConfigurationParameter = ClaimManagementDbContext.CoreCfgParameter.Where(a => a.ParameterGroupName == "GovInsurance" && a.ParameterName == "HIBConfiguration").FirstOrDefault();
+            if (HIBConfigurationParameter == null)
+            {
+                throw new Exception("HIB Configuration Parameter Not Found");
+            }
+
+            return HIBConfigurationParameter;
+        }
+        private static void ConfigureHttpClient(HttpClient client, HIBApiConfig config, string hibCredentials)
+        {
+            client.DefaultRequestHeaders.Clear();
+            client.DefaultRequestHeaders.Add("Authorization", "Basic " + hibCredentials);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            client.DefaultRequestHeaders.Add(config.HIBRemotekey, config.HIBRemoteValue);
+            client.BaseAddress = new Uri(config.HIBUrl);
+        }
+        public List<Diagnosis_DTO> GetDiagnosis(ClaimManagementDbContext claimManagementDbContext)
+        {
+            var diagnosisis = claimManagementDbContext.ICD10Codes
+                .Where(c => c.Active)
+                .Select(c => new Diagnosis_DTO
+                {
+                    ICDCode = c.ICD10Code,
+                    ICDDescription = c.ICD10Description,
+                    Icd10Id = c.ICD10ID
+                }).ToList();
+            return diagnosisis;
+
+        }
+
+        /// <summary>
+        /// To check if Claim Code is already settled. (Ex. ECHS patient)
+        /// </summary>
+        /// <param name="ClaimCode"></param>
+        /// <param name="_claimManagementgDbContext"></param>
+        /// <returns>This return true if Claim is already settled other wise return false</returns>
+        public object CheckIfClaimCodeAlreadySettled(Int64 ClaimCode, ClaimManagementDbContext _claimManagementgDbContext)
+        {
+            if (ClaimCode != 0)
+            {
+                var result = _claimManagementgDbContext.InsuranceClaim.Any(a => a.ClaimCode == ClaimCode && (a.ClaimStatus == ENUM_ClaimManagement_ClaimStatus.PaymentPending || a.ClaimStatus == ENUM_ClaimManagement_ClaimStatus.Settled));
+                return result;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        public object UpdateDocumentReceivedStatus(RbacUser currentUser, List<ClaimBillReviewDTO> bill, ClaimManagementDbContext _claimManagementgDbContext)
+        {
+            using (var dbContextTransaction = _claimManagementgDbContext.Database.BeginTransaction())
+            {
+                try
+                {
+                    bill.ForEach(bil =>
+                    {
+                        if (bil.CreditModule == ENUM_ClaimManagement_CreditModule.Billing)
+                        {
+                            var entity = _claimManagementgDbContext.BillingCreditBillStatus.Where(a => a.BillingCreditBillStatusId == bil.CreditStatusId).FirstOrDefault();
+                            if (entity != null)
+                            {
+                                entity.IsDocumentReceived = bil.IsDocumentReceived;
+                                entity.Remarks = bil.Remarks;
+                                entity.ModifiedBy = currentUser.EmployeeId;
+                                entity.ModifiedOn = DateTime.Now;
+                                entity.DocumentReceivedDate = DateTime.Now;
+                                _claimManagementgDbContext.Entry(entity).State = EntityState.Modified;
+                            }
+                        }
+                        else
+                        {
+                            var entity = _claimManagementgDbContext.PharmacyCreditBillStatus.Where(a => a.PhrmCreditBillStatusId == bil.CreditStatusId).FirstOrDefault();
+                            if (entity != null)
+                            {
+                                entity.IsDocumentReceived = bil.IsDocumentReceived;
+                                entity.Remarks = bil.Remarks;
+                                entity.ModifiedBy = currentUser.EmployeeId;
+                                entity.ModifiedOn = DateTime.Now;
+                                entity.DocumentReceivedDate = DateTime.Now;
+                                _claimManagementgDbContext.Entry(entity).State = EntityState.Modified;
+                            }
+                        }
+                    });
+                    _claimManagementgDbContext.SaveChanges();
+                    dbContextTransaction.Commit();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    dbContextTransaction.Rollback();
+                    throw ex;
+                }
+            }
+        }
+        public object GetClaimDocumentReceivedReport(DateTime FromDate, DateTime ToDate, int? PatientId, long? ClaimCode, string InvoiceNo, ClaimManagementDbContext _claimManagementgDbContext)
+        {
+            DataTable claimDocumentReceivedReport = DALFunctions.GetDataTableFromStoredProc("SP_RPT_ClaimDocumentReceived",
+                              new List<SqlParameter>() {
+                        new SqlParameter("@FromDate", FromDate),
+                        new SqlParameter("@ToDate", ToDate),
+                        new SqlParameter("@PatientId", PatientId),
+                        new SqlParameter("@ClaimCode",ClaimCode),
+                        new SqlParameter("@InvoiceNo",InvoiceNo)}, _claimManagementgDbContext);
+            return claimDocumentReceivedReport;
+        }
     }
 }

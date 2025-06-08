@@ -1,5 +1,6 @@
 import { SsfPatient_DTO } from "../../../insurance/ssf/shared/service/ssf.service";
 import { ENUM_BillPaymentMode } from "../../../shared/shared-enums";
+import { GovInsurancePatientVM } from "../../ins-billing/shared/gov-ins-patient.view-model";
 import { BillingSubScheme_DTO } from "./bill-subscheme.dto";
 import { PatientScheme_DTO } from "./patient-scheme.dto";
 
@@ -37,6 +38,7 @@ export class RegistrationScheme_DTO {
 
   public PatientScheme: PatientScheme_DTO = new PatientScheme_DTO();
   public ssfPatientDetail: SsfPatient_DTO = new SsfPatient_DTO();
+  public NSHIPatientDetail: GovInsurancePatientVM = new GovInsurancePatientVM();
   public HasSubScheme: boolean = false;
   public SubSchemes = new Array<BillingSubScheme_DTO>();
   public SubSchemeId: number = null;

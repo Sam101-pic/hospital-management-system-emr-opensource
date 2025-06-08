@@ -7,9 +7,12 @@ import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import * as moment from 'moment/moment';
 import { CoreService } from "../../../core/shared/core.service";
 import { DispensaryRequisitionService } from "../../../dispensary/dispensary-main/stock-main/requisition/dispensary-requisition.service";
+import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { NepaliDateInGridColumnDetail, NepaliDateInGridParams } from "../../../shared/danphe-grid/NepaliColGridSettingsModel";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
+import { ENUM_DanpheHTTPResponses } from "../../../shared/shared-enums";
+import { PharmacyStoreStockDetail } from "../../shared/dtos/pharmacy-store-stock-detail";
 import { PharmacyBLService } from "../../shared/pharmacy.bl.service";
 import { PharmacyService } from '../../shared/pharmacy.service';
 import { PHRMStoreDispatchItems } from "../../shared/phrm-store-dispatch-items.model";
@@ -28,7 +31,7 @@ export class PHRMStoreRequisitionListComponent implements OnInit {
       public dispatchListbyId: Array<PHRMStoreDispatchItems> = new Array<PHRMStoreDispatchItems>();
       public requisitionItemsDetails: Array<PHRMStoreRequisitionItems> = new Array<PHRMStoreRequisitionItems>();
       public requisitionGridColumns: Array<any> = null;
-      public dispatchList: Array<{ CreatedByName, CreatedOn, RequisitionId, DispatchId, ReceivedBy, DispatchedByName, DepartmentName, SourceStore, TargetStore }> = new Array<{ CreatedByName, CreatedOn, RequisitionId, DispatchId, ReceivedBy, DispatchedByName, DepartmentName, SourceStore, TargetStore }>();
+      public dispatchList: Array<{ CreatedByName, CreatedOn, RequisitionId, DispatchId, ReceivedBy, DispatchedByName, DepartmentName, SourceStore, TargetStore, IssueNo }> = new Array<{ CreatedByName, CreatedOn, RequisitionId, DispatchId, ReceivedBy, DispatchedByName, DepartmentName, SourceStore, TargetStore, IssueNo }>();
       DispatchListGridColumns: Array<any> = null;
       //({ headerName: string; field: string; width: number; template?: undefined; } | { headerName: string; field: string; width: number; template: string; })[];
       public itemchecked: boolean = true;
@@ -62,6 +65,10 @@ export class PHRMStoreRequisitionListComponent implements OnInit {
       public NepaliDateInDispatchListGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
       public showNepaliReceipt: boolean;
       currentDate: string = "";
+      public stockList: PharmacyStoreStockDetail[] = [];
+      IsStockLoaded: boolean = false;
+      Status: string[] = [];
+
 
       public GeneralFieldLabel = new GeneralFieldLabels();
       constructor(public coreService: CoreService, public dispensaryRequisitionService: DispensaryRequisitionService,
@@ -78,18 +85,20 @@ export class PHRMStoreRequisitionListComponent implements OnInit {
             this.requisitionGridColumns = GridColumnSettings.PHRMStoreRequisitionList;
 
             this.CheckReceiptSettings();
-            if (this.PharmacyService._Id !== null) {
-                  this.ShowbyDispatchId(PharmacyService._Id);
+            if (this.PharmacyService.DispatchId > 0) {
+                  this.ShowbyDispatchId(this.PharmacyService.DispatchId);
                   this.showDetailsbyDispatchId = true;
             }
+            this.getGenericList();
+            this.GetStockForItemDispatch();
       }
       ngOnInit() {
             this.DispatchListGridColumns = GridColumnSettings.PHRMDispatchList;
             this.NepaliDateInDispatchListGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('CreatedOn', false));
       }
-      // ngOnDestroy() {
-      //       this.PharmacyService._Id = null;
-      // }
+      ngOnDestroy() {
+            this.PharmacyService.DispatchId = null;
+      }
       onDateChange($event) {
             this.fromDate = $event.fromDate;
             this.toDate = $event.toDate;
@@ -108,6 +117,9 @@ export class PHRMStoreRequisitionListComponent implements OnInit {
                         if (res.Status == "OK") {
                               this.requisitionList = res.Results.requisitionList;
                               this.filterRequisitionList = res.Results.requisitionList;
+                              if (this.Status.length) {
+                                    this.filterRequisitionList = this.requisitionList.filter(a => this.Status.includes(a.RequisitionStatus));
+                              }
                         }
                         else {
                               this.messageBoxService.showMessage("failed", ['failed to get Requisitions.....please check log for details.']);
@@ -117,17 +129,17 @@ export class PHRMStoreRequisitionListComponent implements OnInit {
                   });
       }
       FilterRequisitionList(status: string) {
-            var Status = [];
+            this.Status = [];
             if (status == "pending") {
-                  Status = ["active", "partial"];
+                  this.Status = ["active", "partial"];
             }
             else if (status == "complete") {
-                  Status = ["complete"];
+                  this.Status = ["complete"];
             }
             else {
-                  Status = ["active", "partial", "complete", "initiated", "cancelled"];
+                  this.Status = ["active", "partial", "complete", "initiated", "cancelled"];
             }
-            this.filterRequisitionList = this.requisitionList.filter(a => Status.includes(a.RequisitionStatus));
+            this.filterRequisitionList = this.requisitionList.filter(a => this.Status.includes(a.RequisitionStatus));
       }
       DeptGridAction($event: GridEmitModel) {
             switch ($event.Action) {
@@ -303,6 +315,32 @@ export class PHRMStoreRequisitionListComponent implements OnInit {
             if (event.keyCode == 27) {
                   this.Close();
             }
+      }
+
+      GetStockForItemDispatch() {
+            this.PharmacyBLService.GetStoreStocksToDispatch()
+                  .subscribe(res => {
+                        if (res.Status == "OK") {
+                              this.stockList = res.Results;
+                              this.PharmacyService.setStockForItemDispatch(this.stockList);
+                              this.IsStockLoaded = true;
+                        }
+                        else {
+                              this.messageBoxService.showMessage("error", ["Failed to get Items. " + res.ErrorMessage]);
+                        }
+                  },
+                        err => {
+                              this.messageBoxService.showMessage("error", ["Failed to get Items. " + err.ErrorMessage]);
+                        });
+      }
+
+      public getGenericList() {
+            this.PharmacyBLService.GetGenericList()
+                  .subscribe((res: DanpheHTTPResponse) => {
+                        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+                              this.PharmacyService.SetGenericList(res.Results)
+                        }
+                  });
       }
 
 }

@@ -1,9 +1,12 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
-import { Router } from '@angular/router';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import * as _ from 'lodash';
 import * as moment from 'moment/moment';
+import { VisitService } from '../../appointments/shared/visit.service';
+import { ClinicalService } from '../../clinical-new/shared/clinical.service';
 import { CoreService } from '../../core/shared/core.service';
+import { PatientService } from '../../patients/shared/patient.service';
 import { SecurityService } from '../../security/shared/security.service';
 import { CallbackService } from '../../shared/callback.service';
 import { DanpheHTTPResponse } from '../../shared/common-models';
@@ -17,13 +20,14 @@ import { ADTGridColumnSettings } from '../shared/adt-grid-column-settings';
 import { ADT_BLService } from '../shared/adt.bl.service';
 import { Bed } from '../shared/bed.model';
 import { DischargeCancel } from '../shared/dischage-cancel.model';
+import { DischargeSummary } from '../shared/discharge-summary.model';
 import { PatientBedInfo } from '../shared/patient-bed-info.model';
 
 @Component({
   templateUrl: "./discharge-list.html"
 })
 
-export class DischargedListComponent {
+export class DischargedListComponent implements OnInit {
   public fromDate: string = null;
   public toDate: string = null;
   public currentDate: string = null;
@@ -41,7 +45,6 @@ export class DischargedListComponent {
   public showIsInsurancePatient: boolean = false;
   public allItemList = [];
   public filteredItemList = []
-
   loading: boolean = false;
   public showPoliceCase: boolean = false;
   public NepaliDateInGridSettings: NepaliDateInGridParams = new NepaliDateInGridParams();
@@ -51,7 +54,8 @@ export class DischargedListComponent {
   public PatientBedInfoNew = new PatientBedInfo();
   public bedList = new Array<Bed>();
   public DischargeCancelDto = new DischargeCancel_DTO();
-
+  public DischargeSummary: DischargeSummary[] = [];
+  public showDischargeReferral: boolean = false;
   constructor(
     public router: Router,
     public admissionBLService: ADT_BLService,
@@ -59,6 +63,10 @@ export class DischargedListComponent {
     public changeDetector: ChangeDetectorRef,
     public messageBoxService: MessageboxService,
     public coreService: CoreService,
+    public route: ActivatedRoute,
+    public clinicalService: ClinicalService,
+    public patientService: PatientService,
+    public visitService: VisitService,
     public callbackservice: CallbackService) {
     this.fromDate = moment().format('YYYY-MM-DD');
     this.toDate = moment().format('YYYY-MM-DD');
@@ -72,7 +80,17 @@ export class DischargedListComponent {
     }
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('AdmittedDate', true));
     this.NepaliDateInGridSettings.NepaliDateColumnList.push(new NepaliDateInGridColumnDetail('DischargedDate', true));
+    let check = this.visitService.GetPatientVisitId();
   }
+
+
+  ngOnInit() {
+    if (this.visitService.PatientFromClinical === true) {
+      this.patientFromClinical();
+    }
+
+  }
+
   Load() {
     if (this.checkDateValidation()) {
       try {
@@ -134,19 +152,46 @@ export class DischargedListComponent {
           this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, [err.ErrorMessage]);
         });
   }
-
+  patientFromClinical() {
+    if (this.visitService.selectedPatientDetails) {
+      // this.selectedDischarge = this.dischargedList.find(a => a.PatientVisitId === this.visitService.PatientVisitId);
+      this.selectedDischarge = null;
+      this.changeDetector.detectChanges();
+      this.selectedDischarge = this.visitService.selectedPatientDetails;
+      this.showDischargedList = false;
+      this.visitService.PatientFromClinical = false;
+      if (this.selectedDischarge.IsSubmitted)
+        this.showSummaryView = true;
+      else
+        this.showDischargeSummary = true;
+      // this.DischargeSummary = ...this.visitService.patientsAssessmentAndPlans
+    }
+  }
   DischargedListGridActions($event: GridEmitModel) {
 
     switch ($event.Action) {
-      case "dischargeSummary": {
+      case "discharge-summary-view": {
         this.selectedDischarge = null;
         this.changeDetector.detectChanges();
         this.selectedDischarge = $event.Data;
         this.showDischargedList = false;
-        if (this.selectedDischarge.IsSubmitted)
-          this.showSummaryView = true;
-        else
-          this.showDischargeSummary = true;
+        this.showSummaryView = true;
+        break;
+      }
+      case "discharge-summary-edit":
+      case "discharge-summary-add": {
+        this.selectedDischarge = null;
+        this.changeDetector.detectChanges();
+        this.selectedDischarge = $event.Data;
+        this.showDischargedList = false;
+        this.showDischargeSummary = true;
+        break;
+      }
+      case "refferalLetter": {
+        this.selectedDischarge = null;
+        this.changeDetector.detectChanges();
+        this.selectedDischarge = $event.Data;
+        this.showDischargeReferral = true;
         break;
       }
       case "clear-due": {
@@ -223,6 +268,8 @@ export class DischargedListComponent {
     this.showSummaryView = false;
     this.GetDischargedPatientsList();
     this.showDischargedList = true;
+    this.visitService.PatientVisitId = null;
+    this.dischargedList = null;
   }
   logError(err: any) {
     console.log(err);
@@ -299,6 +346,7 @@ export class DischargedListComponent {
     this.selectedDischarge = null;
     this.previousBedOccupied = false;
     this.selectedDischargeCancel = new DischargeCancel();
+    this.showDischargeReferral = false;
   }
   CloseRecieptView() {
     this.showDischargeSlip = false;
@@ -338,6 +386,11 @@ export class DischargedListComponent {
       this.filteredItemList = this.allItemList;
     }
     this.dischargedList = this.filteredItemList;
+    if (this.dischargedList && this.dischargedList.length > 0) {
+      this.dischargedList.map(a => {
+        a.Age = this.coreService.CalculateAge(a.DateOfBirth);
+      });
+    }
   }
 
   public CallbackFromViewPage($event) {
@@ -349,6 +402,8 @@ export class DischargedListComponent {
     this.showSummaryView = true;
     this.showDischargeSummary = false;
     this.showDischargedList = false;
+    this.visitService.PatientVisitId = null;
+    this.dischargedList = null;
   }
 
   public CloseDischargeSlip($event): void {

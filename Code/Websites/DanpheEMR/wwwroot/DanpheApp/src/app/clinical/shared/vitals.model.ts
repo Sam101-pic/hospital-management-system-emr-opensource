@@ -1,13 +1,12 @@
 
 //importing form and its related components, these are used for forms validation.
 import {
-    NgForm,
-    FormGroup,
-    FormControl,
-    Validators,
     FormBuilder,
-    ReactiveFormsModule
-} from '@angular/forms'
+    FormControl,
+    FormGroup
+} from '@angular/forms';
+import * as moment from 'moment';
+import { ENUM_DateTimeFormat } from '../../shared/shared-enums';
 
 
 export class Vitals {
@@ -18,7 +17,7 @@ export class Vitals {
     public HeightUnit: string = "cm";
     public Weight: number = null;
     public WeightUnit: string = "kg";
-    
+
     //needs revision
     public BMI: number = null;
     public Temperature: number = null;
@@ -31,12 +30,17 @@ export class Vitals {
     public OxygenDeliveryMethod: string = null;
     public PainScale: number = null;
     public BodyPart: string = null;
+    public Eyes: string = '';
+    public Verbal: string = '';
+    public Motor: string = '';
+    public GCS: string = '';
 
     public CreatedBy: number = null;
     public ModifiedBy: number = null;
-    public CreatedOn: string = null;
+    public Remarks: string = '';
+    public CreatedOn: string = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
     public ModifiedOn: string = null;
-    public VitalsTakenOn: string = null;
+    public VitalsTakenOn: string = moment().format(ENUM_DateTimeFormat.Year_Month_Day_Hour_Minute);
 
     public VitalsValidator: FormGroup = null;
 
@@ -57,7 +61,7 @@ export class Vitals {
     }
 
 
-    public IsValid():boolean{if(this.VitalsValidator.valid){return true;}else{return false;}} 
+    public IsValid(): boolean { if (this.VitalsValidator.valid) { return true; } else { return false; } }
     public IsValidCheck(): boolean {
         let bpSys = this.VitalsValidator.controls["systolic"].value;
         let bpDias = this.VitalsValidator.controls["diastolic"].value;
@@ -66,7 +70,7 @@ export class Vitals {
             if (bpSys < bpDias) {
                 return false;
             }
-            else if(bpSys == bpDias){
+            else if (bpSys == bpDias) {
                 return false;
             }
         }

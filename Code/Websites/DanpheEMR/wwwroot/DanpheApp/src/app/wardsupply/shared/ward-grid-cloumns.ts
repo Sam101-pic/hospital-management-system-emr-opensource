@@ -46,8 +46,9 @@ export default class WARDGridColumns {
     { headerName: "Item Name", field: "ItemName", width: 150 },
     { headerName: "Unit", field: "UOMName", width: 150 },
     { headerName: "Available Quantity", field: "AvailableQuantity", width: 100, cellRenderer: WARDGridColumns.QuantityColorWarningRenderer },
+    // { headerName: "CostPrice", field: "CostPrice", width: 100 },
     { headerName: "Item Type", field: "ItemType", width: 100 },
-    // { headerName: "Store", field: "StoreName", width: 100 },
+    { headerName: "Store", field: "StoreName", width: 100 },
   ]
   static ColdStorageIconRenderer(params) {
     var template = (params.data.IsColdStorageApplicable == true) ? `<b title="Cold Storage Item" style="background: #0773bc;border: 1px solid blue;border-radius: 60%;padding: 2px 4px;color: #f8f8f8;">C</b>` : '';
@@ -97,6 +98,7 @@ export default class WARDGridColumns {
     { headerName: "Consumed Item", field: "ItemName", width: 100 },
     { headerName: "Consumed Qty", field: "Quantity", width: 100 },
     { headerName: "Unit", field: "Unit", width: 100 },
+    { headerName: "Consumption Type Name", field: "ConsumptionTypeName", width: 150 },
     { headerName: "Entered By", field: "UsedBy", width: 150 },
     { headerName: "Remarks", field: "Remark", width: 150 }
     //{ headerName: "Action", field: "", width: 100, template: '<a danphe-grid-action="view" class="grid-action">View</a>' }
@@ -125,7 +127,7 @@ export default class WARDGridColumns {
 
   }
   static ExpiryDate(params) {
-    return moment(params).format('LL');
+    return moment(params.data.ExpiryDate).format('LL');
   }
   static DateOfExpiry(params) {
     let expiryDate: Date = params.data.ExpiryDate;
@@ -179,7 +181,7 @@ export default class WARDGridColumns {
 
   //Ward Requisition Report
   static WardRequsitionReport = [
-    { headerName: "Req.Id", field: "RequisitionId", width: 30 },
+    { headerName: "Req.Id", field: "RequisitionReport", width: 30 },
     { headerName: "Dis.Id", field: "DispatchId", width: 30 },
     { headerName: "Requested Date", field: "RequestedDate", width: 90 },
     { headerName: "Dispatch Date", field: "DispatchDate", width: 90, },
@@ -203,7 +205,7 @@ export default class WARDGridColumns {
   ///Ward Internal Consumption
   static WardInternalConsumptionReport = [
     { headerName: "Consumed Date", field: "ConsumedDate", width: 90 },
-    { headerName: "Department Name", field: "DepartmentName", width: 150 },
+    //{ headerName: "Department Name", field: "DepartmentName", width: 150 },
     { headerName: "Item Name", field: "ItemName", width: 150 },
     { headerName: "Consumed By", field: "ConsumedBy", width: 90 },
     { headerName: "Quantity", field: "Quantity", width: 90 },
@@ -280,6 +282,7 @@ export default class WARDGridColumns {
     { headerName: "Unit", field: "UOMName", width: 90 },
     { headerName: "CP Per Unit", field: "CostPrice", width: 90 },
     { headerName: "TotalConsumedValue", field: "TotalConsumedValue", width: 90 },
+    { headerName: "Consumption Type", field: "ConsumptionTypeName", width: 150 },
     { headerName: "User", field: "User", width: 90 },
     { headerName: "Remark", field: "Remark", width: 90 },
   ]
@@ -408,5 +411,23 @@ export default class WARDGridColumns {
   static DispatchDateRender(params) {
     let date: string = params.data.Dispatchdate;
     return moment(date).format('yyyy-mm-hh');
+  }
+  static WardInventoryReturnReportList = [
+    { headerName: "ReturnRefNo", field: "ReturnRefNo", width: 150 },
+    { headerName: "ReturnDate", field: "ReturnDate", width: 150, cellRenderer: WARDGridColumns.ReturnDateOnlyRenderer },
+    { headerName: "TargetInventory", field: "TargetInventory", width: 150 },
+    { headerName: "ItemCategory", field: "ItemCategory", width: 150 },
+    { headerName: "ItemName", field: "ItemName", width: 150 },
+    { headerName: "BatchNo", field: "BatchNo", width: 150 },
+    { headerName: "ExpiryDate", field: "ExpiryDate", width: 150, cellRenderer: WARDGridColumns.ExpiryDateOnlyRenderer },
+    { headerName: "ReturnQuantity", field: "ReturnQuantity", width: 150 },
+    { headerName: "ReturnedBy", field: "ReturnedBy", width: 150 },
+    { headerName: "Remarks", field: "Remarks", width: 150 }
+  ];
+  static ExpiryDateOnlyRenderer(params) {
+    if (params.data.ExpiryDate) {
+      let date: string = params.data.ExpiryDate;
+      return moment(date).format("YYYY-MM-DD");
+    }
   }
 }

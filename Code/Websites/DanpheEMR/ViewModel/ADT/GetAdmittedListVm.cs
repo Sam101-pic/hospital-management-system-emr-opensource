@@ -11,6 +11,7 @@ namespace DanpheEMR.ViewModel.ADT
     {
         public string VisitCode { get; set; }
         public int PatientVisitId { get; set; }
+        public string VisitType { get; set; }
         public int PatientId { get; set; }
         public int PatientAdmissionId { get; set; }
         public DateTime AdmittedDate { get; set; }
@@ -20,6 +21,10 @@ namespace DanpheEMR.ViewModel.ADT
         public int? AdmittingDoctorId { get; set; }
         public string AdmittingDoctorName { get; set; }
         public string Address { get; set; }
+        public string CountryName { get; set; }
+        public string CountrySubDivisionName { get; set; }
+        public string MunicipalityName { get; set; }
+        public Int16? WardNumber { get; set; }
         public string AdmissionStatus { get; set; }
         public string BillStatusOnDischarge { get; set; }
         public string Name { get; set; }
@@ -46,6 +51,9 @@ namespace DanpheEMR.ViewModel.ADT
         public DateTime? StartedOn { get; set; }
         public bool? BedOnHoldEnabled { get; set; }
         public int? ReceivedBy { get; set; }
+        public string SchemeName { get; set; }
+        public string WardBed { get; set; }
+        public string Age { get; set; }
 
         public static List<GetAdmittedListVm> MapDataTableToSingleObject(DataTable admittedListDataTable)
         {
@@ -67,6 +75,7 @@ namespace DanpheEMR.ViewModel.ADT
     {
         public string VisitCode { get; set; }
         public int PatientVisitId { get; set; }
+        public string VisitType { get; set; }
         public int PatientId { get; set; }
         public int PatientAdmissionId { get; set; }
         public DateTime AdmittedDate { get; set; }
@@ -76,6 +85,10 @@ namespace DanpheEMR.ViewModel.ADT
         public int? AdmittingDoctorId { get; set; }
         public string AdmittingDoctorName { get; set; }
         public string Address { get; set; }
+        public string CountryName { get; set; }
+        public string CountrySubDivisionName { get; set; }
+        public string MunicipalityName { get; set; }
+        public Int16? WardNumber { get; set; }
         public string AdmissionStatus { get; set; }
         public string BillStatusOnDischarge { get; set; }
         public string Name { get; set; }
@@ -93,6 +106,9 @@ namespace DanpheEMR.ViewModel.ADT
         public GetAdmittedListBedInfoVm BedInformation { get; set; } = new GetAdmittedListBedInfoVm();
         public string BedCode { get; set; }
         public string Ward { get; set; }
+        public string SchemeName { get; set; }
+        public string WardBed { get; set; }
+        public string Age { get; set; }
 
         public GetAdmittedListVm() { }
         public static List<GetAdmittedListVm> ConvertList_GetAdmittedList_ResultFromSP_VM_To_GetAdmittedListVm(List<GetAdmittedList_ResultFromSP_VM> admittedListFromSP)
@@ -104,6 +120,7 @@ namespace DanpheEMR.ViewModel.ADT
                 var newAdmittedPat = new GetAdmittedListVm();
 
                 newAdmittedPat.VisitCode = admittedPatient.VisitCode;
+                newAdmittedPat.VisitType = admittedPatient.VisitType;
                 newAdmittedPat.PatientVisitId = admittedPatient.PatientVisitId;
                 newAdmittedPat.PatientId = admittedPatient.PatientId;
                 newAdmittedPat.PatientAdmissionId = admittedPatient.PatientAdmissionId;
@@ -114,6 +131,10 @@ namespace DanpheEMR.ViewModel.ADT
                 newAdmittedPat.AdmittingDoctorId = admittedPatient.AdmittingDoctorId;
                 newAdmittedPat.AdmittingDoctorName = admittedPatient.AdmittingDoctorName;
                 newAdmittedPat.Address = admittedPatient.Address;
+                newAdmittedPat.CountryName = admittedPatient.CountryName;
+                newAdmittedPat.CountrySubDivisionName = admittedPatient.CountrySubDivisionName;
+                newAdmittedPat.MunicipalityName = admittedPatient.MunicipalityName;
+                newAdmittedPat.WardNumber = admittedPatient.WardNumber;
                 newAdmittedPat.AdmissionStatus = admittedPatient.AdmissionStatus;
                 newAdmittedPat.BillStatusOnDischarge = admittedPatient.BillStatusOnDischarge;
                 newAdmittedPat.Name = admittedPatient.Name;
@@ -142,7 +163,9 @@ namespace DanpheEMR.ViewModel.ADT
                 newAdmittedPat.BedInformation.ReceivedBy = admittedPatient.ReceivedBy;
                 newAdmittedPat.Ward = admittedPatient.Ward;
                 newAdmittedPat.BedCode = admittedPatient.BedCode;
-
+                newAdmittedPat.SchemeName = admittedPatient.SchemeName;
+                newAdmittedPat.WardBed = admittedPatient.WardBed;
+                newAdmittedPat.Age = admittedPatient.Age;
                 admittedList.Add(newAdmittedPat);
             }
 
@@ -165,5 +188,6 @@ namespace DanpheEMR.ViewModel.ADT
         public DateTime? StartedOn { get; set; }
         public bool? BedOnHoldEnabled { get; set; }
         public int? ReceivedBy { get; set; }
+        public string WardBed { get; set; }
     }
 }

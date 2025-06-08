@@ -1,23 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using DanpheEMR.Core.Caching;
-using DanpheEMR.ServerModel;
+﻿using DanpheEMR.Core.Caching;
 using DanpheEMR.DalLayer;
-using DanpheEMR.Sync.IRDNepal.Models;
-using Newtonsoft.Json;
-using System.Configuration;
-using System.Data.Entity;
-using System.Transactions;
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
-using DanpheEMR.Services.SSF.DTO;
-using DanpheEMR.Sync.SSF;
+using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.PatientModels;
 using DanpheEMR.ServerModel.SSFModels;
+using DanpheEMR.Services.SSF.DTO;
+using DanpheEMR.Sync.IRDNepal;
+using DanpheEMR.Sync.IRDNepal.Models;
+using DanpheEMR.Sync.SSF;
 using DanpheEMR.Utilities;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Transactions;
 
 namespace DanpheEMR.Controllers.Billing
 {
@@ -116,6 +114,7 @@ namespace DanpheEMR.Controllers.Billing
 
         public static void SyncBillToRemoteServer(object billToPost, string billType, BillingDbContext dbContext)
         {
+            var irdConfigs = GetIrdConfigurations(dbContext);
             IRDLogModel irdLog = new IRDLogModel();
             if (billType == "sales")
             {
@@ -124,9 +123,10 @@ namespace DanpheEMR.Controllers.Billing
                 BillingTransactionModel billTxn = (BillingTransactionModel)billToPost;
                 try
                 {
+
                     IRD_BillViewModel bill = IRD_BillViewModel.GetMappedSalesBillForIRD(billTxn, true);
                     irdLog.JsonData = JsonConvert.SerializeObject(bill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesBillToIRD(bill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesBillToIRD(bill, irdConfigs);
                 }
                 catch (Exception ex)
                 {
@@ -155,7 +155,7 @@ namespace DanpheEMR.Controllers.Billing
 
                 irdLog.BillType = "billing-" + billType;
                 irdLog.ResponseMessage = responseMsg;
-                PostIRDLog(irdLog, dbContext);
+                PostIRDLog(irdLog, dbContext, irdConfigs);
             }
             else if (billType == "sales-return")
             {
@@ -166,7 +166,7 @@ namespace DanpheEMR.Controllers.Billing
                 {
                     IRD_BillReturnViewModel salesRetBill = IRD_BillReturnViewModel.GetMappedSalesReturnBillForIRD(billRet, true);
                     irdLog.JsonData = JsonConvert.SerializeObject(salesRetBill);
-                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesReturnBillToIRD(salesRetBill);
+                    responseMsg = DanpheEMR.Sync.IRDNepal.APIs.PostSalesReturnBillToIRD(salesRetBill, irdConfigs);
                 }
                 catch (Exception ex)
                 {
@@ -194,28 +194,39 @@ namespace DanpheEMR.Controllers.Billing
                 dbContext.SaveChanges();
                 irdLog.BillType = "billing-" + billType;
                 irdLog.ResponseMessage = responseMsg;
-                PostIRDLog(irdLog, dbContext);
+                PostIRDLog(irdLog, dbContext, irdConfigs);
             }
         }
+
+        private static IrdConfigsDTO GetIrdConfigurations(BillingDbContext dbContext)
+        {
+            var param = dbContext.AdminParameters.FirstOrDefault(p => p.ParameterGroupName == "IRD" && p.ParameterName == "IrdSyncConfig");
+            if(param != null)
+            {
+                var irdConfigs = DanpheJSONConvert.DeserializeObject<IrdConfigsDTO>(param.ParameterValue);
+                return irdConfigs;
+            }
+            return new IrdConfigsDTO();
+        }
+
         //this function post IRD posting log details to Danphe IRD_Log table
-        public static void PostIRDLog(IRDLogModel irdLogdata, BillingDbContext dbContext)
+        public static void PostIRDLog(IRDLogModel irdLogdata, BillingDbContext dbContext, IrdConfigsDTO irdConfigs)
         {
             try
             {
                 irdLogdata.CreatedOn = DateTime.Now;
-
-                string url_IRDNepal = ConfigurationManager.AppSettings["url_IRDNepal"];
+                string url_IRDNepal = irdConfigs.user_IRDNepal; //ConfigurationManager.AppSettings["url_IRDNepal"];
                 switch (irdLogdata.BillType)
                 {
                     case "billing-sales":
                         {
-                            string api_SalesIRDNepal = ConfigurationManager.AppSettings["api_SalesIRDNepal"];
+                            string api_SalesIRDNepal = irdConfigs.api_SalesIRDNepal; //ConfigurationManager.AppSettings["api_SalesIRDNepal"];
                             irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesIRDNepal;
                             break;
                         }
                     case "billing-sales-return":
                         {
-                            string api_SalesReturnIRDNepal = ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
+                            string api_SalesReturnIRDNepal = irdConfigs.api_SalesReturnIRDNepal; //ConfigurationManager.AppSettings["api_SalesReturnIRDNepal"];
                             irdLogdata.UrlInfo = url_IRDNepal + "/" + api_SalesReturnIRDNepal;
                             break;
                         }
@@ -472,14 +483,17 @@ namespace DanpheEMR.Controllers.Billing
 
             return empDueAmountObj;
         }
-        public static void SyncToSSFServer(SSF_ClaimBookingService_DTO claimBooking, string moduleName, SSFDbContext dbContext, PatientSchemeMapModel patientSchemeMap, RbacUser currentUser)
+        public static void SyncToSSFServer(SSF_ClaimBookingService_DTO claimBooking, string moduleName, SSFDbContext dbContext, PatientSchemeMapModel patientSchemeMap, RbacUser currentUser, bool realTimeSSFClaimBooking)
         {
             SSFClaimBookingModel claimBookingModel = new SSFClaimBookingModel();
             SSF_RealTimeBookingServiceResponse realTimeclaimBookingService = new SSF_RealTimeBookingServiceResponse();
             try
             {
-                var SSFCred = GetSSFCredentials(dbContext);
-                realTimeclaimBookingService = DanpheEMR.Sync.SSF.APIs.BookClaim(claimBooking, SSFCred);
+                if (realTimeSSFClaimBooking)
+                {
+                    var SSFCred = GetSSFCredentials(dbContext);
+                    realTimeclaimBookingService = DanpheEMR.Sync.SSF.APIs.BookClaim(claimBooking, SSFCred);
+                }
             }
             catch (Exception ex)
             {
@@ -488,13 +502,13 @@ namespace DanpheEMR.Controllers.Billing
             }
             claimBookingModel.ResponseData = realTimeclaimBookingService.ResponseData;
             claimBookingModel.BookingStatus = realTimeclaimBookingService.BookingStatus;
-            PostToClaimBookingLog(dbContext, moduleName, claimBookingModel, claimBooking, patientSchemeMap, currentUser);
+            PostToClaimBookingLog(dbContext, moduleName, claimBookingModel, claimBooking, patientSchemeMap, currentUser, realTimeSSFClaimBooking);
 
         }
-        public static void PostToClaimBookingLog(SSFDbContext dbContext, string moduleName, SSFClaimBookingModel claimBooking, SSF_ClaimBookingService_DTO claimBookingObj, PatientSchemeMapModel patientSchemeMap, RbacUser currentUser)
+        public static void PostToClaimBookingLog(SSFDbContext dbContext, string moduleName, SSFClaimBookingModel claimBooking, SSF_ClaimBookingService_DTO claimBookingObj, PatientSchemeMapModel patientSchemeMap, RbacUser currentUser, bool realTimeSSFClaimBooking)
         {
             SSFClaimBookingModel claimBookingModel = new SSFClaimBookingModel();
-            claimBookingModel.BookingStatus = claimBooking.BookingStatus;
+            claimBookingModel.BookingStatus = realTimeSSFClaimBooking == false ? false : claimBooking.BookingStatus;
             claimBookingModel.ResponseData = claimBooking.ResponseData;
             if (moduleName == "billing")
             {

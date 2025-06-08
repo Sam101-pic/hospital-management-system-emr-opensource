@@ -1,14 +1,11 @@
 import {
-  NgForm,
-  FormGroup,
-  FormControl,
-  Validators,
   FormBuilder,
-  ReactiveFormsModule
-} from '@angular/forms'
+  FormGroup,
+  Validators
+} from '@angular/forms';
 
-import { Employee } from '../../employee/shared/employee.model';
 import { AbstractControl } from '@angular/forms';
+import { Employee } from '../../employee/shared/employee.model';
 
 export class User {
   public UserId: number = 0;
@@ -32,9 +29,10 @@ export class User {
 
   public NeedsPasswordUpdate: boolean = true;
   //Ajay 07 Aug 19 -- landing page after login user
-  public LandingPageRouteId: number = null;  
+  public LandingPageRouteId: number = null;
 
   public UserProfileValidator: FormGroup = null;
+  public EmployeeRoleId: number = 0;
 
 
   constructor() {
@@ -48,9 +46,9 @@ export class User {
       'ConfirmPassword': ['', Validators.compose([Validators.required, Validators.minLength(6), Validators.maxLength(20)])]
       ///// Validators.compose([Validators.required, Validators.minLength(6), Validators.maxLength(20)])
     }, {
-        validator: User.MatchPassword // your validation method i.e Common Method to match the value of Differnt input field 
+      validator: User.MatchPassword // your validation method i.e Common Method to match the value of Differnt input field
 
-      }
+    }
 
     );
   }
@@ -64,9 +62,9 @@ export class User {
     if (confirmPassword != null && newpassword != null) {
       if (newpassword != confirmPassword) {
         ///when new password and Confirm password are differnt then set Password Not match error to View
-        AC.get('ConfirmPassword').setErrors({ MatchNewAndConfirmPassword: true })
+        AC.get('ConfirmPassword').setErrors({ MatchNewAndConfirmPassword: true });
       } else {
-        return null
+        return null;
       }
     }
 

@@ -40,7 +40,9 @@ export class PHRMItemMasterModel {
     public PurchaseRate: number = 0;
     public SalesRate: number = 0;
     public PurchaseDiscount: number = 0;
+    public MRP: number = 0;
     public PHRM_MAP_MstItemsPriceCategories: Array<PHRM_MAP_MstItemsPriceCategory> = new Array<PHRM_MAP_MstItemsPriceCategory>();
+    public HSCode: string = '';
     constructor() {
         var _formBuilder = new FormBuilder();
         this.ItemValidator = _formBuilder.group({
@@ -58,7 +60,8 @@ export class PHRMItemMasterModel {
             'SalesVATPercentage': ['', Validators.compose([Validators.pattern('^(0|[1-9]{1}[0-9]{0,1})(\.[0-9]{2})?$')])],
             'PurchaseRate': ['', Validators.compose([Validators.required, this.positiveNumberValdiator])],
             'SalesRate': ['', Validators.compose([Validators.required, this.positiveNumberValdiator])],
-            'PurchaseDiscount': ['', Validators.compose([Validators.required, this.positiveNumberValdiator])]
+            'PurchaseDiscount': ['', Validators.compose([Validators.required, this.positiveNumberValdiator])],
+            'MRP': ['', Validators.compose([Validators.required, this.positiveNumberValdiator])]
         });
         this.RackValidator = _formBuilder.group({
             "Rack": ''

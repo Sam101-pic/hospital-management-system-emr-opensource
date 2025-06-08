@@ -2,6 +2,7 @@ import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import { CoreDLService } from "../../core/shared/core.dl.service";
 import { DanpheHTTPResponse } from "../../shared/common-models";
+import { ChangePolicyNumberDTO } from "./DTOs/change-policy-number.dto";
 import { ChangeVisitScheme_DTO } from "./DTOs/change-visit-scheme.dto";
 import { OrganizationDeposit_DTO } from "./DTOs/organization-deposit.dto";
 import { ProcessConfirmationUserCredentials_DTO } from "./DTOs/process-confirmation-userCredentials.dto";
@@ -108,6 +109,11 @@ export class UtilitiesBLService {
   }
   public ConfirmProcess(processToConfirmUserCredentials: ProcessConfirmationUserCredentials_DTO) {
     return this.utilitiesDLSerivce.ConfirmProcess(processToConfirmUserCredentials)
+      .map(res => res);
+  }
+
+  public UpdatePolicyNumber(changePolicyNumber: ChangePolicyNumberDTO) {
+    return this.utilitiesDLSerivce.UpdatePolicyNumber(changePolicyNumber)
       .map(res => res);
   }
 }

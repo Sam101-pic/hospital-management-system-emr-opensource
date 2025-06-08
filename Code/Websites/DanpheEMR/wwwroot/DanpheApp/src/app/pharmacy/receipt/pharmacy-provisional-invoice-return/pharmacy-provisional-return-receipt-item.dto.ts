@@ -12,6 +12,7 @@ export class PharmacyProvisionalReturnReceiptItem_DTO {
     public GenericName: string = '';
     public VATAmount: number = 0;
     RackNo: string = null;
+    HSCode: string = '';
 }
 
 

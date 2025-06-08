@@ -28,7 +28,7 @@ namespace DanpheEMR.ServerModel.PatientModels
         public string PolicyHolderEmployerID { get; set; }
         public string PolicyHolderUID { get; set; }
         public int? SubSchemeId { get; set; }
-
+        public string Ins_FirstServicePoint { get; set; }
         //Krishna, 16thFeb'23, We need to remove this column after all the migration and impact handling is done.
         public int PriceCategoryId { get; set; }
     }

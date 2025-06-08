@@ -36,5 +36,8 @@ export class BillingMasterDlService {
   GetServiceItemsByPriceCategoryId(priceCategoryId: number) {
     return this.httpClient.get<DanpheHTTPResponse>(`${this.apiUrl}/ServiceItemsByPriceCategory?priceCategoryId=${priceCategoryId}`, this.headerOptions);
   }
+  GetMasterServiceItems() {
+    return this.httpClient.get<DanpheHTTPResponse>(`${this.apiUrl}/MasterServiceItems`, this.headerOptions);
+  }
 
 }

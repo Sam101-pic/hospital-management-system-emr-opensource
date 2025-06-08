@@ -1,15 +1,12 @@
 import {
-  NgForm,
-  FormGroup,
-  FormControl,
-  Validators,
   FormBuilder,
-  ReactiveFormsModule
+  FormControl,
+  FormGroup,
+  Validators
 } from '@angular/forms';
 import * as moment from 'moment/moment';
-import { CoreService } from '../../core/shared/core.service';
 
-export class BedReservationInfo{
+export class BedReservationInfo {
   public ReservedBedInfoId: number = 0;
   public PatientId: number = null;
   public PatientVisitId: number = null;
@@ -32,12 +29,13 @@ export class BedReservationInfo{
   public ModifiedOn: string = null;
   public CancelledBy: number = null;
   public CancelledOn: string = null;
-
+  public AdmissionCase: string = null;
   public IsActive: boolean = true;
   public AutoCancelledOn: string = null;
   public IsAutoCancelled: boolean = null;
-
   public BedReservationInfoValidator: FormGroup = null;
+  public VisitCode: string = "";
+  public CareTakerInformation: string = "";
 
   constructor() {
     var _formBuilder = new FormBuilder();
@@ -53,7 +51,7 @@ export class BedReservationInfo{
   }
 
   dateValidator(control: FormControl): { [key: string]: boolean } {
-    //user can add admission entry  upto 15Aug 12:00AM 
+    //user can add admission entry  upto 15Aug 12:00AM
     var limitDate = moment().format('YYYY-MM-DD HH:mm');
     if (control.value) {
       if ((moment(control.value).diff(moment().add(10, 'minutes').format('YYYY-MM-DD HH:mm')) < 0))

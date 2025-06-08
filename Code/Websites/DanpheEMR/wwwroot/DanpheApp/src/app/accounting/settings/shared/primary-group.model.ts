@@ -10,5 +10,7 @@ export class PrimaryGroupModel {
     public CreatedBy: number = 0;
     public ModifiedOn: string = '';
     public ModifiedBy: number = 0;
+    public HospitalId: number = 0;
+
 }
 

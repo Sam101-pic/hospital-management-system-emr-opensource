@@ -50,7 +50,7 @@
     <div class="row">
       <div class="col-lg-12 col-sm-12">
         <danphe-grid [grid-colDefaults]="dischargedListGridColumns" [grid-data]="dischargedList" (grid-actions)="DischargedListGridActions($event)"
-                     (onDateChange)="onDateChange($event)"
+                     (onDateChange)="onDateChange($event)" [date-settings-name]="'common-range-with-today'"
                      [show-CustomDate]="true" [NepaliDateInGridParams]="NepaliDateInGridSettings"> </danphe-grid>
       </div>
     </div>
@@ -62,6 +62,10 @@
                            [showDischargeSummary]="showDischargeSummary"
                            (sendData)="DischargeSummaryCallback($event)"
                            (CallBackFromAdd)='CallBackFromAddEdit($event)'></discharge-summary-add>
+  </div>
+  <div *ngIf="showDischargeReferral">
+    <discharge-referral-add [selectedDischarge]="selectedDischarge" (OnPopupClose)="Close()"
+                            [showDischargeReferral]="showDischargeReferral"></discharge-referral-add>
   </div>
   <div *ngIf="showSummaryView">
     <button class="btn btn-primary btn-sm" (click)="HideDischargeSummary()"> <i class="fa fa-backward"></i>&nbsp;&nbsp;&nbsp;Back </button>

@@ -12,7 +12,6 @@ import { SchemeVsPriceCategoryModel } from '../shared/MapSchemeVsPriceCategory.m
 @Component({
   selector: 'add-scheme-pricecategory-items',
   templateUrl: './add-scheme-pricecategory-items.component.html',
-  styleUrls: ['./add-scheme-pricecategory-items.component.css'],
   host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class AddSchemePriceCategoryItemsComponent implements OnInit {
@@ -258,5 +257,9 @@ export class AddSchemePriceCategoryItemsComponent implements OnInit {
   public HandleCancel(): void {
 
   }
-
+  DeleteMappedRow(index: number) {
+    if (this.SchemePriceCategoryMapList.length) {
+      this.SchemePriceCategoryMapList.splice(index, 1);
+    }
+  }
 }

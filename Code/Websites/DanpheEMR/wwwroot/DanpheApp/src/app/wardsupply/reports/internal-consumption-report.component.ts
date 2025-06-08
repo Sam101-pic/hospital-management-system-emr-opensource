@@ -1,11 +1,12 @@
-import { Component, Directive, ViewChild } from '@angular/core';
-import { WARDReportsModel } from '../shared/ward-report.model';
-import { WardSupplyBLService } from '../shared/wardsupply.bl.service';
-import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import * as moment from 'moment/moment';
 import { SecurityService } from '../../security/shared/security.service';
+import { MessageboxService } from '../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from '../../shared/shared-enums';
 import WARDGridColumns from '../shared/ward-grid-cloumns';
+import { WARDReportsModel } from '../shared/ward-report.model';
+import { WardSupplyBLService } from '../shared/wardsupply.bl.service';
 
 
 
@@ -58,12 +59,17 @@ export class WardInternalConsumptionReportComponent {
     Load() {
         this.wardBLService.GetWardInernalConsumptionReport(this.wardReports)
             .subscribe(res => {
-                if (res.Status == 'OK') {
+                if (res.Status == 'OK' && res.Results.length) {
                     this.WardInternalConsumptionData = res.Results;
+                    this.WardInternalConsumptionData.forEach(c => {
+                        if (c.ConsumedDate) {
+                            c.ConsumedDate = moment(c.ConsumedDate).format('YYYY-MM-DD');
+                        }
+                    })
                 }
                 else {
 
-                    this.msgBoxServ.showMessage("failed", [res.ErrorMessage])
+                    this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [res.ErrorMessage])
                 }
             });
 

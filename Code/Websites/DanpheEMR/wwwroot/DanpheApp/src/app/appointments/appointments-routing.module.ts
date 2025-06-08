@@ -22,12 +22,14 @@ import { PatientSearchComponent } from './patient-search/patient-search.componen
         path: '',//this is : '/Appointment'
         component: AppointmentsMainComponent, canActivate: [AuthGuardService, ActivateBillingCounterGuardService], canDeactivate: [ResetPatientcontextGuard],
         children: [
-          { path: '', redirectTo: 'PatientSearch', pathMatch: 'full' },
+          // { path: '', redirectTo: 'PatientSearch', pathMatch: 'full' },
+          { path: '', redirectTo: 'ManageVisits', pathMatch: 'full' },
           { path: 'Visit', component: VisitMainComponent, canDeactivate: [ResetPatientcontextGuard] },
           { path: 'ListAppointment', component: AppointmentListComponent, canActivate: [AuthGuardService] },//
           { path: 'CreateAppointment', component: AppointmentCreateComponent, canActivate: [AuthGuardService] },
           { path: 'ListVisit', component: VisitListComponent, canActivate: [AuthGuardService] },
-          { path: 'PatientSearch', component: PatientSearchComponent, canActivate: [AuthGuardService] },
+          // { path: 'PatientSearch', component: PatientSearchComponent, canActivate: [AuthGuardService] },
+          { path: 'ManageVisits', component: PatientSearchComponent, canActivate: [AuthGuardService] },
           { path: 'SSFClaim', component: SSFClaimComponent, canActivate: [AuthGuardService] },
           {
             path: 'OnlineAppointment', component: OnlineAppointmentMainComponent, canActivate: [AuthGuardService],

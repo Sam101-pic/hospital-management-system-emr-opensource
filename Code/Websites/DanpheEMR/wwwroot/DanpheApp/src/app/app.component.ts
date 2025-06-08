@@ -21,11 +21,14 @@ import { MessageboxService } from './shared/messagebox/messagebox.service';
 import 'rxjs/add/operator/map'; //needed to subscribe from rxjs.
 import { EmployeeService } from './employee/shared/employee.service';
 import { LabTypesModel } from './labs/lab-selection/lab-type-selection.component';
+import { PatientAddressDisplaySettings_DTO } from './shared/DTOs/patient-address-display-settings.dto';
 import { DanpheHTTPResponse } from './shared/common-models';
 import { DanpheCache, MasterType } from './shared/danphe-cache-service-utility/cache-services';
+import { LoadingService } from './shared/loading/shared/loading.service';
 import { NavigationService } from './shared/navigation-service';
-import { ENUM_CalendarTypes, ENUM_DanpheHTTPResponses, ENUM_LocalStorageKeys, ENUM_MessageBox_Status, ENUM_ServiceBillingContext } from './shared/shared-enums';
+import { ENUM_CalendarTypes, ENUM_DanpheHTTPResponses, ENUM_LocalStorageKeys, ENUM_MessageBox_Status, ENUM_ModuleName, ENUM_ServiceBillingContext } from './shared/shared-enums';
 // import { parse } from 'path';
+import * as _ from "lodash";
 
 
 @Component({
@@ -43,11 +46,19 @@ export class AppComponent {
   public currUser: User = new User();
   public nepDate: any;
   public validRoutes: Array<DanpheRoute> = new Array<DanpheRoute>();
+  public filteredValidRoutes = new Array<DanpheRoute>();
   public showDatePopup: boolean = false;
   public empPre = { np: false, en: false };
   public selectedDatePref: string = "";
   public defaultCal = "";
+  PatientAddressDisplaySettings = new PatientAddressDisplaySettings_DTO()
+
   public EnableEnglishCalendarOnly: boolean = false;
+  public searchText: string = '';
+  CurrentModule: string = "";
+  LabModule = ENUM_ModuleName.Lab.toLowerCase();
+
+  public IsGlobalSearchEnabled: boolean = false;
   constructor(public _http: HttpClient, _serv: PatientService,
     public router: Router,
     public VisService: VisitService,
@@ -57,7 +68,8 @@ export class AppComponent {
     public dlService: DLService, public navService: NavigationService,
     public changeDetector: ChangeDetectorRef,
     public msgBoxServ: MessageboxService,
-    public elementRef: ElementRef) {
+    public elementRef: ElementRef,
+    public loadingService: LoadingService) {
 
     this.SetLoginTokenToLocalStorage(); //* using this method to set loginToken to localStorage.
 
@@ -77,6 +89,15 @@ export class AppComponent {
     //i.e: bootstrap component.
     this.coreService.InitializeParameters().subscribe(res => {
       this.CallBackLoadParameters(res);
+      let patientAddressDisplayParam = this.coreService.Parameters.find(a => a.ParameterGroupName === 'Billing' && a.ParameterName === 'PatientAddressDisplaySettings');
+      if (patientAddressDisplayParam && patientAddressDisplayParam.ParameterValue) {
+        this.ParsePatientAddressDisplayParam(patientAddressDisplayParam.ParameterValue);
+      }
+      let globalSearchParam = this.coreService.Parameters.find(a => a.ParameterGroupName === 'Common' && a.ParameterName === 'EnableGlobalSearch');
+      if (globalSearchParam && globalSearchParam.ParameterValue) {
+        this.IsGlobalSearchEnabled = JSON.parse(globalSearchParam.ParameterValue);
+      }
+
     });
 
     //load all master entries at the beginning only.
@@ -101,6 +122,9 @@ export class AppComponent {
       if (res.Status == "OK") {
         this.coreService.AppSettings = res.Results;
         this.coreService.SetAppVersionNum();
+        this.coreService.CheckIfIsDemo();
+        this.coreService.SetFewaPayConfig();
+        this.coreService.SetDirectFonePayConfig();
       }
     });
 
@@ -109,6 +133,8 @@ export class AppComponent {
 
     //set counterInformation of pharmacy at the time of loading
     this.GetActivePharmacyCounter();
+    //Bibek:11March'24 to get and set current hospital information for common.
+    this.LoadCommonHospitalInfo();
 
     //sud-nagesh:21Jun'20-- to get and set current hospital information for accounting.
     this.LoadAccountingHospitalInfo();
@@ -125,9 +151,9 @@ export class AppComponent {
         this.GetActiveLab();
       }
     });
-
-
-
+    this.coreService.GetActivePharmacyPackages();
+    this.coreService.GetActivePharmacyPackageItems();
+    this.coreService.GetSalutations();
     this.GetMunicipalities();
     this.GetGovLabItems();
     //add windows listener for logout-event.. this will be triggered from Logout button on top.
@@ -167,6 +193,8 @@ export class AppComponent {
     this.GetPaymentPages();
     this.GetMembershipTypeVsPriceCategoryMapping();
     this.GetSchemeList();
+    this.GetInsuranceMasterItems();
+    this.GetCurrentFiscalYear();
   }
 
 
@@ -174,7 +202,51 @@ export class AppComponent {
   loading: boolean = true;
   public loadingScreen: boolean = false; //default not showing loading screen
   ngAfterViewChecked() {
+    const currentModule = this.coreService.GetCurrentModule();
+    if (currentModule) {
+      this.CurrentModule = currentModule.toLowerCase();
+    }
     this.changeDetector.detectChanges();
+  }
+
+
+  ParsePatientAddressDisplayParam(parameterValue: string): void {
+    const parsedSettings = JSON.parse(parameterValue);
+
+    let patientAddress = parsedSettings.find(f => f.ShowPatientAddress);
+    if (patientAddress) {
+      this.PatientAddressDisplaySettings.ShowPatientAddress = patientAddress.ShowPatientAddress;
+    }
+
+    let country = parsedSettings.find(f => f.ShowCountry);
+    if (country) {
+      this.PatientAddressDisplaySettings.ShowCountry = country.ShowCountry;
+      this.PatientAddressDisplaySettings.CountryDisplaySequence = parseInt(country.CountryDisplaySequence) || 0;
+    }
+
+    let countrySubDivision = parsedSettings.find(f => f.ShowCountrySubDivision);
+    if (countrySubDivision) {
+      this.PatientAddressDisplaySettings.ShowCountrySubDivision = countrySubDivision.ShowCountrySubDivision;
+      this.PatientAddressDisplaySettings.CountrySubDivisionDisplaySequence = parseInt(countrySubDivision.CountrySubDivisionDisplaySequence) || 0;
+    }
+
+    let municipality = parsedSettings.find(f => f.ShowMunicipality);
+    if (municipality) {
+      this.PatientAddressDisplaySettings.ShowMunicipality = municipality.ShowMunicipality;
+      this.PatientAddressDisplaySettings.MunicipalityDisplaySequence = parseInt(municipality.MunicipalityDisplaySequence) || 0;
+    }
+
+    let wardNumber = parsedSettings.find(f => f.ShowWardNumber);
+    if (wardNumber) {
+      this.PatientAddressDisplaySettings.ShowWardNumber = wardNumber.ShowWardNumber;
+      this.PatientAddressDisplaySettings.WardNumberDisplaySequence = parseInt(wardNumber.WardNumberDisplaySequence) || 0;
+    }
+
+    let address = parsedSettings.find(f => f.ShowAddress);
+    if (address) {
+      this.PatientAddressDisplaySettings.ShowAddress = address.ShowAddress;
+      this.PatientAddressDisplaySettings.AddressDisplaySequence = parseInt(address.AddressDisplaySequence) || 0;
+    }
   }
 
   SetLoginTokenToLocalStorage(): void {
@@ -269,7 +341,8 @@ export class AppComponent {
         }
       },
         err => {
-          alert('failed to get the data.. please check log for details.');
+          // alert('failed to get the data.. please check log for details.');
+          console.log('failed to get the data.. please check log for details.');
           this.logError(err.ErrorMessage);
         });
   }
@@ -317,17 +390,26 @@ export class AppComponent {
   GetAllValidRouteList(): void {
     this.securityBlService.GetAllValidRouteList()
       .subscribe(res => {
-        if (res.Status == 'OK') {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
           this.securityService.validRouteList = res.Results;
           this.validRoutes = this.securityService.GetAllValidRoutes();
           //  this.securityService.validRouteList[0].ChildRoutes.filter(s => s.DefaultShow == true).length
-
+          this.filteredValidRoutes = _.cloneDeep(this.validRoutes);
         }
       },
         err => {
           //alert('failed to get the data.. please check log for details.');
           this.logError(err.ErrorMessage);
         });
+  }
+  FilterMenuItems() {
+    this.filteredValidRoutes = _.cloneDeep(this.validRoutes);
+
+    if (this.searchText && this.searchText.trim()) {
+      this.filteredValidRoutes = this.filteredValidRoutes.filter(route =>
+        route.DisplayName.toLowerCase().includes(this.searchText.toLowerCase())
+      );
+    }
   }
   GetActivePharmacyCounter(): void {
     this.securityBlService.GetActivePharmacyCounter()
@@ -355,7 +437,8 @@ export class AppComponent {
         }
       },
         err => {
-          alert('failed to get navigation menu data.. please check log for details.');
+          // alert('failed to get navigation menu data.. please check log for details.');
+          console.log('failed to get navigation menu data.. please check log for details.');
           this.logError(err.ErrorMessage);
         });
   }
@@ -382,7 +465,8 @@ export class AppComponent {
         }
       },
         err => {
-          alert('failed to get user permissions.. please check log for details.');
+          // alert('failed to get user permissions.. please check log for details.');
+          console.log('failed to get user permissions.. please check log for details.');
           this.logError(err.ErrorMessage);
         });
   }
@@ -412,7 +496,8 @@ export class AppComponent {
     else {
 
       window.location.href = '/Account/Logout';
-      alert(res.ErrorMessage);
+      // alert(res.ErrorMessage);
+      console.log(res.ErrorMessage);
       //console.log(res.ErrorMessage);
     }
   }
@@ -444,11 +529,10 @@ export class AppComponent {
         a.download = "DanpheEMR-UserManual.pdf";
         document.body.appendChild(a);
         a.click();
-      },
-
-        res => {
-          alert(res);
-        });
+      }, err => {
+        // alert(err);
+        this.logError(err);
+      });
   }
 
   LogoutFromAplication() {
@@ -522,7 +606,25 @@ export class AppComponent {
   // END: VIKAS
 
 
+  LoadCommonHospitalInfo(): void {
+    this.securityBlService.GetCommonHospitalInfo()
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status == 'OK') {
+          this.securityService.SetComonHospitalInfo(res.Results);
+          this.coreService.GetCodeDetails().subscribe(res => {
+            this.coreService.SetCodeDetails(res);
+          });
 
+          this.coreService.GetFiscalYearList().subscribe(res => {
+            this.coreService.SetFiscalYearList(res);
+          });
+        }
+      },
+        err => {
+          console.log('failed to get user permissions.. please check log for details.');
+          this.logError(err.ErrorMessage);
+        });
+  }
   LoadAccountingHospitalInfo(): void {
     this.securityBlService.GetAccountingHopitalInfo()
       .subscribe((res: DanpheHTTPResponse) => {
@@ -538,7 +640,8 @@ export class AppComponent {
         }
       },
         err => {
-          alert('failed to get user permissions.. please check log for details.');
+          // alert('failed to get user permissions.. please check log for details.');
+          console.log('failed to get user permissions.. please check log for details.');
           this.logError(err.ErrorMessage);
         });
   }
@@ -644,5 +747,12 @@ export class AppComponent {
 
   public GetSchemeList() {
     this.coreService.GetSchemeList(ENUM_ServiceBillingContext.OpBilling);
+  }
+
+  public GetInsuranceMasterItems() {
+    this.coreService.GetInsuranceMasterItems();
+  }
+  public GetCurrentFiscalYear() {
+    this.coreService.GetCurrentFiscalYear();
   }
 }

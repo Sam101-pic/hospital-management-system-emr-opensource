@@ -27,7 +27,7 @@
                         </th>
                         <th style="width: 40%;"> Bank Reconciliation Category</th>
                         <th style="width: 20%;"> Ledger Name </th>
-                        <th style="width: 20%;"> Sub-Ledger Name </th>
+                        <th *ngIf="subLedgerAndCostCenterSetting.EnableSubLedger" style="width: 20%;"> Sub-Ledger Name </th>
                         <th style="width: 20%;"> DrCr </th>
                     </tr>
                 </thead>
@@ -47,7 +47,8 @@
                                    [list-formatter]="LedgerListFormatter" max-num-list="15"
                                    onclick="this.select()" id="Ledger_{{i+1}}" style="width: 100%;" [disabled]="!led.IsSelected" />
                         </td>
-                        <td><input danphe-auto-complete class="form-control" [(ngModel)]="selectedSubLedger[i]"
+                        <td *ngIf="subLedgerAndCostCenterSetting.EnableSubLedger"><input danphe-auto-complete class="form-control"
+                                   [(ngModel)]="selectedSubLedger[i]"
                                    [source]="ledgerWiseSubLedger[i]" placeholder="SubLedger Name" display-property-name="SubLedgerName"
                                    value-property-name=null (valueChanged)="AssignSelectedSubLedger(i)"
                                    [list-formatter]="SubLedgerListFormatter" max-num-list="15"

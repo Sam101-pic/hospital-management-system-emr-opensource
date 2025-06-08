@@ -12,7 +12,7 @@ export class PharmacySchemePriceCategory_DTO {
         IpCreditLimit: 0,
         GeneralCreditLimit: 0
     };
-    public IsDiscountApplicable: boolean = true;
+    public IsDiscountApplicable: boolean = false;
     public DiscountPercent: number = 0;
     public IsDiscountEditable: boolean = false;
     public IsCreditApplicable: boolean = false;
@@ -28,5 +28,12 @@ export class PharmacySchemePriceCategory_DTO {
     public CoPaymentCreditPercent: number = 0;
     public IsSystemDefault: boolean = false;
     public AllowProvisionalBilling: boolean = false;
+    public DefaultPriceCategoryId: number = 0;
+    public SchemeApiIntegrationName: string = '';
+    public IsGeneralCreditLimited: boolean = false;
+    public IsCreditLimited: boolean = false;
+    public IsPharmacyCappingApplicable: boolean = false;
+    public IsPharmacySalePriceEditable: boolean = false;
+    public UseCappingAPI: boolean = false;
 
 }

@@ -14,6 +14,7 @@ import { BillingTransactionItem } from "../../billing/shared/billing-transaction
 import { BillingTransaction } from "../../billing/shared/billing-transaction.model";
 import { BillingBLService } from "../../billing/shared/billing.bl.service";
 import { BillingService } from "../../billing/shared/billing.service";
+import { BillingPackages_DTO } from "../../billing/shared/dto/billing-packages.dto";
 import { SchemePriceCategory_DTO } from "../../billing/shared/dto/scheme-pricecategory.dto";
 import { ServiceItemDetails_DTO } from "../../billing/shared/dto/service-item-details.dto";
 import { PatientBillingContextVM } from "../../billing/shared/patient-billing-context-vm";
@@ -25,7 +26,8 @@ import { ServiceDepartmentVM } from "../../shared/common-masters.model";
 import { DanpheHTTPResponse } from "../../shared/common-models";
 import { DLService } from "../../shared/dl.service";
 import { MessageboxService } from "../../shared/messagebox/messagebox.service";
-import { ENUM_BillingStatus, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_ServiceBillingContext, ENUM_VisitType } from "../../shared/shared-enums";
+import { PackageBillingService } from "../../shared/package-billing.service";
+import { ENUM_BillingStatus, ENUM_DanpheHTTPResponseText, ENUM_DanpheHTTPResponses, ENUM_IntegrationNames, ENUM_MessageBox_Status, ENUM_OrderStatus, ENUM_ServiceBillingContext, ENUM_VisitType } from "../../shared/shared-enums";
 import { NursingBLService } from "../shared/nursing.bl.service";
 
 @Component({
@@ -47,11 +49,14 @@ export class NursingIPRequestComponent implements OnChanges {
   public visitType: string;
   @Input("billingType")
   public billingType: string;
+  @Input("isBillingDetailsShow")
+  IsBillingDetailsShow: boolean = true;
 
   public pastTests: Array<any> = [];
   departmentsList: Array<any> = [];
   BillingDetails: { TotalDepositAmount: number, TotalPendingBillAmount: number, RemainingBalanceAmount: number };
-
+  public SelectedPackage: BillingPackages_DTO = new BillingPackages_DTO();
+  OPDServiceDEP: ServiceDepartmentVM = new ServiceDepartmentVM();
   @Input("past-tests")
   set SetPastTests(value: Array<any>) {
     this.PastTest(value);
@@ -107,6 +112,15 @@ export class NursingIPRequestComponent implements OnChanges {
   public SchemePriCeCategoryFromVisit: SchemePriceCategoryCustomType = { SchemeId: 0, PriceCategoryId: 0 };
   public serviceBillingContext: string = ENUM_ServiceBillingContext.IpBilling;
   public ServiceItems = new Array<ServiceItemDetails_DTO>();
+  confirmationTitle: string = "Confirm !";
+  confirmationMessage: string = "Are you sure you want to request selected items?";
+  public IsPackageBilling: boolean = false;
+  public ServicePackages: BillingPackages_DTO[] = [];
+  public hasPackageBillingPermission: boolean = false;
+  ShowProvisionalSlip: boolean = false;
+  ShowPrintProvisionalSlip: boolean = false;
+  ProvisionalReceiptInputs = { PatientId: 0, ProvFiscalYrId: 0, ProvReceiptNo: 0, visitType: null };
+  AllRequestedData: any = null;
 
   constructor(
     public labBLService: LabsBLService,
@@ -118,14 +132,15 @@ export class NursingIPRequestComponent implements OnChanges {
     public coreService: CoreService,
     public nursingBLService: NursingBLService,
     public dlService: DLService,
-    private billingMasterBlService: BillingMasterBlService
+    private billingMasterBlService: BillingMasterBlService,
+    private sharedPackageBilling: PackageBillingService,
   ) {
     this.billingTransaction = new BillingTransaction();
     this.serviceDeptList = this.coreService.Masters.ServiceDepartments;
-    this.serviceDeptList = this.serviceDeptList.filter(
-      (a) => a.ServiceDepartmentName != "OPD"
-    );
+    this.OPDServiceDEP = this.serviceDeptList.find((a) => a.IntegrationName === ENUM_IntegrationNames.OPD);
+    // this.serviceDeptList = this.serviceDeptList.filter((a) => a.IntegrationName != ENUM_IntegrationNames.OPD);
     this.searchByItemCode = this.coreService.UseItemCodeItemSearch();
+    this.hasPackageBillingPermission = this.securityService.HasPermission('btn-nursing-enable-package-billing');
 
     //instead of Using in OnInit Component is initiated from inside  this function by calling InitiateComponent function
     // this.GetDoctorsList();
@@ -152,15 +167,20 @@ export class NursingIPRequestComponent implements OnChanges {
 
   ngOnInit() {
     this.ItemsListFormatter = this.ItemsListFormatter.bind(this);
+    this.PackageFormatter = this.PackageFormatter.bind(this);
     //Asynchronous (incase if user )
     if (this.patientId && this.visitId) {
       this.billingBLService
-        .GetDataOfInPatient(this.patientId, this.visitId)
+        .GetPatientCurrentVisitContext(this.patientId, this.visitId)
         .subscribe((res: DanpheHTTPResponse) => {
           if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
             this.currPatVisitContext = res.Results;
+            this.sharedPackageBilling.SetCurrPatVisitContext(this.currPatVisitContext);
             this.SchemePriCeCategoryFromVisit.SchemeId = this.currPatVisitContext.SchemeId;
             this.SchemePriCeCategoryFromVisit.PriceCategoryId = this.currPatVisitContext.PriceCategoryId;
+            this.sharedPackageBilling.GetServicePackages(this.SchemePriCeCategoryFromVisit.SchemeId, this.SchemePriCeCategoryFromVisit.PriceCategoryId).subscribe((packages: BillingPackages_DTO[]) => {
+              this.ServicePackages = packages;
+            });
           } else {
             this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Problem! Cannot get the Current Visit Context ! "], res.ErrorMessage);
           }
@@ -344,6 +364,10 @@ export class NursingIPRequestComponent implements OnChanges {
               valCtrls
             ].updateValueAndValidity();
           }
+          if (!this.CheckIfOPDItemSelected(i)) {
+            isFormValid = false;
+            break;
+          }
 
           if (this.isRequestedByDrMandatory == false) {
             currTxnItm.UpdateValidator("off", "PrescriberId", "required");
@@ -420,21 +444,33 @@ export class NursingIPRequestComponent implements OnChanges {
   // }
 
 
-  PostProvisionalDepartmentRequisition() {
-    this.billingBLService.ProceedToBillingTransaction(this.billingTransaction, this.billingTransaction.BillingTransactionItems, "active", "provisional", false, this.currPatVisitContext).subscribe(res => {
-      if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
-        this.ResetAllRowData();
+  PostProvisionalDepartmentRequisition(): void {
+    this.billingBLService.ProceedToBillingTransaction(this.billingTransaction, this.billingTransaction.BillingTransactionItems, "active", "provisional", false, this.currPatVisitContext)
+      .finally((): void => {
         this.loading = false;
-        this.msgBoxServ.showMessage("success", ["Items Requested"]);
-        //check if we can send back the response data so that page below don't have to do server call again.
-        this.emitBillItemReq.emit({ action: "save", data: null });
-      }
-      else {
-        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Unable to complete transaction."]);
-        console.log(res.ErrorMessage)
-        this.loading = false;
-      }
-    });
+      })
+      .subscribe((res: DanpheHTTPResponse): void => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
+          if (this.ShowProvisionalSlip === true) {
+            this.AllRequestedData = res.Results;
+            // this.loading = false;
+            this.ProvisionalReceiptInputs.ProvFiscalYrId = this.AllRequestedData[0].ProvisionalFiscalYearId;
+            this.ProvisionalReceiptInputs.ProvReceiptNo = this.AllRequestedData[0].ProvisionalReceiptNo;
+            this.ProvisionalReceiptInputs.visitType = null;
+            this.ShowPrintProvisionalSlip = true;
+          }
+          this.ResetAllRowData();
+          this.IsPackageBilling = false;
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ["Items Requested"]);
+          //check if we can send back the response data so that page below don't have to do server call again.
+          this.emitBillItemReq.emit({ action: "save", data: null });
+        }
+        else {
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ["Unable to complete transaction."]);
+          console.log(res.ErrorMessage)
+          this.loading = false;
+        }
+      });
   }
   // public PostToBillingTransaction() {
   //   this.billingBLService
@@ -509,9 +545,10 @@ export class NursingIPRequestComponent implements OnChanges {
         if (res.Status == "OK") {
           if (res.Results.length) {
             this.doctorsList = res.Results;
+            this.SetDefaultPrescriber();
             let Obj = new Object();
             Obj["EmployeeId"] = null; //change by Yub -- 23rd Aug '18
-            Obj["FullName"] = "SELF";
+            Obj["FullName"] = "";
             this.doctorsList.push(Obj);
 
             this.billingTransaction.BillingTransactionItems[0].AssignedDoctorList = this.doctorsList;
@@ -572,12 +609,17 @@ export class NursingIPRequestComponent implements OnChanges {
         this.billingTransaction.BillingTransactionItems[index].IsValidSelItemName = true;
 
         this.billingTransaction.BillingTransactionItems[index].IsDoctorMandatory = item.IsDoctorMandatory; //sud:6Feb'19--need to verify once.
-
+        this.billingTransaction.BillingTransactionItems[index].IsPriceChangeAllowed = item.IsPriceChangeAllowed;
+        this.billingTransaction.BillingTransactionItems[index].ItemIntegrationName = item.IntegrationName;
+        this.billingTransaction.BillingTransactionItems[index].IntegrationName = item.IntegrationName;
+        if (!this.CheckIfOPDItemSelected(index)) {
+          return;
+        }
+        this.AssignRequestedByDoctor(index);
         this.FilterBillItems(index);
         this.CheckItemProviderValidation(index);
-        if (!this.selectedAssignedToDr[index]) {
-          this.ResetDoctorListOnItemChange(item, index);
-        }
+        this.ResetDoctorListOnItemChange(item, index);
+
       } else
         this.billingTransaction.BillingTransactionItems[index].IsValidSelItemName = false;
       if (!item && !this.selectedServDepts[index]) {
@@ -725,30 +767,21 @@ export class NursingIPRequestComponent implements OnChanges {
         //sud:6Feb'19--we have Use doctormandatory field of database item, not from code.
         //if (this.IsDoctorMandatory(servDeptName, null)) {
         if (
-          this.billingTransaction.BillingTransactionItems[index] &&
-          this.billingTransaction.BillingTransactionItems[index]
-            .IsDoctorMandatory
+          this.billingTransaction.BillingTransactionItems[index] && this.billingTransaction.BillingTransactionItems[index].IsDoctorMandatory
         ) {
-          this.billingTransaction.BillingTransactionItems[
-            index
-          ].UpdateValidator("on", "PerformerId", "required");
+          this.billingTransaction.BillingTransactionItems[index].UpdateValidator("on", "PerformerId", "required");
         } else {
-          this.billingTransaction.BillingTransactionItems[
-            index
-          ].UpdateValidator("off", "PerformerId", null);
+          this.billingTransaction.BillingTransactionItems[index].UpdateValidator("off", "PerformerId", null);
         }
+
       }
     } else {
-      let billItems = this.billItems.filter(
-        (a) => a.ServiceDepartmentName != "OPD"
-      );
-      this.billingTransaction.BillingTransactionItems[index].ItemList =
-        billItems;
+      let billItems = this.billItems.filter((a) => a.IntegrationName != ENUM_IntegrationNames.OPD);
+      this.billingTransaction.BillingTransactionItems[index].ItemList = billItems;
     }
   }
 
   //end: autocomplete assign functions  and item filter logic
-
   ResetAllRowData() {
     //this.showIpBillRequest = false;
     this.selectedItems = [];
@@ -757,6 +790,10 @@ export class NursingIPRequestComponent implements OnChanges {
     //this.selectedRequestedByDr = [];
     this.visitList = [];
     this.billingTransaction = new BillingTransaction();
+    this.SetDefaultPrescriber();
+    if (this.SelectedPackage) {
+      this.SelectedPackage = new BillingPackages_DTO();
+    }
     this.AddNewBillTxnItemRow();
     this.AssignRequestedByDoctor(0);
   }
@@ -771,11 +808,33 @@ export class NursingIPRequestComponent implements OnChanges {
 
   AddNewBillTxnItemRow(index = null) {
     //method to add the row
+    //! Sanjeev if it is empty on first row and we hit enter row get removed
+    if (index !== null
+      && (!this.billingTransaction.BillingTransactionItems[index] || !(this.billingTransaction.BillingTransactionItems[index] && this.billingTransaction.BillingTransactionItems[index].ServiceItemId))) {
+      if (index !== 0) {
+        this.billingTransaction.BillingTransactionItems.splice(index, 1);
+      }
+      return;
+    }
+    if (index !== null) {
+      let currentItem = this.billingTransaction.BillingTransactionItems[index];
+      let isPerformerMandatory = currentItem && currentItem.IsDoctorMandatory;
+      let isPerformerValid = currentItem && currentItem.IsValidCheck('PerformerId', 'required');
+
+      if (isPerformerMandatory && !isPerformerValid) {
+        this.msgBoxServ.showMessage(
+          ENUM_MessageBox_Status.Warning,
+          ['Performer is mandatory for this item.']
+        );
+        return;
+      }
+    }
+
     let billItem = this.NewBillingTransactionItem();
     billItem.EnableControl("Price", false);
     this.billingTransaction.BillingTransactionItems.push(billItem);
     this.pastTests.push(billItem);
-    if (index != null) {
+    if (index !== null) {
       let new_index = this.billingTransaction.BillingTransactionItems.length - 1;
       this.selectedRequestedByDr[new_index] = this.selectedRequestedByDr[index];
       this.AssignRequestedByDoctor(new_index);
@@ -803,11 +862,21 @@ export class NursingIPRequestComponent implements OnChanges {
     this.billingTransaction.BillingTransactionItems.slice();
     this.selectedItems.splice(index, 1);
     this.selectedItems.slice();
+    this.selectedServDepts.splice(index, 1); //  selectedServDepts is updated
+    this.selectedServDepts.slice();
+    this.selectedAssignedToDr.splice(index, 1); //  selectedAssignedToDr is updated
+    this.selectedAssignedToDr.slice();
+    this.selectedRequestedByDr.splice(index, 1); //  selectedRequestedByDr is updated
+    this.selectedRequestedByDr.slice();
+
     if (
       index == 0 &&
       this.billingTransaction.BillingTransactionItems.length == 0
     ) {
       this.AddNewBillTxnItemRow();
+      this.billingTransaction.BillingTransactionItems = [];
+      this.ResetAllRowData();
+      this.selectedRequestedByDr = [];
       this.changeDetectorRef.detectChanges();
     }
 
@@ -950,11 +1019,11 @@ export class NursingIPRequestComponent implements OnChanges {
   //end: mandatory doctor validations
 
   CheckItemProviderValidation(index: number) {
-    this.billingTransaction.BillingTransactionItems[index].UpdateValidator(
-      "off",
-      "PerformerId",
-      null
-    );
+    if (this.billingTransaction.BillingTransactionItems[index] && this.billingTransaction.BillingTransactionItems[index].IsDoctorMandatory) {
+      this.billingTransaction.BillingTransactionItems[index].UpdateValidator("on", "PerformerId", "required");
+    } else {
+      this.billingTransaction.BillingTransactionItems[index].UpdateValidator("off", "PerformerId", null);
+    }
   }
 
   //start: list formatters
@@ -971,6 +1040,20 @@ export class NursingIPRequestComponent implements OnChanges {
 
     return html;
   }
+  PackageFormatter(data: any): string {
+    let html: string = "";
+    html = `<font color='blue' size='3'>${data["PackageCode"]} :&nbsp;&nbsp;${data["BillingPackageName"]}</font>`;
+
+    if (this.coreService && this.coreService.currencyUnit) {
+      html += `&nbsp;${this.coreService.currencyUnit}<b>${data["TotalPrice"]}</b>`;
+    } else {
+      html += `&nbsp;<b>${data["TotalPrice"]}</b>`;
+    }
+
+    return html;
+  }
+
+
 
   DoctorListFormatter(data: any): string {
     return data["FullName"];
@@ -1095,7 +1178,7 @@ export class NursingIPRequestComponent implements OnChanges {
         this.billingTransaction.BillingTransactionItems.filter(
           (a) =>
             a.ServiceDepartmentId == itm.ServiceDepartmentId &&
-            a.ItemId == itm.ItemId
+            a.ServiceItemId == itm.ServiceItemId
         ).length > 1
       ) {
         itm.IsDoubleEntry_Now = true;
@@ -1217,7 +1300,7 @@ export class NursingIPRequestComponent implements OnChanges {
 
   public GetBillingSummaryForPatient() {
     this.nursingBLService.GetBillingSummaryForPatient(this.patientId, this.visitId).subscribe((res: DanpheHTTPResponse) => {
-      if (res.Status = ENUM_DanpheHTTPResponseText.OK) {
+      if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
         this.BillingDetails = res.Results;
         this.BillingDetails.RemainingBalanceAmount = (this.BillingDetails.TotalDepositAmount - this.BillingDetails.TotalPendingBillAmount);
       }
@@ -1240,9 +1323,123 @@ export class NursingIPRequestComponent implements OnChanges {
     this.billingMasterBlService.GetServiceItems(ENUM_ServiceBillingContext.IpBilling, schemeId, priceCategoryId).subscribe((res: DanpheHTTPResponse) => {
       if (res.Status === ENUM_DanpheHTTPResponses.OK && res.Results) {
         this.ServiceItems = res.Results;
+        this.sharedPackageBilling.SetServiceItem(this.ServiceItems);
         this.billItems = this.ServiceItems;
         this.InitiateComponent();
       }
     });
+  }
+
+  handleConfirm(): void {
+    this.loading = true;
+    this.ShowProvisionalSlip = false;
+    this.ShowPrintProvisionalSlip = false;
+    this.SubmitBillingTransaction();
+  }
+
+  handleCancel(): void {
+    this.loading = false;
+    this.ShowProvisionalSlip = false;
+    this.ShowPrintProvisionalSlip = false;
+  }
+  /**
+   * @returns void
+   * @summary this function is responsible to reset the selected data for package billing, if checkbox is false
+   */
+  HandlePackageBillingChange() {
+    if (this.IsPackageBilling) {
+      this.GoToNextInput('id_Search_Package');
+    } else {
+      this.billingTransaction.BillingTransactionItems = [];
+      this.ResetAllRowData();
+      this.selectedRequestedByDr = [];
+    }
+  }
+
+  GoToNextInput(nextInputId: string) {
+    const nextInput = document.getElementById(nextInputId);
+    console.log('Element found:', nextInput);
+    if (nextInput) {
+      nextInput.focus();
+    } else {
+      console.warn('Element with ID', nextInputId, 'not found.');
+    }
+  }
+  /**
+   * 
+   * @param selectedPackage 
+   * @summary When package is selected its service items are selected as individual Items 
+   * @returns void
+   */
+  OnPackageSelected(selectedPackage: BillingPackages_DTO): void {
+    let billingTransactionItemList = [];
+    this.billingTransaction.BillingTransactionItems = [];
+    this.SelectedPackage = selectedPackage;
+    if (this.SelectedPackage && typeof this.SelectedPackage === 'object') {
+      this.sharedPackageBilling.handleSelectedPackage(this.SelectedPackage);
+      billingTransactionItemList = this.sharedPackageBilling.getTransactionItems();
+      if (billingTransactionItemList.length) {
+        billingTransactionItemList.forEach((itm) => {
+          const PackageAsItemList = Object.assign(new BillingTransactionItem(), itm);
+          PackageAsItemList.ServiceDepartmentId = itm.ServiceDepartmentId;
+          PackageAsItemList.ServiceDepartmentName = itm.ServiceDepartmentName;
+          PackageAsItemList.PrescriberId = itm.PrescriberId;
+          PackageAsItemList.PrescriberName = itm.PrescriberName;
+          const performer = this.doctorsList.find(dr => dr.EmployeeId === itm.PerformerId);
+          if (performer) {
+            PackageAsItemList.PerformerId = performer.EmployeeId;
+            PackageAsItemList.PerformerName = performer.FullName;
+          }
+          PackageAsItemList.ItemId = itm.ItemId;
+          PackageAsItemList.ItemName = itm.ItemName;
+          PackageAsItemList.Quantity = itm.Quantity;
+          PackageAsItemList.IsPackageItem = true;
+          this.billingTransaction.BillingTransactionItems.push(PackageAsItemList);
+          this.billingTransaction.BillingTransactionItems.forEach((item, i) => {
+            this.selectedServDepts[i] = this.serviceDeptList.find(sd => sd.ServiceDepartmentId === item.ServiceDepartmentId);
+            this.selectedItems[i] = this.ServiceItems.find(sd => sd.ServiceItemId === item.ServiceItemId);
+            this.selectedAssignedToDr[i] = this.doctorsList.find(dr => dr.EmployeeId === item.PerformerId);
+            this.selectedRequestedByDr[i] = this.doctorsList.find(dr => dr.EmployeeId === this.currPatVisitContext.PerformerId);
+            console.log(this.selectedRequestedByDr)
+          });
+        });
+      }
+    } else {
+      console.error(this.SelectedPackage);
+    }
+  }
+  HandlePrintConfirm() {
+    this.loading = true;
+    this.SubmitBillingTransaction();
+    this.ShowProvisionalSlip = true;
+
+  }
+  HandlePrintCancel() {
+    this.loading = false;
+    this.ShowPrintProvisionalSlip = false;
+    this.ShowProvisionalSlip = false
+  }
+  CloseProvisionalSlip() {
+    this.ShowProvisionalSlip = false;
+    this.ShowPrintProvisionalSlip = false;
+    this.loading = false;
+  }
+  SetDefaultPrescriber(): void {
+    const doctor = this.doctorsList.find(d => d.EmployeeId === this.currPatVisitContext.PerformerId);
+    if (doctor) {
+      this.selectedRequestedByDr[0] = doctor.FullName;
+    }
+  }
+  CheckIfOPDItemSelected(index: number): boolean {
+    if (this.currPatVisitContext.VisitType != ENUM_VisitType.outpatient) {
+      const currTxnItem = this.billingTransaction.BillingTransactionItems[index];
+      if (currTxnItem.ItemIntegrationName != null && (currTxnItem.ItemIntegrationName === this.OPDServiceDEP.IntegrationName)) {
+        const itemName = currTxnItem.ItemName;
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Warning, [`The item "${itemName}" is not allowed in this visit type, please select an alternative item.`]);
+        return false;
+      }
+      return true;
+    }
+    return true;
   }
 }

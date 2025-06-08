@@ -1,8 +1,10 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { response } from '../../core/response.model';
+import { DanpheHTTPResponse } from '../../shared/common-models';
 import { AccBillingLedgerMapping_DTO } from '../settings/shared/dto/acc-billing-ledger-mapping.dto';
 import { VoucherVerify_DTO } from '../transactions/shared/DTOs/voucher-verify.DTO';
+import { AddAccountTenantPost_DTO } from './DTOs/account-tenant-section-map.dto';
 import { SuspenseAccountTransaction_DTO } from './DTOs/suspense-account-transaction.dto';
 @Injectable()
 export class AccountingDLService {
@@ -95,9 +97,9 @@ export class AccountingDLService {
             throw ex;
         }
     }
-    public GetTransactionbyVoucher(vouchernumber: string, secId, fsYearId) {
+    public GetTransactionbyVoucher(vouchernumber: string, secId, fsYearId, HospitalId) {
         try {
-            return this.http.get<response>('/api/Accounting/TransactionByVoucherNumber?voucherNumber=' + vouchernumber + "&sectionId=" + secId + "&FiscalYearId=" + fsYearId);
+            return this.http.get<response>('/api/Accounting/TransactionByVoucherNumber?voucherNumber=' + vouchernumber + "&sectionId=" + secId + "&FiscalYearId=" + fsYearId + "&HospitalId=" + HospitalId);
         } catch (ex) {
             throw ex;
         }
@@ -226,9 +228,9 @@ export class AccountingDLService {
         }
     }
     //get good receipt list 
-    GetGRList(vendorId: number, sectionId: number, number: any, date: string) {
+    GetGRList(vendorId: number, sectionId: number, number: any, date: string, goodReceiptNo: number) {
         try {
-            return this.http.get<response>('/api/Accounting/GoodReceipts?voucherId=' + vendorId + '&sectionId=' + sectionId + '&voucherNumber=' + number + '&transactiondate=' + date);
+            return this.http.get<response>(`/api/Accounting/GoodReceipts?vendorId=${vendorId}&sectionId=${sectionId}&invoiceNumber=${number}&transactiondate=${date}&goodReceiptNo=${goodReceiptNo}`);
         } catch (ex) {
             throw ex;
         }
@@ -237,7 +239,7 @@ export class AccountingDLService {
     //START: POST
     public PostTransaction(TransactionObjString: string) {
         let data = TransactionObjString;
-        return this.http.post<any>("/api/Accounting/Trannsaction", data);
+        return this.http.post<any>("/api/Accounting/Transaction", data);
     }
 
     //post TxnList to accounting Transaction table
@@ -315,5 +317,20 @@ export class AccountingDLService {
 
     public PostSuspenseAccReconciliationTransaction(data: SuspenseAccountTransaction_DTO) {
         return this.http.post<response>(`/api/Accounting/SuspenseAcc/Reconcile`, data, this.optionJson);
+    }
+
+    public GetTenantSectionMap() {
+        return this.http.get<response>(`/api/Accounting/AccountTenantSectionMap`, this.options);
+    }
+
+    public AddNetAccountTenant(object: AddAccountTenantPost_DTO) {
+        return this.http.post<response>(`/api/Accounting/AccountTenant`, object, this.optionJson);
+    }
+
+    public DeactivateAccountTenant() {
+        return this.http.put<any>("/api/Security/DeactivateActiveAccountTenant", this.options);
+    }
+    public GetSupplierList() {
+        return this.http.get<DanpheHTTPResponse>("/api/Accounting/GetSupplierList", this.optionJson)
     }
 }

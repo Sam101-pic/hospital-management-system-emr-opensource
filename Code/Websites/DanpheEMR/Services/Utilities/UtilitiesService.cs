@@ -1,15 +1,19 @@
-﻿using DanpheEMR.DalLayer;
+﻿using Application.Common.Exceptions;
+using DanpheEMR.DalLayer;
 using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.PatientModels;
 using DanpheEMR.ServerModel.Utilities;
 using DanpheEMR.Services.Utilities.DTOs;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Entity;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace DanpheEMR.Services.Utilities
 {
@@ -385,6 +389,81 @@ namespace DanpheEMR.Services.Utilities
                                      }).FirstOrDefault();
 
             return organizationDeposit;
+        }
+
+        /// <summary>
+        /// Changes the policy number for a specified patient and scheme.
+        /// </summary>
+        /// <param name="currentUser">The currently authenticated user performing the operation.</param>
+        /// <param name="changePolicyNumber">The DTO containing the patient ID, scheme ID, and the new policy number.</param>
+        /// <param name="utilitiesDbContext">The database context for accessing utility-related data.</param>
+        /// <returns>
+        /// A Task representing the asynchronous operation. The task result contains the number of database changes or 
+        /// a status indicator.
+        /// </returns>
+        /// <exception cref="NotFoundException">Thrown when the patient scheme mapping is not found.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when input validation fails.</exception>
+        /// <exception cref="Exception">Thrown for any other unexpected errors during the operation.</exception>
+        public async Task<object> ChangePolicyNumber(RbacUser currentUser, ChangePolicyNumberDTO changePolicyNumber, UtilitiesDbContext utilitiesDbContext)
+        {
+            try
+            {
+                ValidateChangePolicyNumber(utilitiesDbContext, changePolicyNumber.PatientId, changePolicyNumber.SchemeId, changePolicyNumber.PolicyNumber);
+
+                PatientSchemeMapModel patientSchemeMapModel = await utilitiesDbContext.PatientSchemeMapModel
+                                                                                .SingleOrDefaultAsync(p => p.PatientId == changePolicyNumber.PatientId && p.SchemeId == changePolicyNumber.SchemeId);
+                if (patientSchemeMapModel is null) 
+                {
+                    Log.Error($"Patient Scheme Mapping not found with provided details, PatientId: {changePolicyNumber.PatientId}, SchemeId: {changePolicyNumber.PatientId}");
+                    throw new NotFoundException($"Patient Scheme Mapping not found with provided details, PatientId: {changePolicyNumber.PatientId}, SchemeId: {changePolicyNumber.PatientId}");
+                }
+
+                patientSchemeMapModel.PolicyNo = changePolicyNumber.PolicyNumber;
+
+                return await utilitiesDbContext.SaveChangesAsync();
+
+            }
+            catch (InvalidOperationException ex)
+            {
+                Log.Error($"Invalid Operation Exception caught, exception details: {ex.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Exception caught, exception details: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Validates the input parameters for changing a policy number.
+        /// </summary>
+        /// <param name="patientId">The ID of the patient.</param>
+        /// <param name="schemeId">The ID of the scheme.</param>
+        /// <param name="policyNumber">The new policy number to be set.</param>
+        /// <exception cref="InvalidOperationException">Thrown when any of the input parameters are invalid.</exception>
+        private static void ValidateChangePolicyNumber(UtilitiesDbContext utilitiesDbContext, int patientId, int schemeId, string policyNumber)
+        {
+            if (patientId == 0)
+            {
+                throw new InvalidOperationException($"PatientId is required to update Policy Number");
+            }
+
+            if (schemeId == 0)
+            {
+                throw new InvalidOperationException($"SchemeId is required to update Policy Number");
+            }
+
+            if (String.IsNullOrEmpty(policyNumber))
+            {
+                throw new InvalidOperationException($"Policy Number is required");
+            }
+
+            bool isPolicyNoAlreadyExists = utilitiesDbContext.PatientSchemeMapModel
+                                                             .Any(p => p.PolicyNo == policyNumber);
+            if (isPolicyNoAlreadyExists) {
+                throw new InvalidOperationException($"{policyNumber} already exists for another patient.");
+            }
         }
     }
 }

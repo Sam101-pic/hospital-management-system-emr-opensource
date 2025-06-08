@@ -74,6 +74,14 @@ export class VisitBillingInfoComponent implements OnInit {
   public IsItemLevelDiscountChanged: boolean = false;
   public FreeVisitSettings = new FreeVisitSettings_DTO();
 
+  @Input("IsNGHISCoPayApplicable")
+  public IsNGHISCoPayApplicable: boolean = false;
+
+  @Input("IsNGHISScheme")
+  public IsNGHISScheme: boolean = false;
+
+  @Input("visit-type")
+  VisitType: string = '';
   constructor(
     private _billingService: BillingService,
     private _securityService: SecurityService,
@@ -135,14 +143,26 @@ export class VisitBillingInfoComponent implements OnInit {
   public FreeVisitSubscription(): void {
     this.VisitBillInfoSubscriptions.add(this._visitService.ObserveFreeVisitCheckboxChangedEvent()
       .subscribe((res: FreeVisitSettings_DTO) => {
-        this.FreeVisitSettings = res;
-        if (!this.FreeVisitSettings.EnableFreeVisit && !this.FreeVisitSettings.InitialSubscriptionFromVisitInfo) {
-          if (this.BillingTransaction.BillingTransactionItems && this.BillingTransaction.BillingTransactionItems.length) {
-            let billTxnItm = this.NewBillingTransactionItem();
-            this.BillingTransaction.BillingTransactionItems = new Array<BillingTransactionItem>();
-            this.BillingTransaction.BillingTransactionItems.push(billTxnItm);
+        if (res) {
+          this.FreeVisitSettings = res;
+          if (!this.FreeVisitSettings.EnableFreeVisit && !this.FreeVisitSettings.InitialSubscriptionFromVisitInfo) {
+            if (this.BillingTransaction && this.BillingTransaction.BillingTransactionItems && this.BillingTransaction.BillingTransactionItems.length) {
+              let billTxnItm = this.NewBillingTransactionItem();
+              this.BillingTransaction.BillingTransactionItems = new Array<BillingTransactionItem>();
+              this.BillingTransaction.BillingTransactionItems.push(billTxnItm);
+            }
+          } else {
+            if (this.BillingTransaction && this.BillingTransaction.BillingTransactionItems && this.BillingTransaction.BillingTransactionItems.length && !this.FreeVisitSettings.InitialSubscriptionFromVisitInfo) {
+              let billTxnItm = this.NewBillingTransactionItem();
+              this.BillingTransaction.BillingTransactionItems = new Array<BillingTransactionItem>();
+              this.BillingTransaction.BillingTransactionItems.push(billTxnItm);
+              this.Calculation();
+            }
           }
+        } else {
+          console.log(res);
         }
+
       }));
   }
 
@@ -202,7 +222,20 @@ export class VisitBillingInfoComponent implements OnInit {
               this.SelectedPerformerId = selDoc.PerformerId;
               if (this._visitService.appointmentType.toLowerCase() === ENUM_AppointmentType.referral.toLowerCase()) {
                 this.VisitBillItem = this.DoctorOpdReferralPriceItems.find(d => d.PerformerId === selDoc.PerformerId);
-              } else {
+              } else if (this._visitService.appointmentType.toLowerCase() === ENUM_AppointmentType.revisit.toLowerCase()) {
+                let oldPatOpdParam = this.coreService.Parameters.find(p => p.ParameterGroupName === "Appointment" && p.ParameterName === "OldPatientOpdPriceEnabled");
+                if (oldPatOpdParam) {
+                  let enableOldPatOpdPrice = oldPatOpdParam.ParameterValue.toLowerCase() === "true" ? true : false;
+                  if (enableOldPatOpdPrice) {
+                    this.VisitBillItem = this.DoctorOpdOldPatientPriceItems.find(d => d.PerformerId === selDoc.PerformerId);
+                  } else {
+                    this.VisitBillItem = this.DoctorOpdPriceItems.find(d => d.PerformerId === selDoc.PerformerId);
+                  }
+                } else {
+                  this.VisitBillItem = this.DoctorOpdPriceItems.find(d => d.PerformerId === selDoc.PerformerId);
+                }
+              }
+              else {
                 this.VisitBillItem = this.DoctorOpdPriceItems.find(d => d.PerformerId === selDoc.PerformerId);
               }
 
@@ -219,13 +252,20 @@ export class VisitBillingInfoComponent implements OnInit {
                 this.BillingTransaction.BillingTransactionItems.push(this.OpdBillTxnItem);
               }
               let selDept = newBill.SelectedDepartment;
-              this.SelectedDepartmentId = selDept.DepartmentId;
-              this.VisitBillItem = this.DepartmentOpdPriceItems.find(d => d.DepartmentId === selDept.DepartmentId);
+              this.SelectedDepartmentId = selDept ? selDept.DepartmentId : null;
+              const selectedDepartmentId = selDept ? selDept.DepartmentId : null;
+              this.VisitBillItem = this.DepartmentOpdPriceItems.find(d => d.DepartmentId === selectedDepartmentId);
               this.ResetOpdBillTxnItem();
 
               if (this.VisitBillItem) {
                 this.AssignVisitBillItemToTxn(this.VisitBillItem);
                 this.NotAdditionalBillItem = { ServiceItemId: this.VisitBillItem.ServiceItemId, ItemName: this.VisitBillItem.ItemName };
+              } else {
+                if (this.FreeVisitSettings.EnableFreeVisit) {
+                  let billTxnItm = this.NewBillingTransactionItem();
+                  this.BillingTransaction.BillingTransactionItems = new Array<BillingTransactionItem>();
+                  this.BillingTransaction.BillingTransactionItems.push(billTxnItm);
+                }
               }
             }
             else if (newBill.ChangeType === "Referral") {
@@ -250,6 +290,12 @@ export class VisitBillingInfoComponent implements OnInit {
             this.DisablePaymentModeDropDown = true;
           } else {
             this.DisablePaymentModeDropDown = false;
+          }
+          if (this.RegistrationSchemeDto.IsDiscountEditable) {
+            this.DisableDiscountPercent = false;
+          } else {
+            this.EnableDiscountAmount = false;
+            this.DisableDiscountPercent = true;
           }
           this.Temp_CreditOrgObj_ChangeToId = new CreditOrganization();
           this.Temp_CreditOrgObj_ChangeToId.OrganizationId = scheme.DefaultCreditOrganizationId;
@@ -320,6 +366,8 @@ export class VisitBillingInfoComponent implements OnInit {
     // prevent memory leak when component destroyed
     this.VisitBillInfoSubscriptions.unsubscribe();
     this._visitService.PriceCategory = ENUM_PriceCategory.Normal;
+    this.IsNGHISScheme = false;
+    this.VisitType = '';
   }
   ngOnInit() {
     this.MstPaymentModes = this.coreService.masterPaymentModes;
@@ -341,12 +389,18 @@ export class VisitBillingInfoComponent implements OnInit {
     if (this._visitService.appointmentType.toLowerCase() === ENUM_AppointmentType.referral) {
       this.BillingTransaction.Remarks = "Referral Visit";
       this.DoctorOpdPriceItems = this._visitService.DocOpdPrice_Referral
-    }
-
-    if (this._visitService.appointmentType.toLowerCase() === ENUM_AppointmentType.followup) {
+    } else if (this._visitService.appointmentType.toLowerCase() === ENUM_AppointmentType.followup) {
       this.DepartmentOpdPriceItems = this._visitService.DeptFollowupPrices;
       this.DoctorOpdPriceItems = this._visitService.DocFollowupPrices;
       this.ShowBillSummaryPanel = false;
+    } else if (this._visitService.appointmentType === ENUM_AppointmentType.revisit) {
+      let oldPatOpdParam = this.coreService.Parameters.find(p => p.ParameterGroupName === "Appointment" && p.ParameterName === "OldPatientOpdPriceEnabled");
+      if (oldPatOpdParam) {
+        let enableOldPatOpdPrice = oldPatOpdParam.ParameterValue.toLowerCase() === "true" ? true : false;
+        if (enableOldPatOpdPrice) {
+          this.DoctorOpdPriceItems = this.DoctorOpdOldPatientPriceItems;
+        }
+      }
     }
     else {
       //old patient opd is applicable only when appointment type is not followup.
@@ -431,9 +485,9 @@ export class VisitBillingInfoComponent implements OnInit {
   }
 
   public AssignVisitBillItemToTxn(visBilItm: OpdServiceItemPrice_DTO): void {
-    if (this.FreeVisitSettings && (!this.FreeVisitSettings.EnableDepartmentLevelAppointment && !this.FreeVisitSettings.EnableDoctorLevelAppointment) && !this.FreeVisitSettings.EnableFreeVisit) {
-      return;
-    }
+    // if (this.FreeVisitSettings && (!this.FreeVisitSettings.EnableDepartmentLevelAppointment && !this.FreeVisitSettings.EnableDoctorLevelAppointment) && !this.FreeVisitSettings.EnableFreeVisit) {
+    //   return;
+    // }
     if (!visBilItm) {
       return;
     }
@@ -447,8 +501,8 @@ export class VisitBillingInfoComponent implements OnInit {
     this.OpdBillTxnItem.PerformerId = visBilItm.PerformerId;
     this.OpdBillTxnItem.PerformerName = visBilItm.PerformerName;
     this.OpdBillTxnItem.PriceCategory = this.RegistrationSchemeDto.PriceCategoryName;
-    if (this.FreeVisitSettings.EnableFreeVisit) {
-
+    //! Making service item price zero for Free Visit or Gov Insurance Referral of same day.
+    if (this.FreeVisitSettings.EnableFreeVisit || (this._visitService.appointmentType.toLowerCase() === ENUM_AppointmentType.referral.toLowerCase() && this.IsNGHISScheme && this.VisitType.toLowerCase() !== ENUM_VisitType.emergency.toLowerCase())) {
       this.OpdBillTxnItem.Price = 0;
     } else {
       this.OpdBillTxnItem.Price = visBilItm.Price;
@@ -496,7 +550,7 @@ export class VisitBillingInfoComponent implements OnInit {
       this.BillingTransaction.TotalAmount = 0;
       this.BillingTransaction.Tender = 0;
       this.BillingTransaction.TotalQuantity = 0;
-      if (this.AdditionalVisitBilItems && this.AdditionalVisitBilItems.length) {
+      if (this.AdditionalVisitBilItems && this.AdditionalVisitBilItems.length && !this.IsNGHISCoPayApplicable) {
         this.AdditionalVisitBilItems.forEach(a => {
           if (this.ServiceItemSchemeSettings && this.ServiceItemSchemeSettings.length) {
             let item = this.ServiceItemSchemeSettings.find(a => a.ServiceItemId === a.ServiceItemId && a.SchemeId === this.RegistrationSchemeDto.SchemeId);
@@ -576,16 +630,24 @@ export class VisitBillingInfoComponent implements OnInit {
   }
 
   private CalculateCoPayAndReceivedAmount() {
-    if (this.RegistrationSchemeDto.IsCoPayment) {
+    if (this.RegistrationSchemeDto.IsCoPayment && !this.IsNGHISCoPayApplicable) {
       // this.billingTransaction.ReceivedAmount = (this.PriceCategorySelectedToChangePrice.Copayment_CashPercent / 100) * this.billingTransaction.TotalAmount;
       // this.billingTransaction.CoPaymentCreditAmount = this.billingTransaction.TotalAmount - this.billingTransaction.ReceivedAmount;
       this.BillingTransaction.BillingTransactionItems.forEach((item) => {
         item.CoPaymentCashAmount = (item.CoPaymentCashPercent / 100) * item.TotalAmount;
-        item.CoPaymentCreditAmount = (item.CoPaymentCreditPercent / 100) * item.TotalAmount;
+        item.CoPaymentCreditAmount = item.TotalAmount - item.CoPaymentCashAmount;
       });
       this.BillingTransaction.ReceivedAmount = this.BillingTransaction.BillingTransactionItems.reduce((acc, curr) => acc + curr.CoPaymentCashAmount, 0);
       this.BillingTransaction.CoPaymentCreditAmount = this.BillingTransaction.BillingTransactionItems.reduce((acc, curr) => acc + curr.CoPaymentCreditAmount, 0);
-    } else {
+    } else if (this.IsNGHISCoPayApplicable) {
+      this.BillingTransaction.BillingTransactionItems.forEach(i => {
+        i.CoPaymentCashAmount = (this.BillingTransaction.CoPaymentCashPercent / 100) * i.TotalAmount;
+        i.CoPaymentCreditAmount = i.TotalAmount - i.CoPaymentCashAmount;
+      });
+      this.BillingTransaction.ReceivedAmount = this.BillingTransaction.BillingTransactionItems.reduce((acc, curr) => acc + curr.CoPaymentCashAmount, 0);
+      this.BillingTransaction.CoPaymentCreditAmount = this.BillingTransaction.BillingTransactionItems.reduce((acc, curr) => acc + curr.CoPaymentCreditAmount, 0);
+    }
+    else {
       this.BillingTransaction.ReceivedAmount = this.BillingTransaction.TotalAmount;
     }
     this.BillingTransaction.Tender = CommonFunctions.parseAmount(this.BillingTransaction.ReceivedAmount);
@@ -655,19 +717,38 @@ export class VisitBillingInfoComponent implements OnInit {
       }
 
     }
-    else if (this.PriceCategory !== "Normal") {
+    else {
       this.ShowBillSummaryPanel = true;
 
-      if (newDoctorId && oldDoctorId !== newDoctorId) {
-        this.Followup_DoctorChanged(newDoctorId);
+      //! Below logic will add billing item to transaction for paid follow up patients
+      if (this.BillingTransaction.BillingTransactionItems.length === 0) {
+        this.BillingTransaction.BillingTransactionItems.push(this.OpdBillTxnItem);
       }
-      else {
-        this.Followup_DepartmentChanged(newDepartmentId);
+
+      let selDoc = newBill.SelectedDoctor;
+      this.SelectedPerformerId = selDoc.PerformerId;
+      if (this._visitService.appointmentType.toLowerCase() === ENUM_AppointmentType.referral.toLowerCase()) {
+        this.VisitBillItem = this.DoctorOpdReferralPriceItems.find(d => d.PerformerId === selDoc.PerformerId);
+      } else {
+        this.VisitBillItem = this.DoctorOpdPriceItems.find(d => d.PerformerId === selDoc.PerformerId);
       }
+
+      this.ResetOpdBillTxnItem();
+      if (this.VisitBillItem) {
+        this.AssignVisitBillItemToTxn(this.VisitBillItem);
+        this.NotAdditionalBillItem = { ServiceItemId: this.VisitBillItem.ServiceItemId, ItemName: this.VisitBillItem.ItemName };
+      }
+
+      // if (newDoctorId && oldDoctorId !== newDoctorId) {
+      //   this.Followup_DoctorChanged(newDoctorId);
+      // }
+      // else {
+      //   this.Followup_DepartmentChanged(newDepartmentId);
+      // }
     }
-    else {
-      this.ShowBillSummaryPanel = false;
-    }
+    // else {
+    //   this.ShowBillSummaryPanel = false;
+    // }
 
     this.Calculation();
   }//end of: HandleBillChangedForFollowUp

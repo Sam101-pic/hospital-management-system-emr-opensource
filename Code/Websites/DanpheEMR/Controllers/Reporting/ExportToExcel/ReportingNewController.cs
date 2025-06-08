@@ -9,6 +9,7 @@ using DanpheEMR.Core.Configuration;
 using DanpheEMR.Utilities;
 using System.Data.SqlClient;
 using Newtonsoft.Json;
+using DanpheEMR.Enums;
 // For more information on enabling MVC for empty projects, visit http://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace DanpheEMR.Controllers.ReportingNew
@@ -123,48 +124,48 @@ namespace DanpheEMR.Controllers.ReportingNew
             }
         }
 
-        public FileContentResult ExportToExcelTotalItemsBill(DateTime FromDate, DateTime ToDate, string billingType, string ServiceDepartmentName, string ItemName, string SummaryData, string SummaryHeader)
-        {
-            try
-            {
-                ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
-                DataTable totalitembill = reportingDbContext.TotalItemsBill(FromDate, ToDate, billingType, ServiceDepartmentName, ItemName);
+        //public FileContentResult ExportToExcelTotalItemsBill(DateTime FromDate, DateTime ToDate, string billingType, string ServiceDepartmentName, string ItemName, string SummaryData, string SummaryHeader)
+        //{
+        //    try
+        //    {
+        //        ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
+        //        DataTable totalitembill = reportingDbContext.TotalItemsBill(FromDate, ToDate, billingType, ServiceDepartmentName, ItemName);
 
-                ExcelExportHelper export = new ExcelExportHelper("Sheet1");
-                List<ColumnMetaData> columnamesForTotalItemBill = new List<ColumnMetaData>();
+        //        ExcelExportHelper export = new ExcelExportHelper("Sheet1");
+        //        List<ColumnMetaData> columnamesForTotalItemBill = new List<ColumnMetaData>();
 
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 0, ColName = "BillingDate", ColDisplayName = "Date", Formula = ColumnFormulas.Date });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 1, ColName = "HospitalNumber", ColDisplayName = "Hospital Number", });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 2, ColName = "PatientName", ColDisplayName = "Patient Name", });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 3, ColName = "InvoiceNumber", ColDisplayName = "ReceiptNo", });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 4, ColName = "ServiceDepartmentName", ColDisplayName = "Department", });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 5, ColName = "ItemName", ColDisplayName = "Item", });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 6, ColName = "Price", ColDisplayName = "Price" });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 7, ColName = "Quantity", ColDisplayName = "Quantity", Formula = ColumnFormulas.Sum });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 8, ColName = "SubTotal", ColDisplayName = "SubTotal", Formula = ColumnFormulas.Sum });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 9, ColName = "DiscountAmount", ColDisplayName = "DiscountAmt", Formula = ColumnFormulas.Sum });
-                //columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 10, ColName = "Tax", ColDisplayName = "Tax", Formula = ColumnFormulas.Sum });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 10, ColName = "TotalAmount", ColDisplayName = "TotalAmt", Formula = ColumnFormulas.Sum });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 11, ColName = "ProviderName", ColDisplayName = "Doctor", });
-                columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 12, ColName = "BillStatus", ColDisplayName = "Status", });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 0, ColName = "BillingDate", ColDisplayName = "Date", Formula = ColumnFormulas.Date });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 1, ColName = "HospitalNumber", ColDisplayName = "Hospital Number", });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 2, ColName = "PatientName", ColDisplayName = "Patient Name", });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 3, ColName = "InvoiceNumber", ColDisplayName = "ReceiptNo", });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 4, ColName = "ServiceDepartmentName", ColDisplayName = "Department", });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 5, ColName = "ItemName", ColDisplayName = "Item", });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 6, ColName = "Price", ColDisplayName = "Price" });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 7, ColName = "Quantity", ColDisplayName = "Quantity", Formula = ColumnFormulas.Sum });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 8, ColName = "SubTotal", ColDisplayName = "SubTotal", Formula = ColumnFormulas.Sum });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 9, ColName = "DiscountAmount", ColDisplayName = "DiscountAmt", Formula = ColumnFormulas.Sum });
+        //        //columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 10, ColName = "Tax", ColDisplayName = "Tax", Formula = ColumnFormulas.Sum });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 10, ColName = "TotalAmount", ColDisplayName = "TotalAmt", Formula = ColumnFormulas.Sum });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 11, ColName = "ProviderName", ColDisplayName = "Doctor", });
+        //        columnamesForTotalItemBill.Add(new ColumnMetaData() { DisplaySeq = 12, ColName = "BillStatus", ColDisplayName = "Status", });
 
-                ////Sorted ColMetadata in DisplaySequenceOrder 
-                //////Its Required Because in LoadFromDataTable Function we Require ColMetadata in Sorted Form 
-                var FinalColsForTotalItemInSorted = columnamesForTotalItemBill.OrderBy(x => x.DisplaySeq).ToList();
-                string header = "Total Item Report From: " + FromDate.ToString("yyyy-MM-dd") + " To:" + ToDate.ToString("yyyy-MM-dd");
-                export.LoadFromDataTable(FinalColsForTotalItemInSorted, totalitembill, header, true, true, SummaryData: SummaryData, summaryHeader: SummaryHeader);
-                byte[] filecontent = export.package.GetAsByteArray();
+        //        ////Sorted ColMetadata in DisplaySequenceOrder 
+        //        //////Its Required Because in LoadFromDataTable Function we Require ColMetadata in Sorted Form 
+        //        var FinalColsForTotalItemInSorted = columnamesForTotalItemBill.OrderBy(x => x.DisplaySeq).ToList();
+        //        string header = "Total Item Report From: " + FromDate.ToString("yyyy-MM-dd") + " To:" + ToDate.ToString("yyyy-MM-dd");
+        //        export.LoadFromDataTable(FinalColsForTotalItemInSorted, totalitembill, header, true, true, SummaryData: SummaryData, summaryHeader: SummaryHeader);
+        //        byte[] filecontent = export.package.GetAsByteArray();
 
-                //check if filename could be set from server side, use above format if it can be set..
-                string fileName = "TotalItemsBill.xlsx";
-                return File(filecontent, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                     , fileName);
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
+        //        //check if filename could be set from server side, use above format if it can be set..
+        //        string fileName = "TotalItemsBill.xlsx";
+        //        return File(filecontent, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        //             , fileName);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        throw ex;
+        //    }
+        //}
 
         public FileContentResult ExportToExcelSalesDayBook(DateTime FromDate, DateTime ToDate, bool IsInsurance = false)
         {
@@ -1160,12 +1161,12 @@ namespace DanpheEMR.Controllers.ReportingNew
             }
         }
 
-        public FileContentResult ExportToExcelDailyAppointment(DateTime FromDate, DateTime ToDate, string Doctor_Name, string AppointmentType)
+        public FileContentResult ExportToExcelDailyAppointment(DateTime FromDate, DateTime ToDate, string Doctor_Name, string AppointmentType, int? SchemeId)
         {
             try
             {
                 ReportingDbContext reportingDbContext = new ReportingDbContext(connString);
-                DataTable dailyappointment = reportingDbContext.DailyAppointmentReport(FromDate, ToDate, Doctor_Name, AppointmentType);
+                DataTable dailyappointment = reportingDbContext.DailyAppointmentReport(FromDate, ToDate, Doctor_Name, AppointmentType, SchemeId);
 
                 ExcelExportHelper export = new ExcelExportHelper("Sheet1");
                 //creating list for adding the column 
@@ -1305,10 +1306,12 @@ namespace DanpheEMR.Controllers.ReportingNew
         {
             try
             {
+                int currentHospitalId = HttpContext.Session.Get<int>(ENUM_SessionValues.CurrentHospitalId);
+
                 AccountingDbContext accountingDbContext = new AccountingDbContext(connString);
                 DataTable exportExcelstockItemsResult = (DataTable)JsonConvert.DeserializeObject(transactionData, (typeof(DataTable)));
                 //DataTable exportExcelstockItemsResult = JsonStringToDataTable(transactionData);
-                var voucherList = (from voucher in accountingDbContext.Vouchers select voucher).ToList();
+                var voucherList = (from voucher in accountingDbContext.Vouchers where voucher.HospitalId==currentHospitalId select voucher).ToList();
                 exportExcelstockItemsResult.Columns.Add("VoucherName", typeof(string));
                 foreach (DataRow row in exportExcelstockItemsResult.Rows)
                 {

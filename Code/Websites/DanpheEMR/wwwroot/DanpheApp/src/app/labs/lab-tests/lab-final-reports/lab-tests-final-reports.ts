@@ -1,29 +1,27 @@
-import { Component, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
-import { LabsBLService } from '../../shared/labs.bl.service';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { AfterViewInit, Component } from '@angular/core';
 import * as moment from 'moment/moment';
-import LabGridColumnSettings from '../../shared/lab-gridcol-settings';
-import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
-import { PatientService } from '../../../patients/shared/patient.service';
 import { CoreService } from "../../../core/shared/core.service";
+import { PatientService } from '../../../patients/shared/patient.service';
 import { SecurityService } from '../../../security/shared/security.service';
-import html2canvas from 'html2canvas';
-import * as jsPDF from 'jspdf';
-import { FormControl, FormGroup, Validators } from '@angular/forms';
-import { LoginToTelemed } from '../../shared/labMasterData.model';
+import { DanpheHTTPResponse } from '../../../shared/common-models';
+import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import { RouteFromService } from '../../../shared/routefrom.service';
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { LabFinalReportList_DTO } from '../../shared/DTOs/lab-final-report-list.dto';
+import LabGridColumnSettings from '../../shared/lab-gridcol-settings';
+import { LabsBLService } from '../../shared/labs.bl.service';
 @Component({
   selector: 'lab-final-reports',
   templateUrl: "./lab-tests-final-reports.html"
 })
 export class LabTestsFinalReports implements AfterViewInit {
-  public reportList: Array<any>;
+  public reportList: Array<LabFinalReportList_DTO> = new Array<LabFinalReportList_DTO>();
   gridColumns: Array<any> = null;
   public showAddEditResult: boolean = false;
   public showReport: boolean = false;
   public showGrid: boolean = true;
-  public requisitionIdList = [];
+  public requisitionIdList: Array<number> = [];
   public verificationRequired: boolean = false;
   public fromDate: string = null;
   public toDate: string = null;
@@ -42,16 +40,16 @@ export class LabTestsFinalReports implements AfterViewInit {
   public enableResultEdit: boolean = false;
   public allowOutPatientWithProvisional: boolean = false;
   public loading: boolean = false;
-  public showReportUpload : boolean = false;
-  public TeleMedicineUploadForm:any =
+  public showReportUpload: boolean = false;
+  public TeleMedicineUploadForm: any =
     {
-      phoneNumber:"",
+      phoneNumber: "",
       firstName: "",
       lastName: "",
       email: ""
     }
-    public IsTeleMedicineEnabled : boolean = false;
-
+  public IsTeleMedicineEnabled: boolean = false;
+  public ShowUndoOption: boolean = false;
   constructor(public labBLService: LabsBLService, public coreService: CoreService,
     public msgBoxService: MessageboxService,
     public patientService: PatientService,
@@ -61,8 +59,8 @@ export class LabTestsFinalReports implements AfterViewInit {
     this.labGridCols = new LabGridColumnSettings(this.securityService);
 
     this.gridColumns = this.labGridCols.FinalReportListColumnFilter(this.coreService.GetFinalReportListColumnArray());
-    if(!this.IsTeleMedicineEnabled)
-    this.gridColumns = this.gridColumns.filter(a =>a.headerName !== "Is Uploaded");
+    if (!this.IsTeleMedicineEnabled)
+      this.gridColumns = this.gridColumns.filter(a => a.headerName !== "Is Uploaded");
     this.enableResultEdit = this.coreService.ShowEditResultButtonInLabFinalReport();
     this.allowOutPatientWithProvisional = this.coreService.AllowOutpatientWithProvisional();
     // this.GetPendingReportList(this.fromDate,this.toDate);
@@ -78,33 +76,37 @@ export class LabTestsFinalReports implements AfterViewInit {
     let parameterData = this.coreService.Parameters.find(p => p.ParameterGroupName == "Common" && p.ParameterName == "ServerSideSearchComponent").ParameterValue;
     var data = JSON.parse(parameterData);
     this.enableServerSideSearch = data["LaboratoryFinalReports"];
-    let TeleMedicineConfig = this.coreService.Parameters.find(p =>p.ParameterGroupName == "TeleMedicine" && p.ParameterName == "DanpheConfigurationForTeleMedicine").ParameterValue;
+    let TeleMedicineConfig = this.coreService.Parameters.find(p => p.ParameterGroupName == "TeleMedicine" && p.ParameterName == "DanpheConfigurationForTeleMedicine").ParameterValue;
     this.IsTeleMedicineEnabled = JSON.parse(JSON.parse(TeleMedicineConfig).IsTeleMedicineEnabled);
   }
 
   GetPendingReportList(frmdate, todate, searchtxt = '', categoryList) {
     this.reportList = [];
-    this.loading=true;
-    this.labBLService.GetPatientListInLabFinalReports(frmdate, todate, categoryList).subscribe((res: DanpheHTTPResponse) => {
-      if (res.Status == 'OK') {
-        this.reportList = res.Results;
-        this.reportList.forEach((a)=>{
-          if(a.IsFileUploadedToTeleMedicine == false || a.IsFileUploadedToTeleMedicine == null)
-          a.IsFileUploadedToTeleMedicine = "NO";
-          else
-          a.IsFileUploadedToTeleMedicine = "YES";
-        });
-        this.loading=false;
-      } else {
-        this.msgBoxService.showMessage('failed', ['Unable to get Final Report List']);
-        console.log(res.ErrorMessage);
-        this.loading=false;
-      }
-    }, err => {
-      this.msgBoxService.showMessage('failed', [err]);
-      console.log(err);
-      this.loading=false;
-    });
+    this.loading = true;
+    this.labBLService.GetPatientListInLabFinalReports(frmdate, todate, categoryList)
+      .finally(() => this.loading = false)
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          if (res.Results && res.Results.length) {
+            this.reportList = res.Results;
+            this.reportList.forEach((a) => {
+              if (a.IsFileUploadedToTeleMedicine == false || a.IsFileUploadedToTeleMedicine == null)
+                a.IsFileUploadedToTeleMedicine = "NO";
+              else
+                a.IsFileUploadedToTeleMedicine = "YES";
+            });
+          }
+          else {
+            this.msgBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`No data avaialbe in the selected date range.`]);
+          }
+        } else {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Unable to get Final Report List']);
+          console.log(res.ErrorMessage);
+        }
+      }, err => {
+        this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, [err]);
+        console.log(err);
+      });
   }
 
   GridActions($event: GridEmitModel) {
@@ -122,6 +124,8 @@ export class LabTestsFinalReports implements AfterViewInit {
           this.showGrid = false;
           this.showAddEditResult = false;
           this.showReport = true;
+          this.patientService.setGlobal($event.Data);
+          this.patientService.getGlobal().ShortName = $event.Data.PatientName;
           this.TeleMedicineUploadForm.firstName = ($event.Data.FirstName);
           this.TeleMedicineUploadForm.lastName = ($event.Data.LastName);
           this.TeleMedicineUploadForm.phoneNumber = ($event.Data.PhoneNumber);
@@ -145,6 +149,15 @@ export class LabTestsFinalReports implements AfterViewInit {
 
         }
         break;
+      case "undo":
+        {
+          this.requisitionIdList = [];
+          this.ShowUndoOption = true;
+          let requisitionIds = $event.Data ? $event.Data.LabRequisitionIdCSV : "";
+          this.requisitionIdList = requisitionIds.split(",").map(Number);
+        }
+
+        break;
       default:
         break;
     }
@@ -158,10 +171,8 @@ export class LabTestsFinalReports implements AfterViewInit {
     this.patientService.getGlobal().DateOfBirth = data.DateOfBirth;
     this.patientService.getGlobal().Gender = data.Gender;
     this.patientService.getGlobal().WardName = data.WardName;
-
     this.requisitionIdList = data.LabRequisitionIdCSV.split(",").map(Number);
   }
-
   serverSearchTxt(searchTxt) {
     this.searchText = searchTxt;
     this.GetPendingReportList(this.fromDate, this.toDate, this.searchText, this.catIdList);
@@ -174,7 +185,7 @@ export class LabTestsFinalReports implements AfterViewInit {
     // this.reportList = [];
     // this.requisitionIdList = [];
 
-    //this.GetPendingReportList(this.fromDate, this.toDate, '', this.catIdList);
+    // this.GetPendingReportList(this.fromDate, this.toDate, '', this.catIdList);
   }
 
   public CallBackBackToGrid($event) {
@@ -184,17 +195,17 @@ export class LabTestsFinalReports implements AfterViewInit {
     }
   }
 
-  public UpdateUploadStatus($event){
-    this.reportList.forEach((a)=>{
-      if(a.LabRequisitionIdCSV.includes($event.requisition[0]))
-      a.IsFileUploadedToTeleMedicine = "YES";
+  public UpdateUploadStatus($event) {
+    this.reportList.forEach((a) => {
+      if (a.LabRequisitionIdCSV.includes($event.requisition[0]))
+        a.IsFileUploadedToTeleMedicine = "YES";
     });
   }
 
-  public UpdatePrintStatusLocally($event){
-    this.reportList.map((a)=>{
-      if(a.LabRequisitionIdCSV.includes($event))
-      a.IsPrinted = true;
+  public UpdatePrintStatusLocally($event) {
+    this.reportList.map((a) => {
+      if (a.LabRequisitionIdCSV.includes($event))
+        a.IsPrinted = true;
     });
   }
 
@@ -203,14 +214,14 @@ export class LabTestsFinalReports implements AfterViewInit {
       if (moment(this.fromDate).isBefore(this.toDate) || moment(this.fromDate).isSame(this.toDate)) {
         this.GetPendingReportList(this.fromDate, this.toDate, this.searchText, this.catIdList);
       } else {
-        this.msgBoxService.showMessage('failed', ['Please enter valid From date and To date']);
+        this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Please enter valid From date and To date']);
       }
     }
   }
 
   public LabCategoryOnChange($event) {
     //Reload the  Pending report list only if Category is Changed. 
-    if($event.length != this.catIdList.length){
+    if ($event.length != this.catIdList.length) {
       this.catIdList = [];
       // this.reportList = [];
       if ($event && $event.length) {
@@ -223,7 +234,7 @@ export class LabTestsFinalReports implements AfterViewInit {
         this.timeId = null;
       }
       this.timeId = window.setTimeout(() => {
-        if(this.isInitialLoad){
+        if (this.isInitialLoad) {
           this.GetTestListFilterByCategories();
           this.isInitialLoad = false;
         }
@@ -237,7 +248,7 @@ export class LabTestsFinalReports implements AfterViewInit {
       if (moment(this.fromDate).isBefore(this.toDate) || moment(this.fromDate).isSame(this.toDate)) {
         this.GetPendingReportList(this.fromDate, this.toDate, this.searchText, this.catIdList);
       } else {
-        this.msgBoxService.showMessage('failed', ['Please enter valid From date and To date']);
+        this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Please enter valid From date and To date']);
       }
     }
   }
@@ -247,8 +258,41 @@ export class LabTestsFinalReports implements AfterViewInit {
     this.toDate = $event.toDate;
   }
 
-  Close(){
+  Close() {
     this.showReportUpload = false;
     this.requisitionIdList = [];
+  }
+
+  CloseUndoConfirmationBox() {
+    this.requisitionIdList = [];
+    this.ShowUndoOption = false;
+  }
+
+  UndoFinalReport() {
+    this.showGrid = false;
+    this.loading = true;
+    this.labBLService.UndoFinalReport(this.requisitionIdList)
+      .finally(() => {
+        this.loading = false;
+        this.showGrid = true;
+      })
+      .subscribe((res: DanpheHTTPResponse) => {
+        if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Success, [`Final report is successfully reverted to pending stage.`]);
+          let index = this.reportList.findIndex(a => a.LabRequisitionIdCSV.includes(this.requisitionIdList.join(",")));
+          if (index !== -1) {
+            this.reportList.splice(index, 1);
+          }
+          this.CloseUndoConfirmationBox();
+        } else {
+          this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, ['Unable to undo final report.']);
+        }
+      }, (err: DanpheHTTPResponse) => {
+        this.msgBoxService.showMessage(ENUM_MessageBox_Status.Error, [`Exception: ${err.ErrorMessage}`]);
+      });
+  }
+
+  ngOnDestroy() {
+    this.patientService.CreateNewGlobal();
   }
 }

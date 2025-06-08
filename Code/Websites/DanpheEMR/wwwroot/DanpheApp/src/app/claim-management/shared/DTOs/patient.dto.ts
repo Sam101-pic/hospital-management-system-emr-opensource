@@ -34,7 +34,15 @@ export class Patient_DTO {
   public MedicareEmployeeName: string = "";
   public Designation: string = "";
   public Relation: string = "";
+  public PerformerName: string = "";
+  public DepartmentId: number = 0;
 
   //*Krishna, 8thMay'23, Below Property are added due to their need in SchemeRefund
   public SchemeId: number = null;
+  public PriceCategoryId: number = null;
+  // Bibek:07thDec'23 Below details are added as required in Proceed To Discharge from Clinical Module 
+  public Name: string = "";
+  public BedInformation: { Ward: string; BedNumber: string };
+
+
 }

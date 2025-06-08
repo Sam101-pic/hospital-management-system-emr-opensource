@@ -33,8 +33,9 @@ using Syncfusion.XlsIO;
 using DanpheEMR.ServerModel.ClinicalModels.BloodSugarMonitoring;
 using DanpheEMR.ServerModel.ClinicalModels.Diet;
 using DanpheEMR.ServerModel.ClinicalModels.ConsulationRequests;
-using DanpheEMR.ServerModel.ClinicalModels.DTOs;
 using DbFunctions = System.Data.Entity.DbFunctions;
+using System.Web.Routing;
+using DanpheEMR.Services.NewClinical.DTOs;
 // For more information on enabling Web API for empty projects, visit http://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace DanpheEMR.Controllers.Clinical
@@ -650,6 +651,7 @@ namespace DanpheEMR.Controllers.Clinical
                 var isPending = true;
                 var notes = (from note in _clinicalDbContext.Notes
                              join pat in _clinicalDbContext.Patients on note.PatientId equals pat.PatientId
+                             join visit in _clinicalDbContext.Visit on note.PatientVisitId equals visit.PatientVisitId
                              join emp in _clinicalDbContext.Employee on note.CreatedBy equals emp.EmployeeId
                              join primaryDoc in _clinicalDbContext.Employee on note.PerformerId equals primaryDoc.EmployeeId
                              join nt in _clinicalDbContext.NoteType on note.NoteTypeId equals nt.NoteTypeId into noteTypeTemp
@@ -667,10 +669,14 @@ namespace DanpheEMR.Controllers.Clinical
                                  note.CreatedOn,
                                  note.IsPending,
                                  LoggedUser = "",
-                                 PatientName = pat.FirstName + " " + (String.IsNullOrEmpty(pat.MiddleName) ? " " : pat.MiddleName) + " " + pat.LastName,
+                                 PatientName = pat.ShortName,
                                  Age = pat.Age,
-                                 Gender = pat.Gender
-
+                                 Gender = pat.Gender,
+                                 PatientCode = pat.PatientCode,
+                                 Address = pat.Address,
+                                 PhoneNumber = pat.PhoneNumber,
+                                 VisitType = visit.VisitType,
+                                 VisitCode = visit.VisitCode
                              }).ToList().OrderByDescending(a => a.CreatedOn);
                 return notes;
             }
@@ -932,7 +938,7 @@ namespace DanpheEMR.Controllers.Clinical
                                  SecondaryDoctor = secondaryDoc.FullName,
                                  pat.Age,
                                  Sex = pat.Gender,
-                                 PatientName = pat.FirstName + " " + (String.IsNullOrEmpty(pat.MiddleName) ? " " : pat.MiddleName) + " " + pat.LastName
+                                 PatientName = pat.ShortName
 
                              }).ToList();
             return viewnotes;
@@ -965,7 +971,8 @@ namespace DanpheEMR.Controllers.Clinical
                                  pat.Age,
                                  Sex = pat.Gender,
                                  pat.Address,
-                                 PatientName = pat.FirstName + " " + (String.IsNullOrEmpty(pat.MiddleName) ? " " : pat.MiddleName) + " " + pat.LastName
+                                 PatientName = pat.ShortName,
+                                 PatientCode = pat.PatientCode,  
 
                              }).ToList();
             return viewnotes;
@@ -1100,6 +1107,7 @@ namespace DanpheEMR.Controllers.Clinical
                 Pulse = v.Pulse,
                 BPDiastolic = v.BPDiastolic,
                 BPSystolic = v.BPSystolic,
+                Remarks = v.Remarks,
                 RespiratoryRatePerMin = v.RespiratoryRatePerMin,
                 SpO2 = v.SpO2,
                 OxygenDeliveryMethod = v.OxygenDeliveryMethod,
@@ -1108,7 +1116,10 @@ namespace DanpheEMR.Controllers.Clinical
                 FreeNotes = v.FreeNotes,
                 DiagnosisType = v.DiagnosisType,
                 Diagnosis = v.Diagnosis,
-                CreatedOn = v.CreatedOn
+                CreatedOn = v.CreatedOn,
+                Eyes = v.Eyes,
+                Motor = v.Motor,
+                Verbal = v.Verbal
             }).ToList();
 
 
@@ -3844,7 +3855,21 @@ namespace DanpheEMR.Controllers.Clinical
             VitalsModel vitals = JsonConvert.DeserializeObject<VitalsModel>(str);
             vitals.CreatedBy = currentUser.EmployeeId;
             vitals.CreatedOn = DateTime.Now;
-
+            if (vitals.Eyes != null)
+            {
+                var mappedValue = MapVitalEyeScale(vitals.Eyes);
+                vitals.Eyes = mappedValue;
+            };
+            if (vitals.Verbal != null)
+            {
+                var mappedValue = MapVitalVerbalScale(vitals.Verbal);
+                vitals.Verbal = mappedValue;
+            };
+            if (vitals.Motor != null)
+            {
+                var mappedValue = MapVitalMotorScale(vitals.Motor);
+                vitals.Motor = mappedValue;
+            };
             //client side units have default values for the units.
             //if data is not entered then the respective unit is set as null.
 
@@ -3855,12 +3880,64 @@ namespace DanpheEMR.Controllers.Clinical
             if (vitals.Temperature == null)
                 vitals.TemperatureUnit = null;
 
-
             _clinicalDbContext.Vitals.Add(vitals);
             _clinicalDbContext.SaveChanges();
             return vitals;
         }
-
+        private string MapVitalEyeScale(string eyesValue)
+        {
+            switch (eyesValue)
+            {
+                case "1":
+                    return ENUM_VitalsEyeScale.Scale1;
+                case "2":
+                    return ENUM_VitalsEyeScale.Scale2;
+                case "3":
+                    return ENUM_VitalsEyeScale.Scale3;
+                case "4":
+                    return ENUM_VitalsEyeScale.Scale4;
+                default:
+                    return null;
+            }
+        }
+        private string MapVitalVerbalScale(string verbalValue)
+        {
+            switch (verbalValue)
+            {
+                case "1":
+                    return ENUM_VitalVerbalScale.Scale1;
+                case "2":
+                    return ENUM_VitalVerbalScale.Scale2;
+                case "3":
+                    return ENUM_VitalVerbalScale.Scale3;
+                case "4":
+                    return ENUM_VitalVerbalScale.Scale4;
+                case "5":
+                    return ENUM_VitalVerbalScale.Scale5;
+                default:
+                    return null;
+            }
+        }
+        private string MapVitalMotorScale(string MotorValue)
+        {
+            switch (MotorValue)
+            {
+                case "1":
+                    return ENUM_VitalsMotorScale.Scale1;
+                case "2":
+                    return ENUM_VitalsMotorScale.Scale2;
+                case "3":
+                    return ENUM_VitalsMotorScale.Scale3;
+                case "4":
+                    return ENUM_VitalsMotorScale.Scale4;
+                case "5":
+                    return ENUM_VitalsMotorScale.Scale5;
+                case "6":
+                    return ENUM_VitalsMotorScale.Scale6;
+                default:
+                    return null;
+            }
+        }
 
         //[HttpPost]
         //public string Post()
@@ -5902,6 +5979,15 @@ namespace DanpheEMR.Controllers.Clinical
         [Route("ConsultationRequestsByPatientVisitId")]
         public IActionResult ConsultationRequestsByPatientVisitId(int PatientVisitId)
         {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+            var userId = currentUser.EmployeeId;
+            List<RbacRole> usrAllRoles = RBAC.GetUserAllRoles(currentUser.UserId);
+            bool isAdmin = usrAllRoles != null && usrAllRoles.Count == 1 && usrAllRoles.Single().IsSysAdmin;
+
             var ConsultationRequests = (
                 from cr in _clinicalDbContext.ConsultationRequest
                 join pat in _clinicalDbContext.Patients on cr.PatientId equals pat.PatientId
@@ -5914,7 +6000,10 @@ namespace DanpheEMR.Controllers.Clinical
                 from conEmp in conEmpGroup.DefaultIfEmpty()
                 join conDept in _clinicalDbContext.Departments on cr.ConsultingDepartmentId equals conDept.DepartmentId into conDeptGroup
                 from conDept in conDeptGroup.DefaultIfEmpty()
-                where cr.PatientVisitId == PatientVisitId && cr.IsActive == true
+                where cr.PatientVisitId == PatientVisitId 
+                       && cr.IsActive == true
+                       && (cr.RequestingConsultantId == userId || cr.ConsultingDoctorId == userId || isAdmin)
+
                 select new ConsultationRequestForGetDTO
                 {
                     ConsultationRequestId = cr.ConsultationRequestId,
@@ -7413,7 +7502,21 @@ namespace DanpheEMR.Controllers.Clinical
             VitalsModel clientVitals = JsonConvert.DeserializeObject<VitalsModel>(str);
             clientVitals.ModifiedBy = currentUser.EmployeeId;
             clientVitals.ModifiedOn = DateTime.Now;
-            clientVitals = _clinicalDbContext.UpdateGraph(clientVitals);
+            if (clientVitals.Eyes != null)
+            {
+                var mappedValue = MapVitalEyeScale(clientVitals.Eyes);
+                clientVitals.Eyes = mappedValue;
+            };
+            if (clientVitals.Verbal != null)
+            {
+                var mappedValue = MapVitalVerbalScale(clientVitals.Verbal);
+                clientVitals.Verbal = mappedValue;
+            };
+            if (clientVitals.Motor != null)
+            {
+                var mappedValue = MapVitalMotorScale(clientVitals.Motor);
+                clientVitals.Motor = mappedValue;
+            }; clientVitals = _clinicalDbContext.UpdateGraph(clientVitals);
             _clinicalDbContext.Entry(clientVitals).Property(u => u.CreatedBy).IsModified = false;
             _clinicalDbContext.Entry(clientVitals).Property(u => u.CreatedOn).IsModified = false;
             _clinicalDbContext.SaveChanges();
@@ -9102,7 +9205,15 @@ namespace DanpheEMR.Controllers.Clinical
                                           LatestPatientVisitId = g.Max(p => p.PatientVisitId)
                                       }) on adm.PatientVisitId equals visit.LatestPatientVisitId
                                  join pat in _clinicalDbContext.Patients on adm.PatientId equals pat.PatientId
-                                 join schemeMap in _clinicalDbContext.PatientMapScheme on pat.PatientId equals schemeMap.PatientId
+                                 join latestSchemeMap in
+                                     (from schemeMap in _clinicalDbContext.PatientMapScheme
+                                      group schemeMap by schemeMap.PatientId into schemeGrp
+                                      select new
+                                      {
+                                          PatientId = schemeGrp.Key,
+                                          LatestPatientSchemeId = schemeGrp.Max(s => s.PatientSchemeId)
+                                      }) on pat.PatientId equals latestSchemeMap.PatientId
+                                 join schemeMap in _clinicalDbContext.PatientMapScheme on latestSchemeMap.LatestPatientSchemeId equals schemeMap.PatientSchemeId
                                  join scheme in _clinicalDbContext.Scheme on schemeMap.SchemeId equals scheme.SchemeId
                                  join PBI in _clinicalDbContext.PatientBedInfos on new { Id = visit.LatestPatientBedInfoId, VisitId = visit.LatestPatientVisitId } equals new { Id = PBI.PatientBedInfoId, VisitId = PBI.PatientVisitId }
                                  join bed in _clinicalDbContext.Beds on PBI.BedId equals bed.BedId

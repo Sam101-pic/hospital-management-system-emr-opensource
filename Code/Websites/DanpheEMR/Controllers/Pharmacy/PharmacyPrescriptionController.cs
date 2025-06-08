@@ -4,6 +4,7 @@ using DanpheEMR.Enums;
 using DanpheEMR.Security;
 using DanpheEMR.ServerModel;
 using DanpheEMR.ServerModel.SSFModels;
+using DanpheEMR.Services.Dispensary.DTOs;
 using DanpheEMR.Utilities;
 using DocumentFormat.OpenXml.Bibliography;
 using Microsoft.AspNetCore.Mvc;
@@ -95,12 +96,11 @@ namespace DanpheEMR.Controllers.Pharmacy
 
         private object GetPatientsPrescriptions()
         {
-            List<EmployeeModel> employeeList = (from emp in _masterDbContext.Employees select emp).ToList();
-            var presList = (from pres in _phrmDbContext.PHRMPrescriptionItems.AsEnumerable()
-                            where pres.OrderStatus == "active"
-                            join pat in _phrmDbContext.PHRMPatient.AsEnumerable() on pres.PatientId equals pat.PatientId
-                            join emp in employeeList.AsEnumerable() on pres.CreatedBy equals emp.EmployeeId
-                            group new { pres, pat, emp } by new
+            var presList = (from pres in _phrmDbContext.PHRMPrescriptionItems .Where(a => a.IsActive == true)//.Where(a => status.Contains(a.OrderStatus))
+                            join pat in _phrmDbContext.PHRMPatient on pres.PatientId equals pat.PatientId
+                            join emp in _phrmDbContext.Employees on pres.CreatedBy equals emp.EmployeeId
+                            join visit in _phrmDbContext.PHRMPatientVisit on pres.PatientVisitId equals visit.PatientVisitId
+                            group new { pres, pat, emp, visit } by new
                             {
                                 // pres.ProviderId,
                                 pres.PatientId,
@@ -112,7 +112,8 @@ namespace DanpheEMR.Controllers.Pharmacy
                                 eMiddleName = emp.MiddleName,
                                 eLastName = emp.LastName,
                                 PrescriberId = pres.CreatedBy,
-                                PrescriptionId = pres.PrescriptionId
+                                PrescriptionId = pres.PrescriptionId,
+                                visit.VisitType,
                             }
                             into t
                             select new
@@ -123,7 +124,8 @@ namespace DanpheEMR.Controllers.Pharmacy
                                 PatientName = t.Key.FirstName + " " + (string.IsNullOrEmpty(t.Key.MiddleName) ? "" : t.Key.MiddleName + " ") + t.Key.LastName,
                                 PrescriberId = t.Key.PrescriberId,
                                 PrescriberName = t.Key.eFirstName + " " + (string.IsNullOrEmpty(t.Key.eMiddleName) ? "" : t.Key.eMiddleName + " ") + t.Key.eLastName,
-                                CreatedOn = t.Max(r => r.pres.CreatedOn)
+                                VisitType = t.Key.VisitType,
+                                CreatedOn = t.Max(r => r.pres.CreatedOn),
                             }
                             ).OrderByDescending(a => a.CreatedOn).ToList();
             return presList;
@@ -161,6 +163,167 @@ namespace DanpheEMR.Controllers.Pharmacy
 
             _phrmDbContext.SaveChanges();
             return prescItems;
+        }
+
+        [HttpGet]
+        [Route("PatientPrescriptionAvailability")]
+        public IActionResult GetPatientPrescriptionAvailability(int PatientId)
+        {
+            string[] status = { ENUM_PrescriptionOrderStatus.Active, ENUM_PrescriptionOrderStatus.Partial };
+            Func<object> func = () => _phrmDbContext.PHRMPrescriptionItems
+                                                        .Any(a => a.PatientId == PatientId && status.Contains(a.OrderStatus));
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        [HttpGet]
+        [Route("PatientPrescriptions")]
+        public IActionResult GetPatientPrescription(int PatientId)
+        {
+            string[] status = { ENUM_PrescriptionOrderStatus.Active, ENUM_PrescriptionOrderStatus.Partial };
+
+            Func<object> func = () => (from pres in _phrmDbContext.PHRMPrescription.Where(a => a.PatientId == PatientId && status.Contains(a.PrescriptionStatus))
+                                       join visit in _phrmDbContext.PHRMPatientVisit on new { pres.PatientVisitId, pres.PatientId } equals new { visit.PatientVisitId, visit.PatientId }
+                                       join emp in _phrmDbContext.Employees on pres.CreatedBy equals emp.EmployeeId
+                                       join scheme in _phrmDbContext.Schemes on visit.SchemeId equals scheme.SchemeId
+                                       join priceCategory in _phrmDbContext.PriceCategories on visit.PriceCategoryId equals priceCategory.PriceCategoryId
+                                       orderby pres.PrescriptionNo descending
+                                       select new
+                                       {
+                                           pres.PrescriptionId,
+                                           pres.PrescriptionNo,
+                                           pres.PrescriptionStatus,
+                                           visit.VisitType,
+                                           pres.CreatedOn,
+                                           PrescriberName = emp.FullName,
+                                           pres.CreatedBy,
+                                           visit.PatientVisitId,
+                                           visit.SchemeId,
+                                           visit.PriceCategoryId,
+                                           visit.ClaimCode,
+                                           scheme.SchemeName,
+                                           priceCategory.PriceCategoryName
+                                       })
+                                       .ToList();
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+        [HttpGet]
+        [Route("PatientPrescriptionItems")]
+        public IActionResult GetPatientPrescriptionItems(int PrescriptionId)
+        {
+            string[] status = { ENUM_PrescriptionOrderStatus.Active, ENUM_PrescriptionOrderStatus.Partial };
+
+            Func<object> func = () => (from presItem in _phrmDbContext.PHRMPrescriptionItems.Where(a => a.PrescriptionId == PrescriptionId && a.IsActive == true
+                                       && status.Contains(a.OrderStatus))
+                                       join item in _phrmDbContext.PHRMItemMaster on presItem.ItemId equals item.ItemId
+                                       join gen in _phrmDbContext.PHRMGenericModel on item.GenericId equals gen.GenericId
+                                       select new
+                                       {
+                                           presItem.PrescriptionItemId,
+                                           presItem.PatientId,
+                                           presItem.PatientVisitId,
+                                           presItem.PrescriberId,
+                                           presItem.ItemId,
+                                           presItem.GenericId,
+                                           PendingQuantity = presItem.Quantity - presItem.SalesQuantity,
+                                           item.ItemName,
+                                           gen.GenericName,
+                                           Quantity = 0,
+                                           presItem.FrequencyAbbreviation,
+                                           presItem.Strength,
+                                           presItem.Dosage,
+                                           presItem.HowManyDays
+                                       })
+                                       .ToList();
+            return InvokeHttpGetFunction<object>(func);
+        }
+
+
+        [HttpPut]
+        [Route("PrescriptionItems")]
+        public IActionResult PrescriptionItems([FromBody] List<PrescriptionItemQuantityUpdate_DTO> prescriptionItems)
+        {
+            Func<object> func = () => UpdatePrescriptionQuantity(prescriptionItems);
+            return InvokeHttpPutFunction<object>(func);
+        }
+
+        private object UpdatePrescriptionQuantity(List<PrescriptionItemQuantityUpdate_DTO> prescriptionItemsToUpdate)
+        {
+            var prescriptionItemIds = prescriptionItemsToUpdate.Select(a => a.PrescriptionItemId).ToList();
+            var prescriptionItemUpdates = prescriptionItemsToUpdate.ToDictionary(x => x.PrescriptionItemId);
+            var prescriptionItemsFromServer = _phrmDbContext.PHRMPrescriptionItems
+                                                       .Where(a => prescriptionItemIds.Contains(a.PrescriptionItemId))
+                                                       .ToList();
+            if (prescriptionItemsFromServer.Any(a => a.Quantity > 0))
+            {
+                throw new InvalidOperationException($"Some of the prescription quantity is already modified.");
+            }
+            foreach (var item in prescriptionItemsFromServer)
+            {
+                if (prescriptionItemUpdates.TryGetValue(item.PrescriptionItemId, out var itemUpdate))
+                {
+                    item.Quantity = itemUpdate.Quantity;
+                }
+            }
+            _phrmDbContext.SaveChanges();
+            return prescriptionItemsFromServer;
+        }
+
+        [HttpPut]
+        [Route("DiscardPrescriptionItem")]
+        public IActionResult DiscardPrescriptionItem(int PrescriptionItemId)
+        {
+            Func<object> func = () => UpdatePrescriptionItemOrderStatus(PrescriptionItemId);
+            return InvokeHttpPutFunction<object>(func);
+        }
+
+        private object UpdatePrescriptionItemOrderStatus(int PrescriptionItemId)
+        {
+            var prescriptionItemFromServer = _phrmDbContext.PHRMPrescriptionItems
+                                                           .FirstOrDefault(a => a.PrescriptionItemId == PrescriptionItemId);
+            if (prescriptionItemFromServer == null)
+            {
+                throw new InvalidOperationException("Prescription Item not found");
+            }
+            prescriptionItemFromServer.OrderStatus = ENUM_PrescriptionOrderStatus.Discarded;
+            _phrmDbContext.SaveChanges();
+
+
+
+            var prescriptionId = prescriptionItemFromServer.PrescriptionId;
+            var isAllPrescriptionItemDiscarded = _phrmDbContext.PHRMPrescriptionItems.Where(a => a.PrescriptionId == prescriptionId).All(a => a.OrderStatus == ENUM_PrescriptionOrderStatus.Discarded);
+            if (isAllPrescriptionItemDiscarded)
+            {
+                var prescription = _phrmDbContext.PHRMPrescription.FirstOrDefault(a => a.PrescriptionId == prescriptionId);
+                prescription.PrescriptionStatus = ENUM_PrescriptionOrderStatus.Discarded;
+            }
+            _phrmDbContext.SaveChanges();
+            return prescriptionItemFromServer;
+        }
+
+        [HttpPut]
+        [Route("DiscardPrescription")]
+        public IActionResult DiscardPrescription(int PrescriptionId)
+        {
+            Func<object> func = () => UpdatePrescriptionOrderStatus(PrescriptionId);
+            return InvokeHttpPutFunction<object>(func);
+        }
+
+        private object UpdatePrescriptionOrderStatus(int PrescriptionId)
+        {
+            var prescriptionFromServer = _phrmDbContext.PHRMPrescription.Include("PHRMPrescriptionItems")
+                                                           .FirstOrDefault(a => a.PrescriptionId == PrescriptionId);
+            if (prescriptionFromServer == null)
+            {
+                throw new InvalidOperationException("Prescription not found");
+            }
+            prescriptionFromServer.PrescriptionStatus = ENUM_PrescriptionOrderStatus.Discarded;
+            prescriptionFromServer.PHRMPrescriptionItems.ForEach(item =>
+            {
+                item.OrderStatus = ENUM_PrescriptionOrderStatus.Discarded;
+            });
+            _phrmDbContext.SaveChanges();
+            return prescriptionFromServer;
         }
     }
 }

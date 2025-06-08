@@ -25,7 +25,7 @@ export class NursingOpdCheckinComponent implements OnInit {
   public showNursingCheckin: boolean = false;
   @Output() CallBackNursingCheckin = new EventEmitter<boolean>();
 
-  @Output('nursing-opd-checkIn-callback)')
+  @Output('nursing-opd-checkIn-callback')
   NursingOpdCheckInCallback = new EventEmitter<object>();
 
   @Input('selected-visit')

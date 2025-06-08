@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import * as moment from 'moment';
 import { CoreService } from '../../../core/shared/core.service';
@@ -32,6 +32,8 @@ export class GoodsReceiptViewComponent implements OnInit {
   verifierDetails: any[] = [];
   showSpecification: boolean = false;
   public GeneralFieldLabel = new GeneralFieldLabels();
+
+  @ViewChild('closeModal') closeModal: ElementRef;
 
   constructor(
     public procBLService: ProcurementBLService,
@@ -92,6 +94,7 @@ export class GoodsReceiptViewComponent implements OnInit {
         this.goodsreceiptDetails.GoodsReceiptDate = moment(this.goodsreceiptDetails.GoodsReceiptDate).format('YYYY-MM-DD');
         this.goodsreceiptDetails.ReceivedDate = moment(this.goodsreceiptDetails.ReceivedDate).format('YYYY-MM-DD');
         this.goodsreceiptDetails.CreatedOn = moment(this.goodsreceiptDetails.CreatedOn).format('YYYY-MM-DD');
+        this.goodsreceiptDetails.VendorBillDate = moment(this.goodsreceiptDetails.VendorBillDate).format('YYYY-MM-DD');
         this.goodsreceiptDetails.GoodsReceiptItem = this.goodsreceiptItemsDetails;
       }
       else {
@@ -119,7 +122,7 @@ export class GoodsReceiptViewComponent implements OnInit {
            .img-responsive{ position: relative;top: 10px;}
            .qr-code{position:relative;}
            .no-print{display:none;}
-           @page { size: auto;  margin: 0mm; }
+           @page { size: auto;  margin: 1000px; }
            .cancelStamp {transform: rotate(12deg);color: #555;font-size: 3rem;font-weight: 700;border: 0.25rem solid #555;display: inline-block;padding: 0.25rem 0;text-transform: uppercase;border-radius: 1rem;font-family: 'Courier';mix-blend-mode: multiply;color: #D23;border: 0.5rem solid #D23;transform: rotate(-14deg);border-radius: 0;}
          </style>
          <link rel="stylesheet" type="text/css" href="../../../themes/theme-default/ReceiptList.css" />
@@ -184,9 +187,9 @@ export class GoodsReceiptViewComponent implements OnInit {
       this.msgBoxServ.showMessage("error", ["Please enter parameter values for BillingHeader"]);
   }
 
-  KeysPressed(event) {
-    if (event.keyCode == 27) { //if ESCAPE_KEYCODE key is pressed
-      this.goodsreceiptList();
+  KeysPressed(event: KeyboardEvent) {
+    if (event.keyCode == 27) {
+      this.closeModal.nativeElement.click();
     }
   }
   GetInventoryFieldCustomization(): void {

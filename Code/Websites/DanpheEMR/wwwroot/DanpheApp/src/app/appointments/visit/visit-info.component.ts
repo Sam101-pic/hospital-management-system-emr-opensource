@@ -54,11 +54,13 @@ export class VisitInfoComponent implements OnInit {
     public patientService: PatientService,
     public routeFromService: RouteFromService,
     public changeDetector: ChangeDetectorRef) {
-    this.GetVisitDoctors();
-    this.GetDepartments();
+    this.filteredDocList = this.doctorList = this.visitService.ApptApplicableDoctorsList;
+    this.departmentList = this.AppointmentApplicableDepartments = [...this.visitService.ApptApplicableDepartmentList];
+    this.CheckDepartments();
     this.InitializeSubscription();
     this.LoadReferrerSettings();
     this.LoadFreeVisitSettings();
+    this.AssignAppointmentDetails();
 
     let paramValue = this.coreService.EnableDepartmentLevelAppointment();
     if (paramValue) {
@@ -150,13 +152,12 @@ export class VisitInfoComponent implements OnInit {
     else {
       this.visit.UpdateValidator("on", "Doctor", "required");
     }
-
-    this.AssignAppointmentDetails();
   }
 
   ngAfterViewInit() {
-    if (this.departmentList && this.departmentList.length)
+    if (this.departmentList && this.departmentList.length && this.selectedDepartment == null) {
       this.SetFocusById('txtDepartment');
+    }
     if (this.selectedDepartment && this.selectedDepartment.DepartmentId > 0) {
       this.visitService.TriggerBillChangedEvent({ ChangeType: "Department", SelectedDepartment: this.selectedDepartment });
     }
@@ -175,15 +176,7 @@ export class VisitInfoComponent implements OnInit {
           this.visit[property] = appointment[property];
         }
       });
-
       //assign provider and department information if it was filled during appointment.
-      if (this.visit.PerformerName) {
-        this.selectedDoctor.PerformerName = this.visit.PerformerName;
-        this.selectedDoctor.PerformerId = this.visit.PerformerId;
-      }
-      else {
-        this.selectedDoctor = null;
-      }
       if (this.visit.DepartmentId) {
         this.selectedDepartment.DepartmentId = this.visit.DepartmentId;
         let dep = this.coreService.Masters.Departments.find(a => a.DepartmentId == this.visit.DepartmentId);
@@ -192,31 +185,27 @@ export class VisitInfoComponent implements OnInit {
           this.filteredDocList = this.doctorList.filter(doc => doc.DepartmentId == dep.DepartmentId);
         }
       }
+      if (this.visit.PerformerId) {
+        this.selectedDoctor.PerformerName = appointment.PerformerName;
+        this.selectedDoctor.PerformerId = this.visit.PerformerId;
+        this.selectedDoctor.DepartmentId = this.visit.DepartmentId;
+        this.selectedDoctor.DepartmentName = this.visit.DepartmentName;
+        this.AssignSelectedDoctor();
+      }
+      else {
+        this.selectedDoctor = null;
+      }
+
     }
   }
 
-  GetDepartments() {
-    this.visitBLService.GetDepartment()
-      .subscribe(res => {
-        if (res.Status == "OK") {
-          this.departmentList = res.Results;
-          this.AppointmentApplicableDepartments = this.departmentList;
-        }
-        if (!this.visit.DepartmentId)
-          this.SetFocusById('txtDepartment');
-        else {
-          this.SetFocusById('tender');
-        }
-      },
-        error => {
-          this.msgBoxServ.showMessage('error', ['No Departments found']);
-        });
-  }
-
-  GetVisitDoctors() {
-    //sud:25June'19--get the list from pre-loaded functions.
-    this.filteredDocList = this.doctorList = this.visitService.ApptApplicableDoctorsList;
-    this.AssignSelectedDoctor();
+  CheckDepartments() {
+    this.AppointmentApplicableDepartments = this.departmentList;
+    if (!this.appointmentService.getGlobal().DepartmentId)
+      this.SetFocusById('txtDepartment');
+    else {
+      this.SetFocusById('tender');
+    }
   }
 
   FilterDoctorList() {
@@ -237,6 +226,7 @@ export class VisitInfoComponent implements OnInit {
 
   public AssignSelectedDoctor() {
     let doctor = null;
+    let previousSelectedDoctor = this.selectedDoctor;
     // check if user has given proper input string for item name
     //or has selected object properly from the dropdown list.
     //        this.emitDoctorDetail.emit({ "selectedDoctor": null });
@@ -249,16 +239,25 @@ export class VisitInfoComponent implements OnInit {
       if (doctor) {
         //to filter doctor List after department is changed (flow: assigning department by selecting doctor).
         this.departmentId = doctor.DepartmentId;
-        this.selectedDepartment = doctor.DepartmentName;
         this.filteredDocList = this.doctorList.filter(doc => doc.DepartmentId == this.departmentId);
-        this.selectedDoctor = Object.assign(this.selectedDoctor, doctor);
+        this.selectedDoctor = doctor;
         this.visit.PerformerId = doctor.PerformerId;//this will give providerid
         this.visit.PerformerName = doctor.PerformerName;
         this.visit.IsValidSelProvider = true;
         this.visit.IsValidSelDepartment = true;
         this.visit.DepartmentId = doctor.DepartmentId;
+        this.visit.DepartmentName = doctor.DepartmentName;
+        if (doctor.DepartmentId && this.departmentList && this.departmentList.length) {
+          this.selectedDepartment = this.departmentList.find(a => a.DepartmentId == doctor.DepartmentId);
+        }
         if (this.selectedDepartment != null) {
           this.AssignSelectedDepartment();
+        }
+        // If the department is changed for the second time, reset the selected doctor
+        if (this.departmentId != doctor.DepartmentId) {
+          this.selectedDoctor = null;
+        } else {
+          this.selectedDoctor = previousSelectedDoctor; // Restore the previously selected doctor
         }
         this.visitService.TriggerBillChangedEvent({ ChangeType: "Doctor", SelectedDoctor: this.selectedDoctor });
       }
@@ -267,6 +266,7 @@ export class VisitInfoComponent implements OnInit {
         this.visit.PerformerName = null;
         this.visit.IsValidSelProvider = false;
       }
+
     }
     else {
       this.visit.PerformerId = null;
@@ -286,13 +286,20 @@ export class VisitInfoComponent implements OnInit {
         department = this.departmentList.find(a => a.DepartmentId == this.selectedDepartment.DepartmentId);
       if (department) {
         this.selectedDepartment = Object.assign(this.selectedDepartment, department);
+        this.visit.VisitValidator.get('Department').setValue(this.selectedDepartment.DepartmentName);
         this.departmentId = department.DepartmentId;
         this.visit.IsValidSelDepartment = true;
         this.visit.IsValidSelProvider = true;
         this.visit.DepartmentId = department.DepartmentId;
         this.visit.DepartmentName = department.DepartmentName;
         this.visit.DeptRoomNumber = department.RoomNumber;
-        if (this.selectedDoctor.DepartmentId == 0) {
+        if (this.departmentId && this.selectedDoctor && this.selectedDoctor.DepartmentId) {
+          if (this.departmentId != this.selectedDoctor.DepartmentId) {
+            this.selectedDoctor = null;
+            this.FilterDoctorList();
+          }
+        }
+        else {
           this.FilterDoctorList();
         }
         //getting emergency name from the parameterized data
@@ -320,6 +327,7 @@ export class VisitInfoComponent implements OnInit {
       this.visit.DepartmentId = 0;
       this.visit.DepartmentName = null;
       this.filteredDocList = this.doctorList;
+      this.selectedDoctor = null;
       this.visitService.TriggerBillChangedEvent({ ChangeType: "Department", SelectedDepartment: this.selectedDepartment }); //Removes paticulars from 'Additional Bill Item?' when Department is kept empty
     }
   }
@@ -407,12 +415,17 @@ export class VisitInfoComponent implements OnInit {
       if (this.EnableFreeVisit) {
         this.visit.VisitValidator.reset();
       } else {
-        // this.visit.VisitValidator.get('Department').setValue(null);
         this.visit.VisitValidator.reset();
       }
     } else {
       if (this.EnableFreeVisit) {
         this.showDocMandatory = false;
+        this.visit.PerformerId = null;
+        this.visit.PerformerName = null;
+        if (this.selectedDepartment && this.selectedDepartment.DepartmentId) {
+          this.selectedDepartment = null;
+          this.visitService.TriggerBillChangedEvent({ ChangeType: "Department", SelectedDepartment: this.selectedDepartment });
+        }
       } else {
         this.showDocMandatory = true;
       }
@@ -427,4 +440,14 @@ export class VisitInfoComponent implements OnInit {
     this.visitService.TriggerFreeVisitCheckboxChangeEvent(this.FreeVisitSettings);
     this.changeDetector.detectChanges();
   }
+  Checkvalue() {
+    if (!this.selectedDepartment || this.selectedDepartment.toString().trim() === '') {
+      this.departmentId = 0;
+      this.visit.DepartmentId = 0;
+      this.visit.DepartmentName = null;
+      this.selectedDoctor = null;
+    }
+  }
+
+
 }

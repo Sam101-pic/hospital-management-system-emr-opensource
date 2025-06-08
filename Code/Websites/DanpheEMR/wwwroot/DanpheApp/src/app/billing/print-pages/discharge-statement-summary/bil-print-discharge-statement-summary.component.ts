@@ -93,6 +93,8 @@ export class Bil_Print_DischargeStatementSummaryComponent implements OnInit {
   public showMunicipality: boolean;
 
   public OtherCurrencyDetail: OtherCurrencyDetail = { CurrencyCode: '', ExchangeRate: 0, BaseAmount: 0, ConvertedAmount: 0 };
+  ToBePaid: number = 0;
+  DepositUsedAmount: number = 0;
 
   constructor(public dlService: DLService,
     public msgBoxServ: MessageboxService,
@@ -121,6 +123,7 @@ export class Bil_Print_DischargeStatementSummaryComponent implements OnInit {
   }
 
   ngOnInit() {
+    console.log(this.DepositBalance);
     if (this.patientId && this.patientVisitId) {
       this.GetDischargeSummaryInfo();
     }
@@ -139,7 +142,7 @@ export class Bil_Print_DischargeStatementSummaryComponent implements OnInit {
       this.autoBedBillParam = JSON.parse(param.ParameterValue);
     }
   }
-
+  UserName: string = "";
   GetDischargeSummaryInfo() {
     this.billingBLService.GetDischrageStatementSummary(this.patientId, this.patientVisitId, this.DischargeStatementId).subscribe((res: DanpheHTTPResponse) => {
       if (res.Status === ENUM_DanpheHTTPResponses.OK) {
@@ -147,6 +150,8 @@ export class Bil_Print_DischargeStatementSummaryComponent implements OnInit {
         this.dischargeBill.PatientDetail = res.Results.PatientDetail;
         this.dischargeBill.DepositDetails = res.Results.DepositInfo;
         this.dischargeBill.BillItems = res.Results.BillItems;
+        this.DepositUsedAmount = res.Results.InvoiceInfo.DepositUsed;
+        this.UserName = res.Results.InvoiceInfo.UserName;
         if (res.Results.DischargeInfo.StatementNo !== null) {
           this.dischargeBill.DischargeInfo = res.Results.DischargeInfo;
         }
@@ -163,6 +168,12 @@ export class Bil_Print_DischargeStatementSummaryComponent implements OnInit {
         this.dischargeBill.SubTotal = this.dischargeBill.BillItems.reduce((sum, item) => sum + item.SubTotal, 0);
         this.dischargeBill.DiscountAmount = this.dischargeBill.BillItems.reduce((sum, item) => sum + item.DiscountAmount, 0);
         this.dischargeBill.TotalAmount = this.dischargeBill.BillItems.reduce((sum, item) => sum + item.TotalAmount, 0);
+        if ((this.dischargeBill.BillingTransactionDetail) && (this.dischargeBill.TotalAmount >= this.DepositBalance) && res.Results.InvoiceInfo.DepositUsed > 0) {
+          this.ToBePaid = this.dischargeBill.TotalAmount - res.Results.InvoiceInfo.DepositUsed;
+        }
+        else {
+          this.ToBePaid = this.dischargeBill.TotalAmount;
+        }
       }
     })
   }

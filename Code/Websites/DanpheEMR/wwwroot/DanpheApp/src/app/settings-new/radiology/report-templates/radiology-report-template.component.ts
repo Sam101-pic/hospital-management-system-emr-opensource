@@ -1,15 +1,19 @@
 
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component } from "@angular/core";
 
 import { SecurityService } from '../../../security/shared/security.service';
 import { SettingsBLService } from '../../shared/settings.bl.service';
 
-import { ImagingItem } from '../../../radiology/shared/imaging-item.model';
-import { RadiologyReportTemplate } from '../../../radiology/shared/radiology-report-template.model';
-import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
 import * as moment from 'moment/moment';
-import { SettingsService } from "../../shared/settings-service";
+import { RadiologyReportTemplate } from '../../../radiology/shared/radiology-report-template.model';
+import { DanpheHTTPResponse } from "../../../shared/common-models";
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { SettingsService } from "../../shared/settings-service";
+
+import { ENUM_DanpheHTTPResponses, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
+
+
 
 @Component({
   selector: "rad-report-remplate",
@@ -54,18 +58,19 @@ export class RadiologyReportTemplateComponent {
   GetRADReportTemplateList() {
     try {
       this.settingsBLService.GetRADReportTemplateList()
-        .subscribe(res => {
-          if (res.Status == 'OK') {
-            if (res.Results.length) {
-              this.radTemplateList = res.Results;
+        .subscribe(
+          (res: DanpheHTTPResponse) => {
+            if (res.Status === ENUM_DanpheHTTPResponses.OK) {
+              if (res.Results.length) {
+                this.radTemplateList = res.Results;
+              }
+              else {
+                this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Record not found"]);
+              }
             }
-            else {
-              this.messageBoxService.showMessage("success", ["Record not found"]);
-            }
-          }
-        },
+          },
           err => {
-            this.messageBoxService.showMessage("failed", ["Check log for error message."]);
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ["Check log for error message."]);
             this.logError(err.ErrorMessage);
           });
     } catch (exception) {
@@ -102,6 +107,7 @@ export class RadiologyReportTemplateComponent {
           if (template) {
             //assign value to currentTemplate
             this.currentTemplate = (this.currentTemplate, template.Template);
+            this.currentTemplate.RadiologyReportTemplateValidator.get('ModuleName').setValue(this.currentTemplate.ModuleName);
             // Object.assign(this.currentTemplate, this.radTemplateLocalData.find(i => i.TemplateId == $event.Data.TemplateId).Template[0])                        
           } else {
             //server call
@@ -121,8 +127,8 @@ export class RadiologyReportTemplateComponent {
   GetRADReportTemplateById(templateId: number) {
     try {
       this.settingsBLService.GetRADReportTemplateById(templateId)
-        .subscribe(res => {
-          if (res.Status == 'OK') {
+        .subscribe((res: DanpheHTTPResponse) => {
+          if (res.Status === ENUM_DanpheHTTPResponses.OK) {
             this.currentTemplate = Object.assign(this.currentTemplate, res.Results);
             let localTemplateData = { TemplateId: templateId, Template: this.currentTemplate };
             this.radTemplateLocalData.push(localTemplateData);
@@ -151,14 +157,30 @@ export class RadiologyReportTemplateComponent {
 
   //Add new template in database
   Add(): void {
+
+    if (this.radTemplateList && this.radTemplateList.length) {
+      const isTemplateNameExixts = this.radTemplateList.some(s => s.TemplateName.toLowerCase() === this.currentTemplate.TemplateName.toLowerCase());
+      const isTemplateCodeExixts = this.radTemplateList.some(s => s.TemplateCode.toLowerCase() === this.currentTemplate.TemplateCode.toLowerCase());
+
+      if (isTemplateNameExixts) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Template as Template Name "${this.currentTemplate.TemplateName}" already exists!`]);
+        return;
+      }
+
+      if (isTemplateCodeExixts) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add Template as Template Code "${this.currentTemplate.TemplateCode}" already exists!`]);
+        return;
+      }
+
+    }
     try {
       //if valid then call the BL service to do post request.
       if (this.IsValidModelCheck()) {
         this.currentTemplate.CreatedOn = moment().format('YYYY-MM-DD HH:mm');
         this.currentTemplate.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
         this.settingsBLService.AddRadiologyReportTemplate(this.currentTemplate)
-          .subscribe(res => {
-            this.messageBoxService.showMessage("Success", ["Template Saved."]);
+          .subscribe((res: DanpheHTTPResponse) => {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Template Saved."]);
             this.CallBackAddUpdate(res, "add");
           },
             err => this.logError(err));
@@ -170,13 +192,28 @@ export class RadiologyReportTemplateComponent {
 
   //UpdateTemplate
   Update(): void {
+    if (this.radTemplateList && this.radTemplateList.length) {
+      const isTemplateNameExixts = this.radTemplateList.some(s => s.TemplateName.toLowerCase() === this.currentTemplate.TemplateName.toLowerCase() && s.TemplateId !== this.currentTemplate.TemplateId);
+      const isTemplateCodeExixts = this.radTemplateList.some(s => s.TemplateCode.toLowerCase() === this.currentTemplate.TemplateCode.toLowerCase() && s.TemplateId !== this.currentTemplate.TemplateId);
+
+      if (isTemplateNameExixts) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Template as Template Name "${this.currentTemplate.TemplateName}" already exists!`]);
+        return;
+      }
+
+      if (isTemplateCodeExixts) {
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update Template as Template Code "${this.currentTemplate.TemplateCode}" already exists!`]);
+        return;
+      }
+
+    }
     try {
       //if valid then call the BL service to do post request.
       if (this.IsValidModelCheck()) {
         this.currentTemplate.ModifiedBy = this.securityService.GetLoggedInUser().EmployeeId;
         this.settingsBLService.UpdateRadiologyReportTemplate(this.currentTemplate)
-          .subscribe(res => {
-            this.messageBoxService.showMessage("Success", ["Template Updated."]);
+          .subscribe((res: DanpheHTTPResponse) => {
+            this.messageBoxService.showMessage(ENUM_MessageBox_Status.Success, ["Template Updated."]);
             this.CallBackAddUpdate(res, "update");
           },
             err => this.logError(err));
@@ -189,7 +226,7 @@ export class RadiologyReportTemplateComponent {
   //callback after add and update template data
   CallBackAddUpdate(res, action) {
     try {
-      if (res.Status == "OK") {
+      if (res.Status == ENUM_DanpheHTTPResponses.OK) {
         let radTemplate = new RadiologyReportTemplate();
         this.isValidTemplate = true;
         radTemplate = Object.assign(radTemplate, res.Results);
@@ -212,7 +249,7 @@ export class RadiologyReportTemplateComponent {
         }
       }
       else {
-        this.messageBoxService.showMessage("Error", ["Check log for details"]);
+        this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Check log for details"]);
         this.logError(res.ErrorMessage);
       }
     } catch (exception) {
@@ -259,23 +296,23 @@ export class RadiologyReportTemplateComponent {
   ShowCatchErrMessage(exception) {
     if (exception) {
       let ex: Error = exception;
-      this.messageBoxService.showMessage("error", ["Check error in Console log !"]);
+      this.messageBoxService.showMessage(ENUM_MessageBox_Status.Error, ["Check error in Console log !"]);
       console.log("Error Messsage =>  " + ex.message);
       console.log("Stack Details =>   " + ex.stack);
     }
   }
   FocusElementById(id: string) {
-      window.setTimeout(function () {
-        let itmNameBox = document.getElementById(id);
-        if (itmNameBox) {
-          itmNameBox.focus();
-        }
-      }, 600);
-   
-  }
-  hotkeys(event){
-      if(event.keyCode==27){
-          this.Close()
+    window.setTimeout(function () {
+      let itmNameBox = document.getElementById(id);
+      if (itmNameBox) {
+        itmNameBox.focus();
       }
+    }, 600);
+
+  }
+  hotkeys(event) {
+    if (event.keyCode == 27) {
+      this.Close()
+    }
   }
 }

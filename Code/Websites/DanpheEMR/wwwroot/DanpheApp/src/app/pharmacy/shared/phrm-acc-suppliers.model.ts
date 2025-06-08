@@ -1,14 +1,11 @@
 import {
-  NgForm,
-  FormControl,
-  FormGroup,
-  Validators,
   FormBuilder,
-  ReactiveFormsModule
-} from '@angular/forms'
+  FormControl,
+  FormGroup
+} from '@angular/forms';
 import * as moment from 'moment/moment';
 
-import { PHRMGoodsReceiptItemsModel } from './phrm-goods-receipt-items.model'
+import { PHRMGoodsReceiptItemsModel } from './phrm-goods-receipt-items.model';
 export class PHRMACCSuppliersModel {
 
   public GoodReceiptId: number = 0;
@@ -40,6 +37,7 @@ export class PHRMACCSuppliersModel {
   public GoodReceiptValidator: FormGroup = null;
   public GoodReceiptItem: Array<PHRMGoodsReceiptItemsModel> = new Array<PHRMGoodsReceiptItemsModel>();
   ContactNo: string = null;
+  PANNumber: string = '';
   constructor() {
     var _formBuilder = new FormBuilder();
     this.GoodReceiptValidator = _formBuilder.group({

@@ -32,5 +32,6 @@ namespace DanpheEMR.Services.Billing.DTO
         public decimal DiscountPercent { get; set; }
         public decimal DiscountAmount { get; set; }
         public string ItemCode { get; set; }
+        public string IntegrationName { get; set; }
     }
 }

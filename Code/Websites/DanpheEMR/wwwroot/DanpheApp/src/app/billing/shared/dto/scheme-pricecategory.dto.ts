@@ -35,5 +35,8 @@ export class SchemePriceCategory_DTO {
   public IsCreditLimited: boolean = false;
   public IsGeneralCreditLimited: boolean = false;
   public AllowProvisionalBilling: boolean = false;
+  public IsPharmacyCappingApplicable: boolean = false;
+  public IsBillingCappingApplicable: boolean = false;
+  public UseCappingAPI: boolean = false;
 
 }

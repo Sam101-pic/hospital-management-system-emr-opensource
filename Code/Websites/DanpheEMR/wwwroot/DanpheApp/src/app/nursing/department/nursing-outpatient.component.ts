@@ -6,6 +6,8 @@ import { Subscription } from 'rxjs/Subscription';
 import { VisitBLService } from '../../appointments/shared/visit.bl.service';
 import { Visit } from "../../appointments/shared/visit.model";
 import { VisitService } from '../../appointments/shared/visit.service';
+import { ClinicalPatientService } from '../../clinical-new/shared/clinical-patient.service';
+import { PatientDetails_DTO } from '../../clinical-new/shared/dto/patient-cln-detail.dto';
 import { CoreService } from '../../core/shared/core.service';
 import { PatientService } from "../../patients/shared/patient.service";
 import { SecurityService } from '../../security/shared/security.service';
@@ -96,7 +98,12 @@ export class NursingOutPatientComponent {
     public coreService: CoreService,
     private messageboxService: MessageboxService,
 
-    public visitBLService: VisitBLService) {
+    public visitBLService: VisitBLService,
+    private _selectedPatientService: ClinicalPatientService,) {
+    if (this.routeFromSrv.routeData && this.routeFromSrv.routeData === 'pastDays') {
+      this.currentTab = this.routeFromSrv.routeData;
+      this.showAll();
+    }
     this.GetDepartments();
     this.selectedDepartment = new Department();
     this.LoadVisitList();
@@ -180,9 +187,9 @@ export class NursingOutPatientComponent {
       template += '<i danphe-grid-action="patient-overview" class="fa fa-tv grid-action" style="padding: 3px;" title="overview"> </i>';
     }
 
-    if (NursingOutPatientComponent.serv.HasPermission("nursing-op-clinical-view")) {
-      template += `<a danphe-grid-action="clinical" class="grid-action">Clinical</a>`;
-    }
+    // if (NursingOutPatientComponent.serv.HasPermission("nursing-op-clinical-view")) {
+    //   template += `<a danphe-grid-action="clinical" class="grid-action">Clinical</a>`;
+    // }
 
     if (NursingOutPatientComponent.serv.HasPermission("nursing-op-fileupload-view")) {
       template += ' <i danphe-grid-action="upload-files" class="fa fa-upload grid-action" style="padding: 3px;" title="upload files"> </i>';
@@ -241,6 +248,11 @@ export class NursingOutPatientComponent {
 
           this.opdListOne = opdTriaged;
           // this.onChangeDepartment();
+          if (this.opdList && this.opdList.length > 0) {
+            this.opdList.forEach((pat) => {
+              pat.Age = this.coreService.CalculateAge(pat.DateOfBirth)
+            })
+          }
           this.opdFilteredList = this.opdList;
           //this.opdFilteredList.forEach(a => a.IsSelected = false);
         }
@@ -313,9 +325,11 @@ export class NursingOutPatientComponent {
       case "patient-overview":
         {
           if ($event.Data) {
-            this.SetPatDataToGlobal($event.Data);
-            this.routeFromSrv.RouteFrom = "nursing";
-            this.router.navigate(["/Nursing/PatientOverviewMain"]);
+            let selectedPatient: PatientDetails_DTO = $event.Data;
+            this._selectedPatientService.SelectedPatient = selectedPatient;
+            this._selectedPatientService.SelectedPatient.Name = selectedPatient.ShortName;
+            this.router.navigate(['/Nursing/Clinical-Overview']);
+            break;
           }
           break;
         }
@@ -448,7 +462,8 @@ export class NursingOutPatientComponent {
 
   OPDTriagedCallback($event) {
     if ($event.isSubmitted) {
-      this.LoadVisitList();
+      // this.LoadVisitList();
+      this.LoadPastDaysData(this.fromDate, this.toDate);
     } else {
     }
     this.triageEdit = false;
@@ -479,7 +494,7 @@ export class NursingOutPatientComponent {
 
     }
     else {
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please select patient before CheckIn']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please select patient before Exchange Doc/Dept']);
     }
   }
 
@@ -493,7 +508,7 @@ export class NursingOutPatientComponent {
 
     }
     else {
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please select patient before checkin']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please select patient before Refer']);
     }
   }
   NursingCheckOut() {
@@ -506,7 +521,7 @@ export class NursingOutPatientComponent {
 
     }
     else {
-      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please select patient before checkin']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, ['Please select patient before Conclude']);
     }
   }
   NursingTriage() {
@@ -553,6 +568,15 @@ export class NursingOutPatientComponent {
       if ($event.action === 'close') {
         this.showNursingCheckout = false;
       }
+    }
+  }
+
+  OnDepartmentChange(departmentId: number): void {
+    if (departmentId) {
+      this.opdFilteredList = this.opdList.filter(d => d.DepartmentId === departmentId);
+    }
+    else {
+      this.opdFilteredList = this.opdList;
     }
   }
 }

@@ -1,7 +1,7 @@
 import {
+  FormBuilder,
   FormGroup,
   Validators,
-  FormBuilder,
 } from '@angular/forms';
 import * as moment from 'moment';
 
@@ -40,6 +40,7 @@ export class DeathDetails {
   public IsActive: boolean = true;
 
   public ShortName: string = null;
+  public PatientCode: string = null;
 
 
 

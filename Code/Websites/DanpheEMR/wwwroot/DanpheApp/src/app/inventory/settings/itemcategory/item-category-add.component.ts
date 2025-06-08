@@ -1,13 +1,13 @@
 ﻿
-import { Component, Input, Output, EventEmitter, ChangeDetectorRef } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output } from "@angular/core";
 
-import { ItemCategoryModel } from '../shared/item-category.model';
 import { InventorySettingBLService } from "../shared/inventory-settings.bl.service";
+import { ItemCategoryModel } from '../shared/item-category.model';
 
 import { SecurityService } from '../../../security/shared/security.service';
 //Parse, validate, manipulate, and display dates and times in JS.
-import * as moment from 'moment/moment';
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 
 
 @Component({
@@ -19,6 +19,8 @@ export class ItemCategoryAddComponent {
     public showAddPage: boolean = false;
     @Input("selectedItemCategory")
     public selectedItemCategory: ItemCategoryModel;
+    @Input("itemcategoryList")
+    public ItemCategoryList = new Array<ItemCategoryModel>();
     @Output("callback-add")
     callbackAdd: EventEmitter<Object> = new EventEmitter<Object>();
     public update: boolean = false;
@@ -27,12 +29,12 @@ export class ItemCategoryAddComponent {
     public CurrentItemCategory: ItemCategoryModel;
     public completeitemcategorylist: Array<ItemCategoryModel> = new Array<ItemCategoryModel>();
     public itemcategorylist: Array<ItemCategoryModel> = new Array<ItemCategoryModel>();
-    
+
     constructor(
         public invSettingBL: InventorySettingBLService,
         public securityService: SecurityService,
         public changeDetector: ChangeDetectorRef, public msgBoxServ: MessageboxService) {
-            }
+    }
     @Input("showAddPage")
     public set value(val: boolean) {
         this.showAddPage = val;
@@ -48,7 +50,7 @@ export class ItemCategoryAddComponent {
             this.update = false;
         }
     }
-    
+
     //adding new department
     AddItemCategory() {
         //for checking validations, marking all the fields as dirty and checking the validity.
@@ -56,20 +58,29 @@ export class ItemCategoryAddComponent {
             this.CurrentItemCategory.ItemCategoryValidator.controls[i].markAsDirty();
             this.CurrentItemCategory.ItemCategoryValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.ItemCategoryList && this.ItemCategoryList.length) {
+            const isItemCategoryNameAlreadyExists = this.ItemCategoryList.some(a => a.ItemCategoryName.toLowerCase() === this.CurrentItemCategory.ItemCategoryName.toLowerCase());
+            if (isItemCategoryNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Add ItemCategory as the ItemCategory Name "${this.CurrentItemCategory.ItemCategoryName}" already exists.`]);
+                return;
+            }
+        }
+
         if (this.CurrentItemCategory.IsValidCheck(undefined, undefined)) {
             this.loading = true;
             this.invSettingBL.AddItemCategory(this.CurrentItemCategory)
                 .subscribe(
-                res => {
-                    this.showMessageBox("success", "ItemCategory Added");
-                    this.CurrentItemCategory = new ItemCategoryModel();
-                    this.CallBackAddItemCategory(res)
-                    this.loading = false;
-                },
-                err => {
-                    this.logError(err);
-                    this.loading = false;
-                });
+                    res => {
+                        this.showMessageBox("success", "ItemCategory Added");
+                        this.CurrentItemCategory = new ItemCategoryModel();
+                        this.CallBackAddItemCategory(res)
+                        this.loading = false;
+                    },
+                    err => {
+                        this.logError(err);
+                        this.loading = false;
+                    });
         }
     }
     //adding new department
@@ -79,20 +90,29 @@ export class ItemCategoryAddComponent {
             this.CurrentItemCategory.ItemCategoryValidator.controls[i].markAsDirty();
             this.CurrentItemCategory.ItemCategoryValidator.controls[i].updateValueAndValidity();
         }
+
+        if (this.ItemCategoryList && this.ItemCategoryList.length) {
+            const isItemCategoryNameAlreadyExists = this.ItemCategoryList.some(a => a.ItemCategoryName.toLowerCase() === this.CurrentItemCategory.ItemCategoryName.toLowerCase() && a.ItemCategoryId !== this.CurrentItemCategory.ItemCategoryId);
+            if (isItemCategoryNameAlreadyExists) {
+                this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot Update ItemCategory as the ItemCategory Name "${this.CurrentItemCategory.ItemCategoryName}" already exists.`]);
+                return;
+            }
+        }
+
         if (this.CurrentItemCategory.IsValidCheck(undefined, undefined)) {
             this.loading = true;
             this.invSettingBL.UpdateItemCategory(this.CurrentItemCategory)
                 .subscribe(
-                res => {
-                    this.showMessageBox("success", "ItemCategory List Updated");
-                    this.CurrentItemCategory = new ItemCategoryModel();
-                    this.CallBackAddItemCategory(res)
-                    this.loading = false;
-                },
-                err => {
-                    this.logError(err);
-                    this.loading = false;
-                });
+                    res => {
+                        this.showMessageBox("success", "ItemCategory List Updated");
+                        this.CurrentItemCategory = new ItemCategoryModel();
+                        this.CallBackAddItemCategory(res)
+                        this.loading = false;
+                    },
+                    err => {
+                        this.logError(err);
+                        this.loading = false;
+                    });
         }
     }
 

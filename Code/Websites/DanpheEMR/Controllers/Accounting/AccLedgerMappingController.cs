@@ -99,12 +99,16 @@ namespace DanpheEMR.Controllers
 
         private object GetBillingItemLedgers(int currentHospitalId)
         {
-            List<SqlParameter> paramList = new List<SqlParameter>() { };
+            List<SqlParameter> paramList = new List<SqlParameter>() {
+        new SqlParameter("@HospitalId", currentHospitalId),
+    };
+
             DataSet mappingDetail = DALFunctions.GetDatasetFromStoredProc("SP_ACC_GetIncomeLedgerMappingDetail", paramList, _accountingDbContext);
             DataTable mapTable = mappingDetail.Tables[0];
             var IncomeLedgerMapping = AccBillingLedgerMapping_DTO.MapDataTableToSingleObject(mapTable);
             return IncomeLedgerMapping;
         }
+
 
         private object MapBillingIncomeLedger(int HospitalId, AccBillingLedgerMapping_DTO accBillingLedgerMapping)
         {

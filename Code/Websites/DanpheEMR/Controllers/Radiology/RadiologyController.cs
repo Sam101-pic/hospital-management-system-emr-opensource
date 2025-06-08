@@ -22,6 +22,14 @@ using DanpheEMR.Enums;
 using System.Transactions;
 using System.Data.SqlClient;
 using System.Data;
+using DanpheEMR.Services.Shared.DTOs;
+using DanpheEMR.ServerModel.RadiologyModels;
+using Newtonsoft.Json.Linq;
+using DanpheEMR.Services.Emergency.DTOs;
+using Serilog;
+using Microsoft.EntityFrameworkCore.Storage;
+using System.Web.UI.WebControls.WebParts;
+using DocumentFormat.OpenXml.Drawing.Spreadsheet;
 
 namespace DanpheEMR.Controllers
 {
@@ -32,6 +40,8 @@ namespace DanpheEMR.Controllers
         private readonly DicomDbContext _dicomDbContext;
         private readonly CoreDbContext _coreDBContext;
         private readonly MasterDbContext _masterDBContext;
+        private readonly PatientDbContext _patientDbContext;
+
 
         public RadiologyController(IOptions<MyConfiguration> _config, IEmailService emailService) : base(_config)
         {
@@ -40,6 +50,8 @@ namespace DanpheEMR.Controllers
             _dicomDbContext = new DicomDbContext(connString);
             _coreDBContext = new CoreDbContext(connString);
             _masterDBContext = new MasterDbContext(connString);
+            _patientDbContext = new PatientDbContext(connString);
+
         }
 
         #region Get APIs
@@ -60,6 +72,15 @@ namespace DanpheEMR.Controllers
         {
             //if (reqType == "getRequisitionsList")
             Func<object> func = () => RequisitionsList(reqOrderStatus, reportOrderStatus, typeList, fromDate, toDate);
+            return InvokeHttpGetFunction(func);
+        }
+
+        [HttpGet]
+        [Route("PendingReportsandRequisition")]
+        public IActionResult GetPendingReportsandRequisition(string reqOrderStatus, string reportOrderStatus, string typeList, DateTime? fromDate, DateTime? toDate)
+        {
+            //if (reqType == "getRequisitionsList")
+            Func<object> func = () => PendingReportsandRequisition(reqOrderStatus, reportOrderStatus, typeList, fromDate, toDate);
             return InvokeHttpGetFunction(func);
         }
 
@@ -119,9 +140,9 @@ namespace DanpheEMR.Controllers
         public IActionResult ImagingItems()
         {
             //if (reqType == "allImagingItems")
-                Func<object> func = () => (from app in _radiologyDbContext.ImagingItems
-                                           select app).ToList();
-                return InvokeHttpGetFunction(func);
+            Func<object> func = () => (from app in _radiologyDbContext.ImagingItems
+                                       select app).ToList();
+            return InvokeHttpGetFunction(func);
         }
 
         [HttpGet]
@@ -158,8 +179,8 @@ namespace DanpheEMR.Controllers
         {
             //if (reqType == "all-report-templates")
             Func<object> func = () => (from rep in _radiologyDbContext.RadiologyReportTemplate
-                                                                 where rep.IsActive == true && rep.ModuleName == "Radiology"
-                                                                 select rep).ToList();
+                                       where rep.IsActive == true && rep.ModuleName == "Radiology"
+                                       select rep).ToList();
             return InvokeHttpGetFunction(func);
         }
 
@@ -169,8 +190,8 @@ namespace DanpheEMR.Controllers
         {
             //if (reqType == "dicomImageLoaderUrl")
             Func<object> func = () => (from parameter in _coreDBContext.Parameters
-                                     where parameter.ParameterName == "DicomImageLoaderUrl"
-                                     select parameter.ParameterValue
+                                       where parameter.ParameterName == "DicomImageLoaderUrl"
+                                       select parameter.ParameterValue
                                  ).SingleOrDefault();
             return InvokeHttpGetFunction(func);
         }
@@ -202,6 +223,24 @@ namespace DanpheEMR.Controllers
             return InvokeHttpGetFunction(func);
         }
 
+        [HttpGet]
+        [Route("patientFileDetail")]
+        public IActionResult GetPatientFileDetail([FromQuery] string patientDetail)
+        {
+            try
+            {
+                var patientDetailObject = JsonConvert.DeserializeObject<FileUpload_DTO>(patientDetail);
+
+                Func<object> func = () => GetPatientFileDetails(patientDetailObject);
+                return InvokeHttpGetFunction(func);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+
         #endregion
 
         #region Post APIs
@@ -216,7 +255,7 @@ namespace DanpheEMR.Controllers
             Func<object> func = () => AddRequisitions(ipDataStr, currentUser);
             return InvokeHttpPostFunction(func);
         }
-        
+
         [HttpPost]
         [Route("Report")]
         public IActionResult Report()
@@ -225,6 +264,324 @@ namespace DanpheEMR.Controllers
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             Func<object> Func = () => PostReport(currentUser);
             return InvokeHttpPostFunction(Func);
+        }
+        [HttpPost]
+        [Route("UploadFile")]
+        public IActionResult UploadRadiologyFile()
+        {
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+            try
+            {
+                RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+                var files = this.ReadFiles();
+                var patientReportDetail = Request.Form["patientReportDetail"];
+                var fileToUpload = Request.Form["fileToUpload"];
+                var fileData = Request.Form.Files["file"];
+                var enableProviderEditInBillTxnItem = Convert.ToBoolean(Request.Form["enableProviderEditInBillTxnItem"]);
+                PatientFilesModel patFileData = DanpheJSONConvert.DeserializeObject<PatientFilesModel>(fileToUpload);
+                var patientDetailsList = DanpheJSONConvert.DeserializeObject<List<FileUpload_DTO>>(patientReportDetail);
+                dynamic fileToUploadObject = DanpheJSONConvert.DeserializeObject<dynamic>(fileToUpload);
+                int patientId = patientDetailsList.FirstOrDefault()?.PatientId ?? 0;
+
+                if (fileToUploadObject.Remarks != null)
+                {
+                    patFileData.Description = fileToUploadObject.Remarks;
+                }
+
+                using (var transactionScope = new TransactionScope())
+                {
+                    try
+                    {
+                        foreach (var file in files)
+                        {
+                            if (file.Length > 0)
+                            {
+                                using (var ms = new MemoryStream())
+                                {
+                                    string currentFileExtention = Path.GetExtension(file.FileName);
+                                    file.CopyTo(ms);
+                                    var fileBytes = ms.ToArray();
+
+                                    PatientFilesModel data = UploadPatientFiles(_patientDbContext, patFileData, files);
+                                    var tempModel = new PatientFilesModel
+                                    {
+                                        PatientId = patientId,
+                                        ROWGUID = Guid.NewGuid(),
+                                        FileType = "Radiology",
+                                        UploadedBy = currentUser.EmployeeId,
+                                        UploadedOn = DateTime.Now,
+                                        Description = patFileData.Description,
+                                        FileName = data.FileName,
+                                        IsActive = data.IsActive,
+                                        Title = patFileData.Title,
+                                        FileExtention = currentFileExtention
+                                    };
+                                    _radiologyDbContext.PatientFiles.Add(tempModel);
+                                    _radiologyDbContext.SaveChanges();
+
+                                    // Get ImagingRequisitionIds from patientDetailsList
+                                    var RequisitionIds = patientDetailsList
+                                        .Select(a => a.ImagingRequisitionId)
+                                        .Where(id => id != 0)
+                                        .Distinct()
+                                        .ToList();
+
+                                    // Fetch ImagingRequisition details
+                                    var RequisitionDetails = _radiologyDbContext.ImagingRequisitions
+                                        .Where(r => RequisitionIds.Contains(r.ImagingRequisitionId))
+                                        .ToList();
+                                    var ReportIds = patientDetailsList.Select(a => a.ImagingReportId).ToList();
+                                    var ImagingReport = _radiologyDbContext.ImagingReports
+                                        .Where(r => ReportIds.Contains(r.ImagingReportId) && r.ImagingReportId != 0)
+                                        .ToList();
+
+                                    foreach (var detail in patientDetailsList)
+                                    {
+                                        ImagingReportModel rep;
+
+                                        if (detail.ImagingReportId == 0)
+                                        {
+                                            var requisitionDetail = RequisitionDetails
+                                            .FirstOrDefault(r => r.ImagingRequisitionId == detail.ImagingRequisitionId);
+                                            // Add new record in imaging trport table
+                                            rep = new ImagingReportModel
+                                            {
+                                                CreatedOn = DateTime.Now,
+                                                CreatedBy = currentUser.EmployeeId,
+                                                PatientId = detail.PatientId,
+                                                PatientFileId = tempModel.PatientFileId,
+                                                ImagingItemName = detail.ImagingItemName,
+                                                ImagingRequisitionId = detail.ImagingRequisitionId,
+                                                OrderStatus = "pending",
+                                                ImagingTypeName = requisitionDetail?.ImagingTypeName,
+                                                PrescriberName = requisitionDetail?.PrescriberName,
+                                                PrescriberId = requisitionDetail?.PrescriberId,
+                                                ImagingTypeId = requisitionDetail?.ImagingTypeId,
+                                                ImagingItemId = requisitionDetail?.ImagingItemId,
+                                                PerformerName = fileToUploadObject.ReportingDoctor.EmployeeName,
+                                                PerformerId = fileToUploadObject.ReportingDoctor.EmployeeId,
+                                            };
+                                            _radiologyDbContext.ImagingReports.Add(rep);
+                                            _radiologyDbContext.SaveChanges();
+                                        }
+                                        else
+                                        {
+                                            rep = ImagingReport.FirstOrDefault(r => r.ImagingReportId == detail.ImagingReportId);
+
+                                            if (rep != null)
+                                            {
+                                                rep.ModifiedOn = DateTime.Now;
+                                                rep.ModifiedBy = currentUser.EmployeeId;
+                                                rep.PerformerName = fileToUploadObject.ReportingDoctor.EmployeeName;
+                                                rep.PerformerId = fileToUploadObject.ReportingDoctor.EmployeeId;
+                                                rep.PatientFileId = tempModel.PatientFileId;
+                                            }
+                                        }
+
+                                        try
+                                        {
+                                            UpdateRequisitionAndRelatedEntities(rep, rep.OrderStatus, enableProviderEditInBillTxnItem, _radiologyDbContext);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            // Handle or log exception for UpdateRequisitionAndRelatedEntities
+                                            throw new Exception("Error updating requisition and related entities.", ex);
+                                        }
+
+                                        _radiologyDbContext.SaveChanges();
+                                    }
+                                }
+                            }
+                        }
+                        transactionScope.Complete();
+                        responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+                        responseData.Results = true;
+                        return Ok(responseData);
+                    }
+                    catch (Exception ex)
+                    {
+                        transactionScope.Dispose();
+                        responseData.Status = "Failed";
+                        responseData.ErrorMessage = "Transaction failed: " + ex.Message;
+                        return BadRequest(responseData);
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                responseData.Status = "Failed";
+                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
+                return BadRequest(responseData);
+            }
+        }
+
+
+        [HttpPut]
+        [Route("UploadFile")]
+        public IActionResult UpdateRadiologyFile()
+        {
+            DanpheHTTPResponse<object> responseData = new DanpheHTTPResponse<object>();
+            try
+            {
+                RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+                var files = this.ReadFiles();
+                var patientReportDetail = Request.Form["patientReportDetail"];
+                var fileToUpload = Request.Form["fileToUpload"];
+                // Deserialize input data
+                PatientFilesModel patFileData = DanpheJSONConvert.DeserializeObject<PatientFilesModel>(fileToUpload);
+                var patientDetailsList = DanpheJSONConvert.DeserializeObject<List<FileUpload_DTO>>(patientReportDetail);
+                dynamic fileToUploadObject = DanpheJSONConvert.DeserializeObject<dynamic>(fileToUpload);
+                int patientId = patientDetailsList.FirstOrDefault()?.PatientId ?? 0;
+                int patientFileId = patientDetailsList.FirstOrDefault()?.PatientFileId ?? 0;
+
+                if (fileToUploadObject.Remarks != null)
+                {
+                    patFileData.Description = fileToUploadObject.Remarks;
+                }
+                PatientFilesModel data = null;
+                string currentFileExtension = null;
+
+                using (var dbContextTransaction = _radiologyDbContext.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        foreach (var file in files)
+                        {
+                            if (file.Length > 0)
+                            {
+                                using (var ms = new MemoryStream())
+                                {
+                                    currentFileExtension = Path.GetExtension(file.FileName);
+                                    file.CopyTo(ms);
+                                    var fileBytes = ms.ToArray();
+                                    data = UploadPatientFiles(_patientDbContext, patFileData, files);
+                                }
+                            }
+                        }
+                        foreach (var pat in patientDetailsList)
+                        {
+                            var imagingReportId = pat.ImagingReportId;
+                            var existingReport = _radiologyDbContext.ImagingReports
+                                .FirstOrDefault(r => r.ImagingReportId == imagingReportId);
+                            if (existingReport != null)
+                            {
+                                // Update existing report details
+                                existingReport.ModifiedOn = DateTime.Now;
+                                existingReport.ModifiedBy = currentUser.EmployeeId;
+                                existingReport.PerformerName = fileToUploadObject.ReportingDoctor.EmployeeName;
+                                existingReport.PerformerId = fileToUploadObject.ReportingDoctor.EmployeeId;
+                                existingReport.OrderStatus = pat.OrderStatus;
+
+                                // Check if the existing report is linked to a file; if so, update the file
+                                var existingFile = (from f in _radiologyDbContext.PatientFiles
+                                                    where f.PatientFileId == patientFileId
+                                                       && f.PatientId == patientId
+                                                    select f).FirstOrDefault();
+
+                                if (existingFile != null)
+                                {
+                                    //string newFileName = Path.GetFileNameWithoutExtension(patFileData.FileName) + "_" + DateTime.Now.Ticks + Path.GetExtension(existingFile.FileName);
+                                    //using (var ms = new MemoryStream())
+                                    //{
+                                    //    var parm = _radiologyDbContext.CfgParameters.Where(a => a.ParameterGroupName == "Patient" && a.ParameterName == "PatientFileLocationPath").FirstOrDefault();
+                                    //    currentFileExtension = Path.GetExtension(existingFile.FileName);
+                                    //    var fileBytes = ms.ToArray();
+                                    //    string strPath = parm.ParameterValue + "/" + newFileName;
+                                    //    System.IO.File.WriteAllBytes(strPath, fileBytes);
+                                    //}
+
+                                    if (data != null)
+                                    {
+                                        existingFile.FileName = data.FileName;
+                                        existingFile.FileType = data.FileType;
+                                        existingFile.Description = data.Description;
+                                        existingFile.ROWGUID = data.ROWGUID;
+                                        existingFile.FileExtention = data.FileExtention;
+                                        existingFile.UploadedBy = data.UploadedBy;
+                                        existingFile.IsActive = data.IsActive;
+                                    }
+                                    else
+                                    {
+                                        existingFile.Description = patFileData.Description;
+                                    }
+
+                                }
+                                _radiologyDbContext.SaveChanges();
+                            }
+                        }
+                        dbContextTransaction.Commit();
+                        responseData.Status = ENUM_Danphe_HTTP_ResponseStatus.OK;
+                        responseData.Results = true;
+                        return Ok(responseData);
+                    }
+                    catch (Exception ex)
+                    {
+                        dbContextTransaction.Rollback();
+                        throw ex;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                responseData.Status = "Failed";
+                responseData.ErrorMessage = ex.Message + " exception details:" + ex.ToString();
+                return BadRequest(responseData);
+            }
+        }
+
+        private PatientFilesModel UploadPatientFiles(PatientDbContext patDbContext, PatientFilesModel patFileUploadData, IFormFileCollection files)
+        {
+
+            var parm = patDbContext.CFGParameters.Where(a => a.ParameterGroupName == "Patient" && a.ParameterName == "PatientFileLocationPath").FirstOrDefault();
+            var currentTick = System.DateTime.Now.Ticks.ToString();
+
+            if (parm == null)
+            {
+                throw new Exception("Please set parameter");
+            }
+            using (var scope = new TransactionScope())
+            {
+                try
+                {
+                    if (files.Any())
+                    {
+                        foreach (var file in files)
+                        {
+                            using (var ms = new MemoryStream())
+                            {
+                                string currentFileExtention = Path.GetExtension(file.FileName);
+                                file.CopyTo(ms);
+                                var fileBytes = ms.ToArray();
+                                Random generator = new Random();
+                                String randomeNumber = generator.Next(1, 1000000).ToString("D6");
+                                patFileUploadData.FileName = patFileUploadData.PatientCode + '_' + randomeNumber + '_' + file.FileName;
+                                patFileUploadData.IsActive = true;
+                                patFileUploadData.ROWGUID = Guid.NewGuid();
+
+                                string strPath = parm.ParameterValue + "/" + patFileUploadData.FileName;
+
+                                if (!Directory.Exists(parm.ParameterValue))
+                                {
+                                    Directory.CreateDirectory(parm.ParameterValue);
+                                }
+                                System.IO.File.WriteAllBytes(strPath, fileBytes);
+                            }
+                        }
+                        scope.Complete();
+                        return patFileUploadData;
+                    }
+                    else
+                    {
+                        throw new Exception("File not selected");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    scope.Dispose();
+                    throw ex;
+                }
+            }
         }
 
         [HttpPost]
@@ -291,7 +648,7 @@ namespace DanpheEMR.Controllers
             //if (reqType == "updatePatientStudy")
             string ipDataStr = this.ReadPostData();
             Func<object> func = () => UpdatePatientStudy(ipDataStr);
-            return InvokeHttpPutFunction(func);  
+            return InvokeHttpPutFunction(func);
         }
 
         [HttpPut]
@@ -314,6 +671,13 @@ namespace DanpheEMR.Controllers
             Func<object> func = () => UpdateDoctor(ipDataStr, prescriberId, prescriberName);
             return InvokeHttpPutFunction(func);
         }
+        [HttpPut]
+        [Route("Referrer")]
+        public IActionResult Referrer(int referredById, string referredByName, int requisitionId)
+        {
+            Func<object> func = () => UpdateReferrer(requisitionId, referredById, referredByName);
+            return InvokeHttpPutFunction(func);
+        }
 
         [HttpPut]
         [Route("PatientScanDone")]
@@ -324,6 +688,44 @@ namespace DanpheEMR.Controllers
             RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
             Func<object> func = () => UpdatePatientScanData(ipDataStr, currentUser);
             return InvokeHttpPutFunction(func);
+        }
+
+        [HttpPut]
+        [Route("PrintCount")]
+        public IActionResult PutPrintCount([FromQuery] int requisitionId)
+        {
+            RbacUser currentUser = HttpContext.Session.Get<RbacUser>(ENUM_SessionVariables.CurrentUser);
+            Func<object> func = () => UpdatePrintCount(requisitionId, currentUser);
+            return InvokeHttpPutFunction(func);
+        }
+
+        private object UpdatePrintCount(int requisitionId, RbacUser currentUser)
+        {
+            using (var radiologyTransactionScope = new TransactionScope())
+            {
+                try
+                {
+                    ImagingReportModel imagingRequest = (from req in _radiologyDbContext.ImagingReports
+                                                         where req.ImagingRequisitionId == requisitionId
+                                                         select req).FirstOrDefault();
+
+                    imagingRequest.PrintCount = imagingRequest.PrintCount + 1;
+                    imagingRequest.ModifiedBy = currentUser.EmployeeId;
+                    imagingRequest.ModifiedOn = DateTime.Now;
+
+                    _radiologyDbContext.Entry(imagingRequest).Property(ent => ent.PrintCount).IsModified = true;
+                    _radiologyDbContext.Entry(imagingRequest).Property(ent => ent.ModifiedBy).IsModified = true;
+                    _radiologyDbContext.Entry(imagingRequest).Property(ent => ent.ModifiedOn).IsModified = true;
+                    _radiologyDbContext.SaveChanges();
+                    radiologyTransactionScope.Complete();
+                    return imagingRequest;
+                }
+                catch (Exception ex)
+                {
+                    radiologyTransactionScope.Dispose();
+                    throw new Exception(ex.InnerException.Message);
+                }
+            }
         }
 
         #endregion
@@ -341,6 +743,7 @@ namespace DanpheEMR.Controllers
             bool IsShowButton = radSettings["RAD_AttachFileButtonShowHide"];
 
             List<int> imgValidTypeList = DanpheJSONConvert.DeserializeObject<List<int>>(typeList);
+
 
             var dbReports =
                 (from i in _radiologyDbContext.ImagingReports
@@ -367,6 +770,8 @@ namespace DanpheEMR.Controllers
                      PrescriberName = ((i.PrescriberName != null) && i.PrescriberName.Length > 0) ? i.PrescriberName : "self",
                      PerformerId = i.PerformerId,
                      PerformerName = i.PerformerName,
+                     ReferredById = i.ReferredById,
+                     ReferredByName = i.ReferredByName,
                      ImagingTypeId = i.ImagingTypeId,
                      ImagingTypeName = i.ImagingTypeName,
                      ImagingItemId = i.ImagingItemId,
@@ -380,6 +785,7 @@ namespace DanpheEMR.Controllers
                      Indication = i.Indication,
                      RadiologyNo = i.RadiologyNo,
                      Signatories = i.Signatories,
+                     PatientFileId = i.PatientFileId,
                      IsScanned = true,
                      ScannedBy = requisition.ScannedBy,
                      ScannedOn = requisition.ScannedOn,
@@ -388,6 +794,7 @@ namespace DanpheEMR.Controllers
                      HasInsurance = requisition.HasInsurance,
                      IsShowButton = IsShowButton,
                      IsReportSaved = requisition.IsReportSaved,
+                     PatientFile = i.PatientFileId,
                      Patient = new
                      {
                          Age = i.Patient.Age,
@@ -413,7 +820,7 @@ namespace DanpheEMR.Controllers
                               && (req.BillingStatus.ToLower() == "paid" || req.BillingStatus.ToLower() == "unpaid" || req.BillingStatus.ToLower() == "provisional")
                                   && (DbFunctions.TruncateTime(req.CreatedOn) >= fromDate && DbFunctions.TruncateTime(req.CreatedOn) <= toDate)
                                   && imgValidTypeList.Contains(req.ImagingTypeId.Value)
-                                  && (req.IsReportSaved != true)
+                                  && (req.IsReportSaved != true) && req.IsActive == true
                               join mun in _radiologyDbContext.Muncipality
                               on req.Patient.MunicipalityId equals mun.MunicipalityId into g
                               from municipality in g.DefaultIfEmpty()
@@ -428,6 +835,7 @@ namespace DanpheEMR.Controllers
                                   PrescriberName = ((req.PrescriberName != null) && req.PrescriberName.Length > 0) ? req.PrescriberName : "self",
                                   PerformerId = billItem.PerformerId,
                                   PerformerName = billItem.PerformerName,
+                                  ReferredById = billItem.ReferredById,
                                   ImagingTypeId = req.ImagingTypeId,
                                   ImagingTypeName = req.ImagingTypeName,
                                   ImagingItemId = req.ImagingItemId,
@@ -492,6 +900,7 @@ namespace DanpheEMR.Controllers
                         CreatedOn = imgReq.ImagingDate,
                         PrescriberId = imgReq.PrescriberId,
                         PerformerId = imgReq.PerformerId,
+                        ReferredById = imgReq.ReferredById,
                         PerformerName = imgReq.PerformerName,
                         WardName = imgReq.WardName,
                         IsActive = imgReq.IsActive,
@@ -500,6 +909,7 @@ namespace DanpheEMR.Controllers
                         ScannedBy = imgReq.ScannedBy,
                         ScannedOn = imgReq.ScannedOn,
                         IsShowButton = imgReq.IsShowButton,
+
                         Patient = new
                         {
                             Age = imgReq.Patient.Age,
@@ -522,6 +932,221 @@ namespace DanpheEMR.Controllers
             }
             return imgReportList;
         }
+        private object PendingReportsandRequisition(string reqOrderStatus, string reportOrderStatus, string typeList, DateTime? fromDate, DateTime? toDate)
+        {
+            List<object> imgReportList = new List<object>();
+            Dictionary<string, bool> radSettings = _coreDBContext.Parameters.Where(p => p.ParameterGroupName.ToLower() == "radiology"
+                                         && (p.ParameterName == "EnableRadScan" || p.ParameterName == "RadHoldIPBillBeforeScan"
+                                         || p.ParameterName == "RAD_AttachFileButtonShowHide"))
+                                        .ToDictionary(k => k.ParameterName, d => ((d.ParameterValue == "1" || d.ParameterValue == "true") ? true : false));
+
+            bool EnableRadScan = radSettings["EnableRadScan"];
+            bool RadHoldIPBillBeforeScan = radSettings["RadHoldIPBillBeforeScan"];
+            bool IsShowButton = radSettings["RAD_AttachFileButtonShowHide"];
+
+            List<int> imgValidTypeList = DanpheJSONConvert.DeserializeObject<List<int>>(typeList);
+
+
+            var dbReports =
+                (from i in _radiologyDbContext.ImagingReports
+                 join requisition in _radiologyDbContext.ImagingRequisitions on i.ImagingRequisitionId equals requisition.ImagingRequisitionId
+                 where i.OrderStatus == reportOrderStatus && (requisition.BillingStatus.ToLower() == "paid"
+                 || requisition.BillingStatus.ToLower() == "unpaid"
+                 || requisition.BillingStatus.ToLower() == "provisional")
+                  && (DbFunctions.TruncateTime(requisition.ScannedOn) >= DbFunctions.TruncateTime(fromDate) && DbFunctions.TruncateTime(requisition.ScannedOn) <= DbFunctions.TruncateTime(toDate))
+                 && imgValidTypeList.Contains(requisition.ImagingTypeId.Value)
+                 join pat in _radiologyDbContext.Patients
+                 on i.PatientId equals pat.PatientId
+                 join country in _radiologyDbContext.Countries
+                 on pat.CountryId equals country.CountryId
+                 join con in _radiologyDbContext.CountrySubDivision
+                on pat.CountrySubDivisionId equals con.CountrySubDivisionId into h
+                 from CountrySubDivision in h.DefaultIfEmpty()
+                 join mun in _radiologyDbContext.Muncipality
+                 on pat.MunicipalityId equals mun.MunicipalityId into g
+                 from municipality in g.DefaultIfEmpty()
+                 select new
+                 {
+                     ImagingReportId = i.ImagingReportId,
+                     ImagingRequisitionId = i.ImagingRequisitionId,
+                     PatientVisitId = i.PatientVisitId,
+                     PatientId = i.PatientId,
+                     PrescriberName = ((i.PrescriberName != null) && i.PrescriberName.Length > 0) ? i.PrescriberName : "self",
+                     PerformerId = i.PerformerId,
+                     PerformerName = i.PerformerName,
+                     ReferredById = i.ReferredById,
+                     ReferredByName = i.ReferredByName,
+                     ImagingTypeId = i.ImagingTypeId,
+                     ImagingTypeName = i.ImagingTypeName,
+                     ImagingItemId = i.ImagingItemId,
+                     ImagingItemName = i.ImagingItemName,
+                     ImageFullPath = i.ImageFullPath,
+                     PrescriberId = i.PrescriberId,
+                     ProviderId = i.PrescriberId,
+                     CreatedOn = i.CreatedOn,
+                     OrderStatus = i.OrderStatus,
+                     PatientStudyId = i.PatientStudyId,
+                     Indication = i.Indication,
+                     RadiologyNo = i.RadiologyNo,
+                     Signatories = i.Signatories,
+                     PatientFileId = i.PatientFileId,
+                     IsScanned = true,
+                     ScannedBy = requisition.ScannedBy,
+                     ScannedOn = requisition.ScannedOn,
+                     WardName = requisition.WardName,
+                     IsActive = requisition.IsActive,
+                     HasInsurance = requisition.HasInsurance,
+                     IsShowButton = IsShowButton,
+                     IsReportSaved = requisition.IsReportSaved,
+                     PatientFile = i.PatientFileId,
+                     ReportTemplateIdsCSV = i.ReportTemplateIdsCSV,
+                     Patient = new
+                     {
+                         Age = i.Patient.Age,
+                         DateOfBirth = i.Patient.DateOfBirth,
+                         Gender = i.Patient.Gender,
+                         FirstName = i.Patient.FirstName,
+                         MiddleName = i.Patient.MiddleName,
+                         LastName = i.Patient.LastName,
+                         ShortName = i.Patient.ShortName,
+                         PatientCode = i.Patient.PatientCode,
+                         PatientId = i.Patient.PatientId,
+                         PhoneNumber = i.Patient.PhoneNumber,
+                         Address = i.Patient.Address,
+                         MunicipalityName = municipality.MunicipalityName,
+                         CountrySubDivisionName = CountrySubDivision.CountrySubDivisionName,
+                         CountryName = country.CountryName,
+                         WardNumber = i.Patient.WardNumber
+                     }
+                 }).OrderByDescending(r => r.ScannedOn).ToList();
+
+            var imgReqList = (from req in _radiologyDbContext.ImagingRequisitions.Include("Patient")
+                              join billItem in _radiologyDbContext.BillingTransactionItems on req.BillingTransactionItemId equals billItem.BillingTransactionItemId
+                              join serDept in _radiologyDbContext.ServiceSepartments on billItem.ServiceDepartmentId equals serDept.ServiceDepartmentId
+                              where serDept.IntegrationName == "Radiology" && (EnableRadScan ? (req.OrderStatus == reqOrderStatus || req.OrderStatus == reportOrderStatus) : req.OrderStatus == reqOrderStatus)
+                              && (req.BillingStatus.ToLower() == "paid" || req.BillingStatus.ToLower() == "unpaid" || req.BillingStatus.ToLower() == "provisional")
+                              && (DbFunctions.TruncateTime(req.ScannedOn) >= DbFunctions.TruncateTime(fromDate) && DbFunctions.TruncateTime(req.ScannedOn) <= DbFunctions.TruncateTime(toDate))
+                              && imgValidTypeList.Contains(req.ImagingTypeId.Value)
+                              && (req.IsReportSaved != true)
+                              join country in _radiologyDbContext.Countries
+                              on req.Patient.CountryId equals country.CountryId
+                              join mun in _radiologyDbContext.Muncipality
+                              on req.Patient.MunicipalityId equals mun.MunicipalityId into g
+                              from municipality in g.DefaultIfEmpty()
+                              join con in _radiologyDbContext.CountrySubDivision
+                              on req.Patient.CountrySubDivisionId equals con.CountrySubDivisionId into h
+                              from CountrySubDivision in h.DefaultIfEmpty()
+                              select new
+                              {
+                                  ImagingRequisitionId = req.ImagingRequisitionId,
+                                  PatientVisitId = req.PatientVisitId,
+                                  PatientId = req.PatientId,
+                                  PrescriberName = ((req.PrescriberName != null) && req.PrescriberName.Length > 0) ? req.PrescriberName : "self",
+                                  PerformerId = billItem.PerformerId,
+                                  PerformerName = billItem.PerformerName,
+                                  ReferredById = billItem.ReferredById,
+                                  ImagingTypeId = req.ImagingTypeId,
+                                  ImagingTypeName = req.ImagingTypeName,
+                                  ImagingItemId = req.ImagingItemId,
+                                  ImagingItemName = req.ImagingItemName,
+                                  ProcedureCode = req.ProcedureCode,
+                                  ImagingDate = req.ImagingDate,
+                                  RequisitionRemarks = req.RequisitionRemarks,
+                                  OrderStatus = req.OrderStatus,
+                                  PrescriberId = req.PrescriberId,
+                                  BillingStatus = req.BillingStatus,
+                                  Urgency = req.Urgency,
+                                  HasInsurance = req.HasInsurance,
+                                  WardName = req.WardName,
+                                  IsActive = req.IsActive,
+                                  IsScanned = EnableRadScan ? req.IsScanned : true,
+                                  ScannedBy = req.ScannedBy,
+                                  ScannedOn = req.ScannedOn,
+                                  IsShowButton = IsShowButton,
+
+                                  Patient = new
+                                  {
+                                      Age = req.Patient.Age,
+                                      DateOfBirth = req.Patient.DateOfBirth,
+                                      Gender = req.Patient.Gender,
+                                      FirstName = req.Patient.FirstName,
+                                      MiddleName = req.Patient.MiddleName,
+                                      LastName = req.Patient.LastName,
+                                      ShortName = req.Patient.ShortName,
+                                      PatientCode = req.Patient.PatientCode,
+                                      PatientId = req.Patient.PatientId,
+                                      PhoneNumber = req.Patient.PhoneNumber,
+                                      CountryName = country.CountryName,
+                                      CountrySubDivisionName = CountrySubDivision.CountrySubDivisionName,
+                                      MunicipalityName = municipality.MunicipalityName,
+                                      WardNumber = req.Patient.WardNumber,
+                                      Address = req.Patient.Address
+                                  }
+                              }).OrderByDescending(y => y.ScannedOn).ToList();
+
+            if (dbReports.Count != 0)
+            {
+                dbReports.ForEach(report =>
+                {
+                    imgReportList.Add(report);
+                });
+            }
+            if (imgReqList.Count != 0)
+            {
+                imgReqList.ForEach(imgReq =>
+                {
+                    var imgReport = new
+                    {
+
+                        ImagingItemId = imgReq.ImagingItemId,
+                        ImagingItemName = imgReq.ImagingItemName,
+                        ImagingRequisitionId = imgReq.ImagingRequisitionId,
+                        ImagingTypeId = imgReq.ImagingTypeId,
+                        ImagingReportId = 0,
+                        ImagingTypeName = imgReq.ImagingTypeName,
+                        OrderStatus = imgReq.OrderStatus,
+                        PatientId = imgReq.PatientId,
+                        PatientVisitId = imgReq.PatientVisitId,
+                        PrescriberName = imgReq.PrescriberName,
+                        ReportingDoctorId = 0,
+                        CreatedOn = imgReq.ImagingDate,
+                        PrescriberId = imgReq.PrescriberId,
+                        PerformerId = imgReq.PerformerId,
+                        ReferredById = imgReq.ReferredById,
+                        PerformerName = imgReq.PerformerName,
+                        WardName = imgReq.WardName,
+                        IsActive = imgReq.IsActive,
+                        HasInsurance = imgReq.HasInsurance,
+                        IsScanned = imgReq.IsScanned,
+                        ScannedBy = imgReq.ScannedBy,
+                        ScannedOn = imgReq.ScannedOn,
+                        IsShowButton = imgReq.IsShowButton,
+
+                        Patient = new
+                        {
+                            Age = imgReq.Patient.Age,
+                            DateOfBirth = imgReq.Patient.DateOfBirth,
+                            Gender = imgReq.Patient.Gender,
+                            FirstName = imgReq.Patient.FirstName,
+                            MiddleName = imgReq.Patient.MiddleName,
+                            LastName = imgReq.Patient.LastName,
+                            ShortName = imgReq.Patient.ShortName,
+                            PatientCode = imgReq.Patient.PatientCode,
+                            PatientId = imgReq.Patient.PatientId,
+                            PhoneNumber = imgReq.Patient.PhoneNumber,
+                            Address = imgReq.Patient.Address,
+                            MunicipalityName = imgReq.Patient.MunicipalityName,
+                            CountrySubDivisionName = imgReq.Patient.CountrySubDivisionName,
+                            WardNumber = imgReq.Patient.WardNumber,
+                            CountryName = imgReq.Patient.CountryName
+                        }
+                    };
+                    imgReportList.Add(imgReport);
+                });
+            }
+            imgReportList.ToList<dynamic>().OrderBy(s => s.ScannedOn);
+            return imgReportList;
+        }
 
         private object AllImagingReports(string reportOrderStatus, DateTime? fromDate, DateTime? toDate, string typeList)
         {
@@ -529,6 +1154,11 @@ namespace DanpheEMR.Controllers
             List<ImagingReportViewModel> imgReportList = (from report in _radiologyDbContext.ImagingReports
                                                           join requisition in _radiologyDbContext.ImagingRequisitions on report.ImagingRequisitionId equals requisition.ImagingRequisitionId
                                                           join patient in _radiologyDbContext.Patients on report.PatientId equals patient.PatientId
+                                                          join country in _radiologyDbContext.Countries on patient.CountryId equals country.CountryId 
+                                                          join countrySudDivision in _radiologyDbContext.CountrySubDivision on patient.CountrySubDivisionId equals countrySudDivision.CountrySubDivisionId into csd
+                                                          from countrySudDivision in csd.DefaultIfEmpty() 
+                                                          join muncipality in _radiologyDbContext.Muncipality on patient.MunicipalityId equals muncipality.MunicipalityId into mun
+                                                          from muncipality in mun.DefaultIfEmpty()
                                                           where report.OrderStatus == reportOrderStatus
                                                           && (requisition.BillingStatus.ToLower() == "paid" || requisition.BillingStatus.ToLower() == "unpaid" || requisition.BillingStatus.ToLower() == "provisional")
                                                           && (DbFunctions.TruncateTime(report.CreatedOn) >= fromDate && DbFunctions.TruncateTime(report.CreatedOn) <= toDate)
@@ -542,6 +1172,7 @@ namespace DanpheEMR.Controllers
                                                               CreatedOn = report.CreatedOn,
                                                               ReportText = null,
                                                               ImageName = report.ImageName,
+                                                              PatientId = report.PatientId,
                                                               PatientName = patient.FirstName + " " + (string.IsNullOrEmpty(patient.MiddleName) ? "" : patient.MiddleName + " ") + patient.LastName,
                                                               Signatories = report.Signatories,
                                                               DateOfBirth = patient.DateOfBirth,
@@ -549,15 +1180,22 @@ namespace DanpheEMR.Controllers
                                                               PhoneNumber = patient.PhoneNumber,
                                                               PatientCode = patient.PatientCode,
                                                               Address = patient.Address,
+                                                              CountryName = country.CountryName, 
+                                                              MunicipalityName = muncipality.MunicipalityName == null ? null : muncipality.MunicipalityName, 
+                                                              CountrySubDivisionName = countrySudDivision.CountrySubDivisionName == null ? null : countrySudDivision.CountrySubDivisionName, 
                                                               PatientStudyId = report.PatientStudyId,
                                                               PrescriberName = requisition.PrescriberName,
                                                               PrescriberId = requisition.PrescriberId,
                                                               PerformerId = report.PerformerId,
                                                               PerformerName = report.PerformerName,
+                                                              ReferredById = report.ReferredById,
+                                                              ReferredByName = report.ReferredByName,
                                                               Indication = report.Indication,
                                                               RadiologyNo = report.RadiologyNo,
                                                               HasInsurance = requisition.HasInsurance,
-                                                              IsActive = requisition.IsActive
+                                                              PrintCount = report.PrintCount,
+                                                              IsActive = requisition.IsActive,
+                                                              PatientFileId = report.PatientFileId,
                                                           }).OrderByDescending(b => b.CreatedOn).ToList();
             return imgReportList;
         }
@@ -596,6 +1234,7 @@ namespace DanpheEMR.Controllers
             ImagingReportViewModel imgReport = (from report in _radiologyDbContext.ImagingReports
                                                 join patient in _radiologyDbContext.Patients on report.PatientId equals patient.PatientId
                                                 join req in _radiologyDbContext.ImagingRequisitions on report.ImagingRequisitionId equals req.ImagingRequisitionId
+                                                join country in _radiologyDbContext.Countries on patient.CountryId equals country.CountryId
                                                 join countrySudDivision in _radiologyDbContext.CountrySubDivision on patient.CountrySubDivisionId equals countrySudDivision.CountrySubDivisionId into csd
                                                 from countrySudDivision in csd.DefaultIfEmpty()
                                                 join muncipality in _radiologyDbContext.Muncipality on patient.MunicipalityId equals muncipality.MunicipalityId into mun
@@ -607,7 +1246,7 @@ namespace DanpheEMR.Controllers
                                                     ReportTemplateId = report.ReportTemplateId,
                                                     ImagingReportId = report.ImagingReportId,
                                                     ImagingRequisitionId = report.ImagingRequisitionId,
-
+                                                    ScannedOn = req.ScannedOn,
                                                     ImagingTypeName = report.ImagingTypeName,
                                                     ImagingItemName = report.ImagingItemName,
                                                     CreatedOn = report.CreatedOn,
@@ -616,8 +1255,10 @@ namespace DanpheEMR.Controllers
                                                     ImageName = report.ImageName,
                                                     PatientName = patient.FirstName + " " + (string.IsNullOrEmpty(patient.MiddleName) ? "" : patient.MiddleName + " ") + patient.LastName,
                                                     Address = patient.Address,
-                                                    Muncipality = muncipality.MunicipalityName == null ? null : muncipality.MunicipalityName,
-                                                    CountrySubDivision = countrySudDivision.CountrySubDivisionName == null ? null : countrySudDivision.CountrySubDivisionName,
+                                                    CountryName = country.CountryName,
+                                                    MunicipalityName = muncipality.MunicipalityName == null ? null : muncipality.MunicipalityName,
+                                                    CountrySubDivisionName = countrySudDivision.CountrySubDivisionName == null ? null : countrySudDivision.CountrySubDivisionName,
+                                                    WardNumber = patient.WardNumber,
                                                     PatientNameLocal = patient.PatientNameLocal,
                                                     Signatories = report.Signatories,
                                                     DateOfBirth = patient.DateOfBirth,
@@ -627,23 +1268,72 @@ namespace DanpheEMR.Controllers
                                                     PrescriberName = report.PrescriberName,
                                                     PatientStudyId = report.PatientStudyId,
                                                     PerformerId = report.PerformerId,
+                                                    ReferredByName = report.ReferredByName,
+                                                    ReferredById = report.ReferredById,
                                                     Indication = report.Indication,
+                                                    PrintCount = report.PrintCount,
                                                     RadiologyNo = report.RadiologyNo,
+                                                    ReportTemplateIdsCSV = report.ReportTemplateIdsCSV,
                                                     HasInsurance = (from req in _radiologyDbContext.ImagingRequisitions
                                                                     where req.ImagingRequisitionId == requisitionId
                                                                     select req.HasInsurance).FirstOrDefault(),
+                                                    SelectedFooterTemplateId = report.SelectedFooterTemplateId,
                                                 }).FirstOrDefault();
-            if (imgReport.ReportTemplateId != null)
-            {
-                var rptTemplate = _radiologyDbContext.RadiologyReportTemplate.Where(r => r.TemplateId == imgReport.ReportTemplateId).FirstOrDefault();
+            //if (imgReport.ReportTemplateId != null)
+            //{
+            //var rptTemplate = _radiologyDbContext.RadiologyReportTemplate.Where(r => r.TemplateId == imgReport.ReportTemplateId).FirstOrDefault();
 
-                if (rptTemplate != null)
+            //if (rptTemplate != null)
+            //{
+            //    imgReport.TemplateName = rptTemplate.TemplateName;
+            //    imgReport.FooterText = rptTemplate.FooterNote;
+            //    imgReport.SignatoryImageBase64 = base64String;
+            //}
+            //}
+            // Split the ReportTemplateIdsCSV into an array of IDs
+            if (imgReport.ReportTemplateIdsCSV != null)
+            {
+                var templateIds = imgReport.ReportTemplateIdsCSV
+                    .Split(',')
+                    .Select(id => id.Trim())
+                    .ToList();
+
+                var rptTemplates = _radiologyDbContext.RadiologyReportTemplate
+                    .Where(r => templateIds.Contains(r.TemplateId.ToString()))
+                    .ToList();
+
+                if (rptTemplates.Any())
                 {
-                    imgReport.TemplateName = rptTemplate.TemplateName;
-                    imgReport.FooterText = rptTemplate.FooterNote;
+                    var templateNames = rptTemplates.Select(t => t.TemplateName).ToList();
+                    imgReport.TemplateName = string.Join(", ", templateNames);
+                    var footerTexts = rptTemplates
+                        .Where(template => template.FooterNote != null)
+                        .Select(template => new FooterText
+                        {
+                            SelectedFooterTemplateId = template.TemplateId,
+                            Text = template.FooterNote,
+                            IsChecked = true
+                        })
+                        .ToList();
+                    imgReport.FooterTextsList = footerTexts;
                     imgReport.SignatoryImageBase64 = base64String;
                 }
             }
+            else
+            {
+                if (imgReport.ReportTemplateId != null)
+                {
+                    var rptTemplate = _radiologyDbContext.RadiologyReportTemplate.Where(r => r.TemplateId == imgReport.ReportTemplateId).FirstOrDefault();
+
+                    if (rptTemplate != null)
+                    {
+                        imgReport.TemplateName = rptTemplate.TemplateName;
+                        imgReport.FooterText = rptTemplate.FooterNote;
+                        imgReport.SignatoryImageBase64 = base64String;
+                    }
+                }
+            }
+
             return imgReport;
         }
 
@@ -652,7 +1342,8 @@ namespace DanpheEMR.Controllers
             var imgReportList = _radiologyDbContext.ImagingReports
                                         .Where(i => i.PatientVisitId == patientVisitId && i.OrderStatus == "final")
                                         .GroupBy(a => a.ImagingItemId)
-                                        .Select(b => new {
+                                        .Select(b => new
+                                        {
                                             latestUniqueImagings = b.OrderByDescending(i => i.CreatedOn).FirstOrDefault()
                                         })
                                         .Select(c => new
@@ -711,9 +1402,62 @@ namespace DanpheEMR.Controllers
                                     where rpt.ImagingReportId == id
                                     select temp).FirstOrDefault();
 
-                var tempName = reptTemplate != null ? reptTemplate.TemplateName : "Not Set";
+                string tempName = "";
+                List<FooterText> footerNotesList = new List<FooterText>();
 
-                if (report.ReportText.Length <= 0)
+                if (!string.IsNullOrEmpty(report.ReportTemplateIdsCSV))
+                {
+                    var templateIds = report.ReportTemplateIdsCSV
+                        .Split(',')
+                        .Select(tempId => tempId.Trim('\'', ' ').Trim()) 
+                        .Where(tempId => int.TryParse(tempId, out _))  
+                        .Select(int.Parse)  
+                        .ToList();
+
+                    if (templateIds.Any())
+                    {
+                        footerNotesList = _radiologyDbContext.RadiologyReportTemplate
+                            .Where(i => templateIds.Contains(i.TemplateId))  
+                            .Select(i => new FooterText
+                            {
+                                SelectedFooterTemplateId = i.TemplateId,
+                                Text = i.FooterNote
+                            })
+                            .ToList();
+                    }
+        
+                }
+
+
+                if (reptTemplate == null)
+                {
+                    if (report != null && !string.IsNullOrEmpty(report.ReportTemplateIdsCSV) && (report.ReportTemplateId == null || report.ReportTemplateId == 0))
+                    {
+                        var TemplateIds = report.ReportTemplateIdsCSV
+                                         .Split(',')                                
+                                         .Select(tempId => tempId.Trim('\'', ' ')) 
+                                         .Where(tempId => !string.IsNullOrEmpty(tempId) && int.TryParse(tempId, out _)) 
+                                         .Select(int.Parse)                        
+                                         .ToArray();                              
+
+                        var templates = _radiologyDbContext.RadiologyReportTemplate
+                                   .Where(i => TemplateIds.Contains(i.TemplateId))
+                                   .ToList();
+
+
+                        tempName = string.Join(", ", templates.Select(t => t.TemplateName));
+                    }
+                    else
+                    {
+                        tempName = "Not Set";
+                    }
+                }
+                else
+                {
+                    tempName = reptTemplate != null ? reptTemplate.TemplateName : "Not Set";
+                }
+
+                if (report.ReportText == null || report.ReportText.Length <= 0)
                 {
                     var repTemp = (from temp in _radiologyDbContext.RadiologyReportTemplate
                                    join imgItm in _radiologyDbContext.ImagingItems
@@ -734,9 +1478,11 @@ namespace DanpheEMR.Controllers
                     TemplateName = tempName,
                     ReportTemplateId = report.ReportTemplateId,
                     ReportText = report.ReportText,
+                    footerNotesList = footerNotesList,
                     ImageFullPath = report.ImageFullPath,
                     ImageName = report.ImageName,
-                    ScannedOn = scannedDate
+                    ScannedOn = scannedDate,
+                    ReportTemplateIdsCSV = report.ReportTemplateIdsCSV
                 };
                 return Results;
             }
@@ -838,97 +1584,150 @@ namespace DanpheEMR.Controllers
             var reportDetails = Request.Form["reportDetails"];
             var orderStatus = Request.Form["orderStatus"];
             var enableProviderEditInBillTxnItem = Convert.ToBoolean(Request.Form["enableProviderEditInBillTxnItem"]);
-            ImagingReportModel imgReport = DanpheJSONConvert.DeserializeObject<ImagingReportModel>(reportDetails);
+            bool UpdateAssignedToDoctorOnAddReport = bool.Parse(_radiologyDbContext.CfgParameters
+                .Where(a => a.ParameterGroupName == "Radiology" && a.ParameterName == "Rad_UpdateAssignedToDoctorOnAddReport")
+                .FirstOrDefault().ParameterValue);
 
-            using (TransactionScope trans = new TransactionScope())
+            // Deserialize the reportDetails into a list of ImagingReportModel
+            var imgReports = JsonConvert.DeserializeObject<List<ImagingReportModel>>(reportDetails);
+
+            // List to store processed reports
+            var processedReports = new List<ImagingReportModel>();
+
+            using (var trans = new TransactionScope())
             {
-                if (files.Count != 0)
+                try
                 {
-                    imgReport = UploadReportFile(imgReport, files, localFolder);
-                }
-
-                imgReport.CreatedBy = currentUser.EmployeeId;
-                imgReport.OrderStatus = orderStatus;
-                if (enableProviderEditInBillTxnItem && imgReport.PerformerIdInBilling.HasValue)
-                {
-                    imgReport.PerformerId = imgReport.PerformerIdInBilling;
-                    imgReport.PerformerName = imgReport.PerformerNameInBilling;
-                }
-                imgReport.CreatedOn = DateTime.Now;
-                _radiologyDbContext.ImagingReports.Add(imgReport);
-
-                if (imgReport.PatientStudyId != null)
-                {
-                    List<int> patStudyIdList = imgReport.PatientStudyId.Split(',').Select(int.Parse).ToList();
-                    List<PatientStudyModel> dicom = (from pp in _dicomDbContext.PatientStudies
-                                                     where patStudyIdList.Contains(pp.PatientStudyId)
-                                                     select pp).ToList();
-
-                    dicom.ForEach(pat =>
+                    if (imgReports.Count > 0)
                     {
-                        pat.IsMapped = true;
-                        _dicomDbContext.PatientStudies.Attach(pat);
-                        _dicomDbContext.Entry(pat).Property(u => u.IsMapped).IsModified = true;
-                    });
+                        imgReports.ForEach(imgReport =>
+                        {
+                            // Upload report file if any files are present
+                            if (files.Count != 0)
+                            {
+                                imgReport = UploadReportFile(imgReport, files, localFolder);
+                            }
 
-                    _dicomDbContext.SaveChanges();
-                }
-                _radiologyDbContext.SaveChanges();
+                            // Set properties on the report
+                            imgReport.CreatedBy = currentUser.EmployeeId;
+                            imgReport.OrderStatus = orderStatus;
+                            
 
-                string putRequisitionResult = PutRequisitionItemStatus(imgReport.ImagingRequisitionId, orderStatus);
+                            // Update performer details if necessary
+                            if (enableProviderEditInBillTxnItem && imgReport.PerformerIdInBilling.HasValue)
+                            {
+                                imgReport.PerformerId = imgReport.PerformerIdInBilling;
+                                imgReport.PerformerName = imgReport.PerformerNameInBilling;
+                            }
 
-                if (putRequisitionResult == "OK")
-                {
-                    ImagingReportModel returnImgReport = new ImagingReportModel();
-                    returnImgReport.ReportText = imgReport.ReportText;
-                    returnImgReport.ImagingReportId = imgReport.ImagingReportId;
-                    returnImgReport.OrderStatus = imgReport.OrderStatus;
-                    returnImgReport.Indication = imgReport.Indication;
-                    returnImgReport.RadiologyNo = imgReport.RadiologyNo;
-                    returnImgReport.ImagingRequisitionId = imgReport.ImagingRequisitionId;
-                    if (files.Count != 0)
-                    {
-                        returnImgReport.ImageFullPath = imgReport.ImageFullPath;
-                        returnImgReport.ImageName = imgReport.ImageName;
+                            imgReport.CreatedOn = DateTime.Now;
+                            _radiologyDbContext.ImagingReports.Add(imgReport);
+
+                            // Update DICOM records if PatientStudyId is present
+                            if (!string.IsNullOrEmpty(imgReport.PatientStudyId))
+                            {
+                                List<int> patStudyIdList = imgReport.PatientStudyId.Split(',').Select(int.Parse).ToList();
+                                var dicom = _dicomDbContext.PatientStudies
+                                            .Where(pp => patStudyIdList.Contains(pp.PatientStudyId))
+                                            .ToList();
+
+                                dicom.ForEach(pat =>
+                                {
+                                    pat.IsMapped = true;
+                                    _dicomDbContext.PatientStudies.Attach(pat);
+                                    _dicomDbContext.Entry(pat).Property(u => u.IsMapped).IsModified = true;
+                                });
+
+                                _dicomDbContext.SaveChanges();
+                            }
+
+                            _radiologyDbContext.SaveChanges();
+                            UpdateRequisitionAndRelatedEntities(imgReport, orderStatus, enableProviderEditInBillTxnItem, _radiologyDbContext);
+
+
+                            GetFooterTexts(imgReport);  
+                            processedReports.Add(imgReport);
+                        });
+                        trans.Complete();
+
+                        return processedReports;
                     }
-
-                    List<SqlParameter> paramList = new List<SqlParameter>(){
-                                                    new SqlParameter("@reqID", imgReport.ImagingRequisitionId),
-                                                    new SqlParameter("@status", orderStatus.ToString())
-                        };
-
-                    DataTable statusUpdated = DALFunctions.GetDataTableFromStoredProc("SP_Bill_OrderStatusUpdate_Radiology", paramList, _radiologyDbContext);
-                    RadiologyDbContext dbContextUpdate = new RadiologyDbContext(base.connString);
-                    ImagingRequisitionModel imgRequsition = dbContextUpdate.ImagingRequisitions.Where(a => a.ImagingRequisitionId == imgReport.ImagingRequisitionId).FirstOrDefault();
-                    imgRequsition.PrescriberId = imgReport.PrescriberId;
-                    imgRequsition.PrescriberName = imgReport.PrescriberName;
-                    dbContextUpdate.Entry(imgRequsition).Property(u => u.PrescriberId).IsModified = true;
-                    dbContextUpdate.Entry(imgRequsition).Property(u => u.PrescriberName).IsModified = true;
-                    dbContextUpdate.SaveChanges();
-                    if (enableProviderEditInBillTxnItem && imgReport.PerformerIdInBilling.HasValue)
+                    else
                     {
-                        List<SqlParameter> paramListToUpdatePerformer = new List<SqlParameter>(){
-                                                    new SqlParameter("@RequisitionId", imgReport.ImagingRequisitionId),
-                                                    new SqlParameter("@PerformerId", imgReport.PerformerId != null ? imgReport.PerformerId : null),
-                                                    new SqlParameter("@PerformerName", imgReport.PerformerName != null ? imgReport.PerformerName : null),
-                                                    new SqlParameter("@PrescriberId", imgReport.PrescriberId != null ? imgReport.PrescriberId : null),
-                                                    new SqlParameter("@PrescriberName", imgReport.PrescriberName != null ? imgReport.PrescriberName : null)
-                        };
-
-                        DataTable providerUpdated = DALFunctions.GetDataTableFromStoredProc("SP_Update_RadiologyProvider_In_BillTransactionItem", paramListToUpdatePerformer, _radiologyDbContext);
+                        throw new Exception("No reports to process.");
                     }
-
-                    trans.Complete();
-
-                    return returnImgReport;
                 }
-                //if update of RequisitionItem OrderStatus Fails.
-                else
+                catch (Exception ex)
                 {
-                    throw new Exception("Failed");
+                    throw new Exception("Transaction failed: " + ex.Message);
                 }
             }
         }
+        private object GetFooterTexts(ImagingReportModel imgReport)
+        {
+
+            if (imgReport.ReportTemplateIdsCSV != null)
+            {
+                var templateIds = imgReport.ReportTemplateIdsCSV
+                    .Split(',')
+                    .Select(id => id.Trim())
+                    .ToList();
+                var rptTemplates = _radiologyDbContext.RadiologyReportTemplate
+                    .Where(r => templateIds.Contains(r.TemplateId.ToString()))
+                    .ToList();
+
+                if (rptTemplates.Any())
+                {
+                    //imgReport.TemplateName = rptTemplates.First().TemplateName;
+                    var footerText = rptTemplates.Select(template => template.FooterNote).ToList();
+                    var footerTexts = rptTemplates.Select(template => new FooterText
+                    {
+                        Text = template.FooterNote,
+                        IsChecked = true // or your logic to determine if it should be checked
+                    }).ToList();
+                    imgReport.FooterTextsList = footerTexts;
+                }
+            }
+            return imgReport;
+        }
+        private void UpdateRequisitionAndRelatedEntities(ImagingReportModel imgReport, string orderStatus, bool enableProviderEditInBillTxnItem, RadiologyDbContext _radiologyDbContext)
+        {
+            var updateAssignedToDoctorOnAddReport = bool.Parse(GetRadiologyConfigParameter("Rad_UpdateAssignedToDoctorOnAddReport"));
+            string putRequisitionResult = PutRequisitionItemStatus(imgReport.ImagingRequisitionId, orderStatus);
+            if (putRequisitionResult == "OK")
+            {
+
+                var imgRequisition = _radiologyDbContext.ImagingRequisitions
+                    .FirstOrDefault(a => a.ImagingRequisitionId == imgReport.ImagingRequisitionId);
+
+                if (imgRequisition != null)
+                {
+                    imgRequisition.PrescriberId = imgReport.PrescriberId;
+                    imgRequisition.PrescriberName = imgReport.PrescriberName;
+                    _radiologyDbContext.Entry(imgRequisition).Property(u => u.PrescriberId).IsModified = true;
+                    _radiologyDbContext.Entry(imgRequisition).Property(u => u.PrescriberName).IsModified = true;
+                    _radiologyDbContext.SaveChanges();
+                }
+
+                if ((enableProviderEditInBillTxnItem && imgReport.PerformerIdInBilling.HasValue) || updateAssignedToDoctorOnAddReport)
+                {
+                    List<SqlParameter> paramListToUpdatePerformer = new List<SqlParameter>
+                {
+                    new SqlParameter("@RequisitionId", imgReport.ImagingRequisitionId),
+                    new SqlParameter("@PerformerId", (object)imgReport.PerformerId ?? DBNull.Value),
+                    new SqlParameter("@PerformerName", (object)imgReport.PerformerName ?? DBNull.Value),
+                    new SqlParameter("@PrescriberId", (object)imgReport.PrescriberId ?? DBNull.Value)
+                };
+
+                    DALFunctions.GetDataTableFromStoredProc("SP_Update_RadiologyProvider_In_BillTransactionItem", paramListToUpdatePerformer, _radiologyDbContext);
+                }
+            }
+            else
+            {
+                throw new Exception("Failed to update RequisitionItem OrderStatus.");
+            }
+        }
+
 
         private object SavePatientStudy(string ipDataStr, RbacUser currentUser)
         {
@@ -943,12 +1742,12 @@ namespace DanpheEMR.Controllers
 
         private object SendEmail(string ipDataStr, RbacUser currentUser)
         {
-            RadEmailModel EmailModel = JsonConvert.DeserializeObject<RadEmailModel>(ipDataStr);
+            CommonEmail_DTO EmailModel = JsonConvert.DeserializeObject<CommonEmail_DTO>(ipDataStr);
 
-            var apiKey = (from param in _masterDBContext.CFGParameters
-                          where param.ParameterGroupName.ToLower() == "common" && param.ParameterName == "APIKeyOfEmailSendGrid"
-                          select param.ParameterValue
-                          ).FirstOrDefault();
+            //var apiKey = (from param in _masterDBContext.CFGParameters
+            //              where param.ParameterGroupName.ToLower() == "common" && param.ParameterName == "APIKeyOfEmailSendGrid"
+            //              select param.ParameterValue
+            //              ).FirstOrDefault();
 
             if (!EmailModel.SendPdf)
             {
@@ -964,7 +1763,7 @@ namespace DanpheEMR.Controllers
             Task<string> response = _emailService.SendEmail(EmailModel.SenderEmailAddress, EmailModel.EmailList,
                 EmailModel.SenderTitle, EmailModel.Subject, EmailModel.PlainContent,
                 EmailModel.HtmlContent, EmailModel.PdfBase64, EmailModel.AttachmentFileName,
-                EmailModel.ImageAttachments, apiKey);
+                EmailModel.ImageAttachments, EmailModel.EmailApiKey, EmailModel.SmtpServer, EmailModel.Password, EmailModel.PortNo);
 
             response.Wait();
 
@@ -995,130 +1794,178 @@ namespace DanpheEMR.Controllers
         private object UpdateImagingReport(RbacUser currentUser)
         {
             var enableProviderEditInBillTxnItem = Convert.ToBoolean(Request.Form["enableProviderEditInBillTxnItem"]);
+            var updateAssignedToDoctorOnAddReport = bool.Parse(GetRadiologyConfigParameter("Rad_UpdateAssignedToDoctorOnAddReport"));
             var files = Request.Form.Files;
             var localFolder = Request.Form["localFolder"];
             var reportDetails = Request.Form["reportDetails"];
             var orderStatus = Request.Form["orderStatus"];
-            ImagingReportModel imgReport = JsonConvert.DeserializeObject<ImagingReportModel>(reportDetails);
 
-            using (TransactionScope trans = new TransactionScope())
+            var imgReports = JsonConvert.DeserializeObject<List<ImagingReportModel>>(reportDetails);
+            ImagingReportModel returnImgReport = null;
+
+            using (var trans = new TransactionScope())
             {
                 try
                 {
-                    ImagingReportModel dbImgReport = _radiologyDbContext.ImagingReports
-                .Where(r => r.ImagingReportId == imgReport.ImagingReportId).FirstOrDefault<ImagingReportModel>();
+                    foreach (var imgReport in imgReports)
+                    {
+                        var dbImgReport = GetDbImagingReport(imgReport.ImagingReportId);
 
-                    if (files.Count != 0)
-                    {
-                        imgReport = UploadReportFile(imgReport, files, localFolder);
-                        dbImgReport.ImageName = imgReport.ImageName;
-                        dbImgReport.ImageFullPath = imgReport.ImageFullPath;
-                    }
-                    if (!string.IsNullOrEmpty(dbImgReport.PatientStudyId))
-                    {
-                        List<int> patStudyIdList1 = dbImgReport.PatientStudyId.Split(',').Select(int.Parse).ToList();
-                        List<PatientStudyModel> dicom1 = (from pp in _dicomDbContext.PatientStudies
-                                                          where patStudyIdList1.Contains(pp.PatientStudyId)
-                                                          select pp).ToList();
-                        dicom1.ForEach(pat =>
+                        if (files.Count > 0)
                         {
-                            pat.IsMapped = false;
-                            _dicomDbContext.PatientStudies.Attach(pat);
-                            _dicomDbContext.Entry(pat).Property(u => u.IsMapped).IsModified = true;
-                        });
-
-                        _dicomDbContext.SaveChanges();
-
-                    }
-
-                    dbImgReport.ReportText = imgReport.ReportText;
-                    dbImgReport.Indication = imgReport.Indication;
-                    dbImgReport.RadiologyNo = imgReport.RadiologyNo;
-                    dbImgReport.OrderStatus = orderStatus;
-                    dbImgReport.PrescriberId = imgReport.PrescriberId;
-                    dbImgReport.ReportTemplateId = imgReport.ReportTemplateId;
-                    dbImgReport.PrescriberName = imgReport.PrescriberName;
-                    dbImgReport.PatientStudyId = imgReport.PatientStudyId;
-                    dbImgReport.ModifiedBy = currentUser.EmployeeId;
-                    if (enableProviderEditInBillTxnItem && imgReport.PerformerIdInBilling.HasValue)
-                    {
-                        imgReport.PerformerId = imgReport.PerformerIdInBilling;
-                        imgReport.PerformerName = imgReport.PerformerNameInBilling;
-                    }
-                    dbImgReport.ModifiedOn = DateTime.Now;
-                    dbImgReport.Signatories = imgReport.Signatories;
-                    _radiologyDbContext.Entry(dbImgReport).Property(u => u.CreatedBy).IsModified = false;
-                    _radiologyDbContext.Entry(dbImgReport).Property(u => u.CreatedOn).IsModified = false;
-                    _radiologyDbContext.Entry(dbImgReport).State = EntityState.Modified;
-                    _radiologyDbContext.SaveChanges();
-
-                    if (!string.IsNullOrEmpty(dbImgReport.PatientStudyId))
-                    {
-                        List<int> patStudyIdList = dbImgReport.PatientStudyId.Split(',').Select(int.Parse).ToList();
-                        List<PatientStudyModel> dicom = (from pp in _dicomDbContext.PatientStudies
-                                                         where patStudyIdList.Contains(pp.PatientStudyId)
-                                                         select pp).ToList();
-                        dicom.ForEach(pat =>
-                        {
-                            pat.IsMapped = true;
-                            _dicomDbContext.PatientStudies.Attach(pat);
-                            _dicomDbContext.Entry(pat).Property(u => u.IsMapped).IsModified = true;
-                        });
-                        _dicomDbContext.SaveChanges();
-                    }
-
-                    string putRequisitionResult = PutRequisitionItemStatus(dbImgReport.ImagingRequisitionId, orderStatus);
-
-                    List<SqlParameter> parametersList = new List<SqlParameter>(){
-                                                    new SqlParameter("@reqID", dbImgReport.ImagingRequisitionId),
-                                                    new SqlParameter("@status", orderStatus.ToString())
-                            };
-
-                    DataTable statusUpdated = DALFunctions.GetDataTableFromStoredProc("SP_Bill_OrderStatusUpdate_Radiology", parametersList, _radiologyDbContext);
-
-                    ImagingReportModel returnImgReport = new ImagingReportModel();
-
-                    if (putRequisitionResult == "OK")
-                    {
-
-                        returnImgReport.ImagingReportId = dbImgReport.ImagingReportId;
-                        returnImgReport.ImagingRequisitionId = dbImgReport.ImagingRequisitionId;
-                        returnImgReport.ReportText = dbImgReport.ReportText;
-                        returnImgReport.OrderStatus = dbImgReport.OrderStatus;
-
-                        if (files.Count != 0)
-                        {
-                            returnImgReport.ImageFullPath = dbImgReport.ImageFullPath;
-                            returnImgReport.ImageName = dbImgReport.ImageName;
+                            UpdateImagingReportFiles(imgReport, files, localFolder, dbImgReport);
                         }
+                        UpdateDicomMapping(dbImgReport.PatientStudyId, false);
+
+                        UpdateDbImagingReport(imgReport, dbImgReport, orderStatus, currentUser.EmployeeId, enableProviderEditInBillTxnItem);
+
+                        UpdateDicomMapping(dbImgReport.PatientStudyId, true);
+
+                        UpdateRequisitionStatus(dbImgReport.ImagingRequisitionId, orderStatus);
+
+                        UpdatePrescriberInfo(imgReport);
+
+                        if (enableProviderEditInBillTxnItem || updateAssignedToDoctorOnAddReport)
+                        {
+                            UpdateRadiologyProviderInBillTransactionItem(imgReport);
+                        }
+
+                        returnImgReport = CreateReturnImagingReport(dbImgReport, files);
                     }
 
-                    ImagingRequisitionModel imgRequsition = _radiologyDbContext.ImagingRequisitions.Where(a => a.ImagingRequisitionId == imgReport.ImagingRequisitionId).FirstOrDefault();
-                    imgRequsition.PrescriberId = imgReport.PrescriberId;
-                    imgRequsition.PrescriberName = imgReport.PrescriberName;
-                    _radiologyDbContext.Entry(imgRequsition).Property(u => u.PrescriberId).IsModified = true;
-                    _radiologyDbContext.Entry(imgRequsition).Property(u => u.PrescriberName).IsModified = true;
-                    _radiologyDbContext.SaveChanges();
-                    if (enableProviderEditInBillTxnItem && imgReport.PerformerIdInBilling.HasValue)
-                    {
-                        List<SqlParameter> paramList = new List<SqlParameter>(){
-                                                    new SqlParameter("@RequisitionId", imgReport.ImagingRequisitionId),
-                                                    new SqlParameter("@PerformerId", imgReport.PerformerId),
-                                                    new SqlParameter("@PerformerName", imgReport.PerformerName),
-                                                    new SqlParameter("@PrescriberId", imgReport.PrescriberId != null ? imgReport.PrescriberId : null),
-                                                    new SqlParameter("@PrescriberName", imgReport.PrescriberName != null ? imgReport.PrescriberName : null)
-                                                };
-                        DataTable providerUpdated = DALFunctions.GetDataTableFromStoredProc("SP_Update_RadiologyProvider_In_BillTransactionItem", paramList, _radiologyDbContext);
-                    }
                     trans.Complete();
-                    return returnImgReport;
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception("Failed");
+                    throw new Exception("Failed to update imaging report", ex);
                 }
             }
+
+            return returnImgReport;
         }
+
+        private string GetRadiologyConfigParameter(string parameterName)
+        {
+            return _radiologyDbContext.CfgParameters
+                .Where(a => a.ParameterGroupName == "Radiology" && a.ParameterName == parameterName)
+                .Select(a => a.ParameterValue)
+                .FirstOrDefault();
+        }
+
+        private ImagingReportModel GetDbImagingReport(int imagingReportId)
+        {
+            return _radiologyDbContext.ImagingReports
+                .FirstOrDefault(r => r.ImagingReportId == imagingReportId);
+        }
+
+        private void UpdateImagingReportFiles(ImagingReportModel imgReport, IFormFileCollection files, string localFolder, ImagingReportModel dbImgReport)
+        {
+            imgReport = UploadReportFile(imgReport, files, localFolder);
+            dbImgReport.ImageName = imgReport.ImageName;
+            dbImgReport.ImageFullPath = imgReport.ImageFullPath;
+        }
+
+        private void UpdateDicomMapping(string patientStudyId, bool isMapped)
+        {
+            if (!string.IsNullOrEmpty(patientStudyId))
+            {
+                var patStudyIdList = patientStudyId.Split(',').Select(int.Parse).ToList();
+                var dicomList = _dicomDbContext.PatientStudies
+                    .Where(pp => patStudyIdList.Contains(pp.PatientStudyId))
+                    .ToList();
+
+                foreach (var pat in dicomList)
+                {
+                    pat.IsMapped = isMapped;
+                    _dicomDbContext.PatientStudies.Attach(pat);
+                    _dicomDbContext.Entry(pat).Property(u => u.IsMapped).IsModified = true;
+                }
+
+                _dicomDbContext.SaveChanges();
+            }
+        }
+
+        private void UpdateDbImagingReport(ImagingReportModel imgReport, ImagingReportModel dbImgReport, string orderStatus, int modifiedBy, bool enableProviderEditInBillTxnItem)
+        {
+            dbImgReport.ReportText = imgReport.ReportText;
+            dbImgReport.Indication = imgReport.Indication;
+            dbImgReport.RadiologyNo = imgReport.RadiologyNo;
+            dbImgReport.OrderStatus = orderStatus;
+            dbImgReport.PrescriberId = imgReport.PrescriberId;
+            dbImgReport.PerformerId = enableProviderEditInBillTxnItem && imgReport.PerformerIdInBilling.HasValue
+                ? imgReport.PerformerIdInBilling
+                : imgReport.PerformerId;
+            dbImgReport.PerformerName = enableProviderEditInBillTxnItem && imgReport.PerformerIdInBilling.HasValue
+                ? imgReport.PerformerNameInBilling
+                : imgReport.PerformerName;
+            dbImgReport.ReportTemplateId = imgReport.ReportTemplateId;
+            dbImgReport.PrescriberName = imgReport.PrescriberName;
+            dbImgReport.PatientStudyId = imgReport.PatientStudyId;
+            dbImgReport.ModifiedBy = modifiedBy;
+            dbImgReport.ModifiedOn = DateTime.Now;
+            dbImgReport.Signatories = imgReport.Signatories;
+            dbImgReport.ReportTemplateIdsCSV = imgReport.ReportTemplateIdsCSV;
+            dbImgReport.SelectedFooterTemplateId = imgReport.SelectedFooterTemplateId;
+
+            _radiologyDbContext.Entry(dbImgReport).Property(u => u.CreatedBy).IsModified = false;
+            _radiologyDbContext.Entry(dbImgReport).Property(u => u.CreatedOn).IsModified = false;
+            _radiologyDbContext.Entry(dbImgReport).State = EntityState.Modified;
+            _radiologyDbContext.SaveChanges();
+        }
+
+        private void UpdateRequisitionStatus(int requisitionId, string orderStatus)
+        {
+            var parametersList = new List<SqlParameter>
+    {
+        new SqlParameter("@reqID", requisitionId),
+        new SqlParameter("@status", orderStatus)
+    };
+
+            DALFunctions.GetDataTableFromStoredProc("SP_Bill_OrderStatusUpdate_Radiology", parametersList, _radiologyDbContext);
+        }
+
+        private void UpdatePrescriberInfo(ImagingReportModel imgReport)
+        {
+            var imgRequisition = _radiologyDbContext.ImagingRequisitions
+                .FirstOrDefault(a => a.ImagingRequisitionId == imgReport.ImagingRequisitionId);
+
+            if (imgRequisition != null)
+            {
+                imgRequisition.PrescriberId = imgReport.PrescriberId;
+                imgRequisition.PrescriberName = imgReport.PrescriberName;
+                _radiologyDbContext.Entry(imgRequisition).Property(u => u.PrescriberId).IsModified = true;
+                _radiologyDbContext.Entry(imgRequisition).Property(u => u.PrescriberName).IsModified = true;
+                _radiologyDbContext.SaveChanges();
+            }
+        }
+
+        private void UpdateRadiologyProviderInBillTransactionItem(ImagingReportModel imgReport)
+        {
+            var paramList = new List<SqlParameter>
+    {
+        new SqlParameter("@RequisitionId", imgReport.ImagingRequisitionId),
+        new SqlParameter("@PerformerId", imgReport.PerformerId),
+        new SqlParameter("@PerformerName", imgReport.PerformerName),
+        new SqlParameter("@PrescriberId", imgReport.PrescriberId)
+    };
+
+            DALFunctions.GetDataTableFromStoredProc("SP_Update_RadiologyProvider_In_BillTransactionItem", paramList, _radiologyDbContext);
+        }
+
+        private ImagingReportModel CreateReturnImagingReport(ImagingReportModel dbImgReport, IFormFileCollection files)
+        {
+            return new ImagingReportModel
+            {
+                ImagingReportId = dbImgReport.ImagingReportId,
+                ImagingRequisitionId = dbImgReport.ImagingRequisitionId,
+                ReportText = dbImgReport.ReportText,
+                OrderStatus = dbImgReport.OrderStatus,
+                ImageFullPath = files.Count > 0 ? dbImgReport.ImageFullPath : null,
+                ImageName = files.Count > 0 ? dbImgReport.ImageName : null,
+                ReportTemplateIdsCSV = dbImgReport.ReportTemplateIdsCSV
+            };
+        }
+
 
         private object UpdateBillingStatus(string ipDataStr, RbacUser currentUser, string billingStatus)
         {
@@ -1258,6 +2105,20 @@ namespace DanpheEMR.Controllers
             _radiologyDbContext.SaveChanges();
             return prescriberName;
         }
+        private object UpdateReferrer(int requisitionId, int referredById, string referredByName)
+        {
+            ImagingReportModel imagingReport = (from report in _radiologyDbContext.ImagingReports
+                                                where report.ImagingRequisitionId == requisitionId
+                                                select report).FirstOrDefault();
+
+            imagingReport.ReferredByName = referredByName;
+            imagingReport.ReferredById = referredById;
+
+            _radiologyDbContext.Entry(imagingReport).Property(ent => ent.PrescriberId).IsModified = true;
+            _radiologyDbContext.Entry(imagingReport).Property(ent => ent.PrescriberName).IsModified = true;
+            _radiologyDbContext.SaveChanges();
+            return referredByName;
+        }
 
         private object UpdatePatientScanData(string ipDataStr, RbacUser currentUser)
         {
@@ -1304,7 +2165,7 @@ namespace DanpheEMR.Controllers
                 {
                     radiologyTransactionScope.Dispose();
                     /*throw ex;*/
-                    throw new Exception (ex.InnerException.Message);
+                    throw new Exception(ex.InnerException.Message);
                 }
             }
         }
@@ -2957,6 +3818,82 @@ namespace DanpheEMR.Controllers
             {
                 throw new Exception(ex.Message + " exception details:" + ex.ToString());
             }
+        }
+        private object GetPatientFileDetails(FileUpload_DTO patientDetail)
+        {
+            var fileData = (from f in _radiologyDbContext.PatientFiles
+                            where f.PatientFileId == patientDetail.PatientFileId
+                              && f.PatientId == patientDetail.PatientId
+                            select new
+                            {
+                                f.PatientFileId,
+                                f.Description,
+                                f.PatientId,
+                                f.FileType,
+                                f.FileName,
+                                f.FileExtention
+                            }).FirstOrDefault();
+
+            int filesNotFoundCount = 0;
+            var fileDetails = (from report in _radiologyDbContext.ImagingReports
+                               where report.ImagingReportId == patientDetail.ImagingReportId
+                               select new
+                               {
+                                   ImagingReportId = report.ImagingReportId,
+                                   PerformerName = report.PerformerName,
+                                   PerformerId = report.PerformerId
+                               }).FirstOrDefault();
+
+            PatientFilesModel file = null;
+
+            try
+            {
+                var location = (from dbc in _radiologyDbContext.CfgParameters
+                                where dbc.ParameterGroupName == "Patient"
+                                  && dbc.ParameterName == "PatientFileLocationPath"
+                                select dbc.ParameterValue).FirstOrDefault();
+
+                if (location == null)
+                {
+                    Log.Error("UploadFileLocationPath not found.");
+                    throw new Exception("UploadFileLocationPath not found.");
+                }
+
+                if (fileData != null)
+                {
+                    // Map the anonymous type to PatientFilesModel
+                    file = new PatientFilesModel
+                    {
+                        PatientFileId = fileData.PatientFileId,
+                        Description = fileData.Description,
+                        PatientId = fileData.PatientId,
+                        FileType = fileData.FileType,
+                        FileName = fileData.FileName,
+                        FileExtention = fileData.FileExtention
+                    };
+
+                    string imgPath = Path.Combine(location, file.FileName);
+                    try
+                    {
+                        var imageBytes = System.IO.File.ReadAllBytes(imgPath);
+                        string base64Image = Convert.ToBase64String(imageBytes);
+                        string binaryData = "data:" + file.FileType + ";base64," + base64Image;
+                        file.BinaryData = binaryData;
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        filesNotFoundCount++;
+                        file = null; // Set file to null if not found
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Can't read image. Error : {ex.Message}");
+                throw new Exception("Error: " + ex.Message);
+            }
+
+            return new { file, filesNotFoundCount, fileDetails };
         }
     }
 }

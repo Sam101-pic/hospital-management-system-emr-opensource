@@ -348,7 +348,8 @@ export class InventoryGoodsReceiptVM {
   public grCharges: GRChargesViewModel[] = [];
 }
 class VER_PODetailModel {
-  publicurchaseOrderId: number;
+  PurchaseOrderId: number;
+  PONumber: number;
   PoDate: string;
   VendorName: string;
   ContactAddress: string;

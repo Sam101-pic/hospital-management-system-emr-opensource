@@ -12,6 +12,7 @@ import { PatientOverviewComponent } from "../doctors/patient/patient-overview.co
 import { NursingWardBillingComponent } from "./ward-billing/nursing-ward-billing.component";
 
 import { PageNotFound } from "../404-error/404-not-found.component";
+import { ClinicalOverviewWrapperComponent } from "../clinical-new/clinical-overview-wrapper/clinical-overview-wrapper.component";
 import { PatientScannedImages } from "../clinical/scanned-images/patient-scanned-images.component";
 import { PatientOverviewMainComponent } from "../doctors/patient/patient-overview-main.component";
 import { AuthGuardService } from "../security/shared/auth-guard.service";
@@ -65,6 +66,10 @@ import { WardSelectionGuardService } from "./shared/ward-selection-guard.service
               //{ path: "", redirectTo: "ActivateWard", pathMatch: "full" }, //this is done inside wardSelectionGuardService,
               //authorization problem arises if redirected this way. will be solved if different permission is created for inpatientlist.
             ],
+          },
+          {
+            path: 'Clinical-Overview',
+            component: ClinicalOverviewWrapperComponent,
           },
           {
             path: "PatientOverviewMain",

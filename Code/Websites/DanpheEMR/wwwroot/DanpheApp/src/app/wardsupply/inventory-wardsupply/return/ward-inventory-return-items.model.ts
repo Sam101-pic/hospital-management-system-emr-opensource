@@ -36,6 +36,7 @@ export class WardInventoryReturnItemsModel {
     public IsFixedAsset: boolean = false;
     public IsActive: boolean = false;
     ExpiryDate: string = null;
+    CostPrice: number = 0;
     constructor() {
 
         var _formBuilder = new FormBuilder();

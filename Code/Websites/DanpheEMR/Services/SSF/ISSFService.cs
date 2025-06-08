@@ -23,5 +23,10 @@ namespace DanpheEMR.Services.SSF
         Task<object> GetClaimBookingDetail(SSFDbContext ssfDbContext, Int64 claimCode);
         Task<bool> IsClaimed(SSFDbContext sSFDbContext, Int64 claimCode, int patientId); //this will not hit SSF server, Krishna'15thNov'22
         Task<PatientSchemeMapModel> GetSSFPatientDetailLocally(SSFDbContext sSFDbContext, int patientId, int schemeId);
+        Task<string> GetSSFSubProduct(SSFDbContext sSFDbContext, Int64 claimCode);
+        Task<object> CheckClaimBookingStatus(SSFDbContext sSFDbContext, CheckBookingStauts_DTO checkBookingStauts);
+        Task<object> AddAttachments(SSFDbContext sSFDbContext, AddAttachmentDTO addAttachment);
+        Task<object> GetSubmittedClaims(SSFDbContext sSFDbContext, string FromDate, string ToDate);
+
     }
 }

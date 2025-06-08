@@ -40,6 +40,7 @@ namespace DanpheEMR.ServerModel.LabModels
         public string ReportGeneratedBy { get; set; }
         public string LabTestCSV { get; set; }
         public string LabRequisitionIdCSV { get; set; }
+        
         public bool AllowOutpatientWithProvisional { get; set; }
         public List<FinalReportListLabTestDetail> Tests { get; set; }
 

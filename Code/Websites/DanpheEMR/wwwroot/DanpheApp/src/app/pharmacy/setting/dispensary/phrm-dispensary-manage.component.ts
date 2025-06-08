@@ -8,7 +8,7 @@ import { SecurityService } from '../../../security/shared/security.service';
 import { GeneralFieldLabels } from "../../../shared/DTOs/general-field-label.dto";
 import { GridEmitModel } from "../../../shared/danphe-grid/grid-emit.model";
 import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
-import { ENUM_DispensaryType } from "../../../shared/shared-enums";
+import { ENUM_DispensaryType, ENUM_MessageBox_Status } from "../../../shared/shared-enums";
 import PHRMGridColumns from '../../shared/phrm-grid-columns';
 import { PHRMStoreModel } from "../../shared/phrm-store.model";
 @Component({
@@ -130,6 +130,15 @@ export class PHRMDispensaryManageComponent implements OnInit {
       this.CurrentDispensary.StoreValidator.controls[i].markAsDirty();
       this.CurrentDispensary.StoreValidator.controls[i].updateValueAndValidity();
     }
+
+    if (this.dispensaryList && this.dispensaryList.length) {
+      const isDispensaryNameAlreadyExists = this.dispensaryList.some(a => a.Name.toLowerCase() === this.CurrentDispensary.Name.toLowerCase());
+      if (isDispensaryNameAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot add dispensary as the Dispensary Name "${this.CurrentDispensary.Name}" already exists!`]);
+        return;
+      }
+    }
+
     if (this.CurrentDispensary.StoreValidator.valid) {
       this.CurrentDispensary.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
       this.CurrentDispensary.CreatedOn = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -158,6 +167,15 @@ export class PHRMDispensaryManageComponent implements OnInit {
       this.CurrentDispensary.StoreValidator.controls[i].markAsDirty();
       this.CurrentDispensary.StoreValidator.controls[i].updateValueAndValidity();
     }
+
+    if (this.dispensaryList && this.dispensaryList.length) {
+      const isDispensaryNameAlreadyExists = this.dispensaryList.some(a => a.Name.toLowerCase() === this.CurrentDispensary.Name.toLowerCase() && a.StoreId !== this.CurrentDispensary.StoreId);
+      if (isDispensaryNameAlreadyExists) {
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Cannot update dispensary as the Dispensary Name "${this.CurrentDispensary.Name}" already exists!`]);
+        return;
+      }
+    }
+
     if (this.CurrentDispensary.StoreValidator.valid) {
       this.CurrentDispensary.CreatedBy = this.securityService.GetLoggedInUser().EmployeeId;
       this.CurrentDispensary.CreatedOn = moment().format('YYYY-MM-DD HH:mm:ss');

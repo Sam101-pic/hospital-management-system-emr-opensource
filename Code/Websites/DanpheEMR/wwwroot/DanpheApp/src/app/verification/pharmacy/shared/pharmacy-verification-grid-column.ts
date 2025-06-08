@@ -1,4 +1,6 @@
 import * as moment from "moment";
+import { ENUM_Requisition_VerificationStatus } from "../../../shared/shared-enums";
+import { ENUM_PharmacyPurchaseOrderVerificationStatus } from "../../../shared/shared-enums";
 
 export class PharmacyVerificationGridColumn {
     static PurchaseOrderList = [
@@ -20,11 +22,26 @@ export class PharmacyVerificationGridColumn {
             headerName: "Action",
             field: "",
             width: 120,
-            template: `<a danphe-grid-action="verify" class="grid-action">
-            Verify
-         </a>`
+            cellRenderer: PharmacyVerificationGridColumn.POVerificationActionTemplate
         }
     ]
+    static POVerificationActionTemplate(params) {
+
+        if (params.data.CurrentVerificationLevelCount === params.data.MaxVerificationLevel || params.data.POStatus !== ENUM_PharmacyPurchaseOrderVerificationStatus.pending) {
+            let template =
+                `<a danphe-grid-action="verify" class="grid-action" >
+        View
+        </a>`
+            return template
+        }
+        else {
+            let template =
+                `<a danphe-grid-action="verify" class="grid-action" >
+        Verify
+        </a>`
+            return template;
+        }
+    }
     static PurchaseOrderDateOnlyRenderer(params) {
         let date: string = params.data.PoDate;
         return moment(date).format("YYYY-MM-DD");
@@ -50,11 +67,26 @@ export class PharmacyVerificationGridColumn {
             headerName: "Action",
             field: "",
             width: 120,
-            template: `<a danphe-grid-action="verify" class="grid-action">
-            Verify
-         </a>`
+            cellRenderer: PharmacyVerificationGridColumn.RequisitionVerificationActionTemplate
         }
     ]
+    static RequisitionVerificationActionTemplate(params) {
+
+        if (params.data.CurrentVerificationLevelCount === params.data.MaxVerificationLevel || params.data.RequisitionStatus !== ENUM_Requisition_VerificationStatus.pending) {
+            let template =
+                `<a danphe-grid-action="verify" class="grid-action" >
+        View
+        </a>`
+            return template
+        }
+        else {
+            let template =
+                `<a danphe-grid-action="verify" class="grid-action" >
+        Verify
+        </a>`
+            return template;
+        }
+    }
     static RequisitionDateOnlyRenderer(params) {
         let date: string = params.data.RequisitionDate;
         return moment(date).format("YYYY-MM-DD");

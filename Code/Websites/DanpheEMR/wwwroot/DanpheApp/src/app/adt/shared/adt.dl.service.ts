@@ -2,11 +2,17 @@ import { HttpClient, HttpHeaders } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { DischargeDetailBillingVM } from "../../billing/ip-billing/shared/discharge-bill.view.models";
 import { DanpheHTTPResponse } from "../../shared/common-models";
+import { AddBedReservation_DTO } from "./DTOs/adt-add-bed-reservation.dto";
+import { AdtExchangeBed_DTO } from "./DTOs/adt-post-exchange-bed.dto";
+import { CancelBedReservation_DTO } from "./DTOs/cancel-bed-reservation.dto";
 import { AdmissionCancelVM, AdmittingDocInfoVM } from "./admission.view.model";
 import { PatientBedInfo } from "./patient-bed-info.model";
 
 @Injectable()
 export class ADT_DLService {
+  public optionsJson = {
+    headers: new HttpHeaders({ 'Content-Type': 'application/json' })
+  };
   public options = {
     headers: new HttpHeaders({
       "Content-Type": "application/x-www-form-urlencoded",
@@ -22,7 +28,14 @@ export class ADT_DLService {
       this.options
     );
   }
-
+  public GetReservedBedList() {
+    return this.http.get<any>(
+      "/api/Admission/ReservedBedList", this.options);
+  }
+  public CancelBedReservation(reservationDetails: CancelBedReservation_DTO) {
+    return this.http.put<any>(
+      "/api/Admission/CancelBedReservation", reservationDetails, this.optionsJson);
+  }
   public GetEmployeeFollowUp() {
     return this.http.get<any>(
       "/api/Admission/FollowUpPreferences",
@@ -31,9 +44,7 @@ export class ADT_DLService {
   }
   public GetADTDataByVisitId(admissionStatus, patVisitId) {
     return this.http.get<any>(
-      "/api/Admission/AdmittedPatientsData?admissionStatus=" +
-      admissionStatus +
-      "&patientVisitId=" +
+      "/api/Admission/AdmittedPatientsData?admissionStatus=" + admissionStatus + "&patientVisitId=" +
       patVisitId,
       this.options
     );
@@ -136,6 +147,10 @@ export class ADT_DLService {
     );
   }
 
+  public GetReservedBedDetail(patientId: number, patientVisitId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Admission/BedReservationDetail?patientId=${patientId}&patientVisitId=${patientVisitId}`, this.options);
+  }
+
   public GetDischargeType() {
     return this.http.get<any>(
       "/api/Admission/DischargeTypes",
@@ -175,6 +190,12 @@ export class ADT_DLService {
   }
   public GetAvailableBeds(wardId: number, bedFeatureId: number) {
     return this.http.get<any>("/api/Admission/AvailableBeds?" + "bedFeatureId=" + bedFeatureId + "&wardId=" + wardId, this.options);
+  }
+  public GetBedsByBedFeature(wardId: number, bedFeatureId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Admission/GetBedsByBedFeature?bedFeatureId=${bedFeatureId}&wardId=${wardId}`, this.options);
+  }
+  public GetPatientOccupyingTheBed(bedId: number, wardId: number, bedFeatureId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Admission/GetPatientOccupyingTheBed?bedId=${bedId}&bedFeatureId=${bedFeatureId}&wardId=${wardId}`, this.options);
   }
   public CheckPatProvisionalInfo(patId) {
     return this.http.get<any>(
@@ -458,6 +479,24 @@ export class ADT_DLService {
       "/api/Admission/AppointmentApplicableDoctorList",
       this.options
     );
+  }
+  public ExchangeBed(adtBedExchange: AdtExchangeBed_DTO) {
+    return this.http.post<DanpheHTTPResponse>("/api/Admission/ExchangeBed", adtBedExchange, this.optionsJson);
+  }
+  public GetPatientVisitConsultants(patientVisitId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Admission/PatientVisitConsultants?patientVisitId=${patientVisitId}`, this.optionsJson);
+  }
+  public ReserveBed(addBedReservation: AddBedReservation_DTO) {
+    return this.http.post<DanpheHTTPResponse>(`/api/Admission/VisitorBedReservation`, addBedReservation, this.optionsJson);
+  }
+  public GetCareTakerInformation(patientId: number, patientVisitId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Admission/GetCareTakerInformation?patientId=${patientId}&patientVisitId=${patientVisitId}`, this.optionsJson);
+  }
+  public CheckAlreadyReservedBed(patientId: number, patientVisitId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Admission/CheckAlreadyReservedBed?patientId=${patientId}&patientVisitId=${patientVisitId}`, this.optionsJson);
+  }
+  public GetPatientWithVisitInformation(patientId: number, patientVisitId: number) {
+    return this.http.get<DanpheHTTPResponse>(`/api/Visit/GetPatientWithVisitInformation?patientId=${patientId}&patientVisitId=${patientVisitId}`, this.optionsJson);
   }
 
 }

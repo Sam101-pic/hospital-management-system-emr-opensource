@@ -27,6 +27,7 @@ import { RouteFromService } from '../../../../shared/routefrom.service';
 import { ENUM_BillPaymentMode, ENUM_DanpheHTTPResponses, ENUM_Dispensary_ReturnInvoiceBy, ENUM_MessageBox_Status, ENUM_PriceCategory, ENUM_ServiceBillingContext, ENUM_VisitType } from '../../../../shared/shared-enums';
 import { DispensaryService } from '../../../shared/dispensary.service';
 import { InvoiceDetailToBeReturn } from './model/invoice-detail-tobe-return.model';
+import { InvoiceItemDetailToBeReturn } from './model/invoice-item-detail-tobe-return.model';
 
 @Component({
   selector: 'app-sales-return',
@@ -35,32 +36,21 @@ import { InvoiceDetailToBeReturn } from './model/invoice-detail-tobe-return.mode
   host: { '(window:keydown)': 'hotkeys($event)' }
 })
 export class SalesReturnComponent implements OnInit {
-
-  //constructor of class
-  //For counter name
   public currentCounter: number = null;
   public currentCounterName: string = null;
   public allFiscalYrs: Array<BillingFiscalYear> = [];
   public selFiscYrId: number = 3;
   public userName: any;
-  //variable for temporary loop- delete this variable after complete this func
-  public loopvar: Array<number> = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-  //variable for show TotalReturn amount details
   public returnAmount: number = 0;
-  //select or deselect all Items variable
   public selectDeselectAll: boolean = false;
-  //Variable declaration is here for sale
   public loading: boolean = false;
-  //variable for show hide Return Invoice page show whwen matching records findout
   public showReturnInvoicePage: boolean = false;
-  //variable for bind with search textbox for invoice id
   public invoicePrintId: number = null;
   public showSaleItemsPopup: boolean = false;
   public pharmacyReceipt: PharmacyReceiptModel = new PharmacyReceiptModel();
   public patient: any;
-  //only show text message
   public textMessage: string = null;
-  public IsitemlevlDis: boolean;
+  public IsItemLevelDiscountEnable: boolean;
   public isMainDiscountAvailable: boolean;
   public isItemLevelVATApplicable: boolean;
   public isMainVATApplicable: boolean;
@@ -69,7 +59,7 @@ export class SalesReturnComponent implements OnInit {
   public saleReturnModelListPost: Array<PHRMInvoiceReturnItemsModel> = new Array<PHRMInvoiceReturnItemsModel>();
   public salesReturn: PHRMInvoiceReturnModel = new PHRMInvoiceReturnModel();
   public saleReturn: PHRMInvoiceReturnItemsModel = new PHRMInvoiceReturnItemsModel();
-  IsCurrentDispensaryInsurace: boolean;
+  IsCurrentDispensaryInsurance: boolean;
   selectedDispensary: PHRMStoreModel;
   public filteredMembershipList: Array<BillingScheme_DTO> = [];
   public selectedCommunityName: string = "";
@@ -81,7 +71,7 @@ export class SalesReturnComponent implements OnInit {
   NetReturnedAmount: number = 0;
   DiscountReturnAmount: number = 0;
   totalReturnAmt: number;
-  discountMorethanReturnAmount: boolean = false;
+  discountMoreThanReturnAmount: boolean = false;
   invoiceItems: any[] = [];
   showNetAmount: boolean = false;
   PriceCategoryId: number = null;
@@ -89,13 +79,13 @@ export class SalesReturnComponent implements OnInit {
   CoPaymentCreditPercent: number = 0;
   IsCoPayment: boolean = false;
 
-  PaymentMode: string = null;
+  PaymentMode: string = ENUM_BillPaymentMode.cash;
   fromDate: string = null;
   toDate: string = null;
   dispensaryList: Array<Store> = new Array<Store>();
   HospitalNo: string = null;
   PatientDetail: PatientModel = new PatientModel();
-  InvoiceDetailToBeReturn: InvoiceDetailToBeReturn = new InvoiceDetailToBeReturn();
+  InvoiceDataToBeReturn: InvoiceDetailToBeReturn = new InvoiceDetailToBeReturn();
   PriceCategoryInfo: PriceCategory = new PriceCategory();
   enabledPriceCategories: Array<PriceCategory> = new Array<PriceCategory>();
   selectedPriceCategory: PriceCategory = null;
@@ -106,6 +96,9 @@ export class SalesReturnComponent implements OnInit {
   public membershipList: Array<BillingScheme_DTO> = new Array<BillingScheme_DTO>();
   public schemeData: BillingScheme_DTO = new BillingScheme_DTO();
   public SchemeName: string = "";
+  SalesReturnConfig: { ReturnByInvoiceNo: false; ReturnByHospitalNo: false; };
+  InvoiceReturnIds: string[] = [];
+  IsAnonymousPatient: boolean = false;
   public GeneralFieldLabel = new GeneralFieldLabels();
 
 
@@ -131,7 +124,7 @@ export class SalesReturnComponent implements OnInit {
     try {
       this.currentCounter = this.securityService.getPHRMLoggedInCounter().CounterId;
       this.currentCounterName = this.securityService.getPHRMLoggedInCounter().CounterName;
-      this.IsCurrentDispensaryInsurace = this._dispensaryService.isInsuranceDispensarySelected;
+      this.IsCurrentDispensaryInsurance = this._dispensaryService.isInsuranceDispensarySelected;
       this.selectedDispensary = this._dispensaryService.activeDispensary;
       this.GetAllFiscalYrs();
       this.SetCurrentFiscalYear();
@@ -139,6 +132,7 @@ export class SalesReturnComponent implements OnInit {
       this.GetActiveDispensarylist();
       this.GetPriceCategories();
       this.LoadPharmacySchemesList();
+      this.GetSalesReturnConfigurationParameter();
       if (this.currentCounter < 1) {
         this.callBackService.CallbackRoute = '/Dispensary/Sale/New';
         this.router.navigate(['/Dispensary/ActivateCounter']);
@@ -186,8 +180,8 @@ export class SalesReturnComponent implements OnInit {
       let SalesParameter = JSON.parse(salesParameterString.ParameterValue);
       this.isItemLevelVATApplicable = (SalesParameter.EnableItemLevelVAT === true);
       this.isMainVATApplicable = (SalesParameter.EnableMainVAT === true);
-      this.IsitemlevlDis = (SalesParameter.EnableItemLevelDiscount === true);
-      this.isMainDiscountAvailable = (SalesParameter.EnableMainDiscount === true);
+      //this.IsItemLevelDiscountEnable = (SalesParameter.EnableItemLevelDiscount === true);
+      //this.isMainDiscountAvailable = (SalesParameter.EnableMainDiscount === true);
 
     }
   }
@@ -195,8 +189,8 @@ export class SalesReturnComponent implements OnInit {
   //Get Invoide Items details by Invoice Id for return items from customer
   SearchInvoice(fiscYrId) {
     try {
-      this.disableSearchBtn = true;
       if (this.invoicePrintId && fiscYrId) {
+        this.disableSearchBtn = true;
         this.pharmacyBLService.GetReturnFromCustomerModelDataByInvoiceId(this.invoicePrintId, fiscYrId, this.storeId)
           .finally(() => this.disableSearchBtn = false)
           .subscribe((res: DanpheHTTPResponse) => {
@@ -281,21 +275,21 @@ export class SalesReturnComponent implements OnInit {
   }
 
   private setInvoiceReturnDetailsToReturn(i: number, res: DanpheHTTPResponse) {
-    this.returnAmount = CommonFunctions.parseAmount(this.returnAmount + this.saleReturnModelList[i].TotalAmount);
-    let invoiceitems = new PHRMInvoiceItemsModel();
-    invoiceitems.ItemId = this.saleReturnModelList[i].ItemId;
-    invoiceitems.BatchNo = this.saleReturnModelList[i].BatchNo;
-    invoiceitems.ItemName = this.saleReturnModelList[i].ItemName;
-    invoiceitems.Quantity = (this.saleReturnModelList[i].Quantity - this.saleReturnModelList[i].ReturnedQty);
-    invoiceitems.ExpiryDate = moment(this.saleReturnModelList[i].ExpiryDate).format('ll');
-    invoiceitems.Price = this.saleReturnModelList[i].Price;
-    invoiceitems.SalePrice = this.saleReturnModelList[i].SalePrice;
-    invoiceitems.TotalAmount = this.saleReturnModelList[i].TotalAmount;
-    invoiceitems.SubTotal = this.saleReturnModelList[i].SubTotal;
-    invoiceitems.DiscountPercentage = this.saleReturnModelList[i].DiscountPercentage;
-    invoiceitems.DiscountAmount = this.saleReturnModelList[i].DiscountAmount;
-    invoiceitems.ReturnQty = this.saleReturnModelList[i].ReturnedQty;
-    invoiceitems.CreditNoteId = res.Results.invoiceItems[i].CreditNoteId;
+    this.returnAmount = CommonFunctions.parseAmount(this.returnAmount + this.saleReturnModelList[i].TotalAmount, 4);
+    let invoiceItems = new PHRMInvoiceItemsModel();
+    invoiceItems.ItemId = this.saleReturnModelList[i].ItemId;
+    invoiceItems.BatchNo = this.saleReturnModelList[i].BatchNo;
+    invoiceItems.ItemName = this.saleReturnModelList[i].ItemName;
+    invoiceItems.Quantity = (this.saleReturnModelList[i].Quantity - this.saleReturnModelList[i].ReturnedQty);
+    invoiceItems.ExpiryDate = moment(this.saleReturnModelList[i].ExpiryDate).format('ll');
+    invoiceItems.Price = this.saleReturnModelList[i].Price;
+    invoiceItems.SalePrice = this.saleReturnModelList[i].SalePrice;
+    invoiceItems.TotalAmount = this.saleReturnModelList[i].TotalAmount;
+    invoiceItems.SubTotal = this.saleReturnModelList[i].SubTotal;
+    invoiceItems.DiscountPercentage = this.saleReturnModelList[i].DiscountPercentage;
+    invoiceItems.DiscountAmount = this.saleReturnModelList[i].DiscountAmount;
+    invoiceItems.ReturnQty = this.saleReturnModelList[i].ReturnedQty;
+    invoiceItems.CreditNoteId = res.Results.invoiceItems[i].CreditNoteId;
     this.salesReturn.InvoiceReturnItems[i].AvailableQty = (res.Results.invoiceItems[i].Quantity - res.Results.invoiceItems[i].ReturnedQty);
     let availableQuantity = this.salesReturn.InvoiceReturnItems[i].AvailableQty;
     this.salesReturn.InvoiceReturnItems[i].Quantity = availableQuantity;
@@ -313,13 +307,17 @@ export class SalesReturnComponent implements OnInit {
     if (res.Results.invoiceHeader.SettlementId != null) {
       this.salesReturn.SettlementId = this.invoiceHeader.SettlementId;
     }
-    this.pharmacyReceipt.InvoiceItems.push(invoiceitems);
+    this.pharmacyReceipt.InvoiceItems.push(invoiceItems);
   }
 
   private SetPriceCategoryWithCoPaymentDetails(res): void {
     let schemeDetails = res.Results.schemeDetails;
     if (schemeDetails != null) {
       this.PriceCategoryId = schemeDetails.DefaultPriceCategoryId;
+
+      this.IsItemLevelDiscountEnable = schemeDetails.IsDiscountApplicable;
+      this.isMainDiscountAvailable = schemeDetails.IsDiscountApplicable;
+
       this.SchemeId = schemeDetails.SchemeId;
       if (schemeDetails.IsPharmacyCoPayment) {
         this.IsCoPayment = schemeDetails.IsPharmacyCoPayment;
@@ -350,7 +348,7 @@ export class SalesReturnComponent implements OnInit {
 
   private CheckIfReturnValid() {
     try {
-      if (this.IsCurrentDispensaryInsurace && !this.invoiceHeader.ClaimCode) {
+      if (this.IsCurrentDispensaryInsurance && !this.invoiceHeader.ClaimCode) {
         throw new Error("Cannot return it from this dispensary.");
       }
     }
@@ -403,7 +401,7 @@ export class SalesReturnComponent implements OnInit {
       let isValidReturnDate: boolean;
       let param = this.coreService.Parameters.find(p => p.ParameterName === "RestrictReturnDays" && p.ParameterGroupName === "Pharmacy");
       const paramValue = JSON.parse(param.ParameterValue);
-      if (this.invoiceHeader.VisitType == null || undefined) {
+      if (!this.invoiceHeader.VisitType) {
         this.invoiceHeader.VisitType = "outpatient";
       }
       if (this.invoiceHeader.VisitType === "inpatient") {
@@ -411,7 +409,7 @@ export class SalesReturnComponent implements OnInit {
           isValidReturnDate = true;
         }
       }
-      if (this.invoiceHeader.VisitType === "outpatient") {
+      if (this.invoiceHeader.VisitType === "outpatient" || this.invoiceHeader.VisitType === "emergency") {
         if (moment().diff(moment(this.invoiceHeader.InvoiceDate), 'days') <= paramValue.OPVisit) {
           isValidReturnDate = true;
         }
@@ -427,7 +425,6 @@ export class SalesReturnComponent implements OnInit {
           //return only selected items so validation also check only on selected items
           this.salesReturn.InvoiceReturnItems[j].CounterId = this.currentCounter;
           this.salesReturn.InvoiceReturnItems[j].StoreId = this._dispensaryService.activeDispensary.StoreId;
-          this.salesReturn.InvoiceReturnItems[j].PriceCategoryId = this.PriceCategoryId;
           if (this.salesReturn.InvoiceReturnItems[j].ReturnedQty > this.salesReturn.InvoiceReturnItems[j].Quantity) {
             formValidity = false;
             errorMessages.push(`Returned Quantity is greater than Sold Quantity for Item ${this.salesReturn.InvoiceReturnItems[j].ItemName}.`);
@@ -553,21 +550,23 @@ export class SalesReturnComponent implements OnInit {
   ValueChage(index) {
     if (this.salesReturn.InvoiceReturnItems[index].ReturnedQty === 0) {
       this.salesReturn.InvoiceReturnItems[index].checked = false;
-      this.changelistByItem(index);
     }
+    else {
+      this.salesReturn.InvoiceReturnItems[index].checked = true;
+    }
+    this.ChangeListByItem(index);
     //this.salesReturn.InvoiceReturnItems[index].AvailableQty = this.salesReturn.InvoiceReturnItems[index].Quantity - this.salesReturn.InvoiceReturnItems[index].ReturnedQty;
   }
-  CalculationForPHRMReturnfromCustomerItem(row: PHRMInvoiceReturnItemsModel, index) {
+  CalculationForPHRMReturnFromCustomerItem(row: PHRMInvoiceReturnItemsModel, index) {
     if (this.salesReturn.InvoiceReturnItems[index].Price != null && (this.salesReturn.InvoiceReturnItems[index].ReturnedQty <= this.salesReturn.InvoiceReturnItems[index].Quantity)) {
-      //this Disct is the coversion of DiscountPercentage
-      let Disct = this.salesReturn.InvoiceReturnItems[index].DiscountPercentage / 100;
-      let vat = this.salesReturn.InvoiceReturnItems[index].VATPercentage / 100;
-      this.salesReturn.InvoiceReturnItems[index].SubTotal = CommonFunctions.parsePhrmAmount((this.salesReturn.InvoiceReturnItems[index].SalePrice * (row.ReturnedQty)));
+      let discountDecimalConversion = this.salesReturn.InvoiceReturnItems[index].DiscountPercentage / 100;
+      let vatDecimalConversion = this.salesReturn.InvoiceReturnItems[index].VATPercentage / 100;
+      this.salesReturn.InvoiceReturnItems[index].SubTotal = CommonFunctions.parseAmount((this.salesReturn.InvoiceReturnItems[index].SalePrice * (row.ReturnedQty)), 4);
 
-      this.salesReturn.InvoiceReturnItems[index].DiscountAmount = CommonFunctions.parseAmount(Disct * this.salesReturn.InvoiceReturnItems[index].SubTotal);
-      this.salesReturn.InvoiceReturnItems[index].TaxableAmount = CommonFunctions.parseAmount(this.salesReturn.InvoiceReturnItems[index].SubTotal - this.salesReturn.InvoiceReturnItems[index].DiscountAmount);
-      this.salesReturn.InvoiceReturnItems[index].VATAmount = CommonFunctions.parseAmount(vat * this.salesReturn.InvoiceReturnItems[index].TaxableAmount);
-      this.salesReturn.InvoiceReturnItems[index].TotalAmount = CommonFunctions.parseAmount(this.salesReturn.InvoiceReturnItems[index].SubTotal - this.salesReturn.InvoiceReturnItems[index].DiscountAmount + this.salesReturn.InvoiceReturnItems[index].VATAmount);
+      this.salesReturn.InvoiceReturnItems[index].DiscountAmount = CommonFunctions.parseAmount(discountDecimalConversion * this.salesReturn.InvoiceReturnItems[index].SubTotal, 4);
+      this.salesReturn.InvoiceReturnItems[index].TaxableAmount = CommonFunctions.parseAmount(this.salesReturn.InvoiceReturnItems[index].SubTotal - this.salesReturn.InvoiceReturnItems[index].DiscountAmount, 4);
+      this.salesReturn.InvoiceReturnItems[index].VATAmount = CommonFunctions.parseAmount(vatDecimalConversion * this.salesReturn.InvoiceReturnItems[index].TaxableAmount, 4);
+      this.salesReturn.InvoiceReturnItems[index].TotalAmount = CommonFunctions.parseAmount(this.salesReturn.InvoiceReturnItems[index].SubTotal - this.salesReturn.InvoiceReturnItems[index].DiscountAmount + this.salesReturn.InvoiceReturnItems[index].VATAmount, 4);
       this.CalculationForPHRMReturnFromCustomer();
       //this.SetFocusById(`Remark`);
     }
@@ -587,31 +586,31 @@ export class SalesReturnComponent implements OnInit {
     this.NetReturnedAmount = 0;
 
 
-    for (var i = 0; i < this.salesReturn.InvoiceReturnItems.length; i++) {
+    for (let i = 0; i < this.salesReturn.InvoiceReturnItems.length; i++) {
       if (this.salesReturn.InvoiceReturnItems[i].SubTotal != null && this.salesReturn.InvoiceReturnItems[i].TotalAmount != null) {
         STotal = STotal + this.salesReturn.InvoiceReturnItems[i].SubTotal;
-        this.salesReturn.SubTotal = CommonFunctions.parseAmount(STotal);
+        this.salesReturn.SubTotal = CommonFunctions.parseAmount(STotal, 4);
         DisAmount = DisAmount + this.salesReturn.InvoiceReturnItems[i].DiscountAmount;
-        this.salesReturn.DiscountAmount = CommonFunctions.parseAmount(DisAmount);
+        this.salesReturn.DiscountAmount = CommonFunctions.parseAmount(DisAmount, 4);
         VATAmount = VATAmount + this.salesReturn.InvoiceReturnItems[i].VATAmount;
-        this.salesReturn.VATAmount = CommonFunctions.parseAmount(VATAmount);
+        this.salesReturn.VATAmount = CommonFunctions.parseAmount(VATAmount, 4);
       }
 
       if (this.salesReturn.InvoiceReturnItems[i].ReturnedQty > 0) {
         if (this.invoiceHeader && this.invoiceHeader.SettlementId) {
           if (this.invoiceHeader.CashDiscount >= this.DiscountReturnAmount && this.returnAmount > this.DiscountReturnAmount) {
             this.NetReturnedAmount = Number((this.returnAmount - this.DiscountReturnAmount).toFixed(4));
-            this.discountMorethanReturnAmount = false;
+            this.discountMoreThanReturnAmount = false;
           } else {
-            this.discountMorethanReturnAmount = true;
+            this.discountMoreThanReturnAmount = true;
             this.NetReturnedAmount = 0;
           }
         }
       }
 
     }
-    this.salesReturn.DiscountAmount = CommonFunctions.parseAmount(this.salesReturn.DiscountAmount);
-    this.salesReturn.VATAmount = CommonFunctions.parseAmount(this.salesReturn.VATAmount);
+    this.salesReturn.DiscountAmount = CommonFunctions.parseAmount(this.salesReturn.DiscountAmount, 4);
+    this.salesReturn.VATAmount = CommonFunctions.parseAmount(this.salesReturn.VATAmount, 4);
     this.salesReturn.VATPercentage = (this.salesReturn.VATAmount) === 0 ? 0 : (this.salesReturn.VATAmount * 100) / (this.salesReturn.SubTotal - this.salesReturn.DiscountAmount),
       this.salesReturn.TaxableAmount = this.salesReturn.VATAmount > 0 ? (this.salesReturn.SubTotal - this.salesReturn.DiscountAmount) : 0,
       this.salesReturn.NonTaxableAmount = this.salesReturn.VATAmount <= 0 ? (this.salesReturn.SubTotal - this.salesReturn.DiscountAmount) : 0,
@@ -619,18 +618,18 @@ export class SalesReturnComponent implements OnInit {
     //ramesh: Adjustment removed as LPH requirement. And it is causing mismatch in Report Sales Return Amount part.
     // this.salesReturn.Adjustment =CommonFunctions.parseFinalAmount(this.salesReturn.TotalAmount) - this.salesReturn.TotalAmount;
     // this.salesReturn.Adjustment = CommonFunctions.parseAmount(this.salesReturn.Adjustment);
-    this.salesReturn.TotalAmount = CommonFunctions.parseAmount(this.salesReturn.TotalAmount);
+    this.salesReturn.TotalAmount = CommonFunctions.parseAmount(this.salesReturn.TotalAmount, 4);
     this.salesReturn.Tender = this.salesReturn.TotalAmount;
-    this.salesReturn.Change = CommonFunctions.parseAmount(this.salesReturn.Tender - this.salesReturn.TotalAmount);
+    this.salesReturn.Change = CommonFunctions.parseAmount(this.salesReturn.Tender - this.salesReturn.TotalAmount, 4);
     this.returnAmount = this.salesReturn.TotalAmount;
     if (this.PriceCategoryId != null && this.IsCoPayment) {
       if (this.IsCoPayment) {
-        this.salesReturn.ReturnCashAmount = CommonFunctions.parsePhrmAmount((this.salesReturn.TotalAmount * this.CoPaymentCashPercent) / 100);
-        this.salesReturn.ReturnCreditAmount = CommonFunctions.parsePhrmAmount(this.salesReturn.TotalAmount - this.salesReturn.ReturnCashAmount);
+        this.salesReturn.ReturnCashAmount = CommonFunctions.parseAmount((this.salesReturn.TotalAmount * this.CoPaymentCashPercent) / 100, 4);
+        this.salesReturn.ReturnCreditAmount = CommonFunctions.parseAmount(this.salesReturn.TotalAmount - this.salesReturn.ReturnCashAmount, 4);
       }
     }
     else {
-      if (this.salesReturn.PaymentMode === ENUM_BillPaymentMode.credit) {
+      if (this.salesReturn.PaymentMode === ENUM_BillPaymentMode.credit && !this.salesReturn.SettlementId) {
         this.salesReturn.ReturnCreditAmount = this.returnAmount;
       }
       else {
@@ -639,12 +638,12 @@ export class SalesReturnComponent implements OnInit {
     }
     if (this.SchemeId != null && this.IsCoPayment) {
       if (this.IsCoPayment) {
-        this.salesReturn.ReturnCashAmount = CommonFunctions.parsePhrmAmount((this.salesReturn.TotalAmount * this.CoPaymentCashPercent) / 100);
-        this.salesReturn.ReturnCreditAmount = CommonFunctions.parsePhrmAmount(this.salesReturn.TotalAmount - this.salesReturn.ReturnCashAmount);
+        this.salesReturn.ReturnCashAmount = CommonFunctions.parseAmount((this.salesReturn.TotalAmount * this.CoPaymentCashPercent) / 100);
+        this.salesReturn.ReturnCreditAmount = CommonFunctions.parseAmount(this.salesReturn.TotalAmount - this.salesReturn.ReturnCashAmount);
       }
     }
     else {
-      if (this.salesReturn.PaymentMode === ENUM_BillPaymentMode.credit) {
+      if (this.salesReturn.PaymentMode === ENUM_BillPaymentMode.credit && !this.salesReturn.SettlementId) {
         this.salesReturn.ReturnCreditAmount = this.returnAmount;
       }
       else {
@@ -675,16 +674,27 @@ export class SalesReturnComponent implements OnInit {
   }
 
 
-  changelistByItem(i) {
+  ChangeListByItem(i) {
     let index = i;
     if (this.salesReturn.InvoiceReturnItems[index].checked === true) {
-      this.salesReturn.InvoiceReturnItems[index].ReturnedQty = this.salesReturn.InvoiceReturnItems[index].Quantity;
+      if (!this.salesReturn.InvoiceReturnItems[index].ReturnedQty) {
+        this.salesReturn.InvoiceReturnItems[index].ReturnedQty = this.salesReturn.InvoiceReturnItems[index].Quantity;
+      }
     }
     else {
       this.salesReturn.InvoiceReturnItems[index].ReturnedQty = 0;
       this.salesReturn.InvoiceReturnItems[index].InvoiceItemsReturnValidator.get('ReturnedQty').clearValidators();
       this.salesReturn.InvoiceReturnItems[index].InvoiceItemsReturnValidator.get('ReturnedQty').updateValueAndValidity();
     }
+
+    let isAllInvoiceChecked = this.salesReturn.InvoiceReturnItems.every(item => item.checked);
+    if (isAllInvoiceChecked) {
+      this.salesReturn.Checked = isAllInvoiceChecked;
+    }
+    else {
+      this.salesReturn.Checked = false;
+    }
+    this.CalculationForPHRMReturnFromCustomerItem(this.salesReturn.InvoiceReturnItems[index], index);
   }
 
   allItems(event) {
@@ -696,6 +706,9 @@ export class SalesReturnComponent implements OnInit {
     else {
       this.salesReturn.InvoiceReturnItems.forEach(item => { item.ReturnedQty = 0; });
     }
+    this.salesReturn.InvoiceReturnItems.forEach((item, index) => {
+      this.CalculationForPHRMReturnFromCustomerItem(item, index);
+    });
   }
   SetCurrentFiscalYear() {
     //We may do this in client side itself since we already have list of all fiscal years with us. [Part of optimization.]
@@ -830,6 +843,17 @@ export class SalesReturnComponent implements OnInit {
         this.schemeData = res.Results.schemeDetails[0];
         let invoiceItems = res.Results.InvoiceItems;
 
+        if (this.PatientDetail && this.PatientDetail.PatientId === -1) {
+          this.IsAnonymousPatient = true;
+          this.messageboxService.showMessage(ENUM_MessageBox_Status.Notice, [`Anonymous Patient is not allowed to return by Hospital No`]);
+          this.ClearField();
+          return;
+        }
+        else {
+
+          this.IsAnonymousPatient = false;
+        }
+
         if (!invoiceItems.length) {
           this.messageboxService.showMessage(ENUM_MessageBox_Status.Notice, [`No Items Found To Return with PaymentMode: ${this.PaymentMode}, Dispensary: ${this.selectedDispensary.Name}, Scheme: ${this.SchemeId ? this.SchemeName : ENUM_PriceCategory.General} within this date range.`]);
           this.ClearField();
@@ -841,12 +865,13 @@ export class SalesReturnComponent implements OnInit {
           this.messageboxService.showMessage(ENUM_MessageBox_Status.Notice, [`InvoiceNo : PH-${invoiceNumbers} is settled. Please return this invoice by InvoiceNo`]);
           return;
         }
-        this.InvoiceDetailToBeReturn.IsCoPayment = this.schemeData.IsCoPayment;
-        this.InvoiceDetailToBeReturn.InvoiceId = invoiceItems[0].InvoiceId;
-        this.InvoiceDetailToBeReturn.InvoiceReturnItems = invoiceItems;
-        this.InvoiceDetailToBeReturn.OrganizationId = this.schemeData.DefaultCreditOrganizationId;
-        this.InvoiceDetailToBeReturn.InvoiceReturnItems.forEach(invitm => {
-          invitm.AvailableQty = invitm.SoldQty - invitm.PreviouslyReturnedQty;
+        this.InvoiceDataToBeReturn.IsCoPayment = this.schemeData.IsCoPayment;
+        this.InvoiceDataToBeReturn.InvoiceId = invoiceItems[0].InvoiceId;
+        this.InvoiceDataToBeReturn.InvoiceReturnItems = invoiceItems;
+        this.InvoiceDataToBeReturn.OrganizationId = invoiceItems[0].OrganizationId;
+        this.InvoiceDataToBeReturn.VisitType = invoiceItems[0].VisitType;
+        this.InvoiceDataToBeReturn.InvoiceReturnItems.forEach(invoiceItem => {
+          invoiceItem.AvailableQty = invoiceItem.SoldQty - invoiceItem.PreviouslyReturnedQty;
         });
       }
       else {
@@ -861,29 +886,41 @@ export class SalesReturnComponent implements OnInit {
 
   }
 
-  CalculationForPHRMReturnfromCustomerItemByHospitalNo(index: number): void {
-    const item = this.InvoiceDetailToBeReturn.InvoiceReturnItems[index];
+  CalculationForPHRMReturnFromCustomerItemByHospitalNo(index: number): void {
+    const item = this.InvoiceDataToBeReturn.InvoiceReturnItems[index];
+    const { DiscountPercentage, VATPercentage, SalePrice, ReturnedQty } = item;
+    const discountFactor = DiscountPercentage / 100;
+    const vatFactor = VATPercentage / 100;
 
-    if (item.SalePrice && item.ReturnedQty <= item.Quantity) {
-      const { DiscountPercentage, VATPercentage, SalePrice, ReturnedQty } = item;
-      const Disct = DiscountPercentage / 100;
-      const vat = VATPercentage / 100;
-
-      item.SubTotal = CommonFunctions.parsePhrmAmount(SalePrice * ReturnedQty);
-      item.DiscountAmount = CommonFunctions.parseAmount(Disct * item.SubTotal);
-      item.TaxableAmount = CommonFunctions.parseAmount(item.SubTotal - item.DiscountAmount);
-      item.VATAmount = CommonFunctions.parseAmount(vat * item.TaxableAmount);
-      item.TotalAmount = CommonFunctions.parseAmount(item.SubTotal - item.DiscountAmount + item.VATAmount);
+    if (item.SalePrice && item.ReturnedQty && item.ReturnedQty <= item.Quantity) {
+      item.SubTotal = CommonFunctions.parseAmount(SalePrice * ReturnedQty, 4);
+      item.DiscountAmount = CommonFunctions.parseAmount(discountFactor * item.SubTotal, 4);
+      item.TaxableAmount = CommonFunctions.parseAmount(item.SubTotal - item.DiscountAmount, 4);
+      item.VATAmount = CommonFunctions.parseAmount(vatFactor * item.TaxableAmount, 4);
+      item.TotalAmount = CommonFunctions.parseAmount(item.SubTotal - item.DiscountAmount + item.VATAmount, 4);
 
       if (item && item.IsCoPayment && this.schemeData.CoPaymentCashPercent) {
         item.ReturnCashAmount = CommonFunctions.parseAmount(item.TotalAmount * this.schemeData.CoPaymentCashPercent / 100, 4);
         item.ReturnCreditAmount = CommonFunctions.parseAmount(item.TotalAmount - item.ReturnCashAmount, 4);
       }
       else {
-        item.ReturnCashAmount = item.TotalAmount;
+        if (this.PaymentMode === ENUM_BillPaymentMode.credit && !this.salesReturn.SettlementId) {
+          item.ReturnCreditAmount = item.TotalAmount;
+        }
+        else {
+          item.ReturnCashAmount = item.TotalAmount;
+        }
       }
-      this.CalculationForPHRMReturnFromCustomerByHospitalNo();
     }
+    else {
+      item.SubTotal = 0;
+      item.DiscountAmount = 0;
+      item.TaxableAmount = 0;
+      item.VATAmount = 0;
+      item.TotalAmount = 0;
+      item.ReturnCashAmount = 0;
+    }
+    this.CalculationForPHRMReturnFromCustomerByHospitalNo();
   }
   CalculationForPHRMReturnFromCustomerByHospitalNo(): void {
     let STotal: number = 0;
@@ -893,101 +930,113 @@ export class SalesReturnComponent implements OnInit {
     let ReturnCreditAmount = 0;
     this.NetReturnedAmount = 0;
 
-    for (var i = 0; i < this.InvoiceDetailToBeReturn.InvoiceReturnItems.length; i++) {
-      if (this.InvoiceDetailToBeReturn.InvoiceReturnItems[i].SubTotal != null && this.InvoiceDetailToBeReturn.InvoiceReturnItems[i].TotalAmount != null && this.InvoiceDetailToBeReturn.InvoiceReturnItems[i].ReturnedQty > 0) {
-        STotal = STotal + this.InvoiceDetailToBeReturn.InvoiceReturnItems[i].SubTotal;
-        this.InvoiceDetailToBeReturn.SubTotal = CommonFunctions.parseAmount(STotal);
+    for (let i = 0; i < this.InvoiceDataToBeReturn.InvoiceReturnItems.length; i++) {
+      if (this.InvoiceDataToBeReturn.InvoiceReturnItems[i].SubTotal != null && this.InvoiceDataToBeReturn.InvoiceReturnItems[i].TotalAmount != null) {
+        STotal = STotal + this.InvoiceDataToBeReturn.InvoiceReturnItems[i].SubTotal;
+        this.InvoiceDataToBeReturn.SubTotal = CommonFunctions.parseAmount(STotal, 4);
 
-        DisAmount = DisAmount + this.InvoiceDetailToBeReturn.InvoiceReturnItems[i].DiscountAmount;
-        this.InvoiceDetailToBeReturn.DiscountAmount = CommonFunctions.parseAmount(DisAmount);
+        DisAmount = DisAmount + this.InvoiceDataToBeReturn.InvoiceReturnItems[i].DiscountAmount;
+        this.InvoiceDataToBeReturn.DiscountAmount = CommonFunctions.parseAmount(DisAmount, 4);
 
-        VATAmount = VATAmount + this.InvoiceDetailToBeReturn.InvoiceReturnItems[i].VATAmount;
-        this.InvoiceDetailToBeReturn.VATAmount = CommonFunctions.parseAmount(VATAmount);
+        VATAmount = VATAmount + this.InvoiceDataToBeReturn.InvoiceReturnItems[i].VATAmount;
+        this.InvoiceDataToBeReturn.VATAmount = CommonFunctions.parseAmount(VATAmount, 4);
 
-        ReturnCashAmount = ReturnCashAmount + this.InvoiceDetailToBeReturn.InvoiceReturnItems[i].ReturnCashAmount;
-        this.InvoiceDetailToBeReturn.ReturnCashAmount = CommonFunctions.parseAmount(ReturnCashAmount, 4);
+        ReturnCashAmount = ReturnCashAmount + this.InvoiceDataToBeReturn.InvoiceReturnItems[i].ReturnCashAmount;
+        this.InvoiceDataToBeReturn.ReturnCashAmount = CommonFunctions.parseAmount(ReturnCashAmount, 4);
 
-        ReturnCreditAmount = ReturnCreditAmount + this.InvoiceDetailToBeReturn.InvoiceReturnItems[i].ReturnCreditAmount;
-        this.InvoiceDetailToBeReturn.ReturnCreditAmount = CommonFunctions.parseAmount(ReturnCreditAmount, 4);
+        ReturnCreditAmount = ReturnCreditAmount + this.InvoiceDataToBeReturn.InvoiceReturnItems[i].ReturnCreditAmount;
+        this.InvoiceDataToBeReturn.ReturnCreditAmount = CommonFunctions.parseAmount(ReturnCreditAmount, 4)
       }
 
-      if (this.InvoiceDetailToBeReturn.InvoiceReturnItems[i].ReturnedQty > 0) {
+      if (this.InvoiceDataToBeReturn.InvoiceReturnItems[i].ReturnedQty > 0) {
         if (this.invoiceHeader && this.invoiceHeader.SettlementId) {
           if (this.invoiceHeader.CashDiscount >= this.DiscountReturnAmount && this.returnAmount > this.DiscountReturnAmount) {
             this.NetReturnedAmount = Number((this.returnAmount - this.DiscountReturnAmount).toFixed(4));
-            this.discountMorethanReturnAmount = false;
+            this.discountMoreThanReturnAmount = false;
           } else {
-            this.discountMorethanReturnAmount = true;
+            this.discountMoreThanReturnAmount = true;
             this.NetReturnedAmount = 0;
           }
         }
       }
 
     }
-    this.InvoiceDetailToBeReturn.DiscountAmount = CommonFunctions.parseAmount(this.InvoiceDetailToBeReturn.DiscountAmount);
-    this.InvoiceDetailToBeReturn.VATAmount = CommonFunctions.parseAmount(this.InvoiceDetailToBeReturn.VATAmount);
-    this.InvoiceDetailToBeReturn.VATPercentage = (this.InvoiceDetailToBeReturn.VATAmount) === 0 ? 0 : (this.InvoiceDetailToBeReturn.VATAmount * 100) / (this.InvoiceDetailToBeReturn.SubTotal - this.InvoiceDetailToBeReturn.DiscountAmount);
-    this.InvoiceDetailToBeReturn.TaxableAmount = this.InvoiceDetailToBeReturn.VATAmount > 0 ? (this.InvoiceDetailToBeReturn.SubTotal - this.InvoiceDetailToBeReturn.DiscountAmount) : 0;
-    this.InvoiceDetailToBeReturn.NonTaxableAmount = this.InvoiceDetailToBeReturn.VATAmount <= 0 ? (this.InvoiceDetailToBeReturn.SubTotal - this.InvoiceDetailToBeReturn.DiscountAmount) : 0;
-    this.InvoiceDetailToBeReturn.TotalAmount = this.InvoiceDetailToBeReturn.SubTotal - this.InvoiceDetailToBeReturn.DiscountAmount + this.InvoiceDetailToBeReturn.VATAmount;
-    this.InvoiceDetailToBeReturn.TotalAmount = CommonFunctions.parseAmount(this.InvoiceDetailToBeReturn.TotalAmount);
-    this.InvoiceDetailToBeReturn.PaidAmount = this.InvoiceDetailToBeReturn.TotalAmount;
-    this.InvoiceDetailToBeReturn.Tender = this.InvoiceDetailToBeReturn.TotalAmount;
-    this.InvoiceDetailToBeReturn.Change = CommonFunctions.parseAmount(this.InvoiceDetailToBeReturn.Tender - this.InvoiceDetailToBeReturn.TotalAmount);
+    this.InvoiceDataToBeReturn.DiscountAmount = CommonFunctions.parseAmount(this.InvoiceDataToBeReturn.DiscountAmount, 4);
+    this.InvoiceDataToBeReturn.VATAmount = CommonFunctions.parseAmount(this.InvoiceDataToBeReturn.VATAmount, 4);
+    this.InvoiceDataToBeReturn.VATPercentage = (this.InvoiceDataToBeReturn.VATAmount) === 0 ? 0 : (this.InvoiceDataToBeReturn.VATAmount * 100) / (this.InvoiceDataToBeReturn.SubTotal - this.InvoiceDataToBeReturn.DiscountAmount);
+    this.InvoiceDataToBeReturn.TaxableAmount = this.InvoiceDataToBeReturn.VATAmount > 0 ? (this.InvoiceDataToBeReturn.SubTotal - this.InvoiceDataToBeReturn.DiscountAmount) : 0;
+    this.InvoiceDataToBeReturn.NonTaxableAmount = this.InvoiceDataToBeReturn.VATAmount <= 0 ? (this.InvoiceDataToBeReturn.SubTotal - this.InvoiceDataToBeReturn.DiscountAmount) : 0;
+    this.InvoiceDataToBeReturn.TotalAmount = this.InvoiceDataToBeReturn.SubTotal - this.InvoiceDataToBeReturn.DiscountAmount + this.InvoiceDataToBeReturn.VATAmount;
+    this.InvoiceDataToBeReturn.TotalAmount = CommonFunctions.parseAmount(this.InvoiceDataToBeReturn.TotalAmount, 4);
+    this.returnAmount = this.InvoiceDataToBeReturn.ReturnCashAmount;
+    this.InvoiceDataToBeReturn.PaidAmount = this.InvoiceDataToBeReturn.TotalAmount;
+    this.InvoiceDataToBeReturn.Tender = this.InvoiceDataToBeReturn.TotalAmount;
+    this.InvoiceDataToBeReturn.Change = CommonFunctions.parseAmount(this.InvoiceDataToBeReturn.Tender - this.InvoiceDataToBeReturn.TotalAmount, 4);
   }
 
-  onValueChage(index): void {
-    const item = this.InvoiceDetailToBeReturn.InvoiceReturnItems[index];
+  onValueChange(index): void {
+    const item = this.InvoiceDataToBeReturn.InvoiceReturnItems[index];
     item.Checked = item.ReturnedQty !== 0 && item.ReturnedQty !== null;
-    this.ChangelistByItem(index);
+    this.ChangeListByItemUsingHospitalNo(index);
     this.CheckIfAllItemIsChecked();
   }
 
   AllItems(event): void {
     const checked = event.target.checked;
-    this.InvoiceDetailToBeReturn.InvoiceReturnItems.forEach(item => item.Checked = checked);
+    this.InvoiceDataToBeReturn.InvoiceReturnItems.forEach(item => item.Checked = checked);
     if (checked === true) {
-      this.InvoiceDetailToBeReturn.InvoiceReturnItems.forEach(item => { item.ReturnedQty = item.Quantity; });
+      this.InvoiceDataToBeReturn.InvoiceReturnItems.forEach((item, i) => {
+        item.ReturnedQty = item.Quantity;
+        this.CalculationForPHRMReturnFromCustomerItemByHospitalNo(i);
+      });
     }
     else {
-      this.InvoiceDetailToBeReturn.InvoiceReturnItems.forEach(item => { item.ReturnedQty = 0; });
+      this.InvoiceDataToBeReturn.InvoiceReturnItems.forEach((item, i) => {
+        item.ReturnedQty = 0;
+        this.CalculationForPHRMReturnFromCustomerItemByHospitalNo(i);
+      });
     }
   }
 
-  ChangelistByItem(i): void {
-    let index = i;
-    if (this.InvoiceDetailToBeReturn.InvoiceReturnItems[index].Checked === false) {
-      this.InvoiceDetailToBeReturn.InvoiceReturnItems[index].ReturnedQty = 0;
+  ChangeListByItemUsingHospitalNo(index: number): void {
+    if (this.InvoiceDataToBeReturn.InvoiceReturnItems[index].Checked === false) {
+      this.InvoiceDataToBeReturn.InvoiceReturnItems[index].ReturnedQty = 0;
+    }
+    else {
+      if (!this.InvoiceDataToBeReturn.InvoiceReturnItems[index].ReturnedQty) {
+        this.InvoiceDataToBeReturn.InvoiceReturnItems[index].ReturnedQty = this.InvoiceDataToBeReturn.InvoiceReturnItems[index].AvailableQty;
+      }
     }
     this.CheckIfAllItemIsChecked();
+    this.CalculationForPHRMReturnFromCustomerItemByHospitalNo(index);
   }
 
   CheckIfAllItemIsChecked(): void {
-    if (this.InvoiceDetailToBeReturn.InvoiceReturnItems.every(i => i.ReturnedQty > 0)) {
-      this.InvoiceDetailToBeReturn.Checked = true;
+    if (this.InvoiceDataToBeReturn.InvoiceReturnItems.every(i => i.ReturnedQty > 0)) {
+      this.InvoiceDataToBeReturn.Checked = true;
     } else {
-      this.InvoiceDetailToBeReturn.Checked = false;
+      this.InvoiceDataToBeReturn.Checked = false;
     }
   }
 
   SaveMultipleInvoiceItemReturnFromCustomer(): void {
-    const { InvoiceDetailToBeReturn, PaymentMode, schemeData, PatientDetail, messageboxService } = this;
-    InvoiceDetailToBeReturn.CounterId = this.currentCounter;
-    InvoiceDetailToBeReturn.StoreId = this.storeId;
-    InvoiceDetailToBeReturn.FiscalYearId = InvoiceDetailToBeReturn.InvoiceReturnItems[0].FiscalYearId;
-    InvoiceDetailToBeReturn.PaymentMode = PaymentMode;
-    InvoiceDetailToBeReturn.SchemeId = schemeData.SchemeId;
-    InvoiceDetailToBeReturn.IsCoPayment = schemeData.IsCoPayment;
-    InvoiceDetailToBeReturn.PatientId = PatientDetail.PatientId;
-    InvoiceDetailToBeReturn.VisitType = PatientDetail.VisitType;
+    const { InvoiceDataToBeReturn, PaymentMode, schemeData, PatientDetail, messageboxService } = this;
+    InvoiceDataToBeReturn.CounterId = this.currentCounter;
+    InvoiceDataToBeReturn.StoreId = this.storeId;
+    InvoiceDataToBeReturn.FiscalYearId = InvoiceDataToBeReturn.InvoiceReturnItems[0].FiscalYearId;
+    InvoiceDataToBeReturn.PaymentMode = PaymentMode;
+    InvoiceDataToBeReturn.SchemeId = schemeData.SchemeId;
+    InvoiceDataToBeReturn.IsCoPayment = schemeData.IsCoPayment;
+    InvoiceDataToBeReturn.PatientId = PatientDetail.PatientId;
+    // InvoiceDataToBeReturn.VisitType = PatientDetail.VisitType;
 
-    InvoiceDetailToBeReturn.InvoiceReturnItems.forEach(itm => {
+    InvoiceDataToBeReturn.InvoiceReturnItems.forEach(itm => {
       itm.PatientId = PatientDetail.PatientId;
       itm.SchemeId = schemeData.SchemeId;
       itm.IsCoPayment = schemeData.IsCoPayment;
     });
 
-    const filteredInvoiceReturnItems = InvoiceDetailToBeReturn.InvoiceReturnItems.filter(itm => itm.ReturnedQty > 0);
+    const filteredInvoiceReturnItems = InvoiceDataToBeReturn.InvoiceReturnItems.filter(itm => itm.ReturnedQty > 0);
     if (!filteredInvoiceReturnItems.length) {
       messageboxService.showMessage(ENUM_MessageBox_Status.Notice, ['No Item Found to Return']);
       return;
@@ -997,19 +1046,19 @@ export class SalesReturnComponent implements OnInit {
       messageboxService.showMessage(ENUM_MessageBox_Status.Notice, ['Return Quantity should not be greater than SoldQuantity']);
       return;
     }
-    if (!InvoiceDetailToBeReturn.Remarks) {
+    if (!InvoiceDataToBeReturn.Remarks) {
       messageboxService.showMessage(ENUM_MessageBox_Status.Notice, ['Remarks is mandatory']);
       return;
     }
-    InvoiceDetailToBeReturn.InvoiceReturnItems = filteredInvoiceReturnItems;
+    InvoiceDataToBeReturn.InvoiceReturnItems = filteredInvoiceReturnItems;
 
     let param = this.coreService.Parameters.find(p => p.ParameterName === "RestrictReturnDays" && p.ParameterGroupName === "Pharmacy");
     const paramValue = JSON.parse(param.ParameterValue);
 
     let InvalidItems = [];
-    InvoiceDetailToBeReturn.InvoiceReturnItems.forEach((i, index) => {
+    InvoiceDataToBeReturn.InvoiceReturnItems.forEach((i, index) => {
       if (i.Checked) {
-        const visitType = this.PatientDetail.VisitType === ENUM_VisitType.inpatient ? ENUM_VisitType.inpatient : ENUM_VisitType.outpatient;
+        const visitType = this.PatientDetail.VisitType;
         if (visitType === ENUM_VisitType.inpatient) {
           if (moment().diff(moment(i.CreatedOn), 'days') > paramValue.IPVisit) {
             InvalidItems.push(`S.N:${index + 1} ` + i.ItemName);
@@ -1027,14 +1076,146 @@ export class SalesReturnComponent implements OnInit {
       if (this.PatientDetail.VisitType === ENUM_VisitType.inpatient) {
         this.messageboxService.showMessage(ENUM_MessageBox_Status.Notice, [`Items with name: <br>  <b>${InvalidItems.join('<br>')}</b><br> not allowed to return after ${paramValue.IPVisit} days of invoice date.`, `Unchecked these items to return invoice`]);
       }
-      if (this.PatientDetail.VisitType === ENUM_VisitType.outpatient) {
+      if (this.PatientDetail.VisitType === ENUM_VisitType.outpatient || this.PatientDetail.VisitType === ENUM_VisitType.emergency) {
         this.messageboxService.showMessage(ENUM_MessageBox_Status.Notice, [`Items with name: <br> <b>${InvalidItems.join('<br>')}</b> <br> not allowed to return after ${paramValue.OPVisit} days of invoice date.`, `Unchecked these items to return invoice`]);
       }
       return;
     }
 
+    // Step 1: Group by InvoiceId
+    // const groupedData: { [key: number]: InvoiceItemDetailToBeReturn[] } = this.InvoiceDataToBeReturn.InvoiceReturnItems.reduce((acc, item) => {
+    //   if (!acc[item.InvoiceId]) {
+    //     acc[item.InvoiceId] = [];
+    //   }
+    //   acc[item.InvoiceId].push(item);
+    //   return acc;
+    // }, {} as { [key: number]: InvoiceItemDetailToBeReturn[] });
+
+
+    // const groupedData: { [key: string]: InvoiceItemDetailToBeReturn[] } = 
+    // this.InvoiceDataToBeReturn.InvoiceReturnItems.reduce((acc, item) => {
+    //   const groupKey = `${item.InvoiceId}-${item.VisitType}`;
+    //   if (!acc[groupKey]) {
+    //     acc[groupKey] = [];
+    //   }
+    //   acc[groupKey].push(item);
+    //   return acc;
+    // }, {} as { [key: string]: InvoiceItemDetailToBeReturn[] });
+
+
+    const groupedData: { [invoiceIdVisitType: string]: InvoiceItemDetailToBeReturn[] } =
+      this.InvoiceDataToBeReturn.InvoiceReturnItems.reduce((acc, item) => {
+        const groupKey = `${item.InvoiceId}_${item.VisitType}`;
+        (acc[groupKey] = acc[groupKey] || []).push(item);
+        return acc;
+      }, {} as { [invoiceIdVisitType: string]: InvoiceItemDetailToBeReturn[] });
+
+
+    console.log(groupedData);
+
+    // Step 2: Create SalesReturnInfo and SalesReturnItems structure
+
+    let salesReturnInvoices = new Array<InvoiceDetailToBeReturn>();
+
+    // Object.keys(groupedData).map(invoiceId => {
+    //   let salesReturnInvoice = new InvoiceDetailToBeReturn();
+    //   const items = groupedData[Number(invoiceId)];
+    //   salesReturnInvoice.CounterId = this.currentCounter;
+    //   salesReturnInvoice.StoreId = this.storeId;
+    //   salesReturnInvoice.FiscalYearId = this.InvoiceDataToBeReturn.InvoiceReturnItems[0].FiscalYearId;
+    //   salesReturnInvoice.OrganizationId = this.InvoiceDataToBeReturn.OrganizationId;
+    //   salesReturnInvoice.PaymentMode = PaymentMode;
+    //   salesReturnInvoice.SchemeId = schemeData.SchemeId;
+    //   salesReturnInvoice.IsCoPayment = schemeData.IsCoPayment;
+    //   salesReturnInvoice.PatientId = PatientDetail.PatientId;
+    //   // salesReturnInvoice.VisitType = PatientDetail.VisitType;
+    //   salesReturnInvoice.SettlementId = this.invoiceHeader.SettlementId;
+    //   salesReturnInvoice.InvoiceId = Number(invoiceId);
+    //   salesReturnInvoice.Remarks = this.InvoiceDataToBeReturn.Remarks;
+    //   salesReturnInvoice.OrganizationId = this.InvoiceDataToBeReturn.OrganizationId;
+    //   if (items && items.length) {
+    //     items.forEach(item => {
+    //       salesReturnInvoice.InvoiceReturnItems.push(Object.assign(new InvoiceItemDetailToBeReturn(), item));
+    //       salesReturnInvoice.PriceCategoryId = item.PriceCategoryId;
+    //       salesReturnInvoice.ClaimCode = item.ClaimCode;
+    //     });
+    //   }
+
+    //   salesReturnInvoices.push(salesReturnInvoice);
+    // });
+
+    Object.keys(groupedData).map(groupKey => {
+      let salesReturnInvoice = new InvoiceDetailToBeReturn();
+
+      // Extract InvoiceId and VisitType from the composite key
+      const [invoiceId, visitType] = groupKey.split('_');
+
+      const items = groupedData[groupKey];
+      salesReturnInvoice.CounterId = this.currentCounter;
+      salesReturnInvoice.StoreId = this.storeId;
+      salesReturnInvoice.FiscalYearId = this.InvoiceDataToBeReturn.InvoiceReturnItems[0].FiscalYearId;
+      salesReturnInvoice.OrganizationId = this.InvoiceDataToBeReturn.OrganizationId;
+      salesReturnInvoice.PaymentMode = PaymentMode;
+      salesReturnInvoice.SchemeId = schemeData.SchemeId;
+      salesReturnInvoice.IsCoPayment = schemeData.IsCoPayment;
+      salesReturnInvoice.PatientId = PatientDetail.PatientId;
+      salesReturnInvoice.VisitType = visitType; // Set VisitType
+      salesReturnInvoice.SettlementId = this.invoiceHeader.SettlementId;
+      salesReturnInvoice.InvoiceId = Number(invoiceId);
+      salesReturnInvoice.Remarks = this.InvoiceDataToBeReturn.Remarks;
+      salesReturnInvoice.OrganizationId = this.InvoiceDataToBeReturn.OrganizationId;
+
+      if (items && items.length) {
+        items.forEach(item => {
+          salesReturnInvoice.InvoiceReturnItems.push(Object.assign(new InvoiceItemDetailToBeReturn(), item));
+          salesReturnInvoice.PriceCategoryId = item.PriceCategoryId;
+          salesReturnInvoice.ClaimCode = item.ClaimCode;
+        });
+      }
+
+      salesReturnInvoices.push(salesReturnInvoice);
+    });
+
+
+    console.log(salesReturnInvoices);
+    salesReturnInvoices.forEach(invoice => {
+      let subtotal = invoice.InvoiceReturnItems.reduce((acc, item) => acc + item.SubTotal, 0);
+      invoice.SubTotal = CommonFunctions.parseAmount(subtotal, 4);
+
+      let discountAmount = invoice.InvoiceReturnItems.reduce((acc, item) => acc + item.DiscountAmount, 0);
+      invoice.DiscountAmount = CommonFunctions.parseAmount(discountAmount, 4);
+
+      let discountPercentage = invoice.DiscountAmount / invoice.SubTotal * 100;
+      invoice.DiscountPercentage = CommonFunctions.parseAmount(discountPercentage, 4);
+
+      let vatAmount = invoice.InvoiceReturnItems.reduce((acc, item) => acc + item.VATAmount, 0);
+      invoice.VATAmount = CommonFunctions.parseAmount(vatAmount, 4);
+
+      let vatPercentage = invoice.VATAmount / (invoice.SubTotal - invoice.DiscountAmount) * 100;
+      invoice.VATPercentage = CommonFunctions.parseAmount(vatPercentage, 4);
+
+      let taxableAmount = invoice.InvoiceReturnItems.reduce((acc, item) => acc + item.TaxableAmount, 0);
+      invoice.TaxableAmount = CommonFunctions.parseAmount(taxableAmount, 4);
+
+      invoice.NonTaxableAmount = CommonFunctions.parseAmount(invoice.DiscountAmount, 4);
+
+      let returnCashAmount = invoice.InvoiceReturnItems.reduce((acc, item) => acc + item.ReturnCashAmount, 0);
+      let returnCreditAmount = invoice.InvoiceReturnItems.reduce((acc, item) => acc + item.ReturnCreditAmount, 0);
+
+      invoice.ReturnCashAmount = CommonFunctions.parseAmount(returnCashAmount, 4);
+      invoice.ReturnCreditAmount = CommonFunctions.parseAmount(returnCreditAmount, 4);
+
+      invoice.TotalAmount = CommonFunctions.parseAmount(invoice.SubTotal - invoice.DiscountAmount + invoice.VATAmount, 4);
+
+      let paidAmount = invoice.InvoiceReturnItems.reduce((acc, item) => acc + item.TotalAmount, 0);
+      invoice.PaidAmount = CommonFunctions.parseAmount(paidAmount, 4);
+      invoice.Tender = invoice.PaidAmount;
+      invoice.Change = invoice.Tender - invoice.PaidAmount;
+    })
+
+
     this.loading = true;
-    this.pharmacyBLService.PostMultipleInvoiceItemReturnFromCustomer(this.InvoiceDetailToBeReturn)
+    this.pharmacyBLService.PostMultipleInvoiceItemReturnFromCustomer(salesReturnInvoices)
       .finally(() => {
         this.loading = false;
       })
@@ -1044,23 +1225,29 @@ export class SalesReturnComponent implements OnInit {
           this.ClearField();
           this.HospitalNo = null;
           this.selectedDispensary = new PHRMStoreModel();
-          this.InvoiceReturnId = res.Results;
+          if (res.Results && res.Results.length) {
+            this.InvoiceReturnIds = res.Results;
+          }
+          else {
+            this.InvoiceReturnId = res.Results;
+          }
           this.showSaleItemsPopup = true;
         }
         else {
-          this.messageboxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed To Return Invoice']);
+          this.messageboxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed To Return Invoice. <br>' + res.ErrorMessage]);
         }
       },
         err => {
-          this.messageboxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed To Return Invoice']);
+          this.messageboxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed To Return Invoice. <br>' + err]);
         });
   }
 
   ClearField(): void {
-    this.InvoiceDetailToBeReturn = new InvoiceDetailToBeReturn();
+    this.InvoiceDataToBeReturn = new InvoiceDetailToBeReturn();
     this.PatientDetail = new PatientModel();
     this.salesReturn = new PHRMInvoiceReturnModel();
-    this.InvoiceDetailToBeReturn = new InvoiceDetailToBeReturn();
+    this.InvoiceDataToBeReturn = new InvoiceDetailToBeReturn();
+    this.showManualReturnForm = false;
   }
   onReturnByChange(): void {
     this.PaymentMode = (this.ReturnBy === ENUM_Dispensary_ReturnInvoiceBy.HospitalNumber) ? 'cash' : null;
@@ -1106,10 +1293,10 @@ export class SalesReturnComponent implements OnInit {
             }
           }
           else {
-            let defaultMemb = this.membershipList.find(a => a.SchemeName.toLowerCase() == "general");
-            if (defaultMemb) {
-              this.selMembershipId = defaultMemb.SchemeId;
-              this.selectedCommunityName = defaultMemb.CommunityName;
+            let defaultMembership = this.membershipList.find(a => a.SchemeName.toLowerCase() == "general");
+            if (defaultMembership) {
+              this.selMembershipId = defaultMembership.SchemeId;
+              this.selectedCommunityName = defaultMembership.CommunityName;
             }
           }
           this.filteredMembershipList = this.membershipList;
@@ -1129,6 +1316,19 @@ export class SalesReturnComponent implements OnInit {
       if (this.filteredMembershipList.length == 1) {
         this.selMembershipId = this.filteredMembershipList[0].SchemeId;
         this.SchemeId = this.selMembershipId;
+      }
+    }
+  }
+
+  GetSalesReturnConfigurationParameter() {
+    let salesReturnConfigParameter = this.coreService.Parameters.find(p => p.ParameterName === "SalesReturnConfig" && p.ParameterGroupName === "Pharmacy");
+    if (salesReturnConfigParameter) {
+      this.SalesReturnConfig = JSON.parse(salesReturnConfigParameter.ParameterValue);
+      if (this.SalesReturnConfig && this.SalesReturnConfig.ReturnByHospitalNo) {
+        this.ReturnBy = this.SalesReturnConfig.ReturnByInvoiceNo ? ENUM_Dispensary_ReturnInvoiceBy.BillNumber : ENUM_Dispensary_ReturnInvoiceBy.HospitalNumber;
+      }
+      else {
+        this.ReturnBy = ENUM_Dispensary_ReturnInvoiceBy.BillNumber;
       }
     }
   }

@@ -83,7 +83,9 @@ export class BIL_Print_ProvisionalCancellationReceiptComponent {
       res => {
         if (res.Status === ENUM_DanpheHTTPResponseText.OK) {
           this.ProvisionalDetails = res.Results;
-
+          if (this.ProvisionalDetails && this.ProvisionalDetails.DateOfBirth) {
+            this.ProvisionalDetails.Age = this.coreService.CalculateAge(this.ProvisionalDetails.DateOfBirth);
+          }
           this.CalculateTotalAmounts(this.ProvisionalDetails);
           this.isReceiptLoaded = true;
           this.coreService.FocusInputById("btnPrintProvisionalCancelReceipt");//focus on print button after provisional slip is loaded.

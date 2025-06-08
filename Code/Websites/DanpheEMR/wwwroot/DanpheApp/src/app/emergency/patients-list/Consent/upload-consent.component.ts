@@ -1,81 +1,92 @@
-import { Component, Input, Output, EventEmitter, HostListener, ViewChild, OnDestroy } from '@angular/core';
-import { SecurityService } from '../../../security/shared/security.service';
-import { CoreService } from '../../../core/shared/core.service';
-import{MessageboxService} from '../../../shared/messagebox/messagebox.service';
-import {UploadCosentFormModel} from '../../shared/upload-consent-form.Model';
+import { Component, EventEmitter, Input, Output, ViewChild } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import * as moment from 'moment/moment';
-import { EmergencyBLService } from '../../shared/emergency.bl.service';
-import { EmergencyPatientModel } from '../../shared/emergency-patient.model';
+import { CoreService } from '../../../core/shared/core.service';
 import { Patient } from '../../../patients/shared/patient.model';
+import { SecurityService } from '../../../security/shared/security.service';
+import { MessageboxService } from '../../../shared/messagebox/messagebox.service';
+import { ENUM_MessageBox_Status } from '../../../shared/shared-enums';
+import { ERGetConsentForm_DTO } from '../../shared/dto/er-get-consent-form.dto';
+import { EmergencyPatientModel } from '../../shared/emergency-patient.model';
+import { EmergencyBLService } from '../../shared/emergency.bl.service';
+import { UploadCosentFormModel } from '../../shared/upload-consent-form.Model';
 
 @Component({
-    selector: 'upload-consent',
-    templateUrl: "./upload-consent.component.html"
-  })
+  selector: 'upload-consent',
+  templateUrl: "./upload-consent.component.html",
+  host: { '(window:keyup)': 'hotkeys($event)' }
+})
 
-  export class uploadConsentAcionComponent {
-    @Input("ERPatientId")
-    public ERPatientId: any;
-  
-    @Input("patientDetail")
-    public patientDetail: Patient=new Patient;
-    @ViewChild("fileInput") fileInput;
+export class uploadConsentAcionComponent {
+  @Input("ERPatientId")
+  public ERPatientId: any;
 
-    public loading: boolean = false;
-    @Output("callBackClose")
-    public callBackFileUploadClose: EventEmitter<Object> = new EventEmitter<Object>();
+  @Input("patientDetail")
+  public patientDetail: Patient = new Patient;
+  @ViewChild("fileInput") fileInput;
 
-    public uploadedDocumentslist: Array<UploadCosentFormModel> = new Array<UploadCosentFormModel>();
-    public selectedFile: UploadCosentFormModel = new UploadCosentFormModel();
-    public selectedERPatientToEdit: EmergencyPatientModel = new EmergencyPatientModel();
-  constructor(public securityService: SecurityService, 
+  public loading: boolean = false;
+  @Output("callBackClose")
+  public callBackFileUploadClose: EventEmitter<Object> = new EventEmitter<Object>();
+
+  public uploadedDocumentslist: Array<ERGetConsentForm_DTO> = new Array<ERGetConsentForm_DTO>();
+  public selectedFile: UploadCosentFormModel = new UploadCosentFormModel();
+  public selectedERPatientToEdit: EmergencyPatientModel = new EmergencyPatientModel();
+  fileSrc: SafeResourceUrl;
+  FileName: string = "";
+  ShowImageFilePreviewPopUp: boolean = false;
+  IsInitialLoad: boolean = false;
+
+  constructor(public securityService: SecurityService,
     public coreService: CoreService,
-    public emergencyBLService:EmergencyBLService, 
+    public emergencyBLService: EmergencyBLService,
     public msgBoxServ: MessageboxService,
+    private _sanitizer: DomSanitizer
   ) {
 
   }
   ngOnInit() {
-    this.GetConsentFormUploadList()
+    this.IsInitialLoad = true;
+    this.GetConsentFormUploadList();
   }
   SubmitFiles() {
     try {
       this.loading = true;
-       ///Takes Files 
-       let files = null;
-       files = this.fileInput.nativeElement.files;
+      ///Takes Files 
+      let files = null;
+      files = this.fileInput.nativeElement.files;
       //Check Validation 
       for (var i in this.selectedFile.FileUploadValidator.controls) {
         this.selectedFile.FileUploadValidator.controls[i].markAsDirty();
         this.selectedFile.FileUploadValidator.controls[i].updateValueAndValidity();
-    }
+      }
       if (this.selectedFile && !this.selectedFile.DisplayName && this.selectedFile.DisplayName.trim().length == 0) {
         this.loading = false;
-        this.msgBoxServ.showMessage("error", ["Please Enter display name"]); return;
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please Enter display name"]); return;
       }
-      if(this.selectedFile && this.selectedFile.DisplayName && this.selectedFile.DisplayName.trim().length > 0){
+      if (this.selectedFile && this.selectedFile.DisplayName && this.selectedFile.DisplayName.trim().length > 0) {
         let duplicateName = this.uploadedDocumentslist.find(x => x.DisplayName == this.selectedFile.DisplayName)
-        if(!!duplicateName){
+        if (!!duplicateName) {
           this.loading = false;
-          this.msgBoxServ.showMessage("error", ["Duplicate File name not allowed"]); 
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Duplicate File name not allowed"]);
           return;
         }
-    } 
-     
+      }
+
       if (this.ValidateFileSize(files)) {
         if (files.length) {
-          if (this.selectedFile && this.selectedFile.FileType !=".pdf") {
+          if (this.selectedFile && this.selectedFile.FileType != ".pdf") {
             this.selectedFile.FileName = this.selectedFile.DisplayName + "_" + moment().format('DDMMYY');
             this.selectedFile.PatientId = this.patientDetail.PatientId;
-           this.selectedFile.ERPatientId = this.ERPatientId;
-           console.log(this.selectedFile);
+            this.selectedFile.ERPatientId = this.ERPatientId;
+            console.log(this.selectedFile);
             console.log(files);
-            this.AddReport(files,this.selectedFile);
+            this.AddReport(files, this.selectedFile);
             this.loading = false;
           }
         }
         else {
-          this.msgBoxServ.showMessage("error", ["Please Select Report File "]);
+          this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Please Select Report File "]);
           this.loading = false;
         }
       }
@@ -88,7 +99,7 @@ import { Patient } from '../../../patients/shared/patient.model';
   public ShowCatchErrMessage(exception) {
     if (exception) {
       let ex: Error = exception;
-      this.msgBoxServ.showMessage("error", ["Check error in Console log !"]);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, ["Check error in Console log !"]);
       this.Close();
     }
 
@@ -96,6 +107,8 @@ import { Patient } from '../../../patients/shared/patient.model';
   }
   Close() {
     this.callBackFileUploadClose.emit({ close: true });
+    console.log('Event emitted with data:', { close: true });
+
   }
   public ValidateFileSize(files) {
     let flag = true;
@@ -115,7 +128,7 @@ import { Patient } from '../../../patients/shared/patient.model';
       return flag;
     }
   }
-  AddReport(filesToUpload,selFile): void {
+  AddReport(filesToUpload, selFile): void {
     this.loading = true;
     try {
       ///Read Files and patientFilesModel Data to Some Variable           
@@ -127,46 +140,77 @@ import { Patient } from '../../../patients/shared/patient.model';
               this.fileInput.Value = null;
               this.fileInput.nativeElement.value = "";
               this.GetConsentFormUploadList();
-              this.msgBoxServ.showMessage("success", ['File Uploded']);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['File Uploded']);
               this.loading = false;
             }
             else {
-              this.msgBoxServ.showMessage("failed", [res.ErrorMessage]);
+              this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, [res.ErrorMessage]);
               this.loading = false;
             }
           },
-            err => { this.msgBoxServ.showMessage("error", [err.ErrorMessage]); this.loading = false; }
+            err => { this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Error, [err.ErrorMessage]); this.loading = false; }
           );
       }
     } catch (exception) {
       this.ShowCatchErrMessage(exception);
     }
   }
-   RemoveFile(Fileid) {
+  RemoveFile(Fileid) {
     this.emergencyBLService.DeleteFile(Fileid).subscribe((res) => {
       if (res.Status == 'OK') {
+        console.log(this.uploadedDocumentslist);
         this.uploadedDocumentslist = this.uploadedDocumentslist.filter(p => (p.FileId != Fileid)).slice();
-        this.msgBoxServ.showMessage('success', ['File successfully removed']);
+        this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Success, ['File successfully removed']);
       }
     }, err => {
-      this.msgBoxServ.showMessage('failed', ['Failed to Remove File']);
+      this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to Remove File']);
     });
   }
-  GetConsentFormUploadList() {
+  GetConsentFormUploadList(): void {
     this.emergencyBLService.GetConsentFormUploadList(this.ERPatientId)
-    .subscribe((res) => {
-      if (res.Status == 'OK') {
-        this.uploadedDocumentslist = res.Results }
-    }, err => {
-      this.msgBoxServ.showMessage('failed', ['Failed to Load Maternity Patient File List']);
-    });
+      .subscribe((res) => {
+        if (res.Status == 'OK') {
+          this.uploadedDocumentslist = res.Results.allFileList;
+          if (res.Results.filesNotFoundCount && this.IsInitialLoad) {
+            this.msgBoxServ.showMessage(ENUM_MessageBox_Status.Notice, [`Additional ${res.Results.filesNotFoundCount} Patient File(s) can't be retrieved from the current location.`]);
+            this.IsInitialLoad = false;
+          }
+          console.log(`Uploaded files are: ${this.uploadedDocumentslist}`);
+        }
+      }, err => {
+        this.msgBoxServ.showMessage('failed', ['Failed to Load Patient Consent File List']);
+      });
   }
-  download(id) {
-    this.emergencyBLService.GetFileFromServer(id).subscribe((event) => {
-      this.downloadFile(event);
-    },
-      err => this.msgBoxServ.showMessage("error", ["Could not download file now"]));
+
+  /**
+   * 
+   * @param file : Object of ERGetConsentForm_DTO
+   * @returns void
+   * @description created by Sanjeev on 9th-Jul-2024 : It is used to convert Image Binary Data into Image And Download that Image 
+   */
+  DownloadConsent(file: ERGetConsentForm_DTO): void {
+    if (file && file.BinaryData) {
+      const base64Data = file.BinaryData.split(',')[1];
+      if (base64Data) {
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const blob = new Blob([bytes], { type: file.FileType });
+        const fileName = `${file.DisplayName}${file.FileType}`;
+        const linkSource = file.BinaryData;
+        const downloadLink = document.createElement('a');
+
+        downloadLink.href = linkSource;
+        downloadLink.download = fileName;
+        downloadLink.href = URL.createObjectURL(blob);
+        downloadLink.click();
+      }
+    }
   }
+
   downloadFile(data: Blob) {
     const downloadedFile = new Blob([data], { type: data.type });
     const a = document.createElement('a');
@@ -179,4 +223,39 @@ import { Patient } from '../../../patients/shared/patient.model';
     a.click();
     document.body.removeChild(a);
   }
+
+  /**
+   * 
+   * @param file : Object of ERGetConsentForm_DTO
+   * @returns void
+   * @description It is used to convert Image Binary Data into Image And Preview that Image 
+   */
+  PreviewConsent(file: ERGetConsentForm_DTO): void {
+    if (file && file.BinaryData) {
+      const base64Data = file.BinaryData.split(',')[1];
+      if (base64Data) {
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: file.FileType });
+        this.fileSrc = this._sanitizer.bypassSecurityTrustResourceUrl(URL.createObjectURL(blob));
+        this.FileName = file.DisplayName;
+        this.ShowImageFilePreviewPopUp = true;
+      }
+    }
   }
+
+  CloseFilePreviewPopUp(): void {
+    this.ShowImageFilePreviewPopUp = false;
+  }
+
+  hotkeys(event): void {
+    if (event.keyCode === 27) {
+      if (this.ShowImageFilePreviewPopUp) {
+        this.CloseFilePreviewPopUp();
+      }
+    }
+  }
+}

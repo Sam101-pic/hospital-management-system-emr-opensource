@@ -17,6 +17,7 @@ import { PharmacyProvisionalReturnReceipt_DTO } from "./pharmacy-provisional-ret
 export class PharmacyProvisionalReturnInvoicePrintComponent {
 
     @Input('return-receipt-no') public ReturnReceiptNo: number = 0;
+    @Input('fiscal-year-id') public FiscalYearId: number = 0;
     ProvisionalInvoiceReturn: PharmacyProvisionalReturnReceipt_DTO = new PharmacyProvisionalReturnReceipt_DTO();
     IsItemLevelVATApplicable: boolean = false;
     IsMainVATApplicable: boolean = false;
@@ -38,6 +39,7 @@ export class PharmacyProvisionalReturnInvoicePrintComponent {
     public GeneralFieldLabel = new GeneralFieldLabels();
     @Output("call-back-print") callBackPrint: EventEmitter<object> = new EventEmitter();
 
+    showRackNoInPrint: boolean = false;
 
     constructor(public coreService: CoreService,
         public pharmacyBLService: PharmacyBLService,
@@ -46,6 +48,8 @@ export class PharmacyProvisionalReturnInvoicePrintComponent {
         private changeDetector: ChangeDetectorRef
     ) {
         this.GeneralFieldLabel = coreService.GetFieldLabelParameter();
+        this.GetRackNoParameterSettings();
+
     }
 
     ngOnInit() {
@@ -54,7 +58,7 @@ export class PharmacyProvisionalReturnInvoicePrintComponent {
         this.GetPharmacyBillingHeaderParameter();
         this.GetPharmacyItemNameDisplaySettings();
         if (this.ReturnReceiptNo) {
-            this.GetProvisionalReturnReceipt(this.ReturnReceiptNo)
+            this.GetProvisionalReturnReceipt(this.ReturnReceiptNo, this.FiscalYearId)
         }
     }
 
@@ -166,8 +170,8 @@ export class PharmacyProvisionalReturnInvoicePrintComponent {
         this.callBackPrint.emit();
     }
 
-    GetProvisionalReturnReceipt(CancelReceiptNo: number) {
-        this.pharmacyBLService.GetProvisionalReturnReceipt(CancelReceiptNo).subscribe((res: DanpheHTTPResponse) => {
+    GetProvisionalReturnReceipt(CancelReceiptNo: number, FiscalYearId: number) {
+        this.pharmacyBLService.GetProvisionalReturnReceipt(CancelReceiptNo, FiscalYearId).subscribe((res: DanpheHTTPResponse) => {
             if (res.Status === ENUM_DanpheHTTPResponses.OK) {
                 this.ProvisionalInvoiceReturn = res.Results;
                 this.UpdateItemDisplayName(this.showGenericName, this.showItemName, this.LeadingSeparator, this.showGenNameAfterItemName);
@@ -179,6 +183,13 @@ export class PharmacyProvisionalReturnInvoicePrintComponent {
             err => {
                 this.messageBoxService.showMessage(ENUM_MessageBox_Status.Failed, ['Failed to load Cancellation Receipt No' + err]);
             })
+    }
+    GetRackNoParameterSettings(): void {
+        let RackNoPrintSetting = this.coreService.Parameters.find(p => p.ParameterName == "ShowRackNoInPharmacyReceipt" && p.ParameterGroupName == "Pharmacy");
+        if (RackNoPrintSetting) {
+            let showRackNoInPrint = JSON.parse(RackNoPrintSetting.ParameterValue);
+            this.showRackNoInPrint = showRackNoInPrint.ShowRackNoInNormalPharmacyReceipt;
+        }
     }
 
 }
