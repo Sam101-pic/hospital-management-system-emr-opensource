@@ -13,7 +13,3 @@ HAMS_Requirements/
 .tfignore
 *.txt
 *.xlsx
-/Code/Solutions/global.json
-/Code/Websites/DanpheEMR/appsettings.json
-/Database/DanpheEMR_CompleteDB_4th_August_2019.bak
-/Code/Websites/DanpheEMR/DanpheEmrAPI.xml
