@@ -8,8 +8,4 @@ packages
 .vs
 package-lock.json
 $tf/
-
-HAMS_Requirements/
 .tfignore
-*.txt
-*.xlsx
