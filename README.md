@@ -161,7 +161,10 @@ Danphe EMR includes the following modules:
 
 ## 🗑️ Cleanup Scripts  
 
-*Just a blank space be sure to wait for us a bit more.*  
+*If you need to reset and completely clean the Danphe HIMS EMR database from scratch, please refer to the following GitHub repository:*
+> 🔗 https://github.com/hospital-management-system-emr/Danphe-HIMS-EMR-Cleanupscript .
+
+*This repository contains all the essential cleanup scripts and documentation required to safely and effectively wipe the database and start fresh.*  
 
 ---
 
