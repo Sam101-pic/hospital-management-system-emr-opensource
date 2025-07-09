@@ -11,6 +11,9 @@
 <p align="center">
   ▶️ Click on the image above to have a clear walkthrough of our Hospital Management & EMR System.
   </p>
+  <p align="center">
+  ▶️ Click on the image above to have a clear walkthrough of our Hospital Management & EMR System.
+  </p>
 
 
  
