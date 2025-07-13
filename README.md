@@ -22,7 +22,7 @@ Danphe EMR is an enterprise web-based application that simplifies hospital manag
 Danphe HMIS has been consistent throughout these years and with that there are some achievements we have received.
 1. **[Recommendation letter from Kenya(Kalimoni Mission Hospital)](https://github.com/hospital-management-system-emr/HIMS-EMR-Recommendation/blob/3196c8ce3370cb6619459c13e15417afd00effba/DANPHE%20RECOMMENDATION(Kalimoni).pdf)**  
 2. **[Recommendation letter from India(SGM)](https://github.com/hospital-management-system-emr/HIMS-EMR-Recommendation/blob/3196c8ce3370cb6619459c13e15417afd00effba/recommendation%20later(SGM).pdf)**  
-
+3. **[Recommendation letter from India(Telangana)](https://github.com/hospital-management-system-emr/HIMS-EMR-Recommendation/blob/main/DanpheRecommendationTelangana.jpg)**  
 ---
 
 ## 🛠 Tech Stack  
